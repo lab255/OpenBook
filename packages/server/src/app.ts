@@ -72,6 +72,7 @@ import {
   type LedgerReconciliationStatus,
   type LedgerReverseOptions,
   type LedgerTransactionState,
+  guestPrincipal,
   localPrincipal,
 } from '@book.dev/sdk';
 import {
@@ -109,6 +110,8 @@ import {
   isAgentRemoteEnabled,
 } from './agentTokens';
 import {mountAgentTokenRoutes} from './agentTokenRoutes';
+import {isAbleOidcPublicRequest, mountAbleOidcRoutes} from './ableOidcRoutes';
+import type {AbleOidcOptions} from './ableOidc';
 import {mountMcpHttp} from './mcpHttp';
 import {agentMayEditDirectly, authoredSubject, resolveAgentEditsForPage} from './agentWriteGate';
 import {mountUi} from './ui';
@@ -420,6 +423,9 @@ function ifNoneMatchMatches(header: string | undefined, etag: string): boolean {
 export type AppWithCollab = Hono<AppEnv> & {collabPersist?: ServerAuthoritativePersister | null};
 
 export interface AppOptions {
+  /** Optional server-side OIDC relying party for able. Inert when omitted; the
+   * process boundary supplies it only when both client id and secret exist. */
+  ableOidc?: AbleOidcOptions;
   /**
    * When set, every `/api/*` request must present this token — as
    * `Authorization: Bearer <token>` or a `?token=` query param (the latter so
@@ -841,7 +847,10 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
       // capability (or publication binding for the descriptor), never by the
       // instance-wide LAN bearer. Keeping them outside this broad gate is what
       // makes a published fill link usable by anyone who holds it.
-      if (isDatabaseFormPublicRequest(c.req.method, c.req.path)) return next();
+      if (
+        isDatabaseFormPublicRequest(c.req.method, c.req.path) ||
+        isAbleOidcPublicRequest(c.req.method, c.req.path)
+      ) return next();
       // An agent PAT (AGENT-6) is its OWN credential class and, when valid, satisfies
       // reachability on its own ("PAT ≥ accessToken" — an intentional LAN trust
       // change): don't measure a `Bearer obat_…` against the instance accessToken
@@ -889,6 +898,12 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   // With no identity provider configured the instance stays legacy: everyone is
   // an anonymous guest with full access.
   app.use('/api/*', async (c, next) => {
+    // Login must remain reachable when guest access is `off`: these exact GETs
+    // carry only OAuth state/code and cannot present an OpenBook identity yet.
+    if (isAbleOidcPublicRequest(c.req.method, c.req.path) && !bearerAgentToken(c)) {
+      c.set('principal', guestPrincipal());
+      return next();
+    }
     // An agent PAT (AGENT-6) is a distinct credential class — detect it FIRST. A
     // PAT-bearing request never ALSO claims the loopback-owner hatch (so a stolen
     // PAT can't ride `localOwner` past `requireInstanceAdmin`); the host secret is
@@ -1098,6 +1113,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   app.use('/api/*', async (c, next) => {
     const agentToken = c.get('agentToken');
     if (!agentToken) return next();
+    if (isAbleOidcPublicRequest(c.req.method, c.req.path)) return next();
     if (!agentScopeAllows(agentToken.scope, c.req.method, c.req.path)) {
       return c.json({error: 'this agent token is not permitted to access this resource'}, 403);
     }
@@ -1205,6 +1221,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   // scope-gate deny it); minting binds each token to the minter's own verified
   // subject.
   mountAgentTokenRoutes(app, store, logEdit);
+  if (opts.ableOidc) mountAbleOidcRoutes(app, store, opts.ableOidc);
 
   app.get(API.health, (c) => c.text('ok'));
 

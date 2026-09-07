@@ -4011,10 +4011,10 @@ export class PageStore {
       public_jwk: import('@book.dev/sdk').Jwk | string;
       private_key_ciphertext: string;
       private_key_iv: string;
-    }>(
-      'SELECT public_jwk, private_key_ciphertext, private_key_iv FROM able_oidc_bridge_keys WHERE issuer = $1',
-      [issuer],
-    );
+        }>(
+        'SELECT public_jwk, private_key_ciphertext, private_key_iv FROM able_oidc_bridge_keys WHERE issuer = $1',
+        [issuer],
+        );
     if (rows.length === 0) return null;
     return {
       publicJwk: parseJson<import('@book.dev/sdk').Jwk>(rows[0].public_jwk, {} as import('@book.dev/sdk').Jwk),
