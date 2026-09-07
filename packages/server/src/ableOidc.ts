@@ -16,6 +16,7 @@ import {
 } from 'node:crypto';
 import {createLocalJWKSet, jwtVerify, type JSONWebKeySet, type JWTPayload} from 'jose';
 import {
+  DEFAULT_ACCOUNT_URL,
   mintIdentityKeypair,
   signIdentity,
   type IdentityClaims,
@@ -26,7 +27,6 @@ import type {PageStore} from './store';
 export const ABLE_OIDC_ISSUER = 'https://account.able.online/api/auth';
 export const ABLE_OIDC_DISCOVERY_URL =
   'https://account.able.online/api/auth/.well-known/openid-configuration';
-export const ABLE_BRIDGE_ISSUER = 'urn:openbook:identity:able';
 export const ABLE_OIDC_SCOPES = 'openid profile email offline_access';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -316,11 +316,11 @@ export class AbleOidcService {
   }
 
   private async bridgeKey(): Promise<{publicJwk: Jwk; privateKey: string}> {
-    let stored = await this.store.getAbleOidcBridgeKey(ABLE_BRIDGE_ISSUER);
+    let stored = await this.store.getAbleOidcBridgeKey(this.issuer);
     if (!stored) {
       const candidate = await this.newEncryptedBridgeKey();
-      await this.store.createAbleOidcBridgeKey({issuer: ABLE_BRIDGE_ISSUER, ...candidate});
-      stored = await this.store.getAbleOidcBridgeKey(ABLE_BRIDGE_ISSUER);
+      await this.store.createAbleOidcBridgeKey({issuer: this.issuer, ...candidate});
+      stored = await this.store.getAbleOidcBridgeKey(this.issuer);
     }
     if (!bridgeKeyIsValid(stored)) throw new AbleOidcError(502, 'able identity bridge is unavailable');
     try {
@@ -332,7 +332,7 @@ export class AbleOidcService {
       // A deliberate client-secret rotation also rotates this local signing key;
       // assertions minted under the prior secret stop verifying immediately.
       const replacement = await this.newEncryptedBridgeKey();
-      await this.store.rotateAbleOidcBridgeKey({issuer: ABLE_BRIDGE_ISSUER, ...replacement});
+      await this.store.rotateAbleOidcBridgeKey({issuer: this.issuer, ...replacement});
       return {
         publicJwk: replacement.publicJwk,
         privateKey: decryptSecret(replacement.privateKeyCiphertext, replacement.privateKeyIv, this.encryptionKey),
@@ -344,16 +344,20 @@ export class AbleOidcService {
     const key = await this.bridgeKey();
     const config = await this.store.getInstanceConfig();
     const trustedIssuers = [
-      ...config.trustedIssuers.filter((entry) => entry.issuer !== ABLE_BRIDGE_ISSUER),
-      {issuer: ABLE_BRIDGE_ISSUER, jwks: {keys: [key.publicJwk]}},
+      ...config.trustedIssuers.filter((entry) => entry.issuer !== this.issuer),
+      {issuer: this.issuer, jwks: {keys: [key.publicJwk]}},
     ];
-    const currentBridge = config.trustedIssuers.find((entry) => entry.issuer === ABLE_BRIDGE_ISSUER);
-    if (JSON.stringify(currentBridge?.jwks?.keys ?? []) !== JSON.stringify([key.publicJwk])) {
-      await this.store.updateInstanceConfig({trustedIssuers});
+    const currentBridge = config.trustedIssuers.find((entry) => entry.issuer === this.issuer);
+    const emailAuthority = config.emailAuthority === DEFAULT_ACCOUNT_URL ? this.issuer : config.emailAuthority;
+    if (
+      JSON.stringify(currentBridge?.jwks?.keys ?? []) !== JSON.stringify([key.publicJwk]) ||
+      emailAuthority !== config.emailAuthority
+    ) {
+      await this.store.updateInstanceConfig({trustedIssuers, emailAuthority});
     }
     const now = Math.floor(this.now() / 1000);
     const claims: IdentityClaims = {
-      iss: ABLE_BRIDGE_ISSUER,
+      iss: this.issuer,
       sub: payload.sub as string,
       ...(typeof payload.name === 'string' ? {name: payload.name} : {}),
       ...(typeof payload.email === 'string' ? {email: payload.email} : {}),

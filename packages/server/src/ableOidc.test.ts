@@ -7,7 +7,7 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {API} from '@book.dev/sdk';
 import {createApp} from './app';
 import {generateAgentToken, AGENT_API_SETTING_KEY} from './agentTokens';
-import {ABLE_BRIDGE_ISSUER, type AbleOidcOptions} from './ableOidc';
+import type {AbleOidcOptions} from './ableOidc';
 import {PgliteDb} from './db';
 import {PageHub} from './hub';
 import {IdentityService} from './instanceConfig';
@@ -251,12 +251,15 @@ describe('able OIDC relying party', () => {
     ).json() as {you: Record<string, unknown>};
     expect(info.you).toMatchObject({
       kind: 'user',
-      subject: `${ABLE_BRIDGE_ISSUER}#able-user-7`,
-      issuer: ABLE_BRIDGE_ISSUER,
+      subject: `${UPSTREAM_ISSUER}#able-user-7`,
+      issuer: UPSTREAM_ISSUER,
       name: 'Ada Able',
       email: 'ada@example.com',
       verifiedVia: 'jws',
     });
+    const config = await store.getInstanceConfig();
+    expect(config.emailAuthority).toBe(UPSTREAM_ISSUER);
+    expect(config.trustedIssuers.find((entry) => entry.issuer === UPSTREAM_ISSUER)?.jwks?.keys).toHaveLength(1);
 
     const db = (store as unknown as {db: {query<T>(sql: string): Promise<T[]>}}).db;
     const [refresh] = await db.query<{token_ciphertext: string}>('SELECT token_ciphertext FROM able_oidc_refresh_tokens');
