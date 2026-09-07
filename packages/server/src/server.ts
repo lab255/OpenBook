@@ -523,12 +523,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   // half-configured deployment exposes no routes and behaves exactly as before.
   const ableClientId = opts.ableOauthClientId ?? process.env.ABLE_OAUTH_CLIENT_ID;
   const ableClientSecret = opts.ableOauthClientSecret ?? process.env.ABLE_OAUTH_CLIENT_SECRET;
+  const ableIssuer = opts.ableOauthIssuer || process.env.ABLE_OAUTH_ISSUER || undefined;
+  const ableDiscoveryUrl = opts.ableOauthDiscoveryUrl || process.env.ABLE_OAUTH_DISCOVERY_URL || undefined;
   const ableOidc = ableClientId && ableClientSecret
     ? {
       clientId: ableClientId,
       clientSecret: ableClientSecret,
-      issuer: opts.ableOauthIssuer ?? process.env.ABLE_OAUTH_ISSUER,
-      discoveryUrl: opts.ableOauthDiscoveryUrl ?? process.env.ABLE_OAUTH_DISCOVERY_URL,
+      issuer: ableIssuer,
+      discoveryUrl: ableDiscoveryUrl,
     }
     : undefined;
 

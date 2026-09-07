@@ -20,7 +20,7 @@ const AUTHORIZE_URL = `${UPSTREAM_ISSUER}/oauth2/authorize`;
 const TOKEN_URL = `${UPSTREAM_ISSUER}/oauth2/token`;
 const JWKS_URL = `${UPSTREAM_ISSUER}/oauth2/jwks`;
 const CLIENT_ID = 'openbook';
-const CLIENT_SECRET = 'test-client-secret-never-log';
+const CLIENT_SECRET = 'test client:secret+never/log';
 const NOW = Date.UTC(2026, 8, 8, 12, 0, 0);
 
 let store: PageStore;
@@ -230,8 +230,9 @@ describe('able OIDC relying party', () => {
     expect(callback.status).toBe(302);
     expect(idp.tokenCalls).toHaveLength(1);
     const exchange = idp.tokenCalls[0];
+    const encodedSecret = new URLSearchParams({v: CLIENT_SECRET}).toString().slice(2);
     expect(exchange.authorization).toBe(
-      `Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')}`,
+      `Basic ${Buffer.from(`${CLIENT_ID}:${encodedSecret}`).toString('base64')}`,
     );
     expect(exchange.body.get('grant_type')).toBe('authorization_code');
     expect(exchange.body.get('code')).toBe('authorization-code');

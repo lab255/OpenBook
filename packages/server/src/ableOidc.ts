@@ -78,12 +78,13 @@ const b64u = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64u
 const stateHash = (state: string): string => createHash('sha256').update(state).digest('hex');
 
 /** RFC 6749 client_secret_basic applies form encoding before joining the pair. */
-const formEncode = (value: string): string => encodeURIComponent(value).replace(/%20/g, '+');
+const formEncode = (value: string): string => new URLSearchParams({v: value}).toString().slice(2);
 
 function safeUrl(value: unknown, field: string): string {
   if (typeof value !== 'string') throw new AbleOidcError(502, `able discovery has no valid ${field}`);
   try {
     const url = new URL(value);
+    if (url.username || url.password) throw new Error('userinfo is not allowed');
     const loopbackHttp = url.protocol === 'http:' &&
       (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]');
     if (url.protocol !== 'https:' && !loopbackHttp) {
@@ -210,6 +211,7 @@ export class AbleOidcService {
   }
 
   async authorizationUrl(origin: string, handoffState = ''): Promise<string> {
+    if (handoffState.length > 512) throw new AbleOidcError(400, 'sign-in handoff state is too long');
     const discovery = await this.discovery();
     const state = b64u(randomBytes(32));
     const verifier = b64u(randomBytes(32));
@@ -371,6 +373,7 @@ export class AbleOidcService {
 
   async callback(origin: string, state: string, code: string): Promise<string> {
     if (!state || !code) throw new AbleOidcError(400, 'able callback is missing code or state');
+    if (state.length > 512 || code.length > 8192) throw new AbleOidcError(400, 'able callback parameters are invalid');
     const pending = await this.store.consumeAbleOidcState(stateHash(state), new Date(this.now()));
     if (!pending) throw new AbleOidcError(400, 'able callback state is invalid or expired');
 
