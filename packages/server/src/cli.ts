@@ -17,6 +17,10 @@ import {isLedgerVerifyAdvisory, verifyLedger} from './ledgerVerify';
  *   --host <host>  --port <port>  | --bind <h:p> | OPENBOOK_BIND
  *   --book-dir <path>   | OPENBOOK_BOOK_DIR        on-disk book-file mirror folder
  *   --access-token <t>  | OPENBOOK_ACCESS_TOKEN    require this token on /api/*
+ *   ABLE_OAUTH_CLIENT_ID / ABLE_OAUTH_CLIENT_SECRET
+ *                                            enable able OIDC sign-in delegation
+ *   ABLE_OAUTH_ISSUER / ABLE_OAUTH_DISCOVERY_URL
+ *                                            optional able endpoint overrides
  *   --ledger-export-root <paths> | OPENBOOK_LEDGER_EXPORT_ROOTS
  *                                            extra dirs the ledger auto-export
  *                                            may write into (<data-dir>/exports
@@ -88,6 +92,8 @@ export async function runCli(overrides: CliOverrides = {}): Promise<void> {
   const bookDir = flag('book-dir') || process.env.OPENBOOK_BOOK_DIR;
   const accessToken = flag('access-token') || process.env.OPENBOOK_ACCESS_TOKEN;
   const socketPath = flag('socket') || process.env.OPENBOOK_SOCKET;
+  const ableOauthClientId = process.env.ABLE_OAUTH_CLIENT_ID || undefined;
+  const ableOauthClientSecret = process.env.ABLE_OAUTH_CLIENT_SECRET || undefined;
 
   const bind = flag('bind') || process.env.OPENBOOK_BIND;
   let host = flag('host');
@@ -172,6 +178,10 @@ export async function runCli(overrides: CliOverrides = {}): Promise<void> {
   const wantTcp = host !== undefined || port !== undefined || !socketPath;
 
   const running = await startServer({
+    ableOauthClientId,
+    ableOauthClientSecret,
+    ableOauthIssuer: process.env.ABLE_OAUTH_ISSUER || undefined,
+    ableOauthDiscoveryUrl: process.env.ABLE_OAUTH_DISCOVERY_URL || undefined,
     databaseUrl,
     dataDir: dataDir ? resolve(dataDir) : undefined,
     bookDir: bookDir ? resolve(bookDir) : undefined,

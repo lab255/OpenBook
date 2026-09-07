@@ -41,6 +41,22 @@ OPENBOOK_DATABASE_URL=postgres://user:pass@host:5432/openbook \
 
 Without `OPENBOOK_DATABASE_URL`, the development server uses embedded PGlite.
 
+### able OIDC sign-in delegation
+
+Set both `ABLE_OAUTH_CLIENT_ID` and `ABLE_OAUTH_CLIENT_SECRET` on the server to
+replace the default account-service sign-in entry point with the server-side
+able OAuth 2.1/OIDC flow. If either value is absent, the two able auth routes are
+not mounted. The confidential-client secret remains server-only and is never
+returned through the settings/API surface.
+
+The production issuer defaults to `https://account.able.online/api/auth`.
+Self-hosted and test deployments may override it with `ABLE_OAUTH_ISSUER`, and
+may independently set `ABLE_OAUTH_DISCOVERY_URL`. The registered local callback
+is `http://localhost:4319/api/auth/oauth2/callback/able`.
+
+For local development, keep credentials in the git-ignored `.env.able.local`
+file and load it into the server process; never add that file to a commit.
+
 ## Further reading
 
 - [Architecture](ARCHITECTURE.md)
