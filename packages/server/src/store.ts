@@ -3937,6 +3937,146 @@ export class PageStore {
     return rows.length > 0;
   }
 
+  // ── able OAuth/OIDC relying-party state (ABLE-1) ──────────────────────────
+
+  /** Persist one short-lived authorization request. The caller hashes the
+   * OAuth state and encrypts the PKCE verifier before crossing this boundary. */
+  async createAbleOidcState(input: {
+    stateHash: string;
+    codeVerifierCiphertext: string;
+    codeVerifierIv: string;
+    nonce: string;
+    handoffState: string;
+    redirectUri: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.db.begin(async (tx) => {
+      await tx.query('DELETE FROM able_oidc_states WHERE expires_at <= now()');
+      await tx.query(
+        `INSERT INTO able_oidc_states
+          (state_hash, code_verifier_ciphertext, code_verifier_iv, nonce, handoff_state, redirect_uri, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          input.stateHash,
+          input.codeVerifierCiphertext,
+          input.codeVerifierIv,
+          input.nonce,
+          input.handoffState,
+          input.redirectUri,
+          input.expiresAt,
+        ],
+      );
+    });
+  }
+
+  /** Atomically consume a live state row. A replay, mismatch, or expired row all
+   * collapse to `null`; deletion happens before any token-endpoint request. */
+  async consumeAbleOidcState(stateHash: string, now: Date): Promise<{
+    codeVerifierCiphertext: string;
+    codeVerifierIv: string;
+    nonce: string;
+    handoffState: string;
+    redirectUri: string;
+  } | null> {
+    const rows = await this.db.query<{
+      code_verifier_ciphertext: string;
+      code_verifier_iv: string;
+      nonce: string;
+      handoff_state: string;
+      redirect_uri: string;
+    }>(
+      `DELETE FROM able_oidc_states
+       WHERE state_hash = $1 AND expires_at > $2
+       RETURNING code_verifier_ciphertext, code_verifier_iv, nonce, handoff_state, redirect_uri`,
+      [stateHash, now],
+    );
+    if (rows.length === 0) return null;
+    const row = rows[0];
+    return {
+      codeVerifierCiphertext: row.code_verifier_ciphertext,
+      codeVerifierIv: row.code_verifier_iv,
+      nonce: row.nonce,
+      handoffState: row.handoff_state,
+      redirectUri: row.redirect_uri,
+    };
+  }
+
+  /** Load the encrypted per-instance Ed25519 bridge key. */
+  async getAbleOidcBridgeKey(issuer: string): Promise<{
+    publicJwk: import('@book.dev/sdk').Jwk;
+    privateKeyCiphertext: string;
+    privateKeyIv: string;
+  } | null> {
+    const rows = await this.db.query<{
+      public_jwk: import('@book.dev/sdk').Jwk | string;
+      private_key_ciphertext: string;
+      private_key_iv: string;
+    }>(
+      'SELECT public_jwk, private_key_ciphertext, private_key_iv FROM able_oidc_bridge_keys WHERE issuer = $1',
+      [issuer],
+    );
+    if (rows.length === 0) return null;
+    return {
+      publicJwk: parseJson<import('@book.dev/sdk').Jwk>(rows[0].public_jwk, {} as import('@book.dev/sdk').Jwk),
+      privateKeyCiphertext: rows[0].private_key_ciphertext,
+      privateKeyIv: rows[0].private_key_iv,
+    };
+  }
+
+  /** Insert the encrypted bridge key if none exists. The conflict-safe insert
+   * prevents two simultaneous first logins from minting mutually invalid keys. */
+  async createAbleOidcBridgeKey(input: {
+    issuer: string;
+    publicJwk: import('@book.dev/sdk').Jwk;
+    privateKeyCiphertext: string;
+    privateKeyIv: string;
+  }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO able_oidc_bridge_keys
+        (issuer, public_jwk, private_key_ciphertext, private_key_iv)
+       VALUES ($1, $2::jsonb, $3, $4)
+       ON CONFLICT (issuer) DO NOTHING`,
+      [input.issuer, JSON.stringify(input.publicJwk), input.privateKeyCiphertext, input.privateKeyIv],
+    );
+  }
+
+  /** Rotate a bridge key whose ciphertext can no longer be decrypted (normally
+   * after an operator deliberately changes the able client secret). */
+  async rotateAbleOidcBridgeKey(input: {
+    issuer: string;
+    publicJwk: import('@book.dev/sdk').Jwk;
+    privateKeyCiphertext: string;
+    privateKeyIv: string;
+  }): Promise<void> {
+    await this.db.query(
+      `UPDATE able_oidc_bridge_keys SET
+         public_jwk = $2::jsonb,
+         private_key_ciphertext = $3,
+         private_key_iv = $4,
+         updated_at = now()
+       WHERE issuer = $1`,
+      [input.issuer, JSON.stringify(input.publicJwk), input.privateKeyCiphertext, input.privateKeyIv],
+    );
+  }
+
+  /** Upsert an encrypted refresh token for the upstream subject. */
+  async setAbleOidcRefreshToken(input: {
+    issuer: string;
+    subject: string;
+    tokenCiphertext: string;
+    tokenIv: string;
+  }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO able_oidc_refresh_tokens (issuer, subject, token_ciphertext, token_iv)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (issuer, subject) DO UPDATE SET
+         token_ciphertext = EXCLUDED.token_ciphertext,
+         token_iv = EXCLUDED.token_iv,
+         updated_at = now()`,
+      [input.issuer, input.subject, input.tokenCiphertext, input.tokenIv],
+    );
+  }
+
   /** The instance's multi-user policy (guest gate + trusted issuers), with
    *  defaults filled in. Cheap — one settings row. */
   async getInstanceConfig(): Promise<InstanceConfig> {

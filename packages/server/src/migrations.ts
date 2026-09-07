@@ -694,6 +694,42 @@ const MIGRATIONS: Migration[] = [
       'CREATE INDEX idempotency_responses_completed_at_idx ON idempotency_responses (completed_at)',
     ],
   },
+  {
+    // ABLE-1 — server-side OAuth 2.1/OIDC relying-party state. OAuth state is
+    // represented only by a SHA-256 digest; every recoverable secret is an
+    // AES-GCM ciphertext whose key is derived from the process-injected able
+    // client secret. Nothing secret enters the general-purpose settings table.
+    name: '0029_able_oidc',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS able_oidc_states (
+        state_hash                 TEXT        PRIMARY KEY,
+        code_verifier_ciphertext   TEXT        NOT NULL,
+        code_verifier_iv           TEXT        NOT NULL,
+        nonce                      TEXT        NOT NULL,
+        handoff_state              TEXT        NOT NULL DEFAULT '',
+        redirect_uri               TEXT        NOT NULL,
+        expires_at                 TIMESTAMPTZ NOT NULL,
+        created_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+      )`,
+      'CREATE INDEX IF NOT EXISTS able_oidc_states_expires_idx ON able_oidc_states (expires_at)',
+      `CREATE TABLE IF NOT EXISTS able_oidc_bridge_keys (
+        issuer                     TEXT        PRIMARY KEY,
+        public_jwk                 JSONB       NOT NULL,
+        private_key_ciphertext     TEXT        NOT NULL,
+        private_key_iv             TEXT        NOT NULL,
+        created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS able_oidc_refresh_tokens (
+        issuer                     TEXT        NOT NULL,
+        subject                    TEXT        NOT NULL,
+        token_ciphertext           TEXT        NOT NULL,
+        token_iv                   TEXT        NOT NULL,
+        updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (issuer, subject)
+      )`,
+    ],
+  },
 ];
 
 /** Apply all pending migrations. Idempotent; safe on every boot. */
