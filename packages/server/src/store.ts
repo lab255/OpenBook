@@ -4083,6 +4083,31 @@ export class PageStore {
     );
   }
 
+  /** Atomically take an encrypted upstream refresh token. Deleting before the
+   * network exchange serializes renewal for a subject and prevents two callers
+   * from replaying a single-use rotating token. */
+  async consumeAbleOidcRefreshToken(issuer: string, subject: string): Promise<{
+    tokenCiphertext: string;
+    tokenIv: string;
+  } | null> {
+    const rows = await this.db.query<{token_ciphertext: string; token_iv: string}>(
+      `DELETE FROM able_oidc_refresh_tokens
+       WHERE issuer = $1 AND subject = $2
+       RETURNING token_ciphertext, token_iv`,
+      [issuer, subject],
+    );
+    if (rows.length === 0) return null;
+    return {tokenCiphertext: rows[0].token_ciphertext, tokenIv: rows[0].token_iv};
+  }
+
+  /** Remove any upstream refresh credential for a signed-out able subject. */
+  async deleteAbleOidcRefreshToken(issuer: string, subject: string): Promise<void> {
+    await this.db.query(
+      'DELETE FROM able_oidc_refresh_tokens WHERE issuer = $1 AND subject = $2',
+      [issuer, subject],
+    );
+  }
+
   /** The instance's multi-user policy (guest gate + trusted issuers), with
    *  defaults filled in. Cheap — one settings row. */
   async getInstanceConfig(): Promise<InstanceConfig> {

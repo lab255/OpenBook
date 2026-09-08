@@ -209,6 +209,8 @@ export const API = {
   ableOauthAuthorize: '/api/auth/oauth2/authorize/able',
   /** Registered OAuth callback: exchanges the code and bridges the identity. */
   ableOauthCallback: '/api/auth/oauth2/callback/able',
+  /** Renew or remove an able bridge session using its prior signed assertion. */
+  ableOauthRefresh: '/api/auth/oauth2/refresh/able',
 
   // ── Multi-user (identity, policy, provenance) — OB-165 ───────────────────────
   /**
