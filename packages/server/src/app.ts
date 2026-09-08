@@ -94,7 +94,7 @@ import {AwarenessRelay, awarenessUser, stampAwarenessIdentity} from './collabAwa
 import {mountAiRoutes} from './ai/routes';
 import {mountPluginRoutes} from './pluginRoutes';
 import {guestGate, isLocalOwnerRequest, recoverAudienceLockedPrincipal, resolvePrincipal, type IdentityProvider} from './principal';
-import {isAuthenticatedPrincipal, requireAccess, requireCreate, requireDbAccess, requireInstanceAdmin, requireInstanceOwner, streamGates} from './access';
+import {isAuthenticatedPrincipal, requireAccess, requireCreate, requireDbAccess, requireInstanceAdmin, requireInstanceOwner, requireRosterMutation, streamGates} from './access';
 import {
   AGENT_FAILED_RATE_LIMIT,
   AGENT_RATE_WINDOW_MS,
@@ -2264,7 +2264,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   });
 
   app.post(API.members, async (c) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     const body = await c.req.json<{invitee?: string; role?: MemberRole; status?: MemberStatus}>();
     const resolved = await resolveInvitee(body.invitee ?? '', opts.handleResolver);
     // By-email ⇒ an unclaimed persona (default 'invited'); by-subject ⇒ an already
@@ -2282,7 +2282,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   });
 
   app.patch(`${API.members}/:id`, async (c) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     const patch = await c.req.json<{role?: MemberRole; status?: MemberStatus}>();
     const member = await store.updateMember(c.req.param('id'), patch);
     if (!member) return c.json({error: 'member not found'}, 404);
@@ -2291,7 +2291,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   });
 
   app.delete(`${API.members}/:id`, async (c) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     const removed = await store.removeMember(c.req.param('id'));
     if (!removed) return c.json({error: 'member not found'}, 404);
     logEdit(c, null, 'member.revoke', c.req.param('id'));
@@ -2314,7 +2314,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   };
 
   const rosterSyncHandler = async (c: Context<AppEnv>) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     if (!opts.roster) return c.json({error: 'roster sync is not available on this instance'}, 501);
     try {
       const result = await opts.roster.syncNow();
