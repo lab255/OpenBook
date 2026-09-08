@@ -94,7 +94,7 @@ import {AwarenessRelay, awarenessUser, stampAwarenessIdentity} from './collabAwa
 import {mountAiRoutes} from './ai/routes';
 import {mountPluginRoutes} from './pluginRoutes';
 import {guestGate, isLocalOwnerRequest, recoverAudienceLockedPrincipal, resolvePrincipal, type IdentityProvider} from './principal';
-import {isAuthenticatedPrincipal, isRealInstanceOwner, requireAccess, requireCreate, requireDbAccess, requireInstanceAdmin, streamGates} from './access';
+import {isAuthenticatedPrincipal, requireAccess, requireCreate, requireDbAccess, requireInstanceAdmin, requireInstanceOwner, streamGates} from './access';
 import {
   AGENT_FAILED_RATE_LIMIT,
   AGENT_RATE_WINDOW_MS,
@@ -2143,23 +2143,26 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
       return c.json({error: 'agentEdits must be "suggest" or "direct"'}, 400);
     }
 
-    // LGR-7 (S1): the ledger auto-export target is a server-side filesystem
-    // WRITE target, so it needs a REAL owner — regardless of claim state. The
-    // general policy gate further down only engages once `ownerSubject` is set,
-    // which on an UNCLAIMED instance (the documented headless `--access-token`
-    // LAN posture) let any caller — including an anonymous one — point the
-    // export at a victim file. This check runs before the claim/repair branches
-    // so no path can ride in on a claim request either.
+    // LGR-7 (S1): validate the filesystem write target before persisting it. The
+    // shared owner gate below applies to this field along with every other
+    // instance-policy field.
     if (patch.ledgerAutoExportPath !== undefined) {
       if (patch.ledgerAutoExportPath !== null) {
         if (typeof patch.ledgerAutoExportPath !== 'string' || patch.ledgerAutoExportPath.trim() === '') {
           return c.json({error: 'ledgerAutoExportPath must be a non-empty file path or null'}, 400);
         }
       }
-      if (!isRealInstanceOwner(c, current)) {
-        return c.json({error: 'only the instance owner can set the ledger auto-export path'}, 403);
-      }
     }
+
+    // SEC-1: EVERY instance-policy field is owner-only and must fail closed while
+    // unclaimed. The sole exception is an ownerSubject-only one-time claim, whose
+    // verified-JWS + CAS path below establishes the owner. In particular, a remote
+    // claimer cannot smuggle other policy fields through that exception.
+    const ownerSubjectOnlyClaim =
+      !current.ownerSubject &&
+      patch.ownerSubject !== undefined &&
+      Object.keys(patch).every((key) => key === 'ownerSubject');
+    if (!ownerSubjectOnlyClaim) await requireInstanceOwner(c, store);
 
     // Owner-claim (OB-182 §2.6 B2). Setting `ownerSubject` on a still-unclaimed
     // instance is the ONE-TIME claim: route it through the atomic compare-and-set
@@ -2218,22 +2221,9 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
       return durableWriteResponse(c, response);
     }
 
-    // Post-claim (or non-claim) policy update: once claimed, only the owner — or
-    // the machine owner over the trusted local transport (the loopback hatch), so
-    // a missing/stale account identity can't lock the desktop out of its own
-    // policy (the "only the instance owner can change multi-user" lockout).
-    // AGENT-6 (Sasha HIGH-1 + HIGH-3): the owner match MUST require `verifiedVia ===
-    // 'jws'`, not merely a subject match — an owner-minted agent PAT carries the
-    // owner's subject but is `verifiedVia:'pat'` and must NEVER change instance
-    // policy (guestAccess / issuers / audience / visibility). This is defence in
-    // depth: the scope-gate already denies `PUT /api/instance` for any PAT.
-    if (
-      current.ownerSubject &&
-      !c.get('localOwner') &&
-      !(principal.verifiedVia === 'jws' && principal.subject === current.ownerSubject)
-    ) {
-      return c.json({error: 'only the instance owner can change multi-user policy'}, 403);
-    }
+    // All non-claim writes have already passed the shared, fail-closed owner gate.
+    // That gate also excludes owner-minted PATs and preserves the trusted local
+    // transport escape hatch for the machine owner.
     const response = await executeDurableWrite(c, async (activeStore) => ({
       status: 200,
       body: await activeStore.updateInstanceConfig(patch),
@@ -2501,18 +2491,10 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   // instance policy. The scheduler reads config fresh each tick, so a change
   // takes effect on the next check (or immediately via the run route).
   app.put(API.backups, async (c) => {
-    const principal = c.get('principal');
-    const instance = await store.getInstanceConfig();
-    // AGENT-6 (Sasha HIGH-1 + HIGH-3): require `verifiedVia === 'jws'` for the owner
-    // match — an owner-minted PAT carries the owner's subject but must NEVER change
-    // backup config (folder, cadences, retention). Defence in depth atop the
-    // scope-gate, which already denies `PUT /api/backups` for any PAT.
-    if (
-      instance.ownerSubject &&
-      !(principal.verifiedVia === 'jws' && principal.subject === instance.ownerSubject)
-    ) {
-      return c.json({error: 'only the instance owner can change backups'}, 403);
-    }
+    // Backup policy includes a server-side folder and scheduler controls, so it
+    // uses the same owner gate as every other host-sensitive setting. The helper
+    // fails closed while unclaimed and excludes owner-minted PATs.
+    await requireInstanceOwner(c, store);
     const patch = await c.req.json<Partial<BackupConfig>>();
     await store.updateBackupConfig(patch);
     logEdit(c, null, 'backups.config');
