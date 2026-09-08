@@ -138,16 +138,21 @@ describe('roster invite routes (create / list / revoke)', () => {
     expect(member).toMatchObject({subject: `${ISS}#sam`, email: null, status: 'active', role: 'admin'});
   });
 
-  it('PATCH suspends a member (role no longer resolves)', async () => {
+  it('PATCH updates only role/status and cannot rebind the member subject', async () => {
     const a = app();
     const member = await (await post(a, '/api/members', {invitee: `${ISS}#sue`, role: 'admin'}, await idFor('owner'))).json();
     expect(await store.resolveMemberRole({kind: 'user', subject: `${ISS}#sue`, issuer: ISS, name: 'sue', verifiedVia: 'jws'})).toBe('admin');
     const patched = await a.request(`/api/members/${member.id}`, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json', [IDENTITY_HEADER]: await idFor('owner')},
-      body: JSON.stringify({status: 'suspended'}),
+      body: JSON.stringify({role: 'viewer', status: 'suspended', subject: `${ISS}#attacker`}),
     });
-    expect((await patched.json()).status).toBe('suspended');
+    expect(await patched.json()).toEqual({...member, role: 'viewer', status: 'suspended'});
+    expect((await store.listMembers()).find((row) => row.id === member.id)).toEqual({
+      ...member,
+      role: 'viewer',
+      status: 'suspended',
+    });
     expect(await store.resolveMemberRole({kind: 'user', subject: `${ISS}#sue`, issuer: ISS, name: 'sue', verifiedVia: 'jws'})).toBeNull();
   });
 

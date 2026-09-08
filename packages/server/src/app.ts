@@ -2299,7 +2299,8 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     if (patch.status !== undefined && !MEMBER_STATUSES.includes(patch.status)) {
       return c.json({error: 'status must be a valid member status'}, 400);
     }
-    const member = await store.updateMember(c.req.param('id'), patch);
+    const {role, status} = patch;
+    const member = await store.updateMember(c.req.param('id'), {role, status});
     if (!member) return c.json({error: 'member not found'}, 404);
     logEdit(c, null, 'member.update', member.id);
     return c.json(member);
