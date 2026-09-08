@@ -46,6 +46,7 @@ const revokeIdentityMint = new Set<string>();
 let identityMintUrls: string[] = [];
 let ableRefreshRequests: Array<{method: string; authorization: string}> = [];
 let failAbleRefresh = false;
+let rejectAbleRefresh = false;
 let ableRenewalSequence = 0;
 const putsFor = (tok: string): Array<{token: string; settings: Record<string, unknown>}> =>
   settingsPuts.filter((p) => p.token === tok);
@@ -83,6 +84,7 @@ function installFetchStub(): void {
         const method = init?.method ?? 'GET';
         ableRefreshRequests.push({method, authorization: auth ?? ''});
         if (method === 'DELETE') return new Response(null, {status: 204});
+        if (rejectAbleRefresh) return jsonResponse(401, {error: 'able session could not be renewed'});
         if (failAbleRefresh) return jsonResponse(502, {error: 'able session could not be renewed'});
         ableRenewalSequence += 1;
         const identity = fakeJws('tok-work', {marker: `able-renewal-${ableRenewalSequence}`});
@@ -168,6 +170,7 @@ beforeEach(() => {
   identityMintUrls = [];
   ableRefreshRequests = [];
   failAbleRefresh = false;
+  rejectAbleRefresh = false;
   ableRenewalSequence = 0;
   installFetchStub();
 });
@@ -289,6 +292,19 @@ describe('AccountProvider — multi-account (OB-194)', () => {
       method: 'POST',
       authorization: `Bearer ${expiring}`,
     }]);
+  });
+
+  it('surfaces rejected able renewal as a re-authentication error', async () => {
+    const {result} = renderAccount();
+    const expiring = fakeJws('tok-work', {expiresInMs: 10_000, marker: 'able-rejected'});
+    act(() => result.current.submitCode(expiring));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    rejectAbleRefresh = true;
+
+    act(() => result.current.syncNow());
+
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(result.current.error).toBe('That sign-in was rejected. Please sign in again.');
   });
 
   it('renews a just-expired stored able identity during activation', async () => {

@@ -31,6 +31,7 @@ export default function AccountSettings() {
           <div className="flex flex-col items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
             <p className="text-sm font-medium">{t('account.reauth.title')}</p>
             <p className="text-sm text-muted-foreground">{t('account.reauth.body')}</p>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button variant="outline" size="sm" onClick={syncNow}>
               {t('account.reauth.reconnect')}
             </Button>

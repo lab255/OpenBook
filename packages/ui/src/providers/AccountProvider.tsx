@@ -862,7 +862,9 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         identityExpiryRef.current = null;
         setIdentityExpired(true);
         setStatus('error');
-        if (!rejected) {
+        if (rejected) {
+          setError(t('account.error.rejectedReauth'));
+        } else {
           identityTimer.current = setTimeout(
             () => void ableRefreshRef.current(id, assertion),
             identityRetryDelay(),
@@ -871,7 +873,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         return false;
       }
     },
-    [patchRow, presentBridgedIdentity],
+    [patchRow, presentBridgedIdentity, t],
   );
   ableRefreshRef.current = refreshAbleIdentity;
 

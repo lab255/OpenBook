@@ -6,6 +6,9 @@ import AccountSettings from '../AccountSettings';
 const state = vi.hoisted(() => ({
   ableMode: false,
   status: 'disconnected',
+  accounts: [] as Array<{id: string}>,
+  error: null as string | null,
+  identityExpired: false,
 }));
 
 const copy: Record<string, string> = {
@@ -17,15 +20,15 @@ const copy: Record<string, string> = {
   'account.signin.able.signInButton': 'Sign in',
   'account.signin.able.connecting': 'Signing you in…',
   'account.signin.able.whatSyncs': 'OpenBook uses your sign-in only to verify who you are on this library.',
+  'account.reauth.title': 'Sign-in expired',
+  'account.reauth.body': 'Reconnect to continue.',
+  'account.reauth.reconnect': 'Reconnect',
 };
 
 vi.mock('@/providers', () => ({
   useTranslation: () => ({t: (key: string) => copy[key] ?? key}),
   useAccount: () => ({
     ...state,
-    accounts: [],
-    error: null,
-    identityExpired: false,
     signIn: vi.fn(),
     submitCode: vi.fn(),
     cancel: vi.fn(),
@@ -46,6 +49,9 @@ describe('AccountSettings able whitelabel copy', () => {
   beforeEach(() => {
     state.ableMode = false;
     state.status = 'disconnected';
+    state.accounts = [];
+    state.error = null;
+    state.identityExpired = false;
   });
 
   it('keeps account.book.pub copy when delegated sign-in is inactive', () => {
@@ -67,5 +73,16 @@ describe('AccountSettings able whitelabel copy', () => {
     state.status = 'connecting';
     view.rerender(<AccountSettings />);
     expect(screen.getByText('Signing you in…')).toBeTruthy();
+  });
+
+  it('renders a renewal rejection beside the re-authentication banner', () => {
+    state.accounts = [{id: 'able-account'}];
+    state.error = 'That sign-in was rejected. Please sign in again.';
+    state.identityExpired = true;
+
+    render(<AccountSettings />);
+
+    expect(screen.getByText('Sign-in expired')).toBeTruthy();
+    expect(screen.getByText('That sign-in was rejected. Please sign in again.')).toBeTruthy();
   });
 });
