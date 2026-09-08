@@ -2176,8 +2176,8 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
       const response = await executeDurableWrite(c, async (activeStore) => {
         const {config, claimed} = await activeStore.claimOwnership(principal.subject);
         if (!claimed) return {status: 409, body: {error: 'this instance has already been claimed'}};
-        // Apply any other policy fields the claim request carried (the CAS already
-        // owns `ownerSubject` + the §2.6 bootstrap, so it's stripped here).
+        // Apply any other policy fields carried by a gate-passing local-owner claimer
+        // (the CAS owns `ownerSubject` + the §2.6 bootstrap, so it's stripped here).
         const rest: Partial<InstanceConfig> = {...patch};
         delete rest.ownerSubject;
         const next = Object.keys(rest).length > 0 ? await activeStore.updateInstanceConfig(rest) : config;

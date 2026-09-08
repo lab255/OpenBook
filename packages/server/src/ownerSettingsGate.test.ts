@@ -14,7 +14,9 @@ import {
   LOCAL_OWNER_HEADER,
   mintIdentityKeypair,
   signIdentity,
+  type BackupConfig,
   type IdentityKeypair,
+  type InstanceConfig,
 } from '@book.dev/sdk';
 import {createApp} from './app';
 import {BackupScheduler} from './backups';
@@ -71,53 +73,50 @@ const put = (path: string, body: unknown, extraHeaders: Record<string, string> =
     body: JSON.stringify(body),
   });
 
-const INSTANCE_FIELDS: ReadonlyArray<readonly [string, unknown]> = [
-  ['guestAccess', 'read'],
-  ['agentEdits', 'direct'],
-  ['instanceId', 'attacker-selected-instance-id'],
-  [
-    'trustedIssuers',
-    [
-      {issuer: DEFAULT_ACCOUNT_URL, jwksUrl: `${DEFAULT_ACCOUNT_URL}/api/identity/jwks`},
-      {issuer: 'https://attacker.test'},
-    ],
+const INSTANCE_FIELDS = {
+  guestAccess: 'read',
+  agentEdits: 'direct',
+  instanceId: 'attacker-selected-instance-id',
+  trustedIssuers: [
+    {issuer: DEFAULT_ACCOUNT_URL, jwksUrl: `${DEFAULT_ACCOUNT_URL}/api/identity/jwks`},
+    {issuer: 'https://attacker.test'},
   ],
-  ['audience', 'https://attacker.test'],
-  ['requireAudience', true],
-  ['defaultVisibility', 'public'],
-  ['emailAuthority', ISS],
-  ['libraryBinding', {libraryId: 'attacker-library'}],
-  ['ledgerAutoExportPath', '/tmp/sec1-attacker-export.csv'],
-];
+  audience: 'https://attacker.test',
+  requireAudience: true,
+  defaultVisibility: 'public',
+  emailAuthority: ISS,
+  libraryBinding: {libraryId: 'attacker-library'},
+  ledgerAutoExportPath: '/tmp/sec1-attacker-export.csv',
+} satisfies Record<Exclude<keyof InstanceConfig, 'ownerSubject'>, unknown>;
 
-const BACKUP_FIELDS: ReadonlyArray<readonly [string, unknown]> = [
-  ['enabled', false],
-  ['userSetEnabled', true],
-  ['dir', '/tmp/sec1-attacker-backups'],
-  ['cadences', {daily: false}],
-  ['keep', {daily: 99}],
-  ['lastRun', {daily: '2026-09-08T00:00:00.000Z'}],
-  ['lastSkippedCount', {daily: 99}],
-  [
-    'failures',
-    {
-      daily: {
-        failedAt: '2026-09-08T00:00:00.000Z',
-        retryAt: '2026-09-09T00:00:00.000Z',
-        attempts: 99,
-        message: 'attacker-controlled',
-      },
+const BACKUP_FIELDS = {
+  enabled: false,
+  userSetEnabled: true,
+  dir: '/tmp/sec1-attacker-backups',
+  cadences: {daily: false},
+  keep: {daily: 99},
+  lastRun: {daily: '2026-09-08T00:00:00.000Z'},
+  lastSkippedCount: {daily: 99},
+  failures: {
+    daily: {
+      failedAt: '2026-09-08T00:00:00.000Z',
+      retryAt: '2026-09-09T00:00:00.000Z',
+      attempts: 99,
+      message: 'attacker-controlled',
     },
-  ],
-];
+  },
+} satisfies Record<keyof BackupConfig, unknown>;
 
 describe('unclaimed instance-policy owner gate', () => {
-  it.each(INSTANCE_FIELDS)('denies a shared-LAN-token guest writing %s', async (field, value) => {
-    const before = await store.getInstanceConfig();
-    const response = await put('/api/instance', {[field]: value});
-    expect(response.status).toBe(403);
-    expect(await store.getInstanceConfig()).toEqual(before);
-  });
+  it.each(Object.entries(INSTANCE_FIELDS))(
+    'denies a shared-LAN-token guest writing %s',
+    async (field, value) => {
+      const before = await store.getInstanceConfig();
+      const response = await put('/api/instance', {[field]: value});
+      expect(response.status).toBe(403);
+      expect(await store.getInstanceConfig()).toEqual(before);
+    },
+  );
 
   it('denies a remote verified identity writing policy before it claims', async () => {
     const identity = await signIdentity(
@@ -139,12 +138,15 @@ describe('unclaimed instance-policy owner gate', () => {
 });
 
 describe('unclaimed backup-policy owner gate', () => {
-  it.each(BACKUP_FIELDS)('denies a shared-LAN-token guest writing %s', async (field, value) => {
-    const before = await store.getBackupConfig();
-    const response = await put('/api/backups', {[field]: value});
-    expect(response.status).toBe(403);
-    expect(await store.getBackupConfig()).toEqual(before);
-  });
+  it.each(Object.entries(BACKUP_FIELDS))(
+    'denies a shared-LAN-token guest writing %s',
+    async (field, value) => {
+      const before = await store.getBackupConfig();
+      const response = await put('/api/backups', {[field]: value});
+      expect(response.status).toBe(403);
+      expect(await store.getBackupConfig()).toEqual(before);
+    },
+  );
 
   it('keeps the local-owner first-run backup settings flow working', async () => {
     const response = await put(
