@@ -213,6 +213,11 @@ describe('per-page ACL share routes', () => {
       headers: {[IDENTITY_HEADER]: await idFor('admin')},
     })).status).toBe(204);
     expect(await (await get(a, `/api/pages/${restricted}/acl`, await idFor('admin'))).json()).toHaveLength(0);
+    await new Promise((resolve) => setTimeout(resolve, 10)); // edit-log writes are fire-after-commit
+    expect((await store.listEdits(restricted)).find((edit) => edit.kind === 'acl.unshare')).toMatchObject({
+      summary: 'eve@x.test',
+      authorSubject: `${ISS}#admin`,
+    });
   });
 
   it('a non-writer of the page cannot read or manage its ACL (404 hides existence)', async () => {

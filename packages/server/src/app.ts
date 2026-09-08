@@ -2399,6 +2399,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     if (!subject && !email) return c.json({error: 'a subject or email query param is required'}, 400);
     const removed = await store.removePageAcl(id, subject ? {subject} : {email: email as string});
     if (!removed) return c.json({error: 'acl grant not found'}, 404);
+    logEdit(c, id, 'acl.unshare', subject ?? (email as string));
     return c.body(null, 204);
   });
 
