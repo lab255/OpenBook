@@ -5,7 +5,11 @@ import {SERVER, emptySnapshot} from './seed';
 // access) and the per-page tri-state override (the Customise pane). Both round-trip
 // through the in-webview PGlite transport and survive a reload.
 
-test('agent-edits: library default round-trips and survives reload', {tag: ['@shell']}, async ({page}) => {
+// The library-wide default is an owner-only instance setting (SEC-1: writes fail
+// closed for anonymous callers even while unclaimed), so this test drives the
+// browser as the desktop host owner via `ownerPage` — the credential lives in
+// Playwright's routing layer, never in page JS.
+test('agent-edits: library default round-trips and survives reload', {tag: ['@shell']}, async ({ownerPage: page}) => {
   await page.goto('/');
   await page.getByRole('button', {name: 'Settings'}).first().click();
   // Agent access lives under Advanced; the tab shows once the admin probe resolves
