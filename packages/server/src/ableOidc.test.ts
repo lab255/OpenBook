@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {exportJWK, generateKeyPair, SignJWT} from 'jose';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {API} from '@book.dev/sdk';
+import {API, DEFAULT_ACCOUNT_URL} from '@book.dev/sdk';
 import {createApp} from './app';
 import {generateAgentToken, AGENT_API_SETTING_KEY} from './agentTokens';
 import type {AbleOidcOptions} from './ableOidc';
@@ -157,6 +157,13 @@ describe('able OIDC relying party', () => {
     expect((await partial.request(API.ableOauthAuthorize)).status).toBe(404);
   });
 
+  it('refuses an able issuer that collides with the default account issuer', async () => {
+    const idp = await idpHarness();
+    expect(() => createApp(store, undefined, new PageHub(), {
+      ableOidc: {...idp.options, issuer: DEFAULT_ACCOUNT_URL},
+    })).toThrow('able OIDC issuer must differ from the default account issuer');
+  });
+
   it('builds an S256 authorize redirect with state, nonce, exact scopes, and request-origin callback', async () => {
     const idp = await idpHarness();
     const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
@@ -295,6 +302,29 @@ describe('able OIDC relying party', () => {
     const settings = await db.query<{value: string}>('SELECT value::text AS value FROM settings');
     expect(JSON.stringify(settings)).not.toContain(CLIENT_SECRET);
     expect(JSON.stringify(settings)).not.toContain('upstream-refresh-token-plaintext');
+  });
+
+  it('does not replace an existing same-issuer JWKS URL with the bridge key', async () => {
+    const config = await store.getInstanceConfig();
+    await store.updateInstanceConfig({
+      trustedIssuers: [...config.trustedIssuers, {issuer: UPSTREAM_ISSUER, jwksUrl: JWKS_URL}],
+    });
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const target = await begin(app);
+    idp.setNonce(target.searchParams.get('nonce') ?? '');
+    const state = target.searchParams.get('state') ?? '';
+
+    const callback = await app.request(
+      `${API.ableOauthCallback}?state=${encodeURIComponent(state)}&code=authorization-code`,
+    );
+
+    expect(callback.status).toBe(502);
+    expect(await callback.json()).toEqual({error: 'able OIDC issuer conflicts with a configured JWKS URL'});
+    expect(idp.tokenCalls).toHaveLength(1);
+    const retained = (await store.getInstanceConfig()).trustedIssuers.find((entry) => entry.issuer === UPSTREAM_ISSUER);
+    expect(retained).toMatchObject({jwksUrl: JWKS_URL});
+    expect(retained?.jwks).toBeUndefined();
   });
 
   for (const kind of ['bad-iss', 'bad-aud', 'expired', 'bad-sig'] as const) {

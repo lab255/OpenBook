@@ -158,6 +158,9 @@ export class AbleOidcService {
     private readonly opts: AbleOidcOptions,
   ) {
     this.issuer = (opts.issuer ?? ABLE_OIDC_ISSUER).replace(/\/+$/, '');
+    if (this.issuer === DEFAULT_ACCOUNT_URL) {
+      throw new AbleOidcError(400, 'able OIDC issuer must differ from the default account issuer');
+    }
     this.discoveryUrl = opts.discoveryUrl ??
       (opts.issuer ? `${this.issuer}/.well-known/openid-configuration` : ABLE_OIDC_DISCOVERY_URL);
     this.encryptionKey = deriveEncryptionKey(opts.clientSecret);
@@ -336,11 +339,14 @@ export class AbleOidcService {
   private async mintBridgeAssertion(payload: JWTPayload): Promise<string> {
     const key = await this.bridgeKey();
     const config = await this.store.getInstanceConfig();
+    const currentBridge = config.trustedIssuers.find((entry) => entry.issuer === this.issuer);
+    if (currentBridge?.jwksUrl) {
+      throw new AbleOidcError(502, 'able OIDC issuer conflicts with a configured JWKS URL');
+    }
     const trustedIssuers = [
       ...config.trustedIssuers.filter((entry) => entry.issuer !== this.issuer),
       {issuer: this.issuer, jwks: {keys: [key.publicJwk]}},
     ];
-    const currentBridge = config.trustedIssuers.find((entry) => entry.issuer === this.issuer);
     const emailAuthority = config.emailAuthority === DEFAULT_ACCOUNT_URL ? this.issuer : config.emailAuthority;
     if (
       JSON.stringify(currentBridge?.jwks?.keys ?? []) !== JSON.stringify([key.publicJwk]) ||
