@@ -1141,10 +1141,10 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       // replaces the account-service connect URL. Cross-origin/desktop shells
       // keep their existing flow because their callback transport is different.
       if (!platform?.redirectUri && typeof window !== 'undefined') {
-        const serverOverride = getServerUrlOverride();
-        const serverOrigin = serverOverride ? new URL(serverOverride).origin : window.location.origin;
-        if (serverOrigin === window.location.origin) {
-          try {
+        try {
+          const serverOverride = getServerUrlOverride();
+          const serverOrigin = serverOverride ? new URL(serverOverride).origin : window.location.origin;
+          if (serverOrigin === window.location.origin) {
             const probe = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
             probe.searchParams.set('probe', '1');
             const response = await fetch(probe, {cache: 'no-store'});
@@ -1153,9 +1153,9 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
               delegated.searchParams.set('handoff_state', state);
               url = delegated.toString();
             }
-          } catch {
-            // Not a same-origin server with delegated auth; retain account connect.
           }
+        } catch {
+          // Not a same-origin server with delegated auth; retain account connect.
         }
       }
 
