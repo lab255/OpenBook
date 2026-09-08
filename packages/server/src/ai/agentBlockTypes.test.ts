@@ -163,12 +163,27 @@ describe('add_blocks: catalogue-derived structure rules (shared with MCP)', () =
   });
 });
 
+describe('rich text agent parity', () => {
+  it('uses the shared parser for update_block and nested add_blocks text', async () => {
+    const page = await blockPage(`rich-${seq}`);
+    const update = await runTool('update_block', {pageId: page.id, blockId: 'b1', text: '**a** [b](https://x.test)'});
+    const updateEvent = update.events.find((event) => event.type === 'suggestions');
+    const updatePayload = updateEvent?.type === 'suggestions' ? updateEvent.suggestions[0]?.payload : undefined;
+    expect(updatePayload?.text).toEqual({runs: [{t: 'a', a: {b: true}}, {t: ' '}, {t: 'b', a: {a: 'https://x.test'}}]});
+
+    const append = await runTool('add_blocks', {pageId: page.id, blocks: [{type: 'group', children: [{type: 'paragraph', text: '*nested*'}]}]});
+    const appendEvent = append.events.find((event) => event.type === 'suggestions');
+    const appendPayload = appendEvent?.type === 'suggestions' ? appendEvent.suggestions[0]?.payload : undefined;
+    expect(appendPayload?.blocks).toEqual([{type: 'group', children: [{type: 'paragraph', text: {runs: [{t: 'nested', a: {i: true}}]}}]}]);
+  });
+});
+
 describe('update_block_props: catalogue-typed props and type changes', () => {
   it('rejects a declared prop with the wrong value type, names prop and type', async () => {
     const page = await blockPage(`props-${seq}`);
     const {result, events} = await runTool('update_block_props', {pageId: page.id, blockId: 'b1', props: {level: 'two'}});
     expect(result).toContain('"level"');
-    expect(result).toContain('must be a number');
+    expect(result).toContain('Expected number');
     expect(events.some((e) => e.type === 'suggestions')).toBe(false);
   });
 
@@ -231,13 +246,18 @@ describe('update_block_props: catalogue-typed props and type changes', () => {
 describe('list_block_types', () => {
   it('returns the full catalogue, and installed plugins\' declared blocks', async () => {
     const before = await runTool('list_block_types', {});
-    for (const entry of BLOCK_TYPE_CATALOGUE) expect(before.result).toContain(`- ${entry.type} (`);
-    expect(before.result).toContain('Installed plugin blocks: none.');
+    const beforeCatalogue = JSON.parse(before.result);
+    expect(beforeCatalogue.blocks.map((entry: {type: string}) => entry.type)).toEqual(BLOCK_TYPE_CATALOGUE.map((entry) => entry.type));
+    expect(beforeCatalogue.blocks.every((entry: {propsSchema?: unknown}) => entry.propsSchema != null)).toBe(true);
+    expect(beforeCatalogue.pluginBlocks).toEqual([]);
 
-    await store.upsertPlugin({manifest: ledgerManifest(), files: {'src/index.ts': ''}});
+    const manifest = ledgerManifest();
+    await store.upsertPlugin({manifest, files: {'src/index.ts': ''}});
     const after = await runTool('list_block_types', {});
-    expect(after.result).toContain('openbook.ledger/journal-entry');
-    expect(after.result).toContain('openbook.ledger/beancount-export');
-    expect(after.result).toContain('(plugin: Ledger');
+    const afterCatalogue = JSON.parse(after.result);
+    expect(afterCatalogue.pluginBlocks.map((entry: {type: string}) => entry.type)).toEqual(
+      manifest.blocks?.map((entry) => `${manifest.id}/${entry.type}`),
+    );
+    expect(afterCatalogue.pluginBlocks.every((entry: {category: string}) => entry.category === 'plugin')).toBe(true);
   });
 });

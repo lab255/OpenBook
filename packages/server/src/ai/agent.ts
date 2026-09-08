@@ -1,18 +1,37 @@
-import {randomUUID} from 'node:crypto';
 import {
   addBlocksGuidance,
   AssetUploadError,
   blockCatalogueText,
   blockTreeError,
+  buildDatabaseToolOptions,
+  buildDatabaseToolProperty,
+  buildPageAppearancePatch,
+  PAGE_BACKGROUND_TOKENS,
+  PAGE_COVER_GRADIENT_IDS,
+  PAGE_THEME_IDS,
+  THEME_PROPERTY_ID,
+  createDatabaseTool,
+  createPropertyTool,
+  DATABASE_TOOL_PROPERTY_TYPES,
+  deleteRowTool,
+  describeDatabaseTool,
   CHILD_ONLY_PARENT,
   CONTAINER_BLOCK_TYPES,
   findUnknownBlockType,
   invalidBlockProps,
+  KIT_VALUE_BLOCK_TYPES,
   providerSettings,
+  movePageTool,
+  resolveDatabaseToolRowValues,
+  richTextRuns,
   snapshotText,
+  shortId,
   tableOrderContractKey,
   tableOrderContractRefusal,
   textSnapshot,
+  updateDatabaseTool,
+  updatePropertyTool,
+  updateRowTool,
   unknownBlockTypeMessage,
   uploadAgentAsset,
   type AgentProposal,
@@ -20,9 +39,7 @@ import {
   type AiProvider,
   type AiSkill,
   type DatabaseProperty,
-  type DatabasePropertyType,
-  type DatabaseSchema,
-  type DatabaseSelectOption,
+  type DatabaseToolStore,
   type InterviewStep,
   type PluginAgentTool,
   type Principal,
@@ -169,7 +186,7 @@ const clip = (s: string, n = 1500): string => (s.length > n ? `${s.slice(0, n)}�
 
 /** Result-size bound for {@link ToolDef.fullResult} tools (fits the whole
  *  block-type catalogue with plugins; still bounded against runaway output). */
-const FULL_RESULT_CLIP = 12000;
+const FULL_RESULT_CLIP = 64000;
 
 const obj = (props: Record<string, unknown>, required: string[] = []): Record<string, unknown> => ({
   type: 'object',
@@ -177,6 +194,13 @@ const obj = (props: Record<string, unknown>, required: string[] = []): Record<st
   ...(required.length ? {required} : {}),
 });
 const str = (description: string) => ({type: 'string', description});
+const richTextSchema = {
+  oneOf: [
+    {type: 'string'},
+    {type: 'object', properties: {runs: {type: 'array', items: {type: 'object'}}}, required: ['runs'], additionalProperties: false},
+  ],
+  description: 'Mini-markdown string or {runs:[{t,a}]} editor runs.',
+};
 
 /** Display name for AI-authored suggestions. */
 const AI_AUTHOR_NAME = 'Assistant';
@@ -190,8 +214,17 @@ const SUGGESTION_KIND: Record<AgentProposal['kind'], SuggestionKind> = {
   set_kit_value: 'replace-text',
   set_db_cell: 'set-cell',
   set_page_theme: 'set-theme',
+  set_page_appearance: 'set-theme',
+  move_page: 'page-op',
+  set_page_properties: 'page-op',
   delete_block: 'delete',
   set_block_props: 'replace-text',
+  create_database: 'database-op',
+  update_database: 'database-op',
+  create_property: 'database-op',
+  update_property: 'database-op',
+  update_row: 'database-op',
+  delete_row: 'database-op',
   // Table STRUCTURE ops (API-3) all review as one `table-op` kind; the
   // `payload.applyKind` is what tells the editor bridge which op to replay.
   table_insert_row: 'table-op',
@@ -456,19 +489,24 @@ export class AgentRunner {
         args: '{"pageId": string}',
         schema: obj({pageId: str('The page hosting the database.')}, ['pageId']),
         run: async (args) => {
-          const db = await this.readableDbByPage(String(args.pageId ?? ''));
+          const pageId = String(args.pageId ?? '');
+          const db = await this.readableDbByPage(pageId);
           if (!db) return 'That page hosts no database.';
-          const props = (db.schema.properties ?? []).map((p) => {
+          const description = await describeDatabaseTool({
+            ...this.databaseToolStore(),
+            getPageDatabase: async () => db,
+            listRows: async () => this.readableRows(db.id),
+          }, pageId);
+          const props = description.properties.map((p) => {
             const opts = p.options?.length ? ` options=[${p.options.map((o) => `${o.id}:${o.label}`).join(', ')}]` : '';
             return `  - [${p.id}] ${p.name} (${p.type})${opts}`;
           });
-          const rows = await this.readableRows(db.id);
-          const rowLines = rows.slice(0, 40).map((r) => `  - [${r.id}] ${r.name ?? 'Untitled'}`);
+          const rowLines = description.rows.map((r) => `  - [${r.id}] ${r.name ?? 'Untitled'}`);
           return [
             `Database "${db.name ?? 'Untitled'}" (database id ${db.id}).`,
             'Columns:',
             ...(props.length ? props : ['  (none)']),
-            `Rows (${rows.length}):`,
+            `Rows (${description.rowCount}):`,
             ...(rowLines.length ? rowLines : ['  (none)']),
           ].join('\n');
         },
@@ -477,6 +515,17 @@ export class AgentRunner {
   }
 
   // ── Database tools (structural CRUD — applied directly, like create_page) ─────
+
+  private databaseToolStore(): DatabaseToolStore {
+    return {
+      getPageDatabase: (pageId) => this.store.getDatabaseByPage(pageId),
+      listRows: (databaseId) => this.store.listRows(databaseId),
+      createDatabase: (input) => this.store.createDatabase(input),
+      updateDatabase: (id, patch) => this.store.updateDatabase(id, patch),
+      updateRow: (databaseId, rowId, patch) => this.store.updateRow(databaseId, rowId, patch),
+      deletePage: (rowId) => this.store.deletePage(rowId),
+    };
+  }
 
   /**
    * Tools that create and edit databases, their columns, and their rows. Unlike
@@ -521,16 +570,11 @@ export class AgentRunner {
           const title = String(args.title ?? '').trim();
           if (!title) return 'A title is required.';
           const specs = Array.isArray(args.properties) ? args.properties : [];
-          const properties = specs.map((s) => buildProperty(s as Record<string, unknown>)).filter((p): p is DatabaseProperty => p !== null);
-          const schema: DatabaseSchema = {
-            properties,
-            views: [{id: shortId('v'), name: 'Table', type: 'table', filters: [], sorts: []}],
-          };
           try {
             const page = await this.store.upsertPage({name: title, data: textSnapshot('', 'agent')});
-            await this.store.createDatabase({pageId: page.id, name: title, schema});
+            const created = await createDatabaseTool(this.databaseToolStore(), {pageId: page.id, title, properties: specs as Array<Record<string, unknown>>});
             this.pagesTouched = true;
-            const cols = properties.length ? ` Columns: ${properties.map((p) => `${p.name} [${p.id}]`).join(', ')}.` : '';
+            const cols = created.schema.properties.length ? ` Columns: ${created.schema.properties.map((p) => `${p.name} [${p.id}]`).join(', ')}.` : '';
             return `Created database "${title}" on page ${page.id}.${cols} Use pageId ${page.id} to add rows (create_row) or columns (create_property).`;
           } catch (err) {
             return `Could not create the database: ${err instanceof Error ? err.message : String(err)}`;
@@ -547,7 +591,7 @@ export class AgentRunner {
           if (!db) return err!;
           const name = String(args.name ?? '').trim();
           if (!name) return 'A name is required.';
-          await this.store.updateDatabase(db.id, {name});
+          await updateDatabaseTool({...this.databaseToolStore(), getPageDatabase: async () => db}, {pageId: String(args.pageId ?? ''), name});
           return `Renamed the database to "${name}".`;
         },
       },
@@ -569,8 +613,10 @@ export class AgentRunner {
           if (!db) return err!;
           const prop = buildProperty(args);
           if (!prop) return `Unsupported column type "${String(args.type)}". Use one of: ${[...CREATABLE_PROP_TYPES].join(', ')}.`;
-          const schema: DatabaseSchema = {...db.schema, properties: [...(db.schema.properties ?? []), prop]};
-          await this.store.updateDatabase(db.id, {schema});
+          await createPropertyTool({...this.databaseToolStore(), getPageDatabase: async () => db}, {
+            pageId: String(args.pageId ?? ''), name: String(args.name ?? ''), type: String(args.type ?? ''),
+            options: Array.isArray(args.options) ? args.options : undefined,
+          });
           return `Added column "${prop.name}" [${prop.id}] (${prop.type}) to "${db.name ?? 'Untitled'}".`;
         },
       },
@@ -599,8 +645,11 @@ export class AgentRunner {
           if (name) next.name = name;
           if (Array.isArray(args.options)) next.options = buildOptions(args.options, next.options ?? []);
           if (!name && !Array.isArray(args.options)) return 'Nothing to update — pass a new name and/or options.';
-          const schema: DatabaseSchema = {...db.schema, properties: props.map((p, i) => (i === idx ? next : p))};
-          await this.store.updateDatabase(db.id, {schema});
+          await updatePropertyTool({...this.databaseToolStore(), getPageDatabase: async () => db}, {
+            pageId: String(args.pageId ?? ''), propertyId: propId,
+            name: args.name === undefined ? undefined : String(args.name),
+            options: Array.isArray(args.options) ? args.options : undefined,
+          });
           return `Updated column "${next.name}" [${next.id}].`;
         },
       },
@@ -667,8 +716,31 @@ export class AgentRunner {
             if (unknown.length) warn = ` (ignored unknown column(s): ${unknown.join(', ')})`;
           }
           if (patch.name === undefined && patch.properties === undefined) return 'Nothing to update — pass a name and/or properties.';
-          const updated = await this.store.updateRow(db.id, rowId, patch);
+          const updated = await updateRowTool({
+            ...this.databaseToolStore(), getPageDatabase: async () => db,
+            listRows: async () => this.readableRows(db.id),
+          }, {
+            pageId: String(args.pageId ?? ''), rowId,
+            name: args.name === undefined ? undefined : String(args.name),
+            properties: args.properties && typeof args.properties === 'object' ? args.properties as Record<string, unknown> : undefined,
+          });
           return updated ? `Updated row "${updated.name ?? 'Untitled'}".${warn}` : 'Could not update the row.';
+        },
+      },
+      {
+        name: 'delete_row',
+        description: 'Move a database row page to the recoverable trash.',
+        args: '{"pageId": string, "rowId": string}',
+        schema: obj({pageId: str('The page hosting the database.'), rowId: str('The row id.')}, ['pageId', 'rowId']),
+        run: async (args) => {
+          const pageId = String(args.pageId ?? '');
+          const {db, err} = await dbForPage(pageId);
+          if (!db) return err!;
+          const deleted = await deleteRowTool({
+            ...this.databaseToolStore(), getPageDatabase: async () => db,
+            listRows: async () => this.readableRows(db.id),
+          }, {pageId, rowId: String(args.rowId ?? '')});
+          return `Moved row "${deleted.name ?? 'Untitled'}" [${deleted.id}] to trash.`;
         },
       },
     ];
@@ -751,13 +823,19 @@ export class AgentRunner {
       {
         name: 'update_block',
         description: 'Propose replacing the text of one block on a page (find the block id via inspect_page_structure). User approves first.',
-        args: '{"pageId": string, "blockId": string, "text": string}',
-        schema: obj({pageId: str('The page id.'), blockId: str('The block id from inspect_page_structure.'), text: str('The new plain text for the block.')}, ['pageId', 'blockId', 'text']),
+        args: '{"pageId": string, "blockId": string, "text": string | {"runs": Run[]}, "plain"?: boolean}',
+        schema: obj({pageId: str('The page id.'), blockId: str('The block id from inspect_page_structure.'), text: richTextSchema, plain: {type: 'boolean', description: 'Keep a string literal.'}}, ['pageId', 'blockId', 'text']),
         write: true,
         run: async (args) => {
           const pageId = String(args.pageId ?? '');
           const blockId = String(args.blockId ?? '');
-          const text = String(args.text ?? '');
+          let runs;
+          try {
+            runs = richTextRuns(args.text as never, args.plain === true);
+          } catch (error) {
+            return error instanceof Error ? error.message : String(error);
+          }
+          const text = runs.map((run) => run.t).join('');
           const page = await this.readablePage(pageId);
           if (!page) return 'Page not found.';
           const before = blockTextById(page.data, blockId);
@@ -771,7 +849,7 @@ export class AgentRunner {
             // The full prior text (not the clipped diff `before`) is the merge
             // base, so accepting this alongside another edit to the same block
             // combines them instead of clobbering. See the bridge's update_block.
-            payload: {pageId, blockId, text, before},
+            payload: {pageId, blockId, text: {runs}, before},
           });
         },
       },
@@ -947,7 +1025,8 @@ export class AgentRunner {
     const blockSchema = obj(
       {
         type: {type: 'string', description: 'Block type — see the catalogue in this tool\'s description.'},
-        text: {description: 'For text blocks: a plain string, or rich runs like [{"t":"bold","a":{"b":true}}].'},
+        text: richTextSchema,
+        plain: {type: 'boolean', description: 'Keep string text literal instead of parsing mini-markdown.'},
         props: {type: 'object', description: 'Type-specific props (level, value, min/max, opts, source, …).'},
         children: {type: 'array', items: {type: 'object'}, description: `Child blocks, ONLY for container types (${[...CONTAINER_BLOCK_TYPES].join(', ')}).`},
       },
@@ -981,12 +1060,27 @@ export class AgentRunner {
           if (structural) return structural;
           const bad = unknownBlockTypeMessage(findUnknownBlockType(blocks, {installedPluginIds: await this.installedPluginIds()}));
           if (bad) return bad;
+          const normalizeBlockText = (value: unknown): unknown => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+            const block = value as Record<string, unknown>;
+            return {
+              ...block,
+              ...(block.text === undefined ? {} : {text: {runs: richTextRuns(block.text as never, block.plain === true)}}),
+              ...(Array.isArray(block.children) ? {children: block.children.map(normalizeBlockText)} : {}),
+            };
+          };
+          let normalized: unknown[];
+          try {
+            normalized = blocks.map(normalizeBlockText);
+          } catch (error) {
+            return error instanceof Error ? error.message : String(error);
+          }
           return this.propose({
             kind: 'append_blocks',
             summary: `Add ${blocks.length} block(s) to "${page.name ?? 'Untitled'}": ${summarizeBlocks(blocks)}`,
             pageId,
             after: summarizeBlocks(blocks),
-            payload: {pageId, blocks},
+            payload: {pageId, blocks: normalized},
           });
         },
       },
@@ -1020,13 +1114,15 @@ export class AgentRunner {
           };
           if (level(args.controlIntensity) !== undefined) theme.controlIntensity = level(args.controlIntensity);
           if (level(args.interfaceIntensity) !== undefined) theme.interfaceIntensity = level(args.interfaceIntensity);
+          const patch = Object.keys(theme).length > 0 ? buildPageAppearancePatch({theme}) : {};
+          const proposalTheme = patch[THEME_PROPERTY_ID] as Record<string, unknown> | undefined;
           const coverGradientId =
             typeof args.cover === 'string' && COVER_GRADIENT_IDS.has(args.cover) ? args.cover : undefined;
           if (Object.keys(theme).length === 0 && !coverGradientId) {
             return `Nothing to set. Themes: ${[...THEME_IDS].join(', ')}. Backgrounds: ${[...BACKGROUND_TOKENS].join(', ')}. Covers: ${[...COVER_GRADIENT_IDS].join(', ')}.`;
           }
           const parts = [
-            ...Object.entries(theme).map(([k, v]) => `${k}=${v}`),
+            ...Object.entries(proposalTheme ?? {}).map(([k, v]) => `${k}=${v}`),
             ...(coverGradientId ? [`cover=${coverGradientId}`] : []),
           ];
           return this.propose({
@@ -1034,7 +1130,7 @@ export class AgentRunner {
             summary: `Restyle "${page.name ?? 'Untitled'}": ${parts.join(', ')}`,
             pageId,
             after: parts.join(', '),
-            payload: {pageId, ...(Object.keys(theme).length ? {theme} : {}), ...(coverGradientId ? {coverGradientId} : {})},
+            payload: {pageId, ...(proposalTheme ? {theme: proposalTheme} : {}), ...(coverGradientId ? {coverGradientId} : {})},
           });
         },
       },
@@ -1049,6 +1145,12 @@ export class AgentRunner {
    * create_page / the database tools), so it applies immediately.
    */
   private pageTools(): ToolDef[] {
+    const pageStore = () => ({
+      listPages: () => this.store.listPages(),
+      getPage: (id: string) => this.store.getPage(id),
+      setPageProperties: (id: string, properties: Record<string, unknown>) => this.store.setPageProperties(id, properties),
+      movePage: (id: string, move: {parentId: string | null; orderedIds: string[]}) => this.store.movePage(id, move.parentId, move.orderedIds),
+    });
     return [
       {
         name: 'move_page',
@@ -1077,14 +1179,18 @@ export class AgentRunner {
           const parentId = args.parentId === undefined ? page.parentId ?? null : args.parentId === null ? null : String(args.parentId);
           if (parentId === pageId) return 'A page cannot be its own parent.';
           if (parentId && !pages.some((p) => p.id === parentId)) return `Parent page "${parentId}" not found.`;
-          // The target parent's children, in order, with the moved page inserted.
-          const siblings = pages.filter((p) => (p.parentId ?? null) === parentId && p.id !== pageId).map((p) => p.id);
           const before = typeof args.beforePageId === 'string' ? args.beforePageId : '';
-          const at = before ? siblings.indexOf(before) : -1;
-          if (at >= 0) siblings.splice(at, 0, pageId);
-          else siblings.push(pageId);
-          const moved = await this.store.movePage(pageId, parentId, siblings);
-          if (!moved) return 'Could not move the page (it would create a cycle — a page cannot nest under its own descendant).';
+          const siblings = pages.filter((p) => (p.parentId ?? null) === parentId && p.id !== pageId);
+          const at = siblings.findIndex((p) => p.id === before);
+          try {
+            await movePageTool(pageStore(), {
+              pageId,
+              parentId,
+              ...(before && at >= 0 ? {position: {index: at}} : {}),
+            });
+          } catch (error) {
+            return error instanceof Error ? error.message : 'Could not move the page.';
+          }
           this.pagesTouched = true;
           const where = parentId ? `under "${pages.find((p) => p.id === parentId)?.name ?? parentId}"` : 'to the top level';
           return `Moved "${page.name ?? 'Untitled'}" ${where}${before ? `, before ${before}` : ''}.`;
@@ -1636,106 +1742,27 @@ export class AgentRunner {
 
 // ── Database tool helpers (build/coerce schema + cell values) ────────────────────
 
-/** Column types the agent may create — the manual (per-row) types, excluding the
- *  computed/relational ones (relation/rollup/formula/expr…) that need extra wiring. */
-const CREATABLE_PROP_TYPES = new Set<DatabasePropertyType>([
-  'text',
-  'number',
-  'rating',
-  'select',
-  'multi_select',
-  'status',
-  'checkbox',
-  'date',
-  'url',
-  'email',
-  'phone',
-]);
-
-/** A short, collision-safe id with a readable prefix (e.g. `p_3f2a9c1b`). */
-const shortId = (prefix: string): string => `${prefix}_${randomUUID().slice(0, 8)}`;
-
-/** Build select/status options from labels, keeping ids/colours of existing
- *  options whose label still matches (so editing choices doesn't orphan cells). */
-function buildOptions(labels: unknown[], existing: DatabaseSelectOption[]): DatabaseSelectOption[] {
-  return labels
-    .map((raw) => String(raw).trim())
-    .filter(Boolean)
-    .map((label) => {
-      const prev = existing.find((o) => o.label.toLowerCase() === label.toLowerCase());
-      return {id: prev?.id ?? shortId('opt'), label, ...(prev?.color ? {color: prev.color} : {})};
-    });
-}
-
-/** Build a new column from a `{name, type, options?}` spec, or null if invalid. */
-function buildProperty(spec: Record<string, unknown>): DatabaseProperty | null {
-  const name = String(spec.name ?? '').trim();
-  const type = String(spec.type ?? '').trim() as DatabasePropertyType;
-  if (!name || !CREATABLE_PROP_TYPES.has(type)) return null;
-  const prop: DatabaseProperty = {id: shortId('p'), name, type};
-  if ((type === 'select' || type === 'multi_select' || type === 'status') && Array.isArray(spec.options)) {
-    prop.options = buildOptions(spec.options, []);
-  }
-  return prop;
-}
-
-/** Resolve a select/status value (an option id OR label) to its option id. */
-function resolveOptionId(prop: DatabaseProperty, value: unknown): string {
-  const s = String(value);
-  const opts = prop.options ?? [];
-  return (opts.find((o) => o.id === s) ?? opts.find((o) => o.label.toLowerCase() === s.toLowerCase()))?.id ?? s;
-}
-
-/** Coerce a raw cell value to the column's stored shape (numbers, booleans,
- *  option ids), so values the model gives loosely still land correctly. */
-function coerceCell(prop: DatabaseProperty, value: unknown): unknown {
-  if (value === null || value === undefined) return null;
-  switch (prop.type) {
-  case 'number':
-  case 'rating': {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
-  }
-  case 'checkbox':
-    return Boolean(value);
-  case 'select':
-  case 'status':
-    return resolveOptionId(prop, value);
-  case 'multi_select':
-    return (Array.isArray(value) ? value : [value]).map((v) => resolveOptionId(prop, v));
-  default:
-    return typeof value === 'string' ? value : String(value);
-  }
-}
-
-/**
- * Resolve a loose `{column: value}` map (keys may be column ids OR names) into
- * `{propertyId: coercedValue}` for the store, collecting any keys that match no
- * column so the tool can report them.
- */
-function resolveRowValues(schema: DatabaseSchema, input: Record<string, unknown>): {values: Record<string, unknown>; unknown: string[]} {
-  const props = schema.properties ?? [];
-  const values: Record<string, unknown> = {};
+const CREATABLE_PROP_TYPES = new Set(DATABASE_TOOL_PROPERTY_TYPES);
+const buildOptions = buildDatabaseToolOptions;
+const buildProperty = (spec: Record<string, unknown>): DatabaseProperty | null => {
+  try { return buildDatabaseToolProperty(spec); } catch { return null; }
+};
+const resolveRowValues = (schema: Parameters<typeof resolveDatabaseToolRowValues>[0], input: Record<string, unknown>) => {
   const unknown: string[] = [];
-  for (const [key, val] of Object.entries(input)) {
-    const prop = props.find((p) => p.id === key) ?? props.find((p) => p.name.toLowerCase() === String(key).toLowerCase());
-    if (!prop) {
-      unknown.push(key);
-      continue;
-    }
-    values[prop.id] = coerceCell(prop, val);
+  for (const key of Object.keys(input)) {
+    const property = schema.properties.find((item) => item.id === key)
+      ?? schema.properties.find((item) => item.name.toLowerCase() === key.toLowerCase());
+    if (!property) unknown.push(key);
   }
-  return {values, unknown};
-}
+  return {values: resolveDatabaseToolRowValues(schema, input, {lenient: true}), unknown};
+};
 
 // ── Layout / rich-block + appearance helpers ─────────────────────────────────────
 
-/** Per-page theme values the agent may set (mirror `lib/themes`, `lib/pageCover`). */
-const THEME_IDS = new Set<string>([
-  'default', 'amber', 'forest', 'graphite', 'ocean', 'rose', 'sandstone', 'slate', 'sunset', 'teal', 'violet',
-]);
-const BACKGROUND_TOKENS = new Set<string>(['gray', 'red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink']);
-const COVER_GRADIENT_IDS = new Set<string>(['dawn', 'ocean', 'dusk', 'forest', 'ember', 'slate', 'citrus', 'mint', 'grape', 'sand', 'rose', 'night']);
+/** Per-page theme values the agent may set (shared with SDK consumers and UI). */
+const THEME_IDS = new Set<string>(PAGE_THEME_IDS);
+const BACKGROUND_TOKENS = new Set<string>(PAGE_BACKGROUND_TOKENS);
+const COVER_GRADIENT_IDS = new Set<string>(PAGE_COVER_GRADIENT_IDS);
 
 /** A short "type ×n" summary of a block list (for the review card). */
 function summarizeBlocks(blocks: unknown[]): string {
@@ -1872,7 +1899,6 @@ function blockInfoById(
  * server side (no Yjs needed for a read). Returns {} for non-block pages.
  */
 const NAME_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const INPUT_TYPES = new Set(['slider', 'number', 'textfield', 'radio', 'checklist', 'dropdown', 'location', 'toggle']);
 
 function varNameFromLabel(label: string): string {
   const cleaned = label.trim().replace(/[^A-Za-z0-9]+(.)?/g, (_, c?: string) => (c ? c.toUpperCase() : ''));
@@ -1893,16 +1919,26 @@ function inputValueOf(b: AnyJsonBlock): unknown {
   case 'number':
     return Number(p.value ?? 0);
   case 'textfield':
+  case 'longtext':
     return String(p.value ?? '');
   case 'radio':
   case 'dropdown':
     return p.value ?? null;
   case 'checklist':
     return Array.isArray(p.selected) ? p.selected : [];
+  case 'choicecards':
+  case 'searchselect':
+    return p.multi ? (Array.isArray(p.selected) ? p.selected : []) : (p.value ?? null);
+  case 'tagfield':
+    return Array.isArray(p.selected) ? p.selected : [];
+  case 'richtext':
+    return Array.isArray(p.runs)
+      ? p.runs.map((run) => run && typeof run === 'object' ? String((run as {t?: unknown}).t ?? '') : '').join('')
+      : '';
   case 'toggle':
     return Boolean(p.value ?? false);
   case 'location':
-    return {lat: p.lat ?? null, lng: p.lng ?? null, label: p.label ?? ''};
+    return {lat: p.lat ?? null, lng: p.lng ?? null, label: p.labeltext ?? ''};
   default:
     return undefined;
   }
@@ -1914,7 +1950,7 @@ function kitValues(data: {editor?: string; blockdoc?: unknown} | null | undefine
   const scope: Record<string, unknown> = {};
   const walk = (list: AnyJsonBlock[]): void => {
     for (const b of list) {
-      if (b.type && INPUT_TYPES.has(b.type)) {
+      if (b.type && KIT_VALUE_BLOCK_TYPES.has(b.type)) {
         const name = publishedName(b);
         if (name && !(name in scope)) scope[name] = inputValueOf(b);
       }

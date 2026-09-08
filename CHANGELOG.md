@@ -1,3 +1,28 @@
+## 3.17.0 (2026-09-07)
+
+### 🚀 Features
+
+- **mcp,sdk,server:** database tools — describe/create/update db, properties, update/delete row (API-9) ([#356](https://github.com/lab255/OpenBook/pull/356))
+- **mcp,sdk,server,ui:** page tools on MCP — set_page_appearance, move_page, get/set_page_properties with policy parity (API-10) ([#359](https://github.com/lab255/OpenBook/pull/359))
+- **mcp,sdk,ui:** move_block + insert_blocks tools; generic block ops lifted into sdk/blockSnapshot.ts (API-7) ([#355](https://github.com/lab255/OpenBook/pull/355))
+- **mcp,server,sdk:** upload_asset tool — images and asset-backed blocks via MCP + in-app agent (API-5) ([#354](https://github.com/lab255/OpenBook/pull/354))
+- **sdk,mcp,server:** typed prop schemas for every block type — list_block_types returns propsSchema; block prop + expression reference (API-11) ([#358](https://github.com/lab255/OpenBook/pull/358))
+- **sdk,mcp,server,ui:** rich text over MCP — mini-markdown and explicit runs on text writes (API-8) ([#357](https://github.com/lab255/OpenBook/pull/357))
+- **ui:** paste fills the selected cell range, growing the table (TBL-13) ([#348](https://github.com/lab255/OpenBook/pull/348))
+- **ui:** table grips open row/column menus on click and right-click (TBL-7) ([#349](https://github.com/lab255/OpenBook/pull/349))
+- **ui:** table column width resize — drag the boundary, widths persisted per colId (TBL-12) ([#350](https://github.com/lab255/OpenBook/pull/350))
+- **ui:** table range menu parity — count-aware inserts, clipboard group, swatch i18n, tinted range clipboard (TBL-10) ([#351](https://github.com/lab255/OpenBook/pull/351))
+- **ui:** floating toolbar over a selected table cell range (TBL-14) ([#353](https://github.com/lab255/OpenBook/pull/353))
+
+### 🩹 Fixes
+
+- **ui:** table row grip sits fully outside the table — never over cell content (TABLE-2) ([#347](https://github.com/lab255/OpenBook/pull/347))
+- **ui:** database cell-menu quick block through i18n — filter labels + date presets ×4 locales (TBL-11) ([#352](https://github.com/lab255/OpenBook/pull/352))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.16.0 (2026-08-28)
 
 ### 🚀 Features

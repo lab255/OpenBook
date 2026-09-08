@@ -197,6 +197,27 @@ describe('run loop: an unknown tool name is reported without aborting', () => {
   });
 });
 
+describe('API-10 page tool regressions', () => {
+  it('uses the shared appearance patch value in the proposal payload', async () => {
+    const page = await store.upsertPage({name: 'Appearance target', data: snapshot()});
+    const events = await runCapture(guestPrincipal(), 'set_page_appearance', {pageId: page.id, themeId: 'ocean', background: 'blue'});
+    const suggestionEvent = events.find((event) => event.type === 'suggestions');
+    expect(suggestionEvent?.type).toBe('suggestions');
+    const payload = suggestionEvent?.type === 'suggestions' ? suggestionEvent.suggestions[0]?.payload : undefined;
+    expect(payload).toMatchObject({pageId: page.id, theme: {themeId: 'ocean', background: 'blue'}});
+  });
+
+  it('appends when beforePageId is not a destination sibling', async () => {
+    const first = await store.upsertPage({name: 'First', data: snapshot()});
+    const moving = await store.upsertPage({name: 'Moving', data: snapshot()});
+    const last = await store.upsertPage({name: 'Last', data: snapshot()});
+    const events = await runCapture(guestPrincipal(), 'move_page', {pageId: moving.id, parentId: null, beforePageId: 'unknown-page'});
+    expect(resultOf(events, 'move_page')).toContain('Moved');
+    const roots = (await store.listPages()).filter((page) => page.parentId === null);
+    expect(roots.map(({id}) => id)).toEqual([first.id, last.id, moving.id]);
+  });
+});
+
 describe('schema fix: set_db_cell points at describe_database for a bad property id', () => {
   let hostPage: string;
   let rowId: string;
@@ -214,6 +235,23 @@ describe('schema fix: set_db_cell points at describe_database for a bad property
     const result = resultOf(events, 'set_db_cell');
     expect(result).toContain('describe_database');
     expect(result).not.toContain('list_db_views');
+  });
+});
+
+describe('agent database rows preserve lenient model-value coercion', () => {
+  it('ignores unknown columns, nulls bad numbers, and Boolean-coerces checkboxes', async () => {
+    const host = await store.upsertPage({name: `lenient-db-${seq}`, data: snapshot()});
+    const database = await store.createDatabase({pageId: host.id, name: 'DB', schema: {properties: [
+      {id: 'points', name: 'Points', type: 'number'},
+      {id: 'done', name: 'Done', type: 'checkbox'},
+    ], views: []}});
+    const events = await runCapture(guestPrincipal(), 'create_row', {
+      pageId: host.id, name: 'Loose row', properties: {Missing: 'ignored', Points: 'not-a-number', Done: 'yes'},
+    });
+
+    expect(resultOf(events, 'create_row')).toContain(' (ignored unknown column(s): Missing)');
+    const rows = await store.listRows(database.id);
+    expect(rows[0]?.properties).toMatchObject({points: null, done: true});
   });
 });
 

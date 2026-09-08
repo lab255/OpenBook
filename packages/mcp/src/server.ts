@@ -11,22 +11,39 @@ import {
   BLOCK_TYPE_CATALOGUE,
   blockCatalogueText,
   blockTreeError,
+  buildMovePlan,
+  buildPageAppearancePatch,
+  buildDatabaseToolOptions,
+  buildDatabaseToolProperty,
   CONTAINER_BLOCK_TYPES,
+  createDatabaseTool,
+  createPropertyTool,
+  DATABASE_TOOL_PROPERTY_TYPES,
+  DatabaseToolError,
+  deleteRowTool,
+  describeDatabaseTool,
   findUnknownBlockType,
   FORM_FIELD_KINDS,
   invalidBlockProps,
   insertBlocks,
   isHttpUrl,
+  KIT_VALUE_BLOCK_TYPES,
   KNOWN_BLOCK_TYPE_IDS,
   MAX_BLOCK_DEPTH,
   MAX_BLOCK_NODES,
-  moveBlock,
-  tableOrderContractKey,
-  tableOrderContractRefusal,
-  TEXT_BLOCK_TYPES,
-  unknownBlockTypeMessage,
-  uploadAgentAsset,
+  movePageTool,
+  PageToolError,
+  PAGE_BACKGROUND_TOKENS,
+  PAGE_COVER_GRADIENT_IDS,
+  PAGE_THEME_IDS,
+  setPageAppearanceTool,
+  setPagePropertiesTool,
+  validatePageProperties,
+  getPagePropertiesTool,
   projectAppendBlocks,
+  moveBlock,
+  richTextRuns,
+  resolveDatabaseToolRowValues,
   resolveTableOp,
   setBlockProps,
   setBlockText,
@@ -36,21 +53,30 @@ import {
   snapshotText,
   tableOpError,
   tableOpRemovesTable,
+  tableOrderContractKey,
+  tableOrderContractRefusal,
   tableShapeOf,
+  TEXT_BLOCK_TYPES,
   textSnapshot,
+  unknownBlockTypeMessage,
+  updateDatabaseTool,
+  updatePropertyTool,
+  updateRowTool,
+  uploadAgentAsset,
   type AgentEditsMode,
   type DataClient,
   type DatabaseRow,
   type FormField,
   type FormSchema,
   type PageSnapshot,
-  type StoredPage,
   type SnapshotTableView,
+  type StoredPage,
   type StoredSuggestion,
   type SuggestionKind,
   type SuggestionTarget,
   type TableOpAddress,
   type TableOpKind,
+  type RichTextInput,
 } from '@book.dev/sdk';
 
 // ── Read helpers over the JSON projection (shared shape with the in-app agent) ─
@@ -383,7 +409,6 @@ function submissionMarker(row: DatabaseRow, formId: string): {formId: string; su
 }
 
 const NAME_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const INPUT_TYPES = new Set(['slider', 'number', 'textfield', 'radio', 'checklist', 'dropdown', 'location', 'toggle']);
 
 function varNameFromLabel(label: string): string {
   const cleaned = label.trim().replace(/[^A-Za-z0-9]+(.)?/g, (_, c?: string) => (c ? c.toUpperCase() : ''));
@@ -404,14 +429,26 @@ function inputValueOf(b: AnyJsonBlock): unknown {
   case 'number':
     return Number(p.value ?? 0);
   case 'textfield':
+  case 'longtext':
     return String(p.value ?? '');
   case 'radio':
   case 'dropdown':
     return p.value ?? null;
   case 'checklist':
     return Array.isArray(p.selected) ? p.selected : [];
+  case 'choicecards':
+  case 'searchselect':
+    return p.multi ? (Array.isArray(p.selected) ? p.selected : []) : (p.value ?? null);
+  case 'tagfield':
+    return Array.isArray(p.selected) ? p.selected : [];
+  case 'richtext':
+    return Array.isArray(p.runs)
+      ? p.runs.map((run) => run && typeof run === 'object' ? String((run as {t?: unknown}).t ?? '') : '').join('')
+      : '';
   case 'toggle':
     return Boolean(p.value ?? false);
+  case 'location':
+    return {lat: p.lat ?? null, lng: p.lng ?? null, label: p.labeltext ?? ''};
   default:
     return undefined;
   }
@@ -423,7 +460,7 @@ function kitValues(data: PageSnapshot | null | undefined): Record<string, unknow
   const scope: Record<string, unknown> = {};
   const walk = (list: AnyJsonBlock[]): void => {
     for (const b of list) {
-      if (b.type && INPUT_TYPES.has(b.type)) {
+      if (b.type && KIT_VALUE_BLOCK_TYPES.has(b.type)) {
         const name = publishedName(b);
         if (name && !(name in scope)) scope[name] = inputValueOf(b);
       }
@@ -445,10 +482,19 @@ function setKitValueInSnapshot(data: PageSnapshot, name: string, value: unknown)
   let applied = false;
   const walk = (list: AnyJsonBlock[]): void => {
     for (const b of list) {
-      if (!applied && b.type && INPUT_TYPES.has(b.type) && publishedName(b) === name) {
+      if (!applied && b.type && KIT_VALUE_BLOCK_TYPES.has(b.type) && publishedName(b) === name) {
         b.props = b.props ?? {};
-        if (b.type === 'checklist') b.props.selected = Array.isArray(value) ? value : [];
-        else b.props.value = value;
+        if (b.type === 'checklist' || b.type === 'tagfield' ||
+          ((b.type === 'choicecards' || b.type === 'searchselect') && b.props.multi)) {
+          b.props.selected = Array.isArray(value) ? value : [];
+        } else if (b.type === 'richtext') {
+          b.props.runs = [{t: String(value ?? '')}];
+        } else if (b.type === 'location') {
+          const location = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+          b.props.lat = location.lat;
+          b.props.lng = location.lng;
+          b.props.labeltext = String(location.label ?? '');
+        } else b.props.value = value;
         applied = true;
       }
       if (b.children) walk(b.children);
@@ -510,7 +556,8 @@ const failure = (value: string) => ({content: [{type: 'text' as const, text: val
 /** A block a client may send to `append_blocks` / `create_artifact_page`. */
 export interface NestedBlockInput {
   type: string;
-  text?: string;
+  text?: RichTextInput;
+  plain?: boolean;
   props?: Record<string, unknown>;
   children?: NestedBlockInput[];
 }
@@ -534,6 +581,15 @@ export interface NestedBlockInput {
 // accepts.
 const BLOCK_TEXT_DESC = `Text content — for the text-carrying types: ${[...TEXT_BLOCK_TYPES].join(', ')}.`;
 
+const runAttrsSchema = z.object({
+  b: z.literal(true).optional(), i: z.literal(true).optional(), u: z.literal(true).optional(),
+  s: z.literal(true).optional(), c: z.literal(true).optional(), a: z.string().optional(),
+}).strict();
+const textInputSchema = z.union([
+  z.string(),
+  z.object({runs: z.array(z.object({t: z.string(), a: runAttrsSchema.optional()}).strict())}).strict(),
+]);
+
 const BLOCK_CHILDREN_DESC =
   `Nested blocks — ONLY for container types (${[...CONTAINER_BLOCK_TYPES].join(', ')}); child-only types sit directly inside their parent (columns→column, table→row→cell, tabs→tab, accordion→accordionsection). ` +
   `Nest to at most ${MAX_BLOCK_DEPTH} levels, ${MAX_BLOCK_NODES} blocks total per call.`;
@@ -543,7 +599,8 @@ function nestedBlockSchema(typeDesc: string, propsDesc: string): z.ZodType<Neste
   const schema: z.ZodType<NestedBlockInput> = z.lazy(() =>
     z.object({
       type: z.string().describe(typeDesc),
-      text: z.string().optional().describe(BLOCK_TEXT_DESC),
+      text: textInputSchema.optional().describe(BLOCK_TEXT_DESC + ' Strings use mini-markdown; {runs:[{t,a}]} supplies editor runs.'),
+      plain: z.boolean().optional().describe('For string text, keep markdown punctuation literal.'),
       props: z.record(z.unknown()).optional().describe(propsDesc),
       children: z.array(schema).optional().describe(BLOCK_CHILDREN_DESC),
     }),
@@ -578,7 +635,10 @@ const blockPayloadError = (blocks: NestedBlockInput[]): string | null =>
  * the identifier is the BRIDGE's, not the tool's). The SDK suggestion `kind` each
  * maps to mirrors `SUGGESTION_KIND` in packages/server/src/ai/agent.ts.
  */
-type McpWriteKind = 'append_blocks' | 'insert_blocks' | 'move_block' | 'update_block' | 'set_kit_value' | 'set_db_cell' | 'delete_block' | 'set_block_props' | TableOpKind;
+type McpWriteKind = 'append_blocks' | 'insert_blocks' | 'move_block' | 'update_block' | 'set_kit_value' | 'set_db_cell' | 'delete_block' | 'set_block_props'
+  | 'create_database' | 'update_database' | 'create_property' | 'update_property' | 'update_row' | 'delete_row'
+  | 'set_page_appearance' | 'move_page' | 'set_page_properties'
+  | TableOpKind;
 
 const MCP_SUGGESTION_KIND: Record<McpWriteKind, SuggestionKind> = {
   append_blocks: 'insert',
@@ -589,6 +649,15 @@ const MCP_SUGGESTION_KIND: Record<McpWriteKind, SuggestionKind> = {
   set_db_cell: 'set-cell',
   delete_block: 'delete',
   set_block_props: 'replace-text',
+  create_database: 'database-op',
+  update_database: 'database-op',
+  create_property: 'database-op',
+  update_property: 'database-op',
+  update_row: 'database-op',
+  delete_row: 'database-op',
+  set_page_appearance: 'set-theme',
+  move_page: 'page-op',
+  set_page_properties: 'page-op',
   // API-3: every table STRUCTURE op reviews as one `table-op` kind; the
   // `payload.applyKind` (the tool name, which is also the bridge's proposal kind)
   // says which op to replay.
@@ -745,7 +814,13 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
     async () => {
       const pages = await client.listPages();
       if (pages.length === 0) return text('The library has no pages yet.');
-      return text(pages.map((p) => `- [${p.id}] ${p.name ?? 'Untitled'}`).join('\n'));
+      const siblingIndex = new Map<string, number>();
+      return text(pages.map((p) => {
+        const parent = p.parentId ?? 'root';
+        const order = siblingIndex.get(parent) ?? 0;
+        siblingIndex.set(parent, order + 1);
+        return `- [${p.id}] ${p.name ?? 'Untitled'} (parent=${parent}, order=${order})`;
+      }).join('\n'));
     },
   );
 
@@ -759,7 +834,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
     async ({pageId}) => {
       const page = await client.getPage(pageId);
       if (!page) return failure('Page not found.');
-      return text(`Title: ${page.name ?? 'Untitled'}\n\n${clip(snapshotText(page.data) || '(empty page)')}`);
+      return text(`Title: ${page.name ?? 'Untitled'}\nProperties: ${JSON.stringify(page.properties ?? {})}\n\n${clip(snapshotText(page.data) || '(empty page)')}`);
     },
   );
 
@@ -802,6 +877,94 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
       }
     },
   );
+
+  // ── Page tools (appearance, metadata, and library-tree structure) ──────────
+  const pageFailure = (error: unknown) => {
+    if (error instanceof PageToolError) return failure(`[${error.code}] ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    return /forbidden|permission|read.only|writer|unauthor/i.test(message)
+      ? failure('[permission_denied] This instance does not allow page writes.')
+      : failure('[invalid_input] The page operation could not be completed.');
+  };
+  const appearanceTheme = z.object({
+    themeId: z.enum(PAGE_THEME_IDS).optional(),
+    background: z.enum(PAGE_BACKGROUND_TOKENS).optional(),
+    controlIntensity: z.number().int().min(0).max(3).optional(),
+    interfaceIntensity: z.number().int().min(0).max(3).optional(),
+  }).strict();
+  const appearanceCover = z.discriminatedUnion('kind', [
+    z.object({kind: z.literal('gradient'), gradientId: z.enum(PAGE_COVER_GRADIENT_IDS)}).strict(),
+    z.object({kind: z.literal('image'), url: z.string().url().or(z.string().startsWith('/api/assets/')).refine((u) => /^https:\/\//i.test(u) || u.startsWith('/api/assets/'), 'cover.url must be https or an OpenBook asset URL'), position: z.number().min(0).max(1).optional()}).strict(),
+  ]);
+
+  server.registerTool('set_page_appearance', {
+    title: 'Set page appearance',
+    description: 'Set or clear a page icon, cover, theme override, or full-width layout. Suggests under Suggest policy and applies under Direct policy.',
+    inputSchema: {
+      pageId: z.string().min(1), icon: z.string().max(32).nullable().optional(),
+      cover: appearanceCover.nullable().optional(), theme: appearanceTheme.nullable().optional(),
+      fullWidth: z.boolean().nullable().optional(),
+    },
+  }, async ({pageId, icon, cover, theme, fullWidth}) => {
+    try {
+      const input = {icon, cover, theme, fullWidth};
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const properties = buildPageAppearancePatch(input);
+        const summary = 'Update page appearance';
+        const suggestion = await recordSuggestion({kind: 'set_page_appearance', pageId, summary, target: {},
+          after: JSON.stringify(properties), payload: {pageId, properties}});
+        return suggested(summary, suggestion);
+      }
+      const updated = await setPageAppearanceTool(client, pageId, input);
+      return text(JSON.stringify({pageId: updated.id, properties: updated.properties}));
+    } catch (error) { return pageFailure(error); }
+  });
+
+  server.registerTool('get_page_properties', {
+    title: 'Get page properties', description: 'Return a page’s stored metadata properties.',
+    inputSchema: {pageId: z.string().min(1)},
+  }, async ({pageId}) => {
+    try { return text(JSON.stringify({pageId, properties: await getPagePropertiesTool(client, pageId)})); }
+    catch (error) { return pageFailure(error); }
+  });
+
+  server.registerTool('set_page_properties', {
+    title: 'Set page properties', description: 'Set validated built-in page properties. Backlinks and appearance keys are not accepted here.',
+    inputSchema: {pageId: z.string().min(1), properties: z.record(z.string(), z.unknown())},
+  }, async ({pageId, properties}) => {
+    try {
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const patch = validatePageProperties(properties);
+        const summary = 'Update page properties';
+        const suggestion = await recordSuggestion({kind: 'set_page_properties', pageId, summary, target: {},
+          after: JSON.stringify(patch), payload: {pageId, properties: patch}});
+        return suggested(summary, suggestion);
+      }
+      const updated = await setPagePropertiesTool(client, pageId, properties);
+      return text(JSON.stringify({pageId: updated.id, properties: updated.properties}));
+    } catch (error) { return pageFailure(error); }
+  });
+
+  server.registerTool('move_page', {
+    title: 'Move a page', description: 'Move a page under a parent (or to the root) and place it by zero-based index or after a sibling.',
+    inputSchema: {pageId: z.string().min(1), parentId: z.string().min(1).nullable(), position: z.union([
+      z.object({index: z.number().int().min(0)}).strict(), z.object({afterId: z.string().min(1)}).strict(),
+    ]).optional()},
+  }, async ({pageId, parentId, position}) => {
+    try {
+      const input = {pageId, parentId, position};
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        buildMovePlan(await client.listPages(), input);
+        const move = {parentId, ...(position && 'afterId' in position ? {afterId: position.afterId} : position ? {index: position.index} : {})};
+        const summary = 'Move page';
+        const suggestion = await recordSuggestion({kind: 'move_page', pageId, summary, target: {},
+          after: JSON.stringify(move), payload: {pageId, move}});
+        return suggested(summary, suggestion);
+      }
+      const moved = await movePageTool(client, input);
+      return text(JSON.stringify({pageId: moved.id, parentId: moved.parentId}));
+    } catch (error) { return pageFailure(error); }
+  });
 
   // The block types an artifact page may contain are the SDK block-type
   // catalogue's (core + kit — the same set the in-app agent accepts), plus
@@ -986,9 +1149,9 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
       title: 'List block types',
       description:
         'List every block type append_blocks / create_artifact_page / update_block_props accept — core blocks, the interactive kit, and installed plugin blocks — with each type\'s nature (container/text/void), where child-only types must sit, declared props, and whether it publishes a reactive kit value.',
-      inputSchema: {},
+      inputSchema: {types: z.array(z.string()).max(50).optional()},
     },
-    async () => {
+    async ({types}) => {
       // Failure-tolerant: an older server without the plugins endpoint still
       // gets the core + kit catalogue, with the plugin section saying so.
       let plugins;
@@ -997,7 +1160,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
       } catch {
         plugins = undefined;
       }
-      return text(blockCatalogueText(plugins));
+      return text(blockCatalogueText(plugins, types));
     },
   );
 
@@ -1332,7 +1495,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
         // nested payload rides in `payload.blocks` (the bridge's coerceNewBlock recurses),
         // so accepting the suggestion materializes the whole tree.
         const after = clip(
-          blocks.map((b) => (b.text ? `${b.type}: ${b.text}` : b.children?.length ? `${b.type} (${b.children.length} children)` : b.type)).join('\n'),
+          blocks.map((b) => (b.text ? `${b.type}: ${richTextRuns(b.text, b.plain).map((run) => run.t).join('')}` : b.children?.length ? `${b.type} (${b.children.length} children)` : b.type)).join('\n'),
           200,
         );
         const s = await recordSuggestion({kind: 'append_blocks', pageId, summary, after, target: {}, payload: {pageId, blocks}});
@@ -1358,10 +1521,11 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
       inputSchema: {
         pageId: z.string().describe('The page id.'),
         blockId: z.string().describe('The block id from inspect_page_structure.'),
-        text: z.string().describe('The new plain text for the block.'),
+        text: textInputSchema.describe('Mini-markdown string or explicit {runs:[{t,a}]} editor runs.'),
+        plain: z.boolean().optional().describe('For string text, keep markdown punctuation literal.'),
       },
     },
-    async ({pageId, blockId, text: newText}) => {
+    async ({pageId, blockId, text: newText, plain}) => {
       const page = await client.getPage(pageId);
       if (!page) return failure('Page not found.');
       if ((await resolveWritePolicy(pageId)) !== 'direct') {
@@ -1375,13 +1539,13 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
           pageId,
           summary,
           before: clip(before, 200),
-          after: clip(newText, 200),
+          after: clip(richTextRuns(newText, plain).map((run) => run.t).join(''), 200),
           target: {blockId},
-          payload: {pageId, blockId, text: newText, before},
+          payload: {pageId, blockId, text: newText, plain, before},
         });
         return suggested(summary, s);
       }
-      const data = setBlockText(page.data, blockId, newText);
+      const data = setBlockText(page.data, blockId, newText, plain);
       if (!data) return failure(`No block "${blockId}" on that block-editor page — use inspect_page_structure.`);
       try {
         await client.savePage({id: page.id, name: page.name, data});
@@ -1587,7 +1751,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
           pageId,
           summary,
           target: parentId ? {blockId: parentId} : {},
-          after: clip(blocks.map((block) => block.text ? `${block.type}: ${block.text}` : block.type).join('\n'), 200),
+          after: clip(blocks.map((block) => block.text ? `${block.type}: ${richTextRuns(block.text, block.plain).map((run) => run.t).join('')}` : block.type).join('\n'), 200),
           payload: {pageId, ...position, blocks},
         });
         return suggested(summary, suggestion);
@@ -1606,7 +1770,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
     {
       title: 'Set a kit value',
       description:
-        'Set a named reactive input on a page (slider/number/toggle/textfield/radio/dropdown/checklist). Find names via get_kit_values. Whether this applies directly or is queued as a REVIEWABLE SUGGESTION is decided per write by the library/page agent-edits policy (default: suggest — applied only when a human accepts it).',
+        'Set a named reactive kit input on a page. Find names and current value shapes via get_kit_values. Whether this applies directly or is queued as a REVIEWABLE SUGGESTION is decided per write by the library/page agent-edits policy (default: suggest — applied only when a human accepts it).',
       inputSchema: {
         pageId: z.string().describe('The page id.'),
         name: z.string().describe('The published input name (from get_kit_values).'),
@@ -1689,6 +1853,160 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
     },
   );
 
+  const databaseFailure = (error: unknown) => {
+    if (error instanceof DatabaseToolError) return failure(`[${error.code}] ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    return /forbidden|permission|read.only|writer|unauthor/i.test(message)
+      ? failure('[permission_denied] This instance does not allow database writes.')
+      : failure('[invalid_input] The database operation could not be completed.');
+  };
+  const databasePropertySchema = {
+    name: z.string().min(1).max(200).describe('Property name.'),
+    type: z.enum(DATABASE_TOOL_PROPERTY_TYPES).describe('Manual database property type.'),
+    options: z.array(z.string().max(200)).max(100).optional().describe('Choice labels for select-style properties.'),
+  };
+
+  server.registerTool('describe_database', {
+    title: 'Describe a database',
+    description: 'Return database identity, property schema, first 40 row identities, and total row count.',
+    inputSchema: {pageId: z.string().describe('The page hosting the database.')},
+  }, async ({pageId}) => {
+    try { return text(JSON.stringify(await describeDatabaseTool(client, pageId))); }
+    catch (error) { return databaseFailure(error); }
+  });
+
+  server.registerTool('create_database', {
+    title: 'Create a database',
+    description: 'Create a database on a new host page, optionally with initial manual properties.',
+    inputSchema: {title: z.string().min(1).max(200), properties: z.array(z.object(databasePropertySchema).strict()).max(100).optional()},
+  }, async ({title, properties}) => {
+    try {
+      const page = await client.savePage({name: title.trim(), data: textSnapshot('', 'mcp')});
+      const schema = {properties: (properties ?? []).map((p) => buildDatabaseToolProperty(p)),
+        views: [{id: `v_${crypto.randomUUID().slice(0, 8)}`, name: 'Table', type: 'table' as const, filters: [], sorts: []}]};
+      if ((await resolveWritePolicy(page.id)) !== 'direct') {
+        const summary = `Create database "${title.trim()}"`;
+        const suggestion = await recordSuggestion({kind: 'create_database', pageId: page.id, summary, target: {},
+          after: JSON.stringify({name: title.trim(), properties: schema.properties}), payload: {pageId: page.id, title: title.trim(), schema}});
+        return suggested(`${summary} on host page ${page.id}`, suggestion);
+      }
+      const database = await createDatabaseTool(client, {pageId: page.id, title, properties});
+      return text(JSON.stringify({pageId: page.id, databaseId: database.id, name: database.name, properties: database.schema.properties}));
+    } catch (error) { return databaseFailure(error); }
+  });
+
+  server.registerTool('update_database', {
+    title: 'Update a database', description: 'Rename the database hosted by a page.',
+    inputSchema: {pageId: z.string(), name: z.string().min(1).max(200)},
+  }, async ({pageId, name}) => {
+    try {
+      const database = await client.getPageDatabase(pageId);
+      if (!database) throw new DatabaseToolError('database_not_found', 'That page hosts no database.');
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const summary = `Rename database to "${name.trim()}"`;
+        const suggestion = await recordSuggestion({kind: 'update_database', pageId, summary, before: database.name ?? '', after: name.trim(),
+          target: {databaseId: database.id}, payload: {databaseId: database.id, patch: {name: name.trim()}}});
+        return suggested(summary, suggestion);
+      }
+      const updated = await updateDatabaseTool(client, {pageId, name});
+      return text(JSON.stringify({databaseId: updated.id, name: updated.name}));
+    } catch (error) { return databaseFailure(error); }
+  });
+
+  server.registerTool('create_property', {
+    title: 'Create a database property', description: 'Add a validated manual property to a database schema.',
+    inputSchema: {pageId: z.string(), ...databasePropertySchema},
+  }, async ({pageId, name, type, options}) => {
+    try {
+      const database = await client.getPageDatabase(pageId);
+      if (!database) throw new DatabaseToolError('database_not_found', 'That page hosts no database.');
+      const property = buildDatabaseToolProperty({name, type, options});
+      const schema = {...database.schema, properties: [...database.schema.properties, property]};
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const summary = `Add property "${property.name}"`;
+        const suggestion = await recordSuggestion({kind: 'create_property', pageId, summary, target: {databaseId: database.id},
+          after: JSON.stringify(property), payload: {databaseId: database.id, patch: {schema}}});
+        return suggested(`${summary} [${property.id}]`, suggestion);
+      }
+      const result = await createPropertyTool(client, {pageId, name, type, options});
+      return text(JSON.stringify({databaseId: result.database.id, property: result.property}));
+    } catch (error) { return databaseFailure(error); }
+  });
+
+  server.registerTool('update_property', {
+    title: 'Update a database property', description: 'Rename a property and/or replace select-style options.',
+    inputSchema: {pageId: z.string(), propertyId: z.string(), name: z.string().min(1).max(200).optional(), options: z.array(z.string().max(200)).max(100).optional()},
+  }, async ({pageId, propertyId, name, options}) => {
+    try {
+      const database = await client.getPageDatabase(pageId);
+      if (!database) throw new DatabaseToolError('database_not_found', 'That page hosts no database.');
+      const index = database.schema.properties.findIndex((p) => p.id === propertyId);
+      if (index < 0) throw new DatabaseToolError('property_not_found', `Unknown property "${propertyId}".`);
+      if (name === undefined && options === undefined) throw new DatabaseToolError('invalid_input', 'Pass a name and/or options.');
+      const property = {...database.schema.properties[index]};
+      if (name !== undefined) {
+        const trimmed = name.trim();
+        if (!trimmed) throw new DatabaseToolError('invalid_input', 'A property name is required.');
+        property.name = trimmed;
+      }
+      if (options !== undefined) property.options = buildDatabaseToolOptions(options, property.options);
+      const schema = {...database.schema, properties: database.schema.properties.map((p, i) => i === index ? property : p)};
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const summary = `Update property "${property.name}"`;
+        const suggestion = await recordSuggestion({kind: 'update_property', pageId, summary, target: {databaseId: database.id, propertyId},
+          before: JSON.stringify(database.schema.properties[index]), after: JSON.stringify(property), payload: {databaseId: database.id, patch: {schema}}});
+        return suggested(summary, suggestion);
+      }
+      const result = await updatePropertyTool(client, {pageId, propertyId, name, options});
+      return text(JSON.stringify({databaseId: result.database.id, property: result.property}));
+    } catch (error) { return databaseFailure(error); }
+  });
+
+  server.registerTool('update_row', {
+    title: 'Update a database row', description: 'Update a row title and/or validated property values without changing other cells.',
+    inputSchema: {
+      pageId: z.string(), rowId: z.string(), name: z.string().max(200).optional(),
+      properties: z.record(z.unknown()).refine((value) => Object.keys(value).length <= 100, 'Too many properties').optional(),
+    },
+  }, async ({pageId, rowId, name, properties}) => {
+    try {
+      const database = await client.getPageDatabase(pageId);
+      if (!database) throw new DatabaseToolError('database_not_found', 'That page hosts no database.');
+      const row = (await client.listRows(database.id)).find((r) => r.id === rowId);
+      if (!row) throw new DatabaseToolError('row_not_found', 'Row not found in this database.');
+      if (name === undefined && properties === undefined) throw new DatabaseToolError('invalid_input', 'Pass a name and/or properties.');
+      const patch = {...(name !== undefined ? {name} : {}), ...(properties !== undefined
+        ? {properties: {...row.properties, ...resolveDatabaseToolRowValues(database.schema, properties)}} : {})};
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const summary = `Update row "${name ?? row.name ?? 'Untitled'}"`;
+        const suggestion = await recordSuggestion({kind: 'update_row', pageId, summary, target: {databaseId: database.id, rowId},
+          before: JSON.stringify({name: row.name, properties: row.properties}), after: JSON.stringify(patch),
+          payload: {databaseId: database.id, rowId, patch}});
+        return suggested(summary, suggestion);
+      }
+      return text(JSON.stringify({row: await updateRowTool(client, {pageId, rowId, name, properties})}));
+    } catch (error) { return databaseFailure(error); }
+  });
+
+  server.registerTool('delete_row', {
+    title: 'Delete a database row', description: 'Move a database row page to the recoverable trash.',
+    inputSchema: {pageId: z.string(), rowId: z.string()},
+  }, async ({pageId, rowId}) => {
+    try {
+      const database = await client.getPageDatabase(pageId);
+      if (!database) throw new DatabaseToolError('database_not_found', 'That page hosts no database.');
+      const row = (await client.listRows(database.id)).find((r) => r.id === rowId);
+      if (!row) throw new DatabaseToolError('row_not_found', 'Row not found in this database.');
+      if ((await resolveWritePolicy(pageId)) !== 'direct') {
+        const summary = `Move row "${row.name ?? 'Untitled'}" to trash`;
+        const suggestion = await recordSuggestion({kind: 'delete_row', pageId, summary, before: JSON.stringify({id: row.id, name: row.name}),
+          target: {databaseId: database.id, rowId}, payload: {databaseId: database.id, rowId}});
+        return suggested(summary, suggestion);
+      }
+      return text(JSON.stringify({deleted: await deleteRowTool(client, {pageId, rowId}), trashed: true}));
+    } catch (error) { return databaseFailure(error); }
+  });
+
   // ── Table structure (API-3) ──────────────────────────────────────────────────
   //
   // The seven structural table ops the editor's context menu offers, plus cell
@@ -1726,7 +2044,8 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
   // `update_block_props` refuses those keys.
 
   /** The write-summary label for a table op (also the suggestion's summary). */
-  const tableOpLabel = (kind: TableOpKind, view: SnapshotTableView, resolved: {rowIndex?: number; colIndex?: number; toIndex?: number; text?: string; color?: string | null; width?: number | null}): string => {
+  const tableText = (value: RichTextInput | undefined, plain?: boolean): string => value === undefined ? '' : richTextRuns(value, plain).map((run) => run.t).join('');
+  const tableOpLabel = (kind: TableOpKind, view: SnapshotTableView, resolved: {rowIndex?: number; colIndex?: number; toIndex?: number; text?: RichTextInput; plain?: boolean; color?: string | null; width?: number | null}): string => {
     const where = `table ${view.tableId}`;
     switch (kind) {
     case 'table_insert_row': return `Insert a row at position ${resolved.rowIndex} of ${where}`;
@@ -1736,7 +2055,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
     case 'table_delete_column': return `Delete column ${resolved.colIndex} of ${where}`;
     case 'table_move_row': return `Move row ${resolved.rowIndex} to position ${resolved.toIndex} of ${where}`;
     case 'table_move_column': return `Move column ${resolved.colIndex} to position ${resolved.toIndex} of ${where}`;
-    case 'table_set_cell': return `Set row ${resolved.rowIndex}, column ${resolved.colIndex} of ${where} to "${clip(resolved.text ?? '', 60)}"`;
+    case 'table_set_cell': return `Set row ${resolved.rowIndex}, column ${resolved.colIndex} of ${where} to "${clip(tableText(resolved.text, resolved.plain), 60)}"`;
     case 'table_set_row_color': return `${resolved.color ? `Tint row ${resolved.rowIndex} ${resolved.color}` : `Clear the tint on row ${resolved.rowIndex}`} of ${where}`;
     case 'table_set_column_color': return `${resolved.color ? `Tint column ${resolved.colIndex} ${resolved.color}` : `Clear the tint on column ${resolved.colIndex}`} of ${where}`;
     case 'table_set_column_width': return `${resolved.width === null ? 'Reset' : `Set ${resolved.width}px for`} column ${resolved.colIndex} of ${where}`;
@@ -1744,7 +2063,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
   };
 
   /** The before→after pair the review card shows for a table op. */
-  const tableOpDiff = (kind: TableOpKind, view: SnapshotTableView, resolved: {rowIndex?: number; colIndex?: number; toIndex?: number; text?: string; color?: string | null; width?: number | null}): {before: string; after: string} => {
+  const tableOpDiff = (kind: TableOpKind, view: SnapshotTableView, resolved: {rowIndex?: number; colIndex?: number; toIndex?: number; text?: RichTextInput; plain?: boolean; color?: string | null; width?: number | null}): {before: string; after: string} => {
     const row = (r: number | undefined): string => (r === undefined ? '' : (view.cells[r] ?? []).join(' | '));
     const column = (c: number | undefined): string => (c === undefined ? '' : view.cells.map((cells) => cells[c] ?? '').join(' | '));
     switch (kind) {
@@ -1755,7 +2074,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
     case 'table_duplicate_row': return {before: row(resolved.rowIndex), after: `${row(resolved.rowIndex)} (copied below)`};
     case 'table_move_row': return {before: `row ${resolved.rowIndex}: ${row(resolved.rowIndex)}`, after: `position ${resolved.toIndex}`};
     case 'table_move_column': return {before: `column ${resolved.colIndex}: ${column(resolved.colIndex)}`, after: `position ${resolved.toIndex}`};
-    case 'table_set_cell': return {before: view.cells[resolved.rowIndex ?? 0]?.[resolved.colIndex ?? 0] ?? '', after: resolved.text ?? ''};
+    case 'table_set_cell': return {before: view.cells[resolved.rowIndex ?? 0]?.[resolved.colIndex ?? 0] ?? '', after: tableText(resolved.text, resolved.plain)};
     case 'table_set_row_color': return {before: '(row tint)', after: resolved.color ?? '(none)'};
     case 'table_set_column_color': return {before: '(column tint)', after: resolved.color ?? '(none)'};
     case 'table_set_column_width': return {before: '(column width)', after: resolved.width === null ? '(auto)' : `${resolved.width}px`};
@@ -2031,11 +2350,12 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
         rowIndex: ROW_INDEX('The cell\'s row.'),
         colIndex: COL_INDEX('The cell\'s column.'),
         cellId: z.string().optional().describe('The cell block id (from inspect_table) — resolves BOTH indices and names the table.'),
-        text: z.string().describe('The new plain text for the cell (empty string clears it).'),
+        text: textInputSchema.describe('Mini-markdown string or explicit runs (empty string clears it).'),
+        plain: z.boolean().optional().describe('Keep a string literal.'),
       },
     },
-    async ({pageId, tableId, rowIndex, colIndex, cellId, text: cellText}) =>
-      runTableOp('table_set_cell', pageId, {tableId, rowIndex, colIndex, cellId, text: cellText}),
+    async ({pageId, tableId, rowIndex, colIndex, cellId, text: cellText, plain}) =>
+      runTableOp('table_set_cell', pageId, {tableId, rowIndex, colIndex, cellId, text: cellText, plain}),
   );
 
   server.registerTool(

@@ -1,6 +1,6 @@
 {
   "name": "@book.dev/sdk",
-  "version": "3.16.0",
+  "version": "3.17.0",
   "description": "Shared OpenBook types and HTTP client used by the server, desktop, and web.",
   "repository": {
     "type": "git",
@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "fflate": "^0.8.3",
-    "marked": "^18.0.5"
+    "marked": "^18.0.5",
+    "zod": "^3.25.0"
   }
 }

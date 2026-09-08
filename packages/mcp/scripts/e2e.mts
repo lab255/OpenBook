@@ -135,6 +135,15 @@ async function main(): Promise<void> {
   const createdId = /id ([0-9a-f-]{36})/.exec(resultText(created))?.[1];
   check('create_page returns the new id', Boolean(createdId));
 
+  const appearance = await client.callTool({name: 'set_page_appearance', arguments: {pageId: createdId!, icon: '📘', theme: {themeId: 'ocean'}}});
+  check('set_page_appearance is available through the handshake', resultText(appearance).includes('Suggested for review'));
+  const move = await client.callTool({name: 'move_page', arguments: {pageId: createdId!, parentId: note.id, position: {index: 0}}});
+  check('move_page is available through the handshake', resultText(move).includes('Suggested for review'));
+  const setProperties = await client.callTool({name: 'set_page_properties', arguments: {pageId: createdId!, properties: {sys_owner: 'MCP'}}});
+  check('set_page_properties is available through the handshake', resultText(setProperties).includes('Suggested for review'));
+  const getProperties = await client.callTool({name: 'get_page_properties', arguments: {pageId: createdId!}});
+  check('get_page_properties is available through the handshake', getProperties.isError !== true && resultText(getProperties).includes('properties'));
+
   // Write tools now route through the review layer by DEFAULT: append_to_page
   // records an `insert` suggestion (applyKind append_blocks) rather than mutating.
   const append = await client.callTool({name: 'append_to_page', arguments: {pageId: createdId!, content: 'Appended line.'}});
@@ -188,6 +197,21 @@ async function main(): Promise<void> {
   check('unknown block types are rejected', badType.isError === true && resultText(badType).includes('iframe'));
 
   console.log('\nDatabase tools');
+  const describeDb = await client.callTool({name: 'describe_database', arguments: {pageId: dbHost.id}});
+  check('describe_database is callable in the handshake', resultText(describeDb).includes(database.id));
+  const createDb = await client.callTool({name: 'create_database', arguments: {title: 'Handshake database'}});
+  check('create_database is callable in the handshake', resultText(createDb).includes('Suggested for review'));
+  const updateDb = await client.callTool({name: 'update_database', arguments: {pageId: dbHost.id, name: 'Tasks renamed'}});
+  check('update_database is callable in the handshake', resultText(updateDb).includes('Suggested for review'));
+  const createProp = await client.callTool({name: 'create_property', arguments: {pageId: dbHost.id, name: 'Estimate', type: 'number'}});
+  check('create_property is callable in the handshake', resultText(createProp).includes('Suggested for review'));
+  const existingProperty = database.schema.properties[0];
+  const updateProp = await client.callTool({name: 'update_property', arguments: {pageId: dbHost.id, propertyId: existingProperty.id, name: 'Title text'}});
+  check('update_property is callable in the handshake', resultText(updateProp).includes('Suggested for review'));
+  const updateDbRow = await client.callTool({name: 'update_row', arguments: {pageId: dbHost.id, rowId: seededRow.id, name: 'Edited task'}});
+  check('update_row is callable in the handshake', resultText(updateDbRow).includes('Suggested for review'));
+  const deleteDbRow = await client.callTool({name: 'delete_row', arguments: {pageId: dbHost.id, rowId: seededRow.id}});
+  check('delete_row is callable in the handshake', resultText(deleteDbRow).includes('Suggested for review'));
   const rows = await client.callTool({name: 'list_database_rows', arguments: {pageId: dbHost.id}});
   check('list_database_rows lists the seeded row', resultText(rows).includes('Write the report'));
 

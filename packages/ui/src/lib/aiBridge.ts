@@ -1,5 +1,7 @@
 import type * as Y from 'yjs';
+import {richTextRuns, type RichTextInput} from '@book.dev/sdk';
 import {
+  buildMovePlan,
   findBlock as findSnapshotBlock,
   insertBlocks as insertSnapshotBlocks,
   moveBlock as moveSnapshotBlock,
@@ -12,6 +14,9 @@ import {
   type AgentProposal,
   type AppendBlock,
   type DataClient,
+  type DatabaseSchema,
+  type DatabaseUpdate,
+  type RowUpdate,
   type SnapshotTableView,
   type StoredSuggestion,
   type TableOpAddress,
@@ -153,7 +158,7 @@ export const getPageIdForDoc = (doc: Y.Doc): string | null => {
 // so the live-vs-stored branching is unit-testable against the doc registry.
 
 /** The subset of the data client the agent write path calls. */
-export type ApplyClient = Pick<DataClient, 'updateRow' | 'getPage' | 'savePage'>;
+export type ApplyClient = Pick<DataClient, 'listPages' | 'updateRow' | 'getPage' | 'savePage' | 'createDatabase' | 'updateDatabase' | 'deletePage' | 'setPageProperties' | 'movePage'>;
 
 /**
  * When deleting `found` would empty its table, the id of the TABLE to delete
@@ -295,6 +300,7 @@ export const applyTableProposalToDoc = (doc: Y.Doc, kind: TableOpKind, payload: 
     // Re-read the grid: the ops above may have run earlier in this same
     // transaction, and `tableGrid` is only valid until the table changes.
     const grid = tableGrid(table.block);
+    const runs = richTextRuns(op.text ?? '', op.plain);
     const cell = grid.cells[op.rowIndex!]?.[op.colIndex!];
     if (!cell) {
       // A merge gap has no cell node — materialize one bound to that column, so
@@ -304,12 +310,17 @@ export const applyTableProposalToDoc = (doc: Y.Doc, kind: TableOpKind, payload: 
       const row = grid.rows[op.rowIndex!];
       const colId = grid.colIds[op.colIndex!];
       const rowCells = row && blockChildren(row);
-      if (rowCells && colId) rowCells.push([makeBlock({type: 'cell', props: {col: colId}, text: [{t: op.text ?? ''}]})]);
+      if (rowCells && colId) rowCells.push([makeBlock({type: 'cell', props: {col: colId}, text: runs})]);
       return;
     }
     const text = blockText(cell);
     if (!text) throw new Error(`row ${op.rowIndex} column ${op.colIndex} of table ${table.id} has no cell to write`);
-    replaceText(text, op.text ?? '');
+    text.delete(0, text.length);
+    let at = 0;
+    for (const run of runs) {
+      text.insert(at, run.t, run.a ?? {});
+      at += run.t.length;
+    }
     return;
   }
   case 'table_set_row_color':
@@ -337,14 +348,26 @@ export const applyProposalToDoc = (doc: Y.Doc, p: AgentProposal): void => {
       const found = findBlock(doc, String(payload.blockId));
       const text = found && blockText(found.block);
       if (text) {
-        const theirs = String(payload.text ?? '');
+        const input = payload.text as RichTextInput;
+        const runs = richTextRuns(input, payload.plain === true);
+        const theirs = runs.map((run) => run.t).join('');
         // `payload.before` is the block text when the suggestion was made.
         // Merging against it (rather than replacing wholesale) means a second
         // suggestion accepted on the same block keeps the first one's edit
         // instead of clobbering it; with no base we fall back to a replace.
         const base = typeof payload.before === 'string' ? payload.before : null;
-        const next = base === null ? theirs : merge3(base, text.toString(), theirs);
-        replaceText(text, next);
+        const rich = typeof input !== 'string' || runs.some((run) => run.a);
+        if (rich) {
+          text.delete(0, text.length);
+          let at = 0;
+          for (const run of runs) {
+            text.insert(at, run.t, run.a ?? {});
+            at += run.t.length;
+          }
+        } else {
+          const next = base === null ? theirs : merge3(base, text.toString(), theirs);
+          replaceText(text, next);
+        }
       }
     } else if (p.kind === 'append_blocks') {
       const list = rootBlocks(doc);
@@ -461,6 +484,26 @@ const applyToStoredPage = async (client: ApplyClient, pageId: string, p: AgentPr
  */
 export const applyProposal = async (client: ApplyClient, p: AgentProposal): Promise<void> => {
   const payload = p.payload;
+  if (p.kind === 'create_database') {
+    await client.createDatabase({
+      pageId: String(payload.pageId),
+      name: String(payload.title),
+      schema: payload.schema as DatabaseSchema,
+    });
+    return;
+  }
+  if (p.kind === 'update_database' || p.kind === 'create_property' || p.kind === 'update_property') {
+    await client.updateDatabase(String(payload.databaseId), payload.patch as DatabaseUpdate);
+    return;
+  }
+  if (p.kind === 'update_row') {
+    await client.updateRow(String(payload.databaseId), String(payload.rowId), payload.patch as RowUpdate);
+    return;
+  }
+  if (p.kind === 'delete_row') {
+    await client.deletePage(String(payload.rowId));
+    return;
+  }
   if (p.kind === 'set_db_cell') {
     // DB cells are manual page properties — never in the editor CRDT.
     await client.updateRow(String(payload.databaseId), String(payload.rowId), {
@@ -476,6 +519,16 @@ export const applyProposal = async (client: ApplyClient, p: AgentProposal): Prom
     // Appearance is a per-page viewing preference (localStorage), not CRDT
     // content — apply it directly here on the client.
     applyPageAppearance(pageId, payload);
+    return;
+  }
+  if (p.kind === 'set_page_appearance' || p.kind === 'set_page_properties') {
+    await client.setPageProperties(pageId, payload.properties as Record<string, unknown>);
+    return;
+  }
+  if (p.kind === 'move_page') {
+    const move = payload.move as {parentId: string | null; afterId?: string; index?: number};
+    const position = move.afterId !== undefined ? {afterId: move.afterId} : move.index !== undefined ? {index: move.index} : undefined;
+    await client.movePage(pageId, buildMovePlan(await client.listPages(), {pageId, parentId: move.parentId, position}));
     return;
   }
 

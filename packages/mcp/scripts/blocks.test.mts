@@ -133,6 +133,26 @@ async function main(): Promise<void> {
   console.log('\nAPI-1: tool catalogue exposes nested children + the new write tools');
   const tools = await mcp.client.listTools();
   const byName = new Map(tools.tools.map((t) => [t.name, t]));
+
+  console.log('\nAPI-8: rich text inputs materialize as editor runs');
+  await mcp.client.callTool({name: 'update_block', arguments: {pageId: page.id, blockId: 'b1', text: '**a** [b](https://x.test)'}});
+  let richPage = await seed.getPage(page.id);
+  let richRuns = ((richPage?.data.blockdoc as {blocks?: Array<{text?: unknown}>})?.blocks?.[0]?.text);
+  check('update_block parses mini-markdown into bold and link runs',
+    Array.isArray(richRuns) && richRuns[0]?.t === 'a' && richRuns[0]?.a?.b === true && richRuns[2]?.t === 'b' && richRuns[2]?.a?.a === 'https://x.test');
+  const explicit = [{t: 'one', a: {i: true}}, {t: ' two', a: {s: true}}];
+  await mcp.client.callTool({name: 'update_block', arguments: {pageId: page.id, blockId: 'b1', text: {runs: explicit}}});
+  richPage = await seed.getPage(page.id);
+  richRuns = ((richPage?.data.blockdoc as {blocks?: Array<{text?: unknown}>})?.blocks?.[0]?.text);
+  check('explicit runs round-trip exactly', Array.isArray(richRuns) && richRuns[0]?.t === 'one' && richRuns[0]?.a?.i === true && richRuns[1]?.t === ' two' && richRuns[1]?.a?.s === true);
+  await mcp.client.callTool({name: 'update_block', arguments: {pageId: page.id, blockId: 'b1', text: '**a**', plain: true}});
+  richPage = await seed.getPage(page.id);
+  richRuns = ((richPage?.data.blockdoc as {blocks?: Array<{text?: unknown}>})?.blocks?.[0]?.text);
+  check('plain true keeps marker bytes literal', JSON.stringify(richRuns) === JSON.stringify([{t: '**a**'}]));
+  await mcp.client.callTool({name: 'update_block', arguments: {pageId: page.id, blockId: 'b1', text: 'ordinary bytes'}});
+  richPage = await seed.getPage(page.id);
+  richRuns = ((richPage?.data.blockdoc as {blocks?: Array<{text?: unknown}>})?.blocks?.[0]?.text);
+  check('unmarked strings preserve existing plain behavior', JSON.stringify(richRuns) === JSON.stringify([{t: 'ordinary bytes'}]));
   check('the catalogue includes delete_block and update_block_props', byName.has('delete_block') && byName.has('update_block_props'));
   check('the catalogue includes move_block and insert_blocks', byName.has('move_block') && byName.has('insert_blocks'));
   const appendSchema = JSON.stringify(byName.get('append_blocks')?.inputSchema ?? {});
@@ -251,7 +271,7 @@ async function main(): Promise<void> {
       editor: 'blocks',
       blockdoc: {
         blocks: [
-          {id: 'img1', type: 'image', props: {src: 'data:image/png;base64,AAA', alt: 'old', width: 320}},
+          {id: 'img1', type: 'image', props: {src: 'data:image/png;base64,AAA', alt: 'old', width: '30%'}},
           {id: 'grp', type: 'group', children: [{id: 'call1', type: 'callout', text: [{t: 'heads up'}], props: {variant: 'info', bg: 'amber'}}]},
         ],
       },
@@ -260,17 +280,15 @@ async function main(): Promise<void> {
       names: [],
     },
   });
-  // API-2: image `width` is a CSS length STRING (the editor writes '30%'/'60%'
-  // — never a bare number), so the canonical value passes and a numeric one is
-  // refused by the catalogue's typed prop check.
+  // API-11: image width is the CSS-length string written by the editor.
   const imgUpd = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: propsPage.id, blockId: 'img1', props: {alt: 'a chart', width: '60%'}}});
   check('update_block_props confirms a direct write on an image block', !isError(imgUpd) && resultText(imgUpd).includes('directly'));
   const imgLine = parseTree(resultText(await mcp.client.callTool({name: 'inspect_page_structure', arguments: {pageId: propsPage.id}}))).find((l) => l.id === 'img1')!;
   check('the passed props were merged and the untouched ones survived',
     /"alt":"a chart"/.test(imgLine.raw) && /"width":"60%"/.test(imgLine.raw) && /"src":"data:image/.test(imgLine.raw));
   const imgBadWidth = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: propsPage.id, blockId: 'img1', props: {width: 640}}});
-  check('a numeric image width (a value the editor never writes) is refused as mistyped',
-    isError(imgBadWidth) && /"width"/.test(resultText(imgBadWidth)) && /must be a string/.test(resultText(imgBadWidth)));
+  check('a numeric image width is refused as mistyped',
+    isError(imgBadWidth) && /"width"/.test(resultText(imgBadWidth)) && /string/i.test(resultText(imgBadWidth)));
 
   const calloutUpd = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: propsPage.id, blockId: 'call1', props: {variant: 'warn', bg: null}}});
   check('update_block_props reaches a NESTED block (inside a group)', !isError(calloutUpd));

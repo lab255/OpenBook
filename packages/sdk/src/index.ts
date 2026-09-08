@@ -211,6 +211,41 @@ export type {
   RowTreeNode,
 } from './database';
 export {
+  DATABASE_TOOL_PROPERTY_TYPES,
+  DatabaseToolError,
+  buildDatabaseToolOptions,
+  buildDatabaseToolProperty,
+  resolveDatabaseToolRowValues,
+  describeDatabaseTool,
+  createDatabaseTool,
+  updateDatabaseTool,
+  createPropertyTool,
+  updatePropertyTool,
+  updateRowTool,
+  deleteRowTool,
+  type DatabaseDescription,
+  type DatabaseToolErrorCode,
+  type DatabaseToolStore,
+} from './databaseTools';
+export {
+  PAGE_THEME_IDS,
+  PAGE_BACKGROUND_TOKENS,
+  PAGE_COVER_GRADIENT_IDS,
+  COVER_GRADIENTS,
+  PageToolError,
+  buildPageAppearancePatch,
+  validatePageProperties,
+  buildMovePlan,
+  setPageAppearanceTool,
+  getPagePropertiesTool,
+  setPagePropertiesTool,
+  movePageTool,
+  type PageAppearanceInput,
+  type PageToolErrorCode,
+  type PageToolStore,
+  type PageToolMoveInput,
+} from './pageTools';
+export {
   TITLE_PROPERTY_ID,
   FORM_PROPERTY_TYPE_WRITABILITY,
   FORM_ROW_VALIDATION_ERROR_CODES,
@@ -361,6 +396,16 @@ export {
 } from './authorize';
 export {snapshotText, snapshotSegments, paragraphBlocks, textSnapshot, appendTextToSnapshot, appendBlocksToSnapshot, projectAppendBlocks, type AppendBlock, type ProjectedBlock, type SnapshotSegment} from './content';
 export {
+  RichTextInputError,
+  normalizeRuns,
+  parseMiniMarkdown,
+  richTextRuns,
+  type RichTextInput,
+  type RichTextInputErrorCode,
+  type Run,
+  type RunAttrs,
+} from './richTextInput';
+export {
   BlockSnapshotError,
   deleteBlock,
   findBlock,
@@ -495,6 +540,7 @@ export {
 } from './plugins';
 export {
   BLOCK_TYPE_CATALOGUE,
+  KIT_VALUE_BLOCK_TYPES,
   KNOWN_BLOCK_TYPE_IDS,
   CONTAINER_BLOCK_TYPES,
   TEXT_BLOCK_TYPES,
@@ -517,6 +563,12 @@ export {
   type UnknownBlockType,
   type PluginBlockSource,
 } from './blockCatalogue';
+export {
+  BLOCK_PROP_SCHEMAS,
+  BLOCK_PROP_JSON_SCHEMAS,
+  type BlockPropsJsonSchema,
+  type CataloguedSchemaType,
+} from './blockPropSchemas';
 export {
   RegistryClient,
   RegistryError,

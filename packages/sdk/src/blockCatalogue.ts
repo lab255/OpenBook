@@ -26,6 +26,8 @@
  * and validators accept them by pattern + an installed-plugin lookup where one
  * is available — see {@link isPluginBlockType} and {@link findUnknownBlockType}.
  */
+import {BLOCK_PROP_JSON_SCHEMAS, BLOCK_PROP_SCHEMAS, type BlockPropsJsonSchema} from './blockPropSchemas';
+export {BLOCK_PROP_JSON_SCHEMAS, BLOCK_PROP_SCHEMAS} from './blockPropSchemas';
 
 /** How a block stores content: `container` blocks carry child blocks in
  *  `children`, `text` blocks carry rich text in `text`, `void` blocks carry
@@ -49,12 +51,9 @@ export interface BlockTypeInfo {
    *  inside (column→columns, row→table, cell→row, tab→tabs,
    *  accordionsection→accordion). */
   readonly parent?: string;
-  /** Well-known props → expected value type. Validation is permissive: props
-   *  NOT declared here always pass (the editor ignores what it doesn't know);
-   *  declared ones must match, `null` always passes (it removes the key). */
+  /** Agent-facing coarse summary; validation uses BLOCK_PROP_SCHEMAS. */
   readonly props?: Readonly<Record<string, BlockPropType>>;
-  /** Publishes a named value into the page's reactive kit scope (mirrors
-   *  `INPUT_TYPES` in packages/ui/src/blockeditor/kit/scope.ts). */
+  /** Publishes a named value into the page's reactive kit scope. */
   readonly kitValue?: boolean;
   /** One-line usage hint surfaced in tool descriptions / list_block_types. */
   readonly hint?: string;
@@ -73,10 +72,8 @@ const CATALOGUE_LITERAL = [
   {type: 'notes', category: 'core', nature: 'text', hint: 'speaker note — presenter view only, never exported'},
   {type: 'divider', category: 'core', nature: 'void'},
   // ── Core media leaves ──────────────────────────────────────────────────────
-  // `width` is a CSS length STRING (the editor writes percentages: '30%',
-  // '60%', `${pct}%` — see ui/blockeditor/imageBlock.ts + ImageBlockView).
-  {type: 'image', category: 'core', nature: 'void', props: {assetId: 'string', src: 'string', alt: 'string', width: 'string'}, hint: '{assetId|src,alt?,width?:"60%"}'},
-  {type: 'htmlArtifact', category: 'core', nature: 'void', props: {assetId: 'string', name: 'string', height: 'number'}, hint: 'sandboxed HTML document {assetId,name?,height?}'},
+  {type: 'image', category: 'core', nature: 'void', props: {assetId: 'string', src: 'string', alt: 'string', caption: 'string', width: 'string'}, hint: '{assetId|src,alt?,caption?,width?} — width is a CSS length such as "60%"'},
+  {type: 'htmlArtifact', category: 'core', nature: 'void', props: {assetId: 'string', title: 'string', height: 'number'}, hint: 'sandboxed HTML document {assetId,title?,height?} — height is CSS px'},
   // ── Core containers (children hold ordinary blocks) ────────────────────────
   {type: 'columns', category: 'core', nature: 'container', hint: 'side-by-side layout → column children (spans sum to 12)'},
   {type: 'column', category: 'core', nature: 'container', parent: 'columns', props: {span: 'number'}, hint: '{span:1-12}'},
@@ -101,7 +98,7 @@ const CATALOGUE_LITERAL = [
   {type: 'choicecards', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', opts: 'array', multi: 'boolean'}, hint: '{name,label?,value,opts:[{label,value,icon?}],multi?}'},
   {type: 'searchselect', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', opts: 'array', multi: 'boolean'}, hint: '{name,label?,value,opts,multi?}'},
   {type: 'tagfield', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', selected: 'array', freeEntry: 'boolean'}, hint: '{name,label?,selected:[],freeEntry?}'},
-  {type: 'location', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string'}, hint: '{name,label?}'},
+  {type: 'location', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', lat: 'number', lng: 'number', labeltext: 'string'}, hint: '{name,label?,lat?,lng?,labeltext?}'},
   // ── Kit actions + reactive display (consume the scope via `source`) ────────
   {type: 'actionbutton', category: 'kit', nature: 'void', props: {btnlabel: 'string', action: 'string', target: 'string', amount: 'number', url: 'string'}, hint: '{btnlabel,action:"increment"|"set"|"toggle"|"link",target?,amount?,url?}'},
   {type: 'kitchart', category: 'kit', nature: 'void', props: {kind: 'string', title: 'string', labels: 'string', source: 'string'}, hint: '{kind:"line"|"area"|"bar"|"pie"|"donut"|"scatter"|"funnel",title?,labels?,source}'},
@@ -131,6 +128,12 @@ export const blockTypeInfo = (type: string): BlockTypeInfo | undefined => byType
 /** Every catalogued (core + kit) type id. */
 export const KNOWN_BLOCK_TYPE_IDS: ReadonlySet<string> = new Set(byType.keys());
 
+/** Every catalogue type that publishes a named value into the reactive kit scope.
+ *  `progressbar` / `actionbutton` are deliberately not inputs: display/action blocks read scope but never publish. */
+export const KIT_VALUE_BLOCK_TYPES: ReadonlySet<string> = new Set(
+  BLOCK_TYPE_CATALOGUE.filter((entry) => entry.kitValue === true).map((entry) => entry.type),
+);
+
 /** Core types whose `children` hold ordinary blocks. */
 export const CONTAINER_BLOCK_TYPES: ReadonlySet<CoreBlockType> = new Set(
   BLOCK_TYPE_CATALOGUE.filter((e) => e.nature === 'container').map((e) => e.type as CoreBlockType),
@@ -145,9 +148,6 @@ export const TEXT_BLOCK_TYPES: ReadonlySet<CoreBlockType> = new Set(
 export const CHILD_ONLY_PARENT: Readonly<Record<string, string>> = Object.fromEntries(
   BLOCK_TYPE_CATALOGUE.filter((e) => e.parent).map((e) => [e.type, e.parent as string]),
 );
-
-/** Props every block accepts regardless of type (block chrome, not content). */
-const COMMON_PROPS: Readonly<Record<string, BlockPropType>> = {bg: 'string'};
 
 // ── Plugin block types ─────────────────────────────────────────────────────────
 
@@ -330,21 +330,13 @@ function raggedTableError(rows: readonly unknown[], path: string): string | null
  * and plugin/unknown types pass entirely. Returns a message, or null.
  */
 export function invalidBlockProps(type: string, props: Record<string, unknown>): string | null {
-  const info = byType.get(type);
-  if (!info) return null;
-  const declared = {...COMMON_PROPS, ...info.props};
-  for (const [key, value] of Object.entries(props)) {
-    // Own-property gate: a prop named after an Object.prototype member
-    // (`toString`, `constructor`, …) must read as UNDECLARED, not as the
-    // inherited function. (hasOwnProperty.call — the SDK targets pre-ES2022.)
-    const expect = Object.prototype.hasOwnProperty.call(declared, key) ? declared[key] : undefined;
-    if (!expect || value === null || value === undefined) continue;
-    const actual = Array.isArray(value) ? 'array' : typeof value;
-    if (actual !== expect) {
-      return `Prop "${key}" of a "${type}" block must be ${expect === 'array' ? 'an array' : `a ${expect}`} — got ${actual} (${clipJson(value)}).`;
-    }
-  }
-  return null;
+  const schema = BLOCK_PROP_SCHEMAS[type as keyof typeof BLOCK_PROP_SCHEMAS];
+  if (!schema) return null; // plugin props belong to their plugin
+  const parsed = schema.safeParse(props);
+  if (parsed.success) return null;
+  const issue = parsed.error.issues[0];
+  const prop = issue.path.length ? String(issue.path[0]) : Object.keys(props)[0] ?? '(props)';
+  return `Invalid prop "${prop}" of a "${type}" block: ${issue.message} (got ${clipJson(props[prop])}).`;
 }
 
 const clipJson = (v: unknown): string => {
@@ -361,44 +353,26 @@ export interface PluginBlockSource {
   enabled?: boolean;
 }
 
-/** One `list_block_types` line for a catalogue entry. */
-function entryLine(e: BlockTypeInfo): string {
-  const bits = [
-    `- ${e.type} (${e.category}, ${e.nature})`,
-    e.nature === 'container' ? `children: yes${CHILD_ONLY_PARENT[e.type] ? ` — only inside "${CHILD_ONLY_PARENT[e.type]}"` : ''}` : CHILD_ONLY_PARENT[e.type] ? `only inside "${CHILD_ONLY_PARENT[e.type]}"` : '',
-    e.kitValue ? 'publishes a kit value' : '',
-    e.props ? `props: ${Object.entries(e.props).map(([k, t]) => `${k}:${t}`).join(', ')}` : '',
-    e.hint ? `— ${e.hint}` : '',
-  ];
-  return bits.filter(Boolean).join(' · ');
-}
-
 /**
  * The full catalogue as `list_block_types` text: every core + kit entry, then
  * one `plugin` entry per block each installed plugin DECLARES in its manifest
  * (`PluginManifest.blocks`). Pass the installed plugins where a listing is
  * available; omit it and the plugin section says so instead of guessing.
  */
-export function blockCatalogueText(plugins?: readonly PluginBlockSource[]): string {
-  const lines: string[] = [
-    'Block types (type · category, nature · children/kit-value · declared props):',
-    ...BLOCK_TYPE_CATALOGUE.map((e) => entryLine(e)),
-  ];
-  if (!plugins) {
-    lines.push('Plugin blocks: installed-plugin listing unavailable — plugin types (`<pluginId>/<type>`) are accepted as-is.');
-    return lines.join('\n');
-  }
-  const pluginLines: string[] = [];
-  for (const p of plugins) {
-    for (const b of p.manifest.blocks ?? []) {
-      pluginLines.push(
-        `- ${p.manifest.id}/${b.type} (plugin: ${p.manifest.name ?? p.manifest.id}${p.enabled === false ? ', disabled' : ''}, void)${b.description ? ` — ${b.description}` : ''}`,
-      );
-    }
-  }
-  lines.push(pluginLines.length ? 'Installed plugin blocks:' : 'Installed plugin blocks: none.');
-  lines.push(...pluginLines);
-  return lines.join('\n');
+export function blockCatalogueText(plugins?: readonly PluginBlockSource[], types?: readonly string[]): string {
+  const wanted = types ? new Set(types) : null;
+  const blocks = BLOCK_TYPE_CATALOGUE.filter((e) => !wanted || wanted.has(e.type)).map((e) => ({
+    type: e.type, category: e.category, nature: e.nature,
+    ...(e.parent ? {parent: e.parent} : {}), ...(e.kitValue ? {kitValue: true} : {}),
+    description: e.hint ?? `${e.type} ${e.nature} block.`,
+    propsSchema: BLOCK_PROP_JSON_SCHEMAS[e.type as keyof typeof BLOCK_PROP_JSON_SCHEMAS] as BlockPropsJsonSchema,
+  }));
+  const pluginBlocks = plugins?.flatMap((p) => (p.manifest.blocks ?? []).map((b) => ({
+    type: `${p.manifest.id}/${b.type}`, category: 'plugin', nature: 'void',
+    description: b.description ?? `${p.manifest.name ?? p.manifest.id} plugin block.`,
+    propsSchema: {type: 'object', properties: {}, additionalProperties: true}, enabled: p.enabled !== false,
+  })).filter((b) => !wanted || wanted.has(b.type))) ?? null;
+  return JSON.stringify({blocks, pluginBlocks, pluginListingAvailable: plugins !== undefined});
 }
 
 /**

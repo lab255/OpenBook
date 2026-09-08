@@ -277,8 +277,17 @@ export interface AgentProposal {
     | 'insert_blocks'
     | 'move_block'
     | 'set_page_theme'
+    | 'set_page_appearance'
+    | 'move_page'
+    | 'set_page_properties'
     | 'delete_block'
     | 'set_block_props'
+    | 'create_database'
+    | 'update_database'
+    | 'create_property'
+    | 'update_property'
+    | 'update_row'
+    | 'delete_row'
     | TableOpKind;
   /** One-line human summary, e.g. `Set "budget" = 1200`. */
   summary: string;
