@@ -1,5 +1,6 @@
 import React, {createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  API,
   AccountClient,
   AccountError,
   decodeIdentity,
@@ -207,6 +208,10 @@ interface StoredIndexRow {
   accountUrl: string;
   connectedAt: number;
   lastServerUpdatedAt: string | null;
+  /** A server-bridged identity assertion, not an account-service device token.
+   * It authenticates data requests but deliberately does no settings sync or
+   * forwarding-account API work. */
+  identityOnly?: boolean;
 }
 
 /** Identity facts decoded from a freshly minted JWS (for labelling/dedup). */
@@ -216,6 +221,26 @@ interface Persona {
   name: string | null;
   /** The audience the issuer actually scoped the minted token to (OB-202), or null. */
   aud: string | null;
+}
+
+function bridgedIdentity(token: string): {persona: Persona; issuer: string; expiresAt: number} | null {
+  const decoded = decodeIdentity(token);
+  if (
+    !decoded ||
+    decoded.header.alg !== 'EdDSA' ||
+    typeof decoded.claims.exp !== 'number' ||
+    decoded.claims.exp * 1000 <= Date.now()
+  ) return null;
+  return {
+    issuer: decoded.claims.iss,
+    persona: {
+      subject: `${decoded.claims.iss}#${decoded.claims.sub}`,
+      email: decoded.claims.email?.trim().toLowerCase() || null,
+      name: decoded.claims.name ?? null,
+      aud: decoded.claims.aud ?? null,
+    },
+    expiresAt: decoded.claims.exp * 1000,
+  };
 }
 
 /**
@@ -471,6 +496,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
 
   const [status, setStatus] = useState<AccountStatus>('disconnected');
   const [token, setToken] = useState<string | null>(null);
+  const [identityOnly, setIdentityOnly] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<StoredIndexRow[]>(() => readIndex());
@@ -730,6 +756,22 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     setIdentityIssuance('unknown');
   }, []);
 
+  /** Present a callback-bridged assertion directly to the data client. The data
+   * server remains the verifier; decoding here is only for expiry/labels. */
+  const presentBridgedIdentity = useCallback((assertion: string, expiresAt: number): void => {
+    if (identityTimer.current) clearTimeout(identityTimer.current);
+    setIdentityToken(assertion);
+    setIdentityIssuance('ok');
+    setIdentityExpired(false);
+    identityExpiryRef.current = expiresAt;
+    identityTimer.current = setTimeout(() => {
+      setIdentityToken(null);
+      identityExpiryRef.current = null;
+      setIdentityExpired(true);
+      setStatus('error');
+    }, Math.max(0, expiresAt - Date.now()));
+  }, []);
+
   // Never leak the identity-refresh timer past unmount: a queued retry that fired
   // after teardown would call a stale refresh (and, in tests, a torn-down fetch).
   useEffect(() => () => void (identityTimer.current && clearTimeout(identityTimer.current)), []);
@@ -769,6 +811,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       // Nothing left to fall back to (identity already cleared above).
       lastSyncedBlob.current = null;
       setToken(null);
+      setIdentityOnly(false);
       setLastSyncedAt(null);
       commitActiveId(null);
       setSyncedLibraries([]); // signed out — nothing to discover (LM-4)
@@ -787,9 +830,26 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       setStatus('syncing');
       setError(null);
       commitActiveId(id);
-      setToken(tok);
       tokensRef.current.set(id, tok);
       try {
+        const row = indexRef.current.find((candidate) => candidate.id === id);
+        const bridged = row?.identityOnly ? bridgedIdentity(tok) : null;
+        if (row?.identityOnly) {
+          setToken(null);
+          setIdentityOnly(true);
+          setLastSyncedAt(null);
+          if (!bridged) {
+            clearIdentity();
+            setIdentityExpired(true);
+            setStatus('error');
+            return;
+          }
+          presentBridgedIdentity(tok, bridged.expiresAt);
+          setStatus('connected');
+          return;
+        }
+        setIdentityOnly(false);
+        setToken(tok);
         // An already-stored account is never the genuine first connect, so never
         // seed its (possibly empty) remote from the current — previous account's —
         // blob; an empty remote is treated as empty (OB-194).
@@ -820,7 +880,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         activatingDepth.current = Math.max(0, activatingDepth.current - 1);
       }
     },
-    [commitActiveId, reconcileSettings, patchRow, accountUrlDefault],
+    [commitActiveId, reconcileSettings, patchRow, accountUrlDefault, clearIdentity, presentBridgedIdentity],
   );
   activateRef.current = activate;
 
@@ -840,6 +900,32 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       setStatus('syncing');
       setError(null);
       try {
+        const bridged = bridgedIdentity(tok);
+        if (bridged) {
+          const existing = indexRef.current.find((row) => row.subject === bridged.persona.subject);
+          const id = existing?.id ?? newAccountId();
+          const row: StoredIndexRow = {
+            id,
+            name: bridged.persona.email ?? bridged.persona.name ?? existing?.name ?? 'Account',
+            email: bridged.persona.email,
+            subject: bridged.persona.subject,
+            accountUrl: bridged.issuer,
+            connectedAt: Date.now(),
+            lastServerUpdatedAt: null,
+            identityOnly: true,
+          };
+          await secretStore.set(id, tok);
+          tokensRef.current.set(id, tok);
+          upsertRow(row);
+          commitActiveId(id);
+          setToken(null);
+          setIdentityOnly(true);
+          setLastSyncedAt(null);
+          presentBridgedIdentity(tok, bridged.expiresAt);
+          setStatus('connected');
+          return;
+        }
+        setIdentityOnly(false);
         const updatedAt = await reconcileSettings(tok, firstAccount); // validates (401 ⇒ AccountError)
         const persona = await refreshRef.current(tok); // mints + sets the live identity
         // Dedupe a re-sign-in of the same account into the same slot. Prefer the
@@ -881,7 +967,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         activatingDepth.current = Math.max(0, activatingDepth.current - 1);
       }
     },
-    [reconcileSettings, secretStore, upsertRow, commitActiveId, clearIdentity, accountUrlDefault],
+    [reconcileSettings, secretStore, upsertRow, commitActiveId, clearIdentity, accountUrlDefault, presentBridgedIdentity],
   );
 
   /**
@@ -1040,17 +1126,48 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     writePendingState(state);
     setStatus('connecting');
     setError(null);
-    const redirectUri =
-      platform?.redirectUri ?? (typeof window !== 'undefined' ? `${window.location.origin}/account/callback` : '');
-    const url = client.connectUrl({redirectUri, state, name});
-    if (platform?.openSignIn) {
-      platform.openSignIn(url);
-    } else if (typeof window !== 'undefined') {
-      // Web: a popup keeps the app mounted to receive the handoff; fall back to a
-      // full navigation if the popup is blocked.
-      const popup = window.open(url, 'openbook-signin', 'width=520,height=720');
-      if (!popup) window.location.href = url;
-    }
+    // Reserve the popup synchronously while this call still has user activation;
+    // the capability probe below is async and browsers otherwise block it.
+    const pendingPopup = !platform?.openSignIn && typeof window !== 'undefined'
+      ? window.open('about:blank', 'openbook-signin', 'width=520,height=720')
+      : null;
+    void (async () => {
+      const redirectUri =
+        platform?.redirectUri ?? (typeof window !== 'undefined' ? `${window.location.origin}/account/callback` : '');
+      let url = client.connectUrl({redirectUri, state, name});
+
+      // A sidecar-served web shell and its API share an origin. Probe the exact
+      // optional route without starting OAuth; when mounted, delegated OIDC
+      // replaces the account-service connect URL. Cross-origin/desktop shells
+      // keep their existing flow because their callback transport is different.
+      if (!platform?.redirectUri && typeof window !== 'undefined') {
+        try {
+          const serverOverride = getServerUrlOverride();
+          const serverOrigin = serverOverride ? new URL(serverOverride).origin : window.location.origin;
+          if (serverOrigin === window.location.origin) {
+            const probe = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
+            probe.searchParams.set('probe', '1');
+            const response = await fetch(probe, {cache: 'no-store'});
+            if (response.status === 204) {
+              const delegated = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
+              delegated.searchParams.set('handoff_state', state);
+              url = delegated.toString();
+            }
+          }
+        } catch {
+          // Not a same-origin server with delegated auth; retain account connect.
+        }
+      }
+
+      if (platform?.openSignIn) {
+        platform.openSignIn(url);
+      } else if (typeof window !== 'undefined') {
+        // Web: a popup keeps the app mounted to receive the handoff; fall back to a
+        // full navigation if the popup is blocked.
+        if (pendingPopup) pendingPopup.location.replace(url);
+        else window.location.href = url;
+      }
+    })();
   }, [client, name, platform]);
 
   /**
@@ -1064,7 +1181,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     (raw: string) => {
       const tok = extractToken(raw);
       if (!tok) {
-        setStatus((s) => (token ? s : 'error'));
+        setStatus((s) => (token || identityOnly ? s : 'error'));
         setError(t('account.error.invalidCode'));
         return;
       }
@@ -1074,15 +1191,15 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       setError(null);
       void addFromToken(tok);
     },
-    [addFromToken, token],
+    [addFromToken, token, identityOnly],
   );
 
   const cancel = useCallback(() => {
     pendingState.current = null;
     clearPendingState();
-    setStatus((s) => (token ? s : 'disconnected'));
+    setStatus((s) => (token || identityOnly ? s : 'disconnected'));
     setError(null);
-  }, [token]);
+  }, [token, identityOnly]);
 
   /** Sign out the ACTIVE account (forget its token; switch to another if any). */
   const signOut = useCallback(() => {
@@ -1096,6 +1213,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     } else {
       clearIdentity();
       setToken(null);
+      setIdentityOnly(false);
       setLastSyncedAt(null);
       setStatus('disconnected');
     }
@@ -1154,7 +1272,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   const value = useMemo<AccountContextValue>(
     () => ({
       status,
-      connected: !!token && (status === 'connected' || status === 'syncing'),
+      connected: (!!token || identityOnly) && (status === 'connected' || status === 'syncing'),
       token,
       deviceName: name,
       lastSyncedAt,
@@ -1178,6 +1296,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     [
       status,
       token,
+      identityOnly,
       name,
       lastSyncedAt,
       error,

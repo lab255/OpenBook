@@ -20,6 +20,15 @@ import {fileURLToPath} from 'node:url';
 import os from 'node:os';
 
 export interface StartOptions {
+  /** able OAuth confidential-client id. The feature remains inert unless this
+   * and {@link ableOauthClientSecret} are both configured. */
+  ableOauthClientId?: string;
+  /** able OAuth confidential-client secret. Never persisted or logged. */
+  ableOauthClientSecret?: string;
+  /** Optional able issuer override (tests/self-host). */
+  ableOauthIssuer?: string;
+  /** Optional discovery-document URL override. */
+  ableOauthDiscoveryUrl?: string;
   /** Connection string for an external Postgres (server mode). */
   databaseUrl?: string;
   /** Data directory for embedded PGlite (desktop mode). Required if no `databaseUrl`. */
@@ -510,10 +519,26 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const serverPersist =
     opts.serverPersist ?? /^(1|true|yes|on)$/i.test((process.env.OPENBOOK_SERVER_PERSIST ?? '').trim());
 
+  // ABLE-1: the relying party is all-or-nothing at the process boundary. A
+  // half-configured deployment exposes no routes and behaves exactly as before.
+  const ableClientId = opts.ableOauthClientId ?? process.env.ABLE_OAUTH_CLIENT_ID;
+  const ableClientSecret = opts.ableOauthClientSecret ?? process.env.ABLE_OAUTH_CLIENT_SECRET;
+  const ableIssuer = opts.ableOauthIssuer || process.env.ABLE_OAUTH_ISSUER || undefined;
+  const ableDiscoveryUrl = opts.ableOauthDiscoveryUrl || process.env.ABLE_OAUTH_DISCOVERY_URL || undefined;
+  const ableOidc = ableClientId && ableClientSecret
+    ? {
+      clientId: ableClientId,
+      clientSecret: ableClientSecret,
+      issuer: ableIssuer,
+      discoveryUrl: ableDiscoveryUrl,
+    }
+    : undefined;
+
   // One hub is shared between the HTTP/SSE app and the disk mirror, so a
   // re-imported page fans out to every connected client too.
   const hub = new PageHub();
   const app = createApp(store, ai, hub, {
+    ableOidc,
     accessToken: opts.accessToken,
     embedded: !opts.databaseUrl,
     identity,
