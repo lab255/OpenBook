@@ -1,7 +1,7 @@
 import React from 'react';
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {renderHook, act, waitFor, cleanup} from '@testing-library/react';
-import {decodeIdentity, getIdentityCredential, setForwardingAudience, setIdentityToken} from '@book.dev/sdk';
+import {API, AccountClient, decodeIdentity, getIdentityCredential, setForwardingAudience, setIdentityToken} from '@book.dev/sdk';
 import {AccountProvider, useAccount} from '../AccountProvider';
 import {PlatformCapabilitiesProvider, type AccountSecretStore, type PlatformCapabilities} from '../PlatformCapabilitiesProvider';
 import {PreferencesProvider} from '../PreferencesProvider';
@@ -155,6 +155,60 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+describe('AccountProvider — delegated able sign-in', () => {
+  const pendingState = (): string =>
+    (JSON.parse(sessionStorage.getItem('openbook.account.pending') ?? '{}') as {state?: string}).state ?? '';
+
+  function popupHarness(): ReturnType<typeof vi.fn> {
+    const replace = vi.fn();
+    vi.spyOn(window, 'open').mockReturnValue({location: {replace}} as unknown as Window);
+    return replace;
+  }
+
+  it('navigates the reserved popup to the able authorize route after a 204 same-origin probe', async () => {
+    const replace = popupHarness();
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, {status: 204}));
+    const {result} = renderAccount();
+
+    act(() => result.current.signIn());
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    const state = pendingState();
+    const target = new URL(String(replace.mock.calls[0][0]));
+    expect(target.origin).toBe(window.location.origin);
+    expect(target.pathname).toBe(API.ableOauthAuthorize);
+    expect(target.searchParams.get('handoff_state')).toBe(state);
+    expect(state).not.toBe('');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const probe = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(probe.origin + probe.pathname).toBe(`${window.location.origin}${API.ableOauthAuthorize}`);
+    expect(probe.searchParams.get('probe')).toBe('1');
+  });
+
+  it.each([
+    ['404 response', () => Promise.resolve(new Response(null, {status: 404}))],
+    ['network failure', () => Promise.reject(new Error('offline'))],
+  ])('retains the account connect URL after a probe %s', async (_case, probeResult) => {
+    const replace = popupHarness();
+    vi.mocked(fetch).mockImplementationOnce(probeResult);
+    const {result} = renderAccount();
+
+    act(() => result.current.signIn());
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    const state = pendingState();
+    const expected = new AccountClient().connectUrl({
+      redirectUri: `${window.location.origin}/account/callback`,
+      state,
+      name: `OpenBook Web · ${localStorage.getItem('openbook.deviceId')}`,
+    });
+    expect(replace).toHaveBeenCalledWith(expected);
+    expect(new URL(expected).searchParams.get('state')).toBe(state);
+    expect(state).not.toBe('');
+  });
+});
+
 describe('AccountProvider — multi-account (OB-194)', () => {
   it('accepts a bridged identity assertion without treating it as an account API bearer', async () => {
     const {result} = renderAccount();
@@ -167,6 +221,38 @@ describe('AccountProvider — multi-account (OB-194)', () => {
     expect(getIdentityCredential().jws).toBe(assertion);
     expect(settingsPuts).toHaveLength(0);
     expect(readIndex()[0]).toMatchObject({subject: subjectOf('tok-work')});
+  });
+
+  it('marks an expired stored bridged identity as errored without calling account services', async () => {
+    const id = 'expired-bridge';
+    const expired = `${b64u({alg: 'EdDSA', typ: 'JWT'})}.${b64u({
+      iss: PERSONAS['tok-work'].iss,
+      sub: PERSONAS['tok-work'].sub,
+      exp: Math.floor(Date.now() / 1000) - 1,
+    })}.sig`;
+    localStorage.setItem('openbook.accounts', JSON.stringify([{
+      id,
+      name: 'Work User',
+      email: 'work@corp.example',
+      subject: subjectOf('tok-work'),
+      accountUrl: PERSONAS['tok-work'].iss,
+      connectedAt: Date.now() - 3600_000,
+      lastServerUpdatedAt: null,
+      identityOnly: true,
+    }]));
+    localStorage.setItem('openbook.accounts.active', id);
+    localStorage.setItem(tokenKey(id), expired);
+    const fetchMock = vi.mocked(fetch);
+
+    const {result} = renderAccount();
+
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(result.current.status).toBe('error');
+    expect(result.current.token).toBeNull();
+    expect(getIdentityCredential().jws).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(identityMintUrls).toHaveLength(0);
+    expect(settingsPuts).toHaveLength(0);
   });
 
   it('adds an account, makes it active, and stores its token in a namespaced slot', async () => {
