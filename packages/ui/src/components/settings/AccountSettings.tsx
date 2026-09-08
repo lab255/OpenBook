@@ -17,10 +17,11 @@ import {cn} from '@/lib/utils';
  */
 export default function AccountSettings() {
   const {t} = useTranslation();
-  const {status, accounts, error, signIn, submitCode, cancel, identityExpired, syncNow} = useAccount();
+  const {status, accounts, error, signIn, submitCode, cancel, identityExpired, syncNow, ableMode} = useAccount();
+  const signin = ableMode ? 'account.signin.able' as const : 'account.signin' as const;
 
   return (
-    <SettingsScreen title={t('account.signin.title')} description={t('account.signin.description')} scope="account">
+    <SettingsScreen title={t('account.signin.title')} description={t(`${signin}.description`)} scope="account">
       {/* A previously-verified identity lapsed and couldn't refresh — surface a
           non-blocking reconnect affordance rather than silently dropping the reader
           to anonymous behind blank content. `syncNow` re-activates the active
@@ -30,6 +31,7 @@ export default function AccountSettings() {
           <div className="flex flex-col items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
             <p className="text-sm font-medium">{t('account.reauth.title')}</p>
             <p className="text-sm text-muted-foreground">{t('account.reauth.body')}</p>
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button variant="outline" size="sm" onClick={syncNow}>
               {t('account.reauth.reconnect')}
             </Button>
@@ -40,19 +42,19 @@ export default function AccountSettings() {
         <SettingsSection>
           {status === 'connecting' ? (
             <div className="flex flex-col items-start gap-3 rounded-lg border border-border p-4">
-              <p className="text-sm text-muted-foreground">{t('account.signin.connecting')}</p>
+              <p className="text-sm text-muted-foreground">{t(`${signin}.connecting`)}</p>
               <Button variant="ghost" size="sm" onClick={cancel}>
                 {t('account.signin.cancel')}
               </Button>
             </div>
           ) : (
             <Button variant="outline" className="w-full truncate sm:w-auto" onClick={signIn}>
-              {t('account.signin.signInButton')}
+              {t(`${signin}.signInButton`)}
             </Button>
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <ManualCodeEntry onSubmit={submitCode} />
-          <p className="text-xs text-muted-foreground">{t('account.signin.whatSyncs')}</p>
+          {!ableMode && <ManualCodeEntry onSubmit={submitCode} />}
+          <p className="text-xs text-muted-foreground">{t(`${signin}.whatSyncs`)}</p>
         </SettingsSection>
       ) : (
         <AccountSwitcher />

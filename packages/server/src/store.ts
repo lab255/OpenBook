@@ -4071,15 +4071,42 @@ export class PageStore {
     subject: string;
     tokenCiphertext: string;
     tokenIv: string;
+    assertionJti: string;
   }): Promise<void> {
     await this.db.query(
-      `INSERT INTO able_oidc_refresh_tokens (issuer, subject, token_ciphertext, token_iv)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO able_oidc_refresh_tokens (issuer, subject, token_ciphertext, token_iv, assertion_jti)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (issuer, subject) DO UPDATE SET
          token_ciphertext = EXCLUDED.token_ciphertext,
          token_iv = EXCLUDED.token_iv,
+         assertion_jti = EXCLUDED.assertion_jti,
          updated_at = now()`,
-      [input.issuer, input.subject, input.tokenCiphertext, input.tokenIv],
+      [input.issuer, input.subject, input.tokenCiphertext, input.tokenIv, input.assertionJti],
+    );
+  }
+
+  /** Atomically take an encrypted upstream refresh token. Deleting before the
+   * network exchange serializes renewal for a subject and prevents two callers
+   * from replaying a single-use rotating token. */
+  async consumeAbleOidcRefreshToken(issuer: string, subject: string, assertionJti: string): Promise<{
+    tokenCiphertext: string;
+    tokenIv: string;
+  } | null> {
+    const rows = await this.db.query<{token_ciphertext: string; token_iv: string}>(
+      `DELETE FROM able_oidc_refresh_tokens
+       WHERE issuer = $1 AND subject = $2 AND assertion_jti = $3
+       RETURNING token_ciphertext, token_iv`,
+      [issuer, subject, assertionJti],
+    );
+    if (rows.length === 0) return null;
+    return {tokenCiphertext: rows[0].token_ciphertext, tokenIv: rows[0].token_iv};
+  }
+
+  /** Remove any upstream refresh credential for a signed-out able subject. */
+  async deleteAbleOidcRefreshToken(issuer: string, subject: string): Promise<void> {
+    await this.db.query(
+      'DELETE FROM able_oidc_refresh_tokens WHERE issuer = $1 AND subject = $2',
+      [issuer, subject],
     );
   }
 

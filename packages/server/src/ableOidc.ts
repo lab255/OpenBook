@@ -36,6 +36,9 @@ export const ABLE_OIDC_SCOPES = 'openid profile email offline_access';
 const STATE_TTL_MS = 10 * 60 * 1000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const ASSERTION_TTL_SEC = 60 * 60;
+/** A timer can fire just after expiry under background-tab throttling. Accept the
+ * prior, still-verified bridge assertion only for this narrow renewal window. */
+const ASSERTION_REFRESH_GRACE_SEC = 5 * 60;
 const AES_GCM_IV_BYTES = 12;
 const AES_GCM_TAG_BYTES = 16;
 const SAFE_ID_TOKEN_ALG = /^(?:RS|PS|ES)(?:256|384|512)$|^EdDSA$/;
@@ -272,7 +275,8 @@ export class AbleOidcService {
     return safe;
   }
 
-  private async verifyIdToken(idToken: string, expectedNonce: string): Promise<JWTPayload> {
+  // callback MUST pass nonce; refresh grant has none (OIDC Core 12.2)
+  private async verifyIdToken(idToken: string, expectedNonce?: string): Promise<JWTPayload> {
     const discovery = await this.discovery();
     const keys = await this.jwks(discovery);
     try {
@@ -286,7 +290,9 @@ export class AbleOidcService {
       if (!payload.sub || typeof payload.iat !== 'number' || typeof payload.exp !== 'number') {
         throw new Error('missing required claims');
       }
-      if (!safeStringEqual(payload.nonce, expectedNonce)) throw new Error('nonce mismatch');
+      if (expectedNonce !== undefined && !safeStringEqual(payload.nonce, expectedNonce)) {
+        throw new Error('nonce mismatch');
+      }
       if (payload.azp !== undefined && payload.azp !== this.opts.clientId) throw new Error('azp mismatch');
       if (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== this.opts.clientId) {
         throw new Error('multiple audiences require azp');
@@ -336,7 +342,7 @@ export class AbleOidcService {
     }
   }
 
-  private async mintBridgeAssertion(payload: JWTPayload): Promise<string> {
+  private async mintBridgeAssertion(payload: JWTPayload): Promise<{assertion: string; jti: string}> {
     const key = await this.bridgeKey();
     const config = await this.store.getInstanceConfig();
     const currentBridge = config.trustedIssuers.find((entry) => entry.issuer === this.issuer);
@@ -355,6 +361,7 @@ export class AbleOidcService {
       await this.store.updateInstanceConfig({trustedIssuers, emailAuthority});
     }
     const now = Math.floor(this.now() / 1000);
+    const jti = randomUUID();
     const claims: IdentityClaims = {
       iss: this.issuer,
       sub: payload.sub as string,
@@ -362,10 +369,127 @@ export class AbleOidcService {
       ...(typeof payload.email === 'string' ? {email: payload.email} : {}),
       iat: now,
       exp: now + ASSERTION_TTL_SEC,
-      jti: randomUUID(),
+      jti,
       ...(config.audience ? {aud: config.audience} : {}),
     };
-    return signIdentity(key.privateKey, claims, key.publicJwk.kid);
+    return {assertion: await signIdentity(key.privateKey, claims, key.publicJwk.kid), jti};
+  }
+
+  /** Verify possession of an assertion minted by this instance. Normal request
+   * authentication cannot bind renewal because it rejects an assertion at `exp`;
+   * this verifier permits only a five-minute post-expiry grace and never accepts
+   * a caller-supplied subject. able-bridge subjects are outside the OB-106
+   * revocation set's scope; revoke by removing the account or unmounting able options. */
+  private async verifyBridgeAssertion(assertion: string): Promise<JWTPayload> {
+    const stored = await this.store.getAbleOidcBridgeKey(this.issuer);
+    if (!bridgeKeyIsValid(stored)) throw new AbleOidcError(401, 'able session could not be renewed');
+    const config = await this.store.getInstanceConfig();
+    const now = Math.floor(this.now() / 1000);
+    try {
+      const {payload} = await jwtVerify(
+        assertion,
+        createLocalJWKSet({keys: [stored.publicJwk]}),
+        {
+          issuer: this.issuer,
+          ...(config.audience ? {audience: config.audience} : {}),
+          algorithms: ['EdDSA'],
+          clockTolerance: ASSERTION_REFRESH_GRACE_SEC,
+          currentDate: new Date(this.now()),
+        },
+      );
+      if (
+        typeof payload.sub !== 'string' || !payload.sub ||
+        typeof payload.jti !== 'string' || !payload.jti ||
+        typeof payload.iat !== 'number' || typeof payload.exp !== 'number' ||
+        payload.iat > now + 60 ||
+        payload.exp < now - ASSERTION_REFRESH_GRACE_SEC ||
+        payload.exp - payload.iat > ASSERTION_TTL_SEC + 60
+      ) {
+        throw new Error('invalid bridge claims');
+      }
+      return payload;
+    } catch {
+      throw new AbleOidcError(401, 'able session could not be renewed');
+    }
+  }
+
+  private async exchangeRefreshToken(refreshToken: string): Promise<TokenResponse> {
+    const discovery = await this.discovery();
+    const body = new URLSearchParams({grant_type: 'refresh_token', refresh_token: refreshToken});
+    const authorization = Buffer.from(
+      `${formEncode(this.opts.clientId)}:${formEncode(this.opts.clientSecret)}`,
+      'utf8',
+    ).toString('base64');
+    try {
+      const response = await (this.opts.fetchImpl ?? fetch)(discovery.token_endpoint, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: {
+          authorization: `Basic ${authorization}`,
+          'content-type': 'application/x-www-form-urlencoded',
+          accept: 'application/json',
+        },
+        body,
+      });
+      if (!response.ok) throw new Error('token endpoint rejected the refresh token');
+      return (await response.json()) as TokenResponse;
+    } catch {
+      throw new AbleOidcError(502, 'able session could not be renewed');
+    }
+  }
+
+  async refresh(assertion: string): Promise<{identity: string; expiresAt: string}> {
+    const prior = await this.verifyBridgeAssertion(assertion);
+    const subject = prior.sub as string;
+    const stored = await this.store.consumeAbleOidcRefreshToken(this.issuer, subject, prior.jti as string);
+    if (!stored) throw new AbleOidcError(401, 'able session could not be renewed');
+
+    let refreshToken: string;
+    try {
+      refreshToken = decryptSecret(stored.tokenCiphertext, stored.tokenIv, this.encryptionKey);
+    } catch {
+      throw new AbleOidcError(401, 'able session could not be renewed');
+    }
+
+    const tokens = await this.exchangeRefreshToken(refreshToken);
+    let refreshed = prior;
+    if (tokens.id_token !== undefined) {
+      if (typeof tokens.id_token !== 'string' || !tokens.id_token) {
+        throw new AbleOidcError(502, 'able session could not be renewed');
+      }
+      try {
+        refreshed = await this.verifyIdToken(tokens.id_token);
+      } catch {
+        throw new AbleOidcError(502, 'able session could not be renewed');
+      }
+      if (!safeStringEqual(refreshed.sub, subject)) {
+        throw new AbleOidcError(401, 'able session could not be renewed');
+      }
+    }
+
+    const nextRefresh = tokens.refresh_token === undefined ? refreshToken : tokens.refresh_token;
+    if (typeof nextRefresh !== 'string' || !nextRefresh) {
+      throw new AbleOidcError(502, 'able session could not be renewed');
+    }
+    const encrypted = encryptSecret(nextRefresh, this.encryptionKey);
+    const renewed = await this.mintBridgeAssertion(refreshed);
+    await this.store.setAbleOidcRefreshToken({
+      issuer: this.issuer,
+      subject,
+      tokenCiphertext: encrypted.ciphertext,
+      tokenIv: encrypted.iv,
+      assertionJti: renewed.jti,
+    });
+
+    return {
+      identity: renewed.assertion,
+      expiresAt: new Date(this.now() + ASSERTION_TTL_SEC * 1000).toISOString(),
+    };
+  }
+
+  async remove(assertion: string): Promise<void> {
+    const prior = await this.verifyBridgeAssertion(assertion);
+    await this.store.deleteAbleOidcRefreshToken(this.issuer, prior.sub as string);
   }
 
   async callback(origin: string, state: string, code: string): Promise<string> {
@@ -387,6 +511,7 @@ export class AbleOidcService {
     const tokens = await this.exchangeCode(code, verifier, pending.redirectUri);
     if (typeof tokens.id_token !== 'string') throw new AbleOidcError(502, 'able token response has no ID token');
     const payload = await this.verifyIdToken(tokens.id_token, pending.nonce);
+    const assertion = await this.mintBridgeAssertion(payload);
 
     if (typeof tokens.refresh_token === 'string' && tokens.refresh_token.length > 0) {
       const encrypted = encryptSecret(tokens.refresh_token, this.encryptionKey);
@@ -395,13 +520,13 @@ export class AbleOidcService {
         subject: payload.sub as string,
         tokenCiphertext: encrypted.ciphertext,
         tokenIv: encrypted.iv,
+        assertionJti: assertion.jti,
       });
     }
 
-    const assertion = await this.mintBridgeAssertion(payload);
     const handoff = new URL('/account/callback', origin);
     handoff.hash = new URLSearchParams({
-      token: assertion,
+      token: assertion.assertion,
       state: pending.handoffState || state,
     }).toString();
     return handoff.toString();

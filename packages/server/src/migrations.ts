@@ -730,6 +730,12 @@ const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    name: '0030_able_oidc_assertion_jti',
+    statements: [
+      'ALTER TABLE able_oidc_refresh_tokens ADD COLUMN IF NOT EXISTS assertion_jti TEXT',
+    ],
+  },
 ];
 
 /** Apply all pending migrations. Idempotent; safe on every boot. */

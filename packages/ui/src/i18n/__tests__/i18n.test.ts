@@ -73,6 +73,22 @@ describe('t', () => {
     }
   });
 
+  it('ships neutral able sign-in copy in all four locales', () => {
+    for (const locale of [en, de, ja, zh]) {
+      const copy = locale.account?.signin?.able;
+      expect([
+        copy?.description,
+        copy?.signInButton,
+        copy?.connecting,
+        copy?.whatSyncs,
+        copy?.signOutHint,
+        locale.account?.switcher?.openBookIdentity,
+      ].every((message) => typeof message === 'string' && message.length > 0)).toBe(true);
+      expect(JSON.stringify(copy)).not.toContain('account.book.pub');
+      expect(JSON.stringify(copy)).not.toContain('account.able.online');
+    }
+  });
+
   it('ships every database-form block string in all four locales', () => {
     const keys = Object.keys(en.formBlock.databaseReference).sort();
     for (const locale of [de, ja, zh]) {

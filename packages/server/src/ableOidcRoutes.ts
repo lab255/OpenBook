@@ -5,9 +5,23 @@ import type {Hono} from 'hono';
 import type {AppEnv} from './appEnv';
 import type {PageStore} from './store';
 import {AbleOidcError, AbleOidcService, type AbleOidcOptions} from './ableOidc';
+import {FixedWindowLimiter, clientIpKey} from './agentTokens';
+
+const ABLE_REFRESH_RATE_LIMIT = 30;
+const ABLE_REFRESH_RATE_WINDOW_MS = 60_000;
 
 export const isAbleOidcPublicRequest = (method: string, path: string): boolean =>
-  method === 'GET' && (path === API.ableOauthAuthorize || path === API.ableOauthCallback);
+  (method === 'GET' && (path === API.ableOauthAuthorize || path === API.ableOauthCallback)) ||
+  ((method === 'POST' || method === 'DELETE') && path === API.ableOauthRefresh);
+
+function bearerAssertion(header: string | undefined): string {
+  if (!header?.startsWith('Bearer ')) throw new AbleOidcError(401, 'able session could not be renewed');
+  const assertion = header.slice(7);
+  if (!assertion || assertion.length > 16_384) {
+    throw new AbleOidcError(401, 'able session could not be renewed');
+  }
+  return assertion;
+}
 
 export function mountAbleOidcRoutes(
   app: Hono<AppEnv>,
@@ -15,6 +29,7 @@ export function mountAbleOidcRoutes(
   options: AbleOidcOptions,
 ): void {
   const oidc = new AbleOidcService(store, options);
+  const refreshLimiter = new FixedWindowLimiter(ABLE_REFRESH_RATE_LIMIT, ABLE_REFRESH_RATE_WINDOW_MS);
 
   app.get(API.ableOauthAuthorize, async (c) => {
     // Same-origin web shells use this side-effect-free capability probe to
@@ -40,6 +55,39 @@ export function mountAbleOidcRoutes(
       return c.redirect(target, 302);
     } catch (error) {
       const known = error instanceof AbleOidcError ? error : new AbleOidcError(502, 'able sign-in failed');
+      return c.json({error: known.message}, known.status);
+    }
+  });
+
+  app.post(API.ableOauthRefresh, async (c) => {
+    try {
+      // Behind a reverse proxy or non-Node adapter, clientIpKey collapses to a shared bucket; renewal DoS fails closed into re-sign-in.
+      if (refreshLimiter.exceeded(clientIpKey(c))) {
+        c.header('Retry-After', String(ABLE_REFRESH_RATE_WINDOW_MS / 1000));
+        throw new AbleOidcError(429, 'too many able session requests');
+      }
+      const identity = await oidc.refresh(bearerAssertion(c.req.header('Authorization')));
+      return c.json(identity);
+    } catch (error) {
+      const known = error instanceof AbleOidcError
+        ? error
+        : new AbleOidcError(502, 'able session could not be renewed');
+      return c.json({error: known.message}, known.status);
+    }
+  });
+
+  app.delete(API.ableOauthRefresh, async (c) => {
+    try {
+      if (refreshLimiter.exceeded(clientIpKey(c))) {
+        c.header('Retry-After', String(ABLE_REFRESH_RATE_WINDOW_MS / 1000));
+        throw new AbleOidcError(429, 'too many able session requests');
+      }
+      await oidc.remove(bearerAssertion(c.req.header('Authorization')));
+      return c.body(null, 204);
+    } catch (error) {
+      const known = error instanceof AbleOidcError
+        ? error
+        : new AbleOidcError(502, 'able session could not be removed');
       return c.json({error: known.message}, known.status);
     }
   });

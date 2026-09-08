@@ -216,6 +216,20 @@ describe('migration 0028 — byte-exact idempotency responses', () => {
   });
 });
 
+describe('migration 0030 — able assertion binding', () => {
+  it('adds the assertion JTI to refresh tokens', async () => {
+    const db = await freshDb();
+    expect(await db.query('SELECT name FROM _migrations WHERE name = \'0030_able_oidc_assertion_jti\''))
+      .toHaveLength(1);
+    const columns = await db.query<{column_name: string}>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'able_oidc_refresh_tokens'`,
+    );
+    expect(columns.map((row) => row.column_name)).toContain('assertion_jti');
+    await db.close();
+  });
+});
+
 describe('migration 0011 — existing database with data', () => {
   it('back-fills visibility=inherit on pre-existing pages and is idempotent', async () => {
     // Simulate a pre-0011 workspace: a real pages table with a row, with 0001..0010

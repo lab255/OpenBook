@@ -1744,6 +1744,14 @@ export const en = {
         'Dismiss the “open OpenBook?” prompt in your browser, copy the code (or the whole openbook:// link), and paste it here.',
       manualPlaceholder: 'Paste your code or openbook://auth-callback#token=… link',
       manualSubmit: 'Sign in with code',
+      able: {
+        description: 'Sign in to OpenBook to use your verified identity on this library. Your pages stay on your data server.',
+        signInButton: 'Sign in',
+        connecting: 'Signing you in…',
+        whatSyncs:
+          'OpenBook uses your sign-in only to verify who you are on this library. Pages and documents stay on your data server.',
+        signOutHint: 'Signing out removes this OpenBook sign-in from this device.',
+      },
     },
     switcher: {
       heading: 'Accounts',
@@ -1760,6 +1768,7 @@ export const en = {
         'This forgets {name} on this device only — sign in again any time to restore it. Your other accounts and your local data are untouched.',
       signOutActiveHint:
         'Sign out forgets the active account on this device; your other accounts stay signed in. To fully revoke a device, remove it in your account dashboard.',
+      openBookIdentity: 'OpenBook identity',
     },
     error: {
       rejected: 'That sign-in was rejected. Please try again.',

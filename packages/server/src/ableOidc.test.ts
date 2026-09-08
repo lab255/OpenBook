@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {exportJWK, generateKeyPair, SignJWT} from 'jose';
+import {decodeJwt, exportJWK, generateKeyPair, SignJWT} from 'jose';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {API, DEFAULT_ACCOUNT_URL} from '@book.dev/sdk';
 import {createApp} from './app';
@@ -45,6 +45,9 @@ interface IdpHarness {
   tokenCalls: Array<{authorization: string; body: URLSearchParams}>;
   setNonce: (nonce: string) => void;
   setTokenKind: (kind: 'valid' | 'bad-iss' | 'bad-aud' | 'expired' | 'bad-sig') => void;
+  setSubject: (subject: string) => void;
+  setRefreshIdToken: (included: boolean) => void;
+  setNow: (now: number) => void;
   failDiscovery: () => void;
   discoveryCalls: () => number;
 }
@@ -55,16 +58,20 @@ async function idpHarness(): Promise<IdpHarness> {
   const publicJwk = await exportJWK(publicKey);
   Object.assign(publicJwk, {kid: 'able-rs1', use: 'sig', alg: 'RS256'});
   let nonce = '';
+  let subject = 'able-user-7';
   let kind: 'valid' | 'bad-iss' | 'bad-aud' | 'expired' | 'bad-sig' = 'valid';
+  let includeRefreshIdToken = true;
+  let currentNow = NOW;
+  let refreshes = 0;
   let discoveryDown = false;
   let discoveries = 0;
   const tokenCalls: Array<{authorization: string; body: URLSearchParams}> = [];
 
   const idToken = async (): Promise<string> => {
-    const now = Math.floor(NOW / 1000);
+    const now = Math.floor(currentNow / 1000);
     const signer = kind === 'bad-sig' ? wrong.privateKey : privateKey;
     return new SignJWT({
-      sub: 'able-user-7',
+      sub: subject,
       name: 'Ada Able',
       email: 'ADA@EXAMPLE.COM',
       nonce,
@@ -95,10 +102,14 @@ async function idpHarness(): Promise<IdpHarness> {
       const headers = new Headers(init?.headers);
       const body = new URLSearchParams(String(init?.body ?? ''));
       tokenCalls.push({authorization: headers.get('authorization') ?? '', body});
+      const isRefresh = body.get('grant_type') === 'refresh_token';
+      if (isRefresh) refreshes += 1;
       return Response.json({
         token_type: 'Bearer',
-        id_token: await idToken(),
-        refresh_token: 'upstream-refresh-token-plaintext',
+        ...(!isRefresh || includeRefreshIdToken ? {id_token: await idToken()} : {}),
+        refresh_token: isRefresh
+          ? `upstream-refresh-token-rotated-${refreshes}`
+          : 'upstream-refresh-token-plaintext',
       });
     }
     throw new Error(`unexpected fetch ${url}`);
@@ -111,7 +122,7 @@ async function idpHarness(): Promise<IdpHarness> {
       issuer: UPSTREAM_ISSUER,
       discoveryUrl: DISCOVERY_URL,
       fetchImpl,
-      now: () => NOW,
+      now: () => currentNow,
     },
     tokenCalls,
     setNonce: (value) => {
@@ -119,6 +130,15 @@ async function idpHarness(): Promise<IdpHarness> {
     },
     setTokenKind: (value) => {
       kind = value;
+    },
+    setSubject: (value) => {
+      subject = value;
+    },
+    setRefreshIdToken: (included) => {
+      includeRefreshIdToken = included;
+    },
+    setNow: (value) => {
+      currentNow = value;
     },
     failDiscovery: () => {
       discoveryDown = true;
@@ -135,6 +155,18 @@ function readAuthorizeLocation(response: Response): URL {
 async function begin(app: ReturnType<typeof createApp>, handoffState = ''): Promise<URL> {
   const suffix = handoffState ? `?handoff_state=${encodeURIComponent(handoffState)}` : '';
   return readAuthorizeLocation(await app.request(`${API.ableOauthAuthorize}${suffix}`));
+}
+
+async function signIn(app: ReturnType<typeof createApp>, idp: IdpHarness): Promise<string> {
+  const target = await begin(app);
+  idp.setNonce(target.searchParams.get('nonce') ?? '');
+  const state = target.searchParams.get('state') ?? '';
+  const callback = await app.request(
+    `${API.ableOauthCallback}?state=${encodeURIComponent(state)}&code=authorization-code`,
+  );
+  expect(callback.status).toBe(302);
+  const handoff = new URL(callback.headers.get('location') ?? '');
+  return new URLSearchParams(handoff.hash.slice(1)).get('token') ?? '';
 }
 
 describe('able OIDC relying party', () => {
@@ -295,13 +327,192 @@ describe('able OIDC relying party', () => {
     expect(config.trustedIssuers.find((entry) => entry.issuer === UPSTREAM_ISSUER)?.jwks?.keys).toHaveLength(1);
 
     const db = (store as unknown as {db: {query<T>(sql: string): Promise<T[]>}}).db;
-    const [refresh] = await db.query<{token_ciphertext: string}>('SELECT token_ciphertext FROM able_oidc_refresh_tokens');
+    const [refresh] = await db.query<{token_ciphertext: string; assertion_jti: string}>(
+      'SELECT token_ciphertext, assertion_jti FROM able_oidc_refresh_tokens',
+    );
     expect(refresh.token_ciphertext).not.toContain('upstream-refresh-token-plaintext');
+    expect(refresh.assertion_jti).toBe(decodeJwt(assertion).jti);
     const [key] = await db.query<{private_key_ciphertext: string}>('SELECT private_key_ciphertext FROM able_oidc_bridge_keys');
     expect(key.private_key_ciphertext).not.toContain('PRIVATE');
     const settings = await db.query<{value: string}>('SELECT value::text AS value FROM settings');
     expect(JSON.stringify(settings)).not.toContain(CLIENT_SECRET);
     expect(JSON.stringify(settings)).not.toContain('upstream-refresh-token-plaintext');
+  });
+
+  it('renews from a just-expired signed bridge assertion and rotates the consumed refresh token', async () => {
+    const idp = await idpHarness();
+    const identity = new IdentityService(store, {now: () => NOW + 3_600_001});
+    const app = createApp(store, undefined, new PageHub(), {
+      ableOidc: idp.options,
+      identity,
+    });
+    const prior = await signIn(app, idp);
+    idp.setNow(NOW + 3_600_001);
+
+    const first = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+
+    expect(first.status).toBe(200);
+    const renewed = await first.json() as {identity: string; expiresAt: string};
+    expect(renewed.identity).not.toBe(prior);
+    expect(renewed.expiresAt).toBe(new Date(NOW + 7_200_001).toISOString());
+    expect(idp.tokenCalls).toHaveLength(2);
+    expect(idp.tokenCalls[1].body.get('grant_type')).toBe('refresh_token');
+    expect(idp.tokenCalls[1].body.get('refresh_token')).toBe('upstream-refresh-token-plaintext');
+    expect(idp.tokenCalls[1].body.has('code')).toBe(false);
+    expect(idp.tokenCalls[1].authorization).toMatch(/^Basic /);
+
+    const info = await (
+      await app.request(API.instance, {headers: {[IDENTITY_HEADER]: renewed.identity}})
+    ).json() as {you: Record<string, unknown>};
+    expect(info.you).toMatchObject({
+      kind: 'user',
+      subject: `${UPSTREAM_ISSUER}#able-user-7`,
+      email: 'ada@example.com',
+    });
+
+    const second = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${renewed.identity}`},
+    });
+    expect(second.status).toBe(200);
+    expect(idp.tokenCalls).toHaveLength(3);
+    expect(idp.tokenCalls[2].body.get('refresh_token')).toBe('upstream-refresh-token-rotated-1');
+
+    const db = (store as unknown as {db: {query<T>(sql: string): Promise<T[]>}}).db;
+    const [stored] = await db.query<{token_ciphertext: string; assertion_jti: string}>(
+      'SELECT token_ciphertext, assertion_jti FROM able_oidc_refresh_tokens',
+    );
+    expect(stored.token_ciphertext).not.toContain('upstream-refresh-token-rotated-2');
+    expect(stored.assertion_jti).toBe(decodeJwt((await second.json() as {identity: string}).identity).jti);
+  });
+
+  it('rejects an older still-valid assertion before calling the IdP', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const older = await signIn(app, idp);
+    const newer = await signIn(app, idp);
+    expect(decodeJwt(older).jti).not.toBe(decodeJwt(newer).jti);
+    expect(idp.tokenCalls).toHaveLength(2);
+
+    const response = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${older}`},
+    });
+
+    expect(response.status).toBe(401);
+    expect(idp.tokenCalls).toHaveLength(2);
+  });
+
+  it('carries prior verified claims when refresh returns no ID token', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const prior = await signIn(app, idp);
+    idp.setRefreshIdToken(false);
+
+    const response = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+
+    expect(response.status).toBe(200);
+    const renewed = await response.json() as {identity: string};
+    const info = await (
+      await app.request(API.instance, {headers: {[IDENTITY_HEADER]: renewed.identity}})
+    ).json() as {you: Record<string, unknown>};
+    expect(info.you).toMatchObject({name: 'Ada Able', email: 'ada@example.com'});
+    expect(idp.tokenCalls[1].body.get('grant_type')).toBe('refresh_token');
+  });
+
+  it('binds refresh to the verified prior assertion and rejects replay or a changed upstream subject', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const prior = await signIn(app, idp);
+
+    const forged = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: 'Bearer not-a-signed-bridge-assertion'},
+    });
+    expect(forged.status).toBe(401);
+    expect(await forged.json()).toEqual({error: 'able session could not be renewed'});
+    expect(idp.tokenCalls).toHaveLength(1);
+
+    idp.setSubject('different-user');
+    const mismatch = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+    expect(mismatch.status).toBe(401);
+    expect(await mismatch.json()).toEqual({error: 'able session could not be renewed'});
+    expect(idp.tokenCalls).toHaveLength(2);
+
+    idp.setSubject('able-user-7');
+    const replay = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+    expect(replay.status).toBe(401);
+    expect(idp.tokenCalls).toHaveLength(2);
+  });
+
+  it('rejects an assertion beyond the bounded expiry grace before consuming its refresh token', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const prior = await signIn(app, idp);
+    idp.setNow(NOW + 3_600_000 + 5 * 60_000 + 1);
+
+    const response = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+
+    expect(response.status).toBe(401);
+    expect(idp.tokenCalls).toHaveLength(1);
+    const db = (store as unknown as {db: {query<T>(sql: string): Promise<T[]>}}).db;
+    expect(await db.query('SELECT token_ciphertext FROM able_oidc_refresh_tokens')).toHaveLength(1);
+  });
+
+  it('deletes the stored refresh token on authenticated sign-out cleanup', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const prior = await signIn(app, idp);
+
+    const removed = await app.request(API.ableOauthRefresh, {
+      method: 'DELETE',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+
+    expect(removed.status).toBe(204);
+    const retry = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${prior}`},
+    });
+    expect(retry.status).toBe(401);
+    expect(idp.tokenCalls).toHaveLength(1);
+  });
+
+  it('rate-limits forged refresh attempts before token lookup or upstream exchange', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const response = await app.request(API.ableOauthRefresh, {
+        method: 'POST',
+        headers: {authorization: `Bearer forged-${attempt}`},
+      });
+      expect(response.status).toBe(401);
+    }
+    const limited = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: 'Bearer forged-over-limit'},
+    });
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('60');
+    expect(await limited.json()).toEqual({error: 'too many able session requests'});
+    expect(idp.tokenCalls).toHaveLength(0);
   });
 
   it('does not replace an existing same-issuer JWKS URL with the bridge key', async () => {
