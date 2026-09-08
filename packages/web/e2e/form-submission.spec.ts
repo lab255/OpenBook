@@ -2,11 +2,14 @@ import {spawn, type ChildProcess} from 'node:child_process';
 import {rmSync} from 'node:fs';
 import {join} from 'node:path';
 import type {BrowserContext} from '@playwright/test';
-import {mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
+import {LOCAL_OWNER_HEADER, mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
 import {expect, test, WORKER_DATA_DIR_PREFIX} from './fixtures';
 
 /** Dedicated claimed/published server: claiming a shared worker server would permanently make later specs read-only. */
 const FORM_BASE_PORT = 4620;
+/** Per-run local-owner secret: owner-only setup writes (trusting the e2e issuer
+ * while UNCLAIMED) authenticate as the machine owner via the trusted transport. */
+const FORM5_LOCAL_OWNER_SECRET = 'openbook-web-e2e-form5-local-owner';
 const ISSUER = 'https://account.book.pub';
 
 interface PublishedInstance {
@@ -27,7 +30,11 @@ async function startPublishedInstance(workerIndex: number): Promise<PublishedIns
   let child: ChildProcess | null = spawn(
     process.execPath,
     ['--import', 'tsx', 'src/bin.ts', '--data-dir', dataDir, '--port', String(port)],
-    {cwd: join(__dirname, '..', '..', 'server'), stdio: ['ignore', 'ignore', 'pipe']},
+    {
+      cwd: join(__dirname, '..', '..', 'server'),
+      env: {...process.env, OPENBOOK_LOCAL_OWNER_SECRET: FORM5_LOCAL_OWNER_SECRET},
+      stdio: ['ignore', 'ignore', 'pipe'],
+    },
   );
   let stderrTail = '';
   child.stderr?.on('data', (chunk: Buffer) => {
@@ -65,9 +72,11 @@ async function startPublishedInstance(workerIndex: number): Promise<PublishedIns
     );
     const ownerHeaders = {...anonymousHeaders, 'X-OpenBook-Identity': assertion};
 
+    // Owner-only settings write: unclaimed instances fail closed for anonymous
+    // callers, so trusting the issuer rides the local-owner hatch (machine owner).
     const trust = await fetch(`${url}/api/instance`, {
       method: 'PUT',
-      headers: anonymousHeaders,
+      headers: {...anonymousHeaders, [LOCAL_OWNER_HEADER]: FORM5_LOCAL_OWNER_SECRET},
       body: JSON.stringify({trustedIssuers: [{issuer: ISSUER, jwks: {keys: [keys.publicJwk]}}]}),
     });
     if (!trust.ok) throw new Error(`could not trust FORM-5 issuer: ${trust.status}`);
