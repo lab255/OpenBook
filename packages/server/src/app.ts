@@ -898,8 +898,8 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   // With no identity provider configured the instance stays legacy: everyone is
   // an anonymous guest with full access.
   app.use('/api/*', async (c, next) => {
-    // Login must remain reachable when guest access is `off`: these exact GETs
-    // carry only OAuth state/code and cannot present an OpenBook identity yet.
+    // Login/renewal entry routes must remain reachable when guest access is `off`.
+    // Each route performs its own OAuth-state or signed-assertion authentication.
     if (isAbleOidcPublicRequest(c.req.method, c.req.path) && !bearerAgentToken(c)) {
       c.set('principal', guestPrincipal());
       return next();

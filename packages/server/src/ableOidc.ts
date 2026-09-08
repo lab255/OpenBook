@@ -453,7 +453,11 @@ export class AbleOidcService {
       if (typeof tokens.id_token !== 'string' || !tokens.id_token) {
         throw new AbleOidcError(502, 'able session could not be renewed');
       }
-      refreshed = await this.verifyIdToken(tokens.id_token);
+      try {
+        refreshed = await this.verifyIdToken(tokens.id_token);
+      } catch {
+        throw new AbleOidcError(502, 'able session could not be renewed');
+      }
       if (!safeStringEqual(refreshed.sub, subject)) {
         throw new AbleOidcError(401, 'able session could not be renewed');
       }

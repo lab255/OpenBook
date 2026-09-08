@@ -470,6 +470,28 @@ describe('able OIDC relying party', () => {
     expect(idp.tokenCalls).toHaveLength(1);
   });
 
+  it('rate-limits forged refresh attempts before token lookup or upstream exchange', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const response = await app.request(API.ableOauthRefresh, {
+        method: 'POST',
+        headers: {authorization: `Bearer forged-${attempt}`},
+      });
+      expect(response.status).toBe(401);
+    }
+    const limited = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: 'Bearer forged-over-limit'},
+    });
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBe('60');
+    expect(await limited.json()).toEqual({error: 'too many able session requests'});
+    expect(idp.tokenCalls).toHaveLength(0);
+  });
+
   it('does not replace an existing same-issuer JWKS URL with the bridge key', async () => {
     const config = await store.getInstanceConfig();
     await store.updateInstanceConfig({
