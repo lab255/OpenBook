@@ -275,6 +275,7 @@ export class AbleOidcService {
     return safe;
   }
 
+  // callback MUST pass nonce; refresh grant has none (OIDC Core 12.2)
   private async verifyIdToken(idToken: string, expectedNonce?: string): Promise<JWTPayload> {
     const discovery = await this.discovery();
     const keys = await this.jwks(discovery);
@@ -377,7 +378,8 @@ export class AbleOidcService {
   /** Verify possession of an assertion minted by this instance. Normal request
    * authentication cannot bind renewal because it rejects an assertion at `exp`;
    * this verifier permits only a five-minute post-expiry grace and never accepts
-   * a caller-supplied subject. */
+   * a caller-supplied subject. able-bridge subjects are outside the OB-106
+   * revocation set's scope; revoke by removing the account or unmounting able options. */
   private async verifyBridgeAssertion(assertion: string): Promise<JWTPayload> {
     const stored = await this.store.getAbleOidcBridgeKey(this.issuer);
     if (!bridgeKeyIsValid(stored)) throw new AbleOidcError(401, 'able session could not be renewed');

@@ -61,6 +61,7 @@ export function mountAbleOidcRoutes(
 
   app.post(API.ableOauthRefresh, async (c) => {
     try {
+      // Behind a reverse proxy or non-Node adapter, clientIpKey collapses to a shared bucket; renewal DoS fails closed into re-sign-in.
       if (refreshLimiter.exceeded(clientIpKey(c))) {
         c.header('Retry-After', String(ABLE_REFRESH_RATE_WINDOW_MS / 1000));
         throw new AbleOidcError(429, 'too many able session requests');
