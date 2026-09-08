@@ -7,6 +7,7 @@ import {streamSSE} from 'hono/streaming';
 import type {StatusCode} from 'hono/utils/http-status';
 import {
   API,
+  ACL_LEVELS,
   AGENT_EDITS_MODES,
   AGENT_EDITS_POLICIES,
   ASSET_IMAGE_MIMES,
@@ -27,6 +28,8 @@ import {
   validateRowAgainstForm,
   validateSubmission,
   PAGE_VISIBILITIES,
+  MEMBER_ROLES,
+  MEMBER_STATUSES,
   TITLE_PROPERTY_ID,
   type AclLevel,
   type AgentEditsPolicy,
@@ -2266,6 +2269,12 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   app.post(API.members, async (c) => {
     await requireRosterMutation(c, store);
     const body = await c.req.json<{invitee?: string; role?: MemberRole; status?: MemberStatus}>();
+    if (body.role !== undefined && !MEMBER_ROLES.includes(body.role)) {
+      return c.json({error: 'role must be a valid member role'}, 400);
+    }
+    if (body.status !== undefined && !MEMBER_STATUSES.includes(body.status)) {
+      return c.json({error: 'status must be a valid member status'}, 400);
+    }
     const resolved = await resolveInvitee(body.invitee ?? '', opts.handleResolver);
     // By-email ⇒ an unclaimed persona (default 'invited'); by-subject ⇒ an already
     // known identity (default 'active').
@@ -2284,6 +2293,12 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   app.patch(`${API.members}/:id`, async (c) => {
     await requireRosterMutation(c, store);
     const patch = await c.req.json<{role?: MemberRole; status?: MemberStatus}>();
+    if (patch.role !== undefined && !MEMBER_ROLES.includes(patch.role)) {
+      return c.json({error: 'role must be a valid member role'}, 400);
+    }
+    if (patch.status !== undefined && !MEMBER_STATUSES.includes(patch.status)) {
+      return c.json({error: 'status must be a valid member status'}, 400);
+    }
     const member = await store.updateMember(c.req.param('id'), patch);
     if (!member) return c.json({error: 'member not found'}, 404);
     logEdit(c, null, 'member.update', member.id);
@@ -2360,6 +2375,9 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     await requireAccess(c, store, 'write', id);
     await rejectManagedPage(id);
     const body = await c.req.json<{invitee?: string; level?: AclLevel}>();
+    if (body.level !== undefined && !ACL_LEVELS.includes(body.level)) {
+      return c.json({error: 'level must be a valid ACL level'}, 400);
+    }
     const resolved = await resolveInvitee(body.invitee ?? '', opts.handleResolver);
     const grant = await store.setPageAcl(id, {
       email: resolved.email ?? null,

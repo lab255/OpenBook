@@ -159,6 +159,30 @@ describe('roster invite routes (create / list / revoke)', () => {
     expect((await res.json()).subject).toBe(`${ISS}#ziggy`);
   });
 
+  it.each([
+    ['role', 'operator'],
+    ['status', 'pending'],
+  ])('POST rejects an invalid %s without adding a member', async (field, value) => {
+    const before = await store.listMembers();
+    const res = await post(app(), '/api/members', {invitee: 'invalid@example.com', [field]: value}, await idFor('admin'));
+    expect(res.status).toBe(400);
+    expect(await store.listMembers()).toEqual(before);
+  });
+
+  it.each([
+    ['role', 'operator'],
+    ['status', 'pending'],
+  ])('PATCH rejects an invalid %s without changing the member', async (field, value) => {
+    const member = await store.addMember({subject: `${ISS}#unchanged`, role: 'viewer', status: 'active'});
+    const res = await app().request(`/api/members/${member.id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json', [IDENTITY_HEADER]: await idFor('admin')},
+      body: JSON.stringify({[field]: value}),
+    });
+    expect(res.status).toBe(400);
+    expect((await store.listMembers()).find((row) => row.id === member.id)).toEqual(member);
+  });
+
   it('only an instance writer manages the roster (viewer + guest 403)', async () => {
     await store.addMember({subject: `${ISS}#viewer`, role: 'viewer', status: 'active'});
     const a = app();
@@ -196,6 +220,17 @@ describe('per-page ACL share routes', () => {
     // A stranger can't even see the restricted page exists → 404 on the ACL route.
     expect((await get(a, `/api/pages/${restricted}/acl`, await idFor('stranger'))).status).toBe(404);
     expect((await post(a, `/api/pages/${restricted}/acl`, {invitee: 'x@y.test'}, await idFor('stranger'))).status).toBe(404);
+  });
+
+  it('rejects an invalid ACL level without adding a grant', async () => {
+    const res = await post(
+      app(),
+      `/api/pages/${restricted}/acl`,
+      {invitee: 'invalid@example.com', level: 'owner'},
+      await idFor('admin'),
+    );
+    expect(res.status).toBe(400);
+    expect(await store.getPageAcl(restricted)).toEqual([]);
   });
 });
 

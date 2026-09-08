@@ -541,6 +541,9 @@ export function resolveAgentEdits(
  *  read-only. (Contract §1.1 names this union `Role`.) */
 export type MemberRole = 'admin' | 'viewer';
 
+/** Every {@link MemberRole} value, used for request-boundary validation. */
+export const MEMBER_ROLES: readonly MemberRole[] = ['admin', 'viewer'];
+
 /**
  * The caller's *effective* instance role (P1-8) — the roster roles plus `owner`,
  * the rung the roster can't express: the claimed owner (`jws` &&
@@ -559,6 +562,9 @@ export type EffectiveRole = 'owner' | MemberRole;
  */
 export type MemberStatus = 'invited' | 'active' | 'suspended';
 
+/** Every {@link MemberStatus} lifecycle value, used for request validation. */
+export const MEMBER_STATUSES: readonly MemberStatus[] = ['invited', 'active', 'suspended'];
+
 /**
  * Where a roster row came from (OB-199). `local` = a locally-issued invite (the
  * OB-191 path); `managed` = projected from the bound account library's roster by
@@ -569,6 +575,9 @@ export type MemberSource = 'local' | 'managed';
 
 /** Per-page ACL grant level (OB-182 §1.1). */
 export type AclLevel = 'read' | 'write';
+
+/** Every {@link AclLevel} value, used for request-boundary validation. */
+export const ACL_LEVELS: readonly AclLevel[] = ['read', 'write'];
 
 /**
  * One roster row — the data-server-native `members` table (OB-182 §2.1). A row is
