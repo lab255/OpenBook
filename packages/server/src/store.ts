@@ -57,6 +57,7 @@ import {AGENT_EDITS_POLICIES, authorize, BACKUP_VERSION, dateStart, DEFAULT_ACCO
 import {LedgerError, LEDGER_AUDIT_ACTIONS, ASSET_IMAGE_MIMES, DEFAULT_MAX_ASSET_BYTES, canonicalLedgerJson, ledgerAuditEventHash, ledgerRestorePayloadContent, verifyLedgerAuditChain} from '@book.dev/sdk';
 import {compareSemver, isSemver} from '@book.dev/sdk';
 import {authoredSubject} from './agentWriteGate';
+import {AbleOidcError} from './ableOidcError';
 import type {Db} from './dbCore';
 import type {IndexablePage} from './ai/search';
 import type {AgentTokenRow} from './agentTokens';
@@ -73,6 +74,7 @@ import {verifyLedger, type LedgerVerifyReport} from './ledgerVerify';
  */
 const USAGE_DB_SETTING_KEY = 'aiUsageDb';
 const DATABASE_FORM_MARKER_VIEW_KEY = 'submittedViaViewId' satisfies keyof DatabaseFormSubmissionMarker;
+const MAX_ABLE_OIDC_STATES = 5000;
 
 /**
  * Thrown by {@link PageStore.putAsset} when storing a NEW asset would push the
@@ -3952,6 +3954,10 @@ export class PageStore {
   }): Promise<void> {
     await this.db.begin(async (tx) => {
       await tx.query('DELETE FROM able_oidc_states WHERE expires_at <= now()');
+      const [live] = await tx.query<{count: number}>('SELECT COUNT(*)::int AS count FROM able_oidc_states');
+      if (live.count >= MAX_ABLE_OIDC_STATES) {
+        throw new AbleOidcError(429, 'too many pending able sign-in requests');
+      }
       await tx.query(
         `INSERT INTO able_oidc_states
           (state_hash, code_verifier_ciphertext, code_verifier_iv, nonce, handoff_state, redirect_uri, expires_at)

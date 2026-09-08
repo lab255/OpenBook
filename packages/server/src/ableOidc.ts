@@ -23,6 +23,9 @@ import {
   type Jwk,
 } from '@book.dev/sdk';
 import type {PageStore} from './store';
+import {AbleOidcError} from './ableOidcError';
+
+export {AbleOidcError};
 
 export const ABLE_OIDC_ISSUER = 'https://account.able.online/api/auth';
 export const ABLE_OIDC_DISCOVERY_URL =
@@ -62,16 +65,6 @@ interface TokenResponse {
 interface Cached<T> {
   value: T;
   at: number;
-}
-
-export class AbleOidcError extends Error {
-  constructor(
-    readonly status: 400 | 502,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'AbleOidcError';
-  }
 }
 
 const b64u = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64url');

@@ -221,6 +221,23 @@ describe('able OIDC relying party', () => {
     expect(idp.tokenCalls).toHaveLength(0);
   });
 
+  it('caps the live authorization state table at 5000 rows', async () => {
+    const db = (store as unknown as {db: {query(sql: string): Promise<unknown>}}).db;
+    await db.query(
+      `INSERT INTO able_oidc_states
+        (state_hash, code_verifier_ciphertext, code_verifier_iv, nonce, handoff_state, redirect_uri, expires_at)
+       SELECT 'flood-' || n, 'ciphertext', 'iv', 'nonce', '', 'http://localhost/callback', now() + INTERVAL '10 minutes'
+       FROM generate_series(1, 5000) AS n`,
+    );
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+
+    const response = await app.request(API.ableOauthAuthorize);
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({error: 'too many pending able sign-in requests'});
+  });
+
   it('exchanges with client_secret_basic + the original verifier, encrypts secrets, and bridges to resolvePrincipal', async () => {
     const idp = await idpHarness();
     const identity = new IdentityService(store, {now: () => NOW});
