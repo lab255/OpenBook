@@ -17,6 +17,9 @@ export function mountAbleOidcRoutes(
   const oidc = new AbleOidcService(store, options);
 
   app.get(API.ableOauthAuthorize, async (c) => {
+    // Same-origin web shells use this side-effect-free capability probe to
+    // choose delegated sign-in only when the server actually mounted it.
+    if (c.req.query('probe') === '1') return c.body(null, 204);
     try {
       const origin = new URL(c.req.url).origin;
       const target = await oidc.authorizationUrl(origin, c.req.query('handoff_state') ?? '');

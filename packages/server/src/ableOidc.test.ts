@@ -138,6 +138,14 @@ async function begin(app: ReturnType<typeof createApp>, handoffState = ''): Prom
 }
 
 describe('able OIDC relying party', () => {
+  it('offers a side-effect-free same-origin capability probe only when mounted', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const response = await app.request(`${API.ableOauthAuthorize}?probe=1`);
+    expect(response.status).toBe(204);
+    expect(idp.discoveryCalls()).toBe(0);
+  });
+
   it('is inert unless both confidential-client credentials are supplied', async () => {
     const absent = createApp(store);
     expect((await absent.request(API.ableOauthAuthorize)).status).toBe(404);

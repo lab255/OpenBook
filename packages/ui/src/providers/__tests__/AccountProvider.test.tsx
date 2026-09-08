@@ -156,6 +156,19 @@ afterEach(() => {
 });
 
 describe('AccountProvider — multi-account (OB-194)', () => {
+  it('accepts a bridged identity assertion without treating it as an account API bearer', async () => {
+    const {result} = renderAccount();
+    const assertion = fakeJws('tok-work');
+    act(() => result.current.submitCode(assertion));
+
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    expect(result.current.connected).toBe(true);
+    expect(result.current.token).toBeNull();
+    expect(getIdentityCredential().jws).toBe(assertion);
+    expect(settingsPuts).toHaveLength(0);
+    expect(readIndex()[0]).toMatchObject({subject: subjectOf('tok-work')});
+  });
+
   it('adds an account, makes it active, and stores its token in a namespaced slot', async () => {
     const {result} = renderAccount();
     await waitFor(() => expect(result.current.status).toBe('disconnected'));
