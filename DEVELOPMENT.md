@@ -47,7 +47,8 @@ Set both `ABLE_OAUTH_CLIENT_ID` and `ABLE_OAUTH_CLIENT_SECRET` on the server to
 replace the default account-service sign-in entry point with the server-side
 able OAuth 2.1/OIDC flow. If either value is absent, the two able auth routes are
 not mounted. The confidential-client secret remains server-only and is never
-returned through the settings/API surface.
+returned through the settings/API surface. Rotating it invalidates existing
+encrypted able OIDC state, refresh tokens, and bridge-key material.
 
 The production issuer defaults to `https://account.able.online/api/auth`.
 Self-hosted and test deployments may override it with `ABLE_OAUTH_ISSUER`, and

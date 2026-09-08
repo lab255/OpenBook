@@ -12,6 +12,7 @@ import {
   createHash,
   randomBytes,
   randomUUID,
+  scryptSync,
   timingSafeEqual,
 } from 'node:crypto';
 import {createLocalJWKSet, jwtVerify, type JSONWebKeySet, type JWTPayload} from 'jose';
@@ -120,10 +121,7 @@ function normalizeJwks(value: unknown): JSONWebKeySet {
 }
 
 function deriveEncryptionKey(clientSecret: string): Buffer {
-  return createHash('sha256')
-    .update('OpenBook able OIDC secret-at-rest v1\0')
-    .update(clientSecret)
-    .digest();
+  return scryptSync(clientSecret, 'OpenBook able OIDC secret-at-rest v1', 32);
 }
 
 function encryptSecret(secret: string, key: Buffer): {ciphertext: string; iv: string} {
