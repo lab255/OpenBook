@@ -16,6 +16,7 @@ const copy: Record<string, string> = {
   'account.signin.description': 'Sign in to account.book.pub to sync your preferences and libraries across devices.',
   'account.signin.signInButton': 'Continue with account.book.pub',
   'account.signin.connecting': 'Waiting for sign-in in your browser…',
+  'account.signin.manualToggle': 'Paste a sign-in code',
   'account.signin.able.description': 'Sign in to OpenBook to use your verified identity on this library.',
   'account.signin.able.signInButton': 'Sign in',
   'account.signin.able.connecting': 'Signing you in…',
@@ -58,6 +59,7 @@ describe('AccountSettings able whitelabel copy', () => {
     render(<AccountSettings />);
 
     expect(screen.getByRole('button', {name: 'Continue with account.book.pub'})).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Paste a sign-in code'})).toBeTruthy();
     expect(screen.getByText(/Sign in to account\.book\.pub/)).toBeTruthy();
   });
 
@@ -66,6 +68,7 @@ describe('AccountSettings able whitelabel copy', () => {
     const view = render(<AccountSettings />);
 
     expect(screen.getByRole('button', {name: 'Sign in'})).toBeTruthy();
+    expect(screen.queryByRole('button', {name: 'Paste a sign-in code'})).toBeNull();
     expect(screen.getByText(/Sign in to OpenBook/)).toBeTruthy();
     expect(view.container.textContent).not.toContain('account.book.pub');
     expect(view.container.textContent).not.toContain('account.able.online');

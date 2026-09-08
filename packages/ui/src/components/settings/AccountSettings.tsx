@@ -53,7 +53,7 @@ export default function AccountSettings() {
             </Button>
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <ManualCodeEntry onSubmit={submitCode} />
+          {!ableMode && <ManualCodeEntry onSubmit={submitCode} />}
           <p className="text-xs text-muted-foreground">{t(`${signin}.whatSyncs`)}</p>
         </SettingsSection>
       ) : (
