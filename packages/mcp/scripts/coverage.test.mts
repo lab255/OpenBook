@@ -205,7 +205,7 @@ async function main(): Promise<void> {
     headers.set(LOCAL_OWNER_HEADER, LOCAL_OWNER_SECRET);
     return fetch(input, {...init, headers});
   }});
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const page = await seed.savePage({name: 'API coverage', data: {editor: 'blocks', blockdoc: {blocks: []}, editorjs: {blocks: []}, values: [], names: []}});
   const mcp = await connect(server.url);
   const run = async (type: string, step: string, fn: () => Promise<void>): Promise<void> => {
