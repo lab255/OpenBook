@@ -4,7 +4,7 @@ import {rmSync} from 'node:fs';
 import {join} from 'node:path';
 import type {Browser, BrowserContext, Page} from '@playwright/test';
 import type {FormSchema, StoredDatabase, StoredPage, StoredSuggestion} from '@book.dev/sdk';
-import {mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
+import {LOCAL_OWNER_HEADER, mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
 import {expect, test, openInfoTip, WORKER_DATA_DIR_PREFIX} from './fixtures';
 
 /**
@@ -15,6 +15,9 @@ import {expect, test, openInfoTip, WORKER_DATA_DIR_PREFIX} from './fixtures';
  */
 const FORM_EPIC_BASE_PORT = 4680;
 const ISSUER = 'https://account.book.pub';
+/** Per-run local-owner secret: owner-only setup writes (trusting the e2e issuer
+ * while UNCLAIMED) authenticate as the machine owner via the trusted transport. */
+const FORM8_LOCAL_OWNER_SECRET = 'openbook-web-e2e-form8-local-owner';
 
 interface ClaimedInstance {
   url: string;
@@ -48,7 +51,11 @@ async function startClaimedInstance(workerIndex: number): Promise<ClaimedInstanc
   let child: ChildProcess | null = spawn(
     process.execPath,
     ['--import', 'tsx', 'src/bin.ts', '--data-dir', dataDir, '--port', String(port)],
-    {cwd: join(__dirname, '..', '..', 'server'), stdio: ['ignore', 'ignore', 'pipe']},
+    {
+      cwd: join(__dirname, '..', '..', 'server'),
+      env: {...process.env, OPENBOOK_LOCAL_OWNER_SECRET: FORM8_LOCAL_OWNER_SECRET},
+      stdio: ['ignore', 'ignore', 'pipe'],
+    },
   );
   let stderrTail = '';
   child.stderr?.on('data', (chunk: Buffer) => {
@@ -87,9 +94,11 @@ async function startClaimedInstance(workerIndex: number): Promise<ClaimedInstanc
     );
     const ownerHeaders = {...anonymousHeaders, 'X-OpenBook-Identity': assertion};
 
+    // Owner-only settings write: unclaimed instances fail closed for anonymous
+    // callers, so trusting the issuer rides the local-owner hatch (machine owner).
     const trust = await fetch(`${url}/api/instance`, {
       method: 'PUT',
-      headers: anonymousHeaders,
+      headers: {...anonymousHeaders, [LOCAL_OWNER_HEADER]: FORM8_LOCAL_OWNER_SECRET},
       body: JSON.stringify({trustedIssuers: [{issuer: ISSUER, jwks: {keys: [keys.publicJwk]}}]}),
     });
     if (!trust.ok) throw new Error(`could not trust FORM-8 issuer: ${trust.status}`);

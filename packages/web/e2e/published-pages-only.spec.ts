@@ -6,7 +6,7 @@ import type {BrowserContext, Page} from '@playwright/test';
 // an `import`-only export map, and Playwright transpiles specs to CJS, so the
 // bare specifier resolves to "No exports main defined". This module is
 // Web-Crypto-only with one relative import, so pulling it in directly is cheap.
-import {mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
+import {LOCAL_OWNER_HEADER, mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
 import {test, expect, chooseValue, WORKER_DATA_DIR_PREFIX} from './fixtures';
 
 /**
@@ -26,7 +26,7 @@ import {test, expect, chooseValue, WORKER_DATA_DIR_PREFIX} from './fixtures';
  * ## Why this file spawns its OWN data server
  *
  * Claiming is PERMANENT (there is no un-claim; `repairOwnership` needs the
- * loopback owner hatch, which e2e leaves inert). The per-worker `dataServer`
+ * loopback owner hatch, which the specs only use for setup). The per-worker `dataServer`
  * fixture is reused by every later spec file in that worker, and every one of
  * them assumes the fresh, UNCLAIMED default (`guestAccess:'write'`, where the
  * anonymous browser is a manager). Claiming that server would turn guests
@@ -40,6 +40,9 @@ import {test, expect, chooseValue, WORKER_DATA_DIR_PREFIX} from './fixtures';
 
 /** Clear of the worker fixtures' 4400-4464 range, still marker-reaped. */
 const CLAIMED_BASE_PORT = 4520;
+/** Per-run local-owner secret: owner-only setup writes (trusting the e2e issuer
+ * while UNCLAIMED) authenticate as the machine owner via the trusted transport. */
+const PUB1_LOCAL_OWNER_SECRET = 'openbook-web-e2e-pub1-local-owner';
 const ISS = 'https://account.book.pub';
 const PUBLISHED = 'PUB1 Published Page';
 const UNPUBLISHED = 'PUB1 Private Sibling';
@@ -79,7 +82,11 @@ async function startClaimedInstance(workerIndex: number): Promise<ClaimedInstanc
   let child: ChildProcess | null = spawn(
     process.execPath,
     ['--import', 'tsx', 'src/bin.ts', '--data-dir', dataDir, '--port', String(port)],
-    {cwd: join(__dirname, '..', '..', 'server'), stdio: ['ignore', 'ignore', 'pipe']},
+    {
+      cwd: join(__dirname, '..', '..', 'server'),
+      env: {...process.env, OPENBOOK_LOCAL_OWNER_SECRET: PUB1_LOCAL_OWNER_SECRET},
+      stdio: ['ignore', 'ignore', 'pipe'],
+    },
   );
   let stderrTail = '';
   child.stderr?.on('data', (chunk: Buffer) => {
@@ -117,12 +124,13 @@ async function startClaimedInstance(workerIndex: number): Promise<ClaimedInstanc
     );
     const owner = {...anon, 'X-OpenBook-Identity': jws};
 
-    // Trust the minted issuer. Allowed unauthenticated while UNCLAIMED (the
-    // owner gate engages only once `ownerSubject` is set); the inline `jwks`
+    // Trust the minted issuer. Owner-only even while UNCLAIMED (anonymous
+    // settings writes fail closed), so this setup write rides the local-owner
+    // hatch — the machine owner, as the desktop host would; the inline `jwks`
     // keeps verification fully offline — no network fetch of a real JWKS.
     const trusted = await fetch(`${url}/api/instance`, {
       method: 'PUT',
-      headers: anon,
+      headers: {...anon, [LOCAL_OWNER_HEADER]: PUB1_LOCAL_OWNER_SECRET},
       body: JSON.stringify({trustedIssuers: [{issuer: ISS, jwks: {keys: [kp.publicJwk]}}]}),
     });
     if (!trusted.ok) throw new Error(`could not trust the e2e issuer: ${trusted.status}`);

@@ -79,12 +79,13 @@ describe('HttpDataClient identity transport', () => {
     expect(edits[0]).toMatchObject({verifiedVia: 'guest', authorName: 'Frank'});
   });
 
-  it('reads the instance policy + identity over the client', async () => {
+  it('reads instance policy and lets the claimed owner update it over the client', async () => {
     const jws = await signIdentity(
       kp.privateKey,
       {iss: ISS, sub: 'gwen', name: 'Gwen', exp: Math.floor(Date.now() / 1000) + 3600},
       'k1',
     );
+    await store.claimOwnership(`${ISS}#gwen`);
     const {client} = clientWithIdentity(() => ({jws}));
     const info = await client.getInstanceInfo();
     expect(info.you).toMatchObject({kind: 'user', subject: `${ISS}#gwen`});

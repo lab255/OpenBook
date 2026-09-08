@@ -22,6 +22,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {HttpDataClient, defaultDatabaseSchema} from '@book.dev/sdk';
 import {startServer} from '@book.dev/server';
+import {localOwnerTestClient, TEST_LOCAL_OWNER_SECRET} from './localOwnerTestClient.mts';
 
 const DATA_DIR = '/tmp/openbook-mcp-suggestions-test';
 
@@ -100,10 +101,11 @@ function startPolicyBlindProxy(targetUrl: string, port: number): Promise<{url: s
 
 async function main(): Promise<void> {
   rmSync(DATA_DIR, {recursive: true, force: true});
-  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4406});
+  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4406, localOwnerSecret: TEST_LOCAL_OWNER_SECRET});
   console.log(`\nOpenBook server up at ${server.url}`);
 
   const seed = new HttpDataClient(server.url);
+  const ownerSeed = localOwnerTestClient(server.url);
 
   // A block-editor page with one text block the write tools can target.
   const page = await seed.savePage({
@@ -188,7 +190,7 @@ async function main(): Promise<void> {
 
   // ── RESOLVED DIRECT (instance mode = direct): immediate mutation. ─────────────
   console.log('\nResolved direct (instance policy = direct) — writes mutate directly');
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const suggestionsBeforeDirect = (await seed.listSuggestions(page.id)).length;
   const direct = await connect(server.url);
 
@@ -241,7 +243,7 @@ async function main(): Promise<void> {
 
   // ── PAGE OVERRIDE beats INSTANCE — direction 2: page direct over instance suggest.
   console.log('\nPage override (direct) beats instance (suggest)');
-  await seed.setInstancePolicy({agentEdits: 'suggest'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'suggest'});
   await seed.setPageAgentEdits(page.id, 'direct');
   const suggestionsBeforeOv2 = (await seed.listSuggestions(page.id)).length;
   const ov2 = await connect(server.url);
@@ -254,7 +256,7 @@ async function main(): Promise<void> {
 
   // ── RETIRED ENV VAR: it does NOT enable direct; a deprecation is logged. ──────
   console.log('\nRetired OPENBOOK_MCP_ALLOW_DIRECT_EDITS — never enables direct, logs a deprecation');
-  await seed.setInstancePolicy({agentEdits: 'suggest'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'suggest'});
   await seed.setPageAgentEdits(page.id, 'inherit'); // resolves to instance suggest
   const suggestionsBeforeEnv = (await seed.listSuggestions(page.id)).length;
   const envConn = await connect(server.url, {directEnv: true});
@@ -270,7 +272,7 @@ async function main(): Promise<void> {
 
   // ── FAIL-SAFE: an older server (policy route 404s) → suggest, even if instance=direct.
   console.log('\nFail-safe: older server (agent-edits route absent) → suggest even under instance=direct');
-  await seed.setInstancePolicy({agentEdits: 'direct'}); // underlying instance WOULD be direct
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'}); // underlying instance WOULD be direct
   const proxy = await startPolicyBlindProxy(server.url, 4407);
   const suggestionsBeforeFs = (await seed.listSuggestions(page.id)).length;
   const fs = await connect(proxy.url);
@@ -283,7 +285,7 @@ async function main(): Promise<void> {
   await proxy.close();
 
   const readOnly = await connect(server.url);
-  await seed.setInstancePolicy({guestAccess: 'read'});
+  await ownerSeed.setInstancePolicy({guestAccess: 'read'});
   const readOnlyCalls = [
     await readOnly.client.callTool({name: 'create_database', arguments: {title: 'Refused DB'}}),
     await readOnly.client.callTool({name: 'update_database', arguments: {pageId: dbHost.id, name: 'Refused rename'}}),

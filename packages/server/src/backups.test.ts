@@ -2,7 +2,7 @@ import {mkdir, readdir, readFile, rm, utimes, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {BACKUP_CADENCE_MS, BACKUP_VERSION, localPrincipal, type LibraryBackup, type StoredPage} from '@book.dev/sdk';
+import {BACKUP_CADENCE_MS, BACKUP_VERSION, LOCAL_OWNER_HEADER, localPrincipal, type LibraryBackup, type StoredPage} from '@book.dev/sdk';
 import {PgliteDb} from './db';
 import {PageStore} from './store';
 import {PageHub} from './hub';
@@ -541,7 +541,8 @@ describe('BackupScheduler', () => {
 describe('backup HTTP routes', () => {
   it('GET/PUT/POST /api/backups drive status, policy, and on-demand runs', async () => {
     await store.upsertPage({name: `route-${seq}`, data: snapshot()});
-    const app = createApp(store, undefined, new PageHub(), {backups: scheduler()});
+    const localOwnerSecret = 'backups-route-local-owner';
+    const app = createApp(store, undefined, new PageHub(), {backups: scheduler(), localOwnerSecret});
 
     const status = await (await app.request('/api/backups')).json();
     expect(status.resolvedDir).toBe(backupDir);
@@ -551,7 +552,11 @@ describe('backup HTTP routes', () => {
     const disabled = await (
       await app.request('/api/backups', {
         method: 'PUT',
-        headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+        headers: {
+          'Content-Type': 'application/json',
+          'X-OpenBook-Client': '1',
+          [LOCAL_OWNER_HEADER]: localOwnerSecret,
+        },
         body: JSON.stringify({enabled: false}),
       })
     ).json();
@@ -561,7 +566,11 @@ describe('backup HTTP routes', () => {
     const enabled = await (
       await app.request('/api/backups', {
         method: 'PUT',
-        headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+        headers: {
+          'Content-Type': 'application/json',
+          'X-OpenBook-Client': '1',
+          [LOCAL_OWNER_HEADER]: localOwnerSecret,
+        },
         body: JSON.stringify({enabled: true}),
       })
     ).json();

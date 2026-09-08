@@ -29,6 +29,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {HttpDataClient} from '@book.dev/sdk';
 import {startServer} from '@book.dev/server';
+import {localOwnerTestClient, TEST_LOCAL_OWNER_SECRET} from './localOwnerTestClient.mts';
 
 const DATA_DIR = '/tmp/openbook-mcp-blocks-test';
 
@@ -121,12 +122,13 @@ const blockPage = (name: string) => ({
 
 async function main(): Promise<void> {
   rmSync(DATA_DIR, {recursive: true, force: true});
-  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4411});
+  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4411, localOwnerSecret: TEST_LOCAL_OWNER_SECRET});
   console.log(`\nOpenBook server up at ${server.url}`);
   const seed = new HttpDataClient(server.url);
+  const ownerSeed = localOwnerTestClient(server.url);
 
   // ── DIRECT mode: the payload must materialize in the STORED page. ─────────────
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const page = await seed.savePage(blockPage('Nested target'));
   const mcp = await connect(server.url);
 
@@ -433,7 +435,7 @@ async function main(): Promise<void> {
 
   // ── SUGGEST mode: the review-layer parity for all three write paths. ──────────
   console.log('\nPolicy gate: the new tools + nested payloads go through review under suggest');
-  await seed.setInstancePolicy({agentEdits: 'suggest'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'suggest'});
   const rPage = await seed.savePage({
     ...blockPage('Review target'),
     data: {
