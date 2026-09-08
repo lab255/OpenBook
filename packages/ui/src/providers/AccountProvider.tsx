@@ -844,8 +844,8 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         }
         return true;
       } catch (err) {
-        if (identityTimer.current) clearTimeout(identityTimer.current);
         if (activeIdRef.current !== id) return false;
+        if (identityTimer.current) clearTimeout(identityTimer.current);
         const rejected = err instanceof AbleRefreshError && (err.status === 401 || err.status === 403);
         const decoded = decodeIdentity(assertion);
         const assertedExpiry = typeof decoded?.claims.exp === 'number' ? decoded.claims.exp * 1000 : null;
