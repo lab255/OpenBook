@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {exportJWK, generateKeyPair, SignJWT} from 'jose';
+import {decodeJwt, exportJWK, generateKeyPair, SignJWT} from 'jose';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {API, DEFAULT_ACCOUNT_URL} from '@book.dev/sdk';
 import {createApp} from './app';
@@ -327,8 +327,11 @@ describe('able OIDC relying party', () => {
     expect(config.trustedIssuers.find((entry) => entry.issuer === UPSTREAM_ISSUER)?.jwks?.keys).toHaveLength(1);
 
     const db = (store as unknown as {db: {query<T>(sql: string): Promise<T[]>}}).db;
-    const [refresh] = await db.query<{token_ciphertext: string}>('SELECT token_ciphertext FROM able_oidc_refresh_tokens');
+    const [refresh] = await db.query<{token_ciphertext: string; assertion_jti: string}>(
+      'SELECT token_ciphertext, assertion_jti FROM able_oidc_refresh_tokens',
+    );
     expect(refresh.token_ciphertext).not.toContain('upstream-refresh-token-plaintext');
+    expect(refresh.assertion_jti).toBe(decodeJwt(assertion).jti);
     const [key] = await db.query<{private_key_ciphertext: string}>('SELECT private_key_ciphertext FROM able_oidc_bridge_keys');
     expect(key.private_key_ciphertext).not.toContain('PRIVATE');
     const settings = await db.query<{value: string}>('SELECT value::text AS value FROM settings');
@@ -379,8 +382,28 @@ describe('able OIDC relying party', () => {
     expect(idp.tokenCalls[2].body.get('refresh_token')).toBe('upstream-refresh-token-rotated-1');
 
     const db = (store as unknown as {db: {query<T>(sql: string): Promise<T[]>}}).db;
-    const [stored] = await db.query<{token_ciphertext: string}>('SELECT token_ciphertext FROM able_oidc_refresh_tokens');
+    const [stored] = await db.query<{token_ciphertext: string; assertion_jti: string}>(
+      'SELECT token_ciphertext, assertion_jti FROM able_oidc_refresh_tokens',
+    );
     expect(stored.token_ciphertext).not.toContain('upstream-refresh-token-rotated-2');
+    expect(stored.assertion_jti).toBe(decodeJwt((await second.json() as {identity: string}).identity).jti);
+  });
+
+  it('rejects an older still-valid assertion before calling the IdP', async () => {
+    const idp = await idpHarness();
+    const app = createApp(store, undefined, new PageHub(), {ableOidc: idp.options});
+    const older = await signIn(app, idp);
+    const newer = await signIn(app, idp);
+    expect(decodeJwt(older).jti).not.toBe(decodeJwt(newer).jti);
+    expect(idp.tokenCalls).toHaveLength(2);
+
+    const response = await app.request(API.ableOauthRefresh, {
+      method: 'POST',
+      headers: {authorization: `Bearer ${older}`},
+    });
+
+    expect(response.status).toBe(401);
+    expect(idp.tokenCalls).toHaveLength(2);
   });
 
   it('carries prior verified claims when refresh returns no ID token', async () => {
