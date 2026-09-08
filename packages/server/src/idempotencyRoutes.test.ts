@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {CLIENT_HEADER, type StoredDatabase, type StoredPage} from '@book.dev/sdk';
+import {CLIENT_HEADER, LOCAL_OWNER_HEADER, type StoredDatabase, type StoredPage} from '@book.dev/sdk';
 import {createApp} from './app';
 import {PgliteDb} from './db';
 import {PageHub} from './hub';
@@ -255,17 +255,20 @@ describe('Idempotency-Key route contract', () => {
   });
 
   it('captures a successful response on every wave-1 route', async () => {
-    const app = createApp(store);
+    const localOwnerSecret = 'idempotency-route-local-owner';
+    const app = createApp(store, undefined, new PageHub(), {localOwnerSecret});
     const request = async (
       method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
       path: string,
       body?: unknown,
+      extraHeaders: Record<string, string> = {},
     ): Promise<Response> => app.request(path, {
       method,
       headers: {
         ...(body === undefined ? {} : {'Content-Type': 'application/json'}),
         [CLIENT_HEADER]: '1',
         'Idempotency-Key': randomUUID(),
+        ...extraHeaders,
       },
       ...(body === undefined ? {} : {body: JSON.stringify(body)}),
     });
@@ -325,7 +328,12 @@ describe('Idempotency-Key route contract', () => {
       .toBe(200);
     expect((await request('DELETE', `/api/databases/${createdDatabase.id}`)).status).toBe(204);
 
-    expect((await request('PUT', '/api/instance', {guestAccess: 'write'})).status).toBe(200);
+    expect((await request(
+      'PUT',
+      '/api/instance',
+      {guestAccess: 'write'},
+      {[LOCAL_OWNER_HEADER]: localOwnerSecret},
+    )).status).toBe(200);
 
     const captured = await db.query<{count: number | string}>(
       'SELECT count(*)::int AS count FROM idempotency_responses',
