@@ -1080,6 +1080,14 @@ export const ja: PartialMessages = {
     signin: {
       title: 'アカウントと同期',
       description: 'account.book.pub にサインインすると、設定とライブラリを複数のデバイス間で同期できます。ローカルファーストが既定のままで、これはオプトインです。',
+      able: {
+        description: 'OpenBook にサインインして、このライブラリで認証済みの本人情報を使用します。ページはデータサーバーに保存されたままです。',
+        signInButton: 'サインイン',
+        connecting: 'サインインしています…',
+        whatSyncs:
+          'OpenBook は、このライブラリで本人確認を行うためだけにサインイン情報を使用します。ページとドキュメントはデータサーバーに保存されたままです。',
+        signOutHint: 'サインアウトすると、この端末から OpenBook のサインイン情報が削除されます。',
+      },
     },
     switcher: {
       heading: 'アカウント',
@@ -1096,6 +1104,7 @@ export const ja: PartialMessages = {
         'この端末から {name} を解除するだけです。いつでも再度サインインすれば復元できます。他のアカウントやローカルデータには影響しません。',
       signOutActiveHint:
         'サインアウトすると、この端末で使用中のアカウントが解除されます。他のアカウントはサインインしたままです。端末を完全に無効化するには、アカウントのダッシュボードから削除してください。',
+      openBookIdentity: 'OpenBook の本人情報',
     },
     error: {
       rejected: 'サインインが拒否されました。もう一度お試しください。',

@@ -1077,6 +1077,13 @@ export const zh: PartialMessages = {
     signin: {
       title: '账户与同步',
       description: '登录 account.book.pub，即可在多台设备间同步你的偏好和资料库。本地优先仍为默认——此项为可选。',
+      able: {
+        description: '登录 OpenBook，以在此资料库中使用已验证的身份。你的页面仍保留在数据服务器上。',
+        signInButton: '登录',
+        connecting: '正在为你登录…',
+        whatSyncs: 'OpenBook 仅使用你的登录信息来验证你在此资料库中的身份。页面和文档仍保留在你的数据服务器上。',
+        signOutHint: '退出登录会从此设备移除这项 OpenBook 登录信息。',
+      },
     },
     switcher: {
       heading: '账户',
@@ -1093,6 +1100,7 @@ export const zh: PartialMessages = {
         '这只会在此设备上忘记 {name}——随时重新登录即可恢复。你的其他账户和本地数据不受影响。',
       signOutActiveHint:
         '退出登录会在此设备上忘记当前账户；你的其他账户仍保持登录。若要彻底吊销某台设备，请在账户面板中将其移除。',
+      openBookIdentity: 'OpenBook 身份',
     },
     error: {
       rejected: '此次登录被拒绝。请重试。',

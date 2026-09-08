@@ -44,6 +44,9 @@ const failIdentityMint = new Set<string>();
 //    visible re-auth state and drop the dead JWS, never a silent guest downgrade.
 const revokeIdentityMint = new Set<string>();
 let identityMintUrls: string[] = [];
+let ableRefreshRequests: Array<{method: string; authorization: string}> = [];
+let failAbleRefresh = false;
+let ableRenewalSequence = 0;
 const putsFor = (tok: string): Array<{token: string; settings: Record<string, unknown>}> =>
   settingsPuts.filter((p) => p.token === tok);
 
@@ -52,9 +55,16 @@ const b64u = (o: unknown): string => {
   for (const byte of new TextEncoder().encode(JSON.stringify(o))) bin += String.fromCharCode(byte);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
-const fakeJws = (tok: string): string => {
+const fakeJws = (tok: string, options: {expiresInMs?: number; marker?: string} = {}): string => {
   const p = PERSONAS[tok];
-  const claims = {iss: p.iss, sub: p.sub, name: p.name, email: p.email, exp: Math.floor(Date.now() / 1000) + 3600};
+  const claims = {
+    iss: p.iss,
+    sub: p.sub,
+    name: p.name,
+    email: p.email,
+    exp: Math.floor((Date.now() + (options.expiresInMs ?? 3_600_000)) / 1000),
+    ...(options.marker ? {jti: options.marker} : {}),
+  };
   return `${b64u({alg: 'EdDSA', typ: 'JWT'})}.${b64u(claims)}.sig`;
 };
 
@@ -69,6 +79,18 @@ function installFetchStub(): void {
       const url = typeof input === 'string' ? input : input.toString();
       const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
       const tok = auth?.replace(/^Bearer\s+/, '') ?? '';
+      if (url.includes(API.ableOauthRefresh)) {
+        const method = init?.method ?? 'GET';
+        ableRefreshRequests.push({method, authorization: auth ?? ''});
+        if (method === 'DELETE') return new Response(null, {status: 204});
+        if (failAbleRefresh) return jsonResponse(502, {error: 'able session could not be renewed'});
+        ableRenewalSequence += 1;
+        const identity = fakeJws('tok-work', {marker: `able-renewal-${ableRenewalSequence}`});
+        return jsonResponse(200, {
+          identity,
+          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        });
+      }
       if (url.includes('/api/identity/token')) {
         identityMintUrls.push(url);
         if (revokeIdentityMint.has(tok)) return jsonResponse(401, {}); // device token revoked/blocked
@@ -144,6 +166,9 @@ beforeEach(() => {
   failIdentityMint.clear();
   revokeIdentityMint.clear();
   identityMintUrls = [];
+  ableRefreshRequests = [];
+  failAbleRefresh = false;
+  ableRenewalSequence = 0;
   installFetchStub();
 });
 afterEach(() => {
@@ -174,6 +199,7 @@ describe('AccountProvider — delegated able sign-in', () => {
     act(() => result.current.signIn());
 
     await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    expect(result.current.ableMode).toBe(true);
     const state = pendingState();
     const target = new URL(String(replace.mock.calls[0][0]));
     expect(target.origin).toBe(window.location.origin);
@@ -204,6 +230,7 @@ describe('AccountProvider — delegated able sign-in', () => {
       name: `OpenBook Web · ${localStorage.getItem('openbook.deviceId')}`,
     });
     expect(replace).toHaveBeenCalledWith(expected);
+    expect(result.current.ableMode).toBe(false);
     expect(new URL(expected).searchParams.get('state')).toBe(state);
     expect(state).not.toBe('');
   });
@@ -223,7 +250,91 @@ describe('AccountProvider — multi-account (OB-194)', () => {
     expect(readIndex()[0]).toMatchObject({subject: subjectOf('tok-work')});
   });
 
-  it('marks an expired stored bridged identity as errored without calling account services', async () => {
+  it('auto-renews an able identity before expiry and rotates its local assertion', async () => {
+    const {result} = renderAccount();
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const prior = fakeJws('tok-work', {marker: 'able-initial'});
+    act(() => result.current.submitCode(prior));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    const id = result.current.activeAccountId!;
+    const renewalTimer = timeoutSpy.mock.calls.find(([, delay]) => Number(delay) > 3_000_000);
+    expect(Number(renewalTimer?.[1])).toBeGreaterThan(3_500_000);
+    expect(Number(renewalTimer?.[1])).toBeLessThanOrEqual(3_600_000);
+
+    act(() => (renewalTimer?.[0] as () => void)());
+
+    await waitFor(() => expect(ableRefreshRequests).toHaveLength(1));
+    await waitFor(() => expect(getIdentityCredential().jws).not.toBe(prior));
+    expect(ableRefreshRequests[0]).toEqual({
+      method: 'POST',
+      authorization: `Bearer ${prior}`,
+    });
+    expect(localStorage.getItem(tokenKey(id))).toBe(getIdentityCredential().jws);
+    expect(result.current.identityExpired).toBe(false);
+  });
+
+  it('falls back to identityExpired when able renewal fails at expiry', async () => {
+    const {result} = renderAccount();
+    const expiring = fakeJws('tok-work', {expiresInMs: 10_000, marker: 'able-expiring'});
+    act(() => result.current.submitCode(expiring));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    failAbleRefresh = true;
+
+    act(() => result.current.syncNow());
+
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(result.current.status).toBe('error');
+    expect(getIdentityCredential().jws).toBeUndefined();
+    expect(ableRefreshRequests).toEqual([{
+      method: 'POST',
+      authorization: `Bearer ${expiring}`,
+    }]);
+  });
+
+  it('renews a just-expired stored able identity during activation', async () => {
+    const id = 'expired-bridge';
+    const expired = fakeJws('tok-work', {expiresInMs: -1_000, marker: 'able-just-expired'});
+    localStorage.setItem('openbook.accounts', JSON.stringify([{
+      id,
+      name: 'Work User',
+      email: 'work@corp.example',
+      subject: subjectOf('tok-work'),
+      accountUrl: PERSONAS['tok-work'].iss,
+      connectedAt: Date.now() - 3_600_000,
+      lastServerUpdatedAt: null,
+      identityOnly: true,
+    }]));
+    localStorage.setItem('openbook.accounts.active', id);
+    localStorage.setItem(tokenKey(id), expired);
+
+    const {result} = renderAccount();
+
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    expect(result.current.identityExpired).toBe(false);
+    expect(ableRefreshRequests).toEqual([{
+      method: 'POST',
+      authorization: `Bearer ${expired}`,
+    }]);
+    expect(localStorage.getItem(tokenKey(id))).toBe(getIdentityCredential().jws);
+    expect(getIdentityCredential().jws).not.toBe(expired);
+  });
+
+  it('sends authenticated refresh-token cleanup when removing an able account', async () => {
+    const {result} = renderAccount();
+    const assertion = fakeJws('tok-work', {marker: 'able-remove'});
+    act(() => result.current.submitCode(assertion));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+
+    act(() => result.current.signOut());
+
+    await waitFor(() => expect(result.current.status).toBe('disconnected'));
+    expect(ableRefreshRequests).toEqual([{
+      method: 'DELETE',
+      authorization: `Bearer ${assertion}`,
+    }]);
+  });
+
+  it('marks an expired stored bridged identity as errored when able renewal fails', async () => {
     const id = 'expired-bridge';
     const expired = `${b64u({alg: 'EdDSA', typ: 'JWT'})}.${b64u({
       iss: PERSONAS['tok-work'].iss,
@@ -246,11 +357,13 @@ describe('AccountProvider — multi-account (OB-194)', () => {
 
     const {result} = renderAccount();
 
+    failAbleRefresh = true;
     await waitFor(() => expect(result.current.identityExpired).toBe(true));
     expect(result.current.status).toBe('error');
     expect(result.current.token).toBeNull();
     expect(getIdentityCredential().jws).toBeUndefined();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
+    expect(ableRefreshRequests).toHaveLength(1);
     expect(identityMintUrls).toHaveLength(0);
     expect(settingsPuts).toHaveLength(0);
   });

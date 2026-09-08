@@ -1085,6 +1085,14 @@ export const de: PartialMessages = {
     signin: {
       title: 'Konto & Sync',
       description: 'Melde dich bei account.book.pub an, um deine Einstellungen und Bibliotheken geräteübergreifend zu synchronisieren. Local-First bleibt die Voreinstellung — dies ist optional.',
+      able: {
+        description: 'Melde dich bei OpenBook an, um deine verifizierte Identität für diese Bibliothek zu verwenden. Deine Seiten bleiben auf deinem Datenserver.',
+        signInButton: 'Anmelden',
+        connecting: 'Du wirst angemeldet…',
+        whatSyncs:
+          'OpenBook verwendet deine Anmeldung nur, um deine Identität für diese Bibliothek zu bestätigen. Seiten und Dokumente bleiben auf deinem Datenserver.',
+        signOutHint: 'Beim Abmelden wird diese OpenBook-Anmeldung von diesem Gerät entfernt.',
+      },
     },
     switcher: {
       heading: 'Konten',
@@ -1101,6 +1109,7 @@ export const de: PartialMessages = {
         'Damit wird {name} nur auf diesem Gerät vergessen – melde dich jederzeit wieder an, um es wiederherzustellen. Deine anderen Konten und lokalen Daten bleiben unberührt.',
       signOutActiveHint:
         'Beim Abmelden wird das aktive Konto auf diesem Gerät vergessen; deine anderen Konten bleiben angemeldet. Um ein Gerät vollständig zu widerrufen, entferne es im Konto-Dashboard.',
+      openBookIdentity: 'OpenBook-Identität',
     },
     error: {
       rejected: 'Diese Anmeldung wurde abgelehnt. Bitte versuche es erneut.',

@@ -66,6 +66,8 @@ export interface ConnectedAccount {
   /** Connection status. The ACTIVE account tracks the live status; the others are
    *  dormant (reported as `connected` until they are made active). */
   status: AccountStatus;
+  /** This slot is an able-backed OpenBook identity, not a sync-account bearer. */
+  identityOnly: boolean;
 }
 
 interface AccountContextValue {
@@ -83,6 +85,9 @@ interface AccountContextValue {
   error: string | null;
   /** The active account's service base URL (for an "open dashboard" link). */
   accountUrl: string;
+  /** Whether this same-origin server exposes able delegated sign-in. The provider
+   * owns and caches the capability probe so settings copy never probes again. */
+  ableMode: boolean;
   /** Start the deep-link sign-in flow (additive — see {@link addAccount}). */
   signIn: () => void;
   /** Complete sign-in from a manually pasted code — the dev/fallback path for when
@@ -92,8 +97,8 @@ interface AccountContextValue {
   submitCode: (raw: string) => void;
   /** Abandon a pending sign-in (returns to disconnected when not yet connected). */
   cancel: () => void;
-  /** Forget the ACTIVE account's token (does not revoke it server-side — do that in
-   *  the dashboard). If other accounts remain, switches to one of them. */
+  /** Forget the ACTIVE account's token. Able-backed slots also remove their
+   * server-held refresh credential. If other accounts remain, switches to one. */
   signOut: () => void;
   /** Pull-then-push a reconciliation now (for the active account). */
   syncNow: () => void;
@@ -241,6 +246,12 @@ function bridgedIdentity(token: string): {persona: Persona; issuer: string; expi
     },
     expiresAt: decoded.claims.exp * 1000,
   };
+}
+
+class AbleRefreshError extends Error {
+  constructor(readonly status: number) {
+    super('able identity refresh failed');
+  }
 }
 
 /**
@@ -501,6 +512,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<StoredIndexRow[]>(() => readIndex());
   const [activeAccountId, setActiveAccountId] = useState<string | null>(() => readActiveId());
+  const [ableMode, setAbleMode] = useState(false);
   // The active account's synced library list (LM-4). Tracked separately from the
   // live LibraryProvider list so the switcher can label which libraries are
   // account-backed and offer to connect ones from another device. Reset on
@@ -532,6 +544,36 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   // depth counter (not a boolean) stays correct across the activate ⇄ forget
   // recursion. A ref (not state) so toggling it triggers no extra render.
   const activatingDepth = useRef(0);
+
+  // One shared capability probe for both copy selection and the sign-in action.
+  // Calling signIn while the mount probe is in flight awaits this same promise,
+  // so surfacing able mode in settings never adds duplicate network chatter.
+  const ableProbeRef = useRef<Promise<boolean> | null>(null);
+  const probeAbleMode = useCallback((): Promise<boolean> => {
+    if (ableProbeRef.current) return ableProbeRef.current;
+    ableProbeRef.current = (async () => {
+      if (platform?.redirectUri || typeof window === 'undefined') return false;
+      try {
+        const serverOverride = getServerUrlOverride();
+        const serverOrigin = serverOverride ? new URL(serverOverride).origin : window.location.origin;
+        if (serverOrigin !== window.location.origin) return false;
+        const probe = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
+        probe.searchParams.set('probe', '1');
+        const response = await fetch(probe, {cache: 'no-store'});
+        return response.status === 204;
+      } catch {
+        return false;
+      }
+    })().then((delegated) => {
+      setAbleMode(delegated);
+      return delegated;
+    });
+    return ableProbeRef.current;
+  }, [platform]);
+
+  useEffect(() => {
+    void probeAbleMode();
+  }, [probeAbleMode]);
 
   // Latest preferences/libraries, read inside async callbacks without re-binding.
   const blobRef = useRef<SyncBlob>(makeSyncBlob(preferences, libraries));
@@ -756,21 +798,82 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     setIdentityIssuance('unknown');
   }, []);
 
+  const ableRefreshRef = useRef<(id: string, assertion: string) => Promise<boolean>>(async () => false);
+
   /** Present a callback-bridged assertion directly to the data client. The data
-   * server remains the verifier; decoding here is only for expiry/labels. */
-  const presentBridgedIdentity = useCallback((assertion: string, expiresAt: number): void => {
+   * server remains the verifier; decoding here is only for expiry/labels and the
+   * same pre-expiry refresh cadence used by account-service identities. */
+  const presentBridgedIdentity = useCallback((id: string, assertion: string, expiresAt: number): void => {
     if (identityTimer.current) clearTimeout(identityTimer.current);
     setIdentityToken(assertion);
     setIdentityIssuance('ok');
     setIdentityExpired(false);
     identityExpiryRef.current = expiresAt;
-    identityTimer.current = setTimeout(() => {
-      setIdentityToken(null);
-      identityExpiryRef.current = null;
-      setIdentityExpired(true);
-      setStatus('error');
-    }, Math.max(0, expiresAt - Date.now()));
+    const ms = Math.max(30_000, expiresAt - Date.now() - 60_000);
+    identityTimer.current = setTimeout(() => void ableRefreshRef.current(id, assertion), ms);
   }, []);
+
+  const refreshAbleIdentity = useCallback(
+    async (id: string, assertion: string): Promise<boolean> => {
+      try {
+        const response = await fetch(API.ableOauthRefresh, {
+          method: 'POST',
+          headers: {authorization: `Bearer ${assertion}`},
+        });
+        if (!response.ok) throw new AbleRefreshError(response.status);
+        const body = await response.json() as {identity?: unknown; expiresAt?: unknown};
+        if (typeof body.identity !== 'string' || typeof body.expiresAt !== 'string') {
+          throw new AbleRefreshError(502);
+        }
+        const renewed = bridgedIdentity(body.identity);
+        const row = indexRef.current.find((candidate) => candidate.id === id);
+        if (!renewed || !row?.identityOnly || renewed.persona.subject !== row.subject) {
+          throw new AbleRefreshError(502);
+        }
+        await secretStoreRef.current.set(id, body.identity);
+        tokensRef.current.set(id, body.identity);
+        patchRow(id, {
+          email: renewed.persona.email,
+          subject: renewed.persona.subject,
+          name: renewed.persona.email ?? renewed.persona.name ?? row.name,
+        });
+        if (activeIdRef.current === id) {
+          presentBridgedIdentity(id, body.identity, renewed.expiresAt);
+          setStatus('connected');
+          setError(null);
+        }
+        return true;
+      } catch (err) {
+        if (identityTimer.current) clearTimeout(identityTimer.current);
+        if (activeIdRef.current !== id) return false;
+        const rejected = err instanceof AbleRefreshError && (err.status === 401 || err.status === 403);
+        const decoded = decodeIdentity(assertion);
+        const assertedExpiry = typeof decoded?.claims.exp === 'number' ? decoded.claims.exp * 1000 : null;
+        const expiry = identityExpiryRef.current ?? assertedExpiry;
+        const stillValid = !rejected && expiry != null && expiry - Date.now() > 30_000;
+        if (stillValid) {
+          identityTimer.current = setTimeout(
+            () => void ableRefreshRef.current(id, assertion),
+            identityRetryDelay(),
+          );
+          return false;
+        }
+        setIdentityToken(null);
+        identityExpiryRef.current = null;
+        setIdentityExpired(true);
+        setStatus('error');
+        if (!rejected) {
+          identityTimer.current = setTimeout(
+            () => void ableRefreshRef.current(id, assertion),
+            identityRetryDelay(),
+          );
+        }
+        return false;
+      }
+    },
+    [patchRow, presentBridgedIdentity],
+  );
+  ableRefreshRef.current = refreshAbleIdentity;
 
   // Never leak the identity-refresh timer past unmount: a queued retry that fired
   // after teardown would call a stale refresh (and, in tests, a torn-down fetch).
@@ -791,6 +894,18 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       // fallback whose own activation fails to mint a replacement (OB-194, Sasha).
       const wasActive = activeIdRef.current === id;
       if (wasActive) clearIdentity();
+      const row = indexRef.current.find((candidate) => candidate.id === id);
+      const storedToken = tokensRef.current.get(id) ?? (await secretStoreRef.current.get(id));
+      if (row?.identityOnly && storedToken) {
+        try {
+          await fetch(API.ableOauthRefresh, {
+            method: 'DELETE',
+            headers: {authorization: `Bearer ${storedToken}`},
+          });
+        } catch {
+          /* best-effort cleanup: local sign-out must still complete while offline */
+        }
+      }
       try {
         await secretStoreRef.current.delete(id);
       } catch {
@@ -839,12 +954,10 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
           setIdentityOnly(true);
           setLastSyncedAt(null);
           if (!bridged) {
-            clearIdentity();
-            setIdentityExpired(true);
-            setStatus('error');
+            await ableRefreshRef.current(id, tok);
             return;
           }
-          presentBridgedIdentity(tok, bridged.expiresAt);
+          presentBridgedIdentity(id, tok, bridged.expiresAt);
           setStatus('connected');
           return;
         }
@@ -921,7 +1034,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
           setToken(null);
           setIdentityOnly(true);
           setLastSyncedAt(null);
-          presentBridgedIdentity(tok, bridged.expiresAt);
+          presentBridgedIdentity(id, tok, bridged.expiresAt);
           setStatus('connected');
           return;
         }
@@ -1136,27 +1249,13 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         platform?.redirectUri ?? (typeof window !== 'undefined' ? `${window.location.origin}/account/callback` : '');
       let url = client.connectUrl({redirectUri, state, name});
 
-      // A sidecar-served web shell and its API share an origin. Probe the exact
-      // optional route without starting OAuth; when mounted, delegated OIDC
-      // replaces the account-service connect URL. Cross-origin/desktop shells
-      // keep their existing flow because their callback transport is different.
-      if (!platform?.redirectUri && typeof window !== 'undefined') {
-        try {
-          const serverOverride = getServerUrlOverride();
-          const serverOrigin = serverOverride ? new URL(serverOverride).origin : window.location.origin;
-          if (serverOrigin === window.location.origin) {
-            const probe = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
-            probe.searchParams.set('probe', '1');
-            const response = await fetch(probe, {cache: 'no-store'});
-            if (response.status === 204) {
-              const delegated = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
-              delegated.searchParams.set('handoff_state', state);
-              url = delegated.toString();
-            }
-          }
-        } catch {
-          // Not a same-origin server with delegated auth; retain account connect.
-        }
+      // The mount-time capability check is shared with settings copy. Await the
+      // cached promise here, so a fast click neither duplicates the probe nor races
+      // into the branded account-service flow.
+      if (await probeAbleMode()) {
+        const delegated = new URL(API.ableOauthAuthorize, window.location.origin);
+        delegated.searchParams.set('handoff_state', state);
+        url = delegated.toString();
       }
 
       if (platform?.openSignIn) {
@@ -1168,7 +1267,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         else window.location.href = url;
       }
     })();
-  }, [client, name, platform]);
+  }, [client, name, platform, probeAbleMode]);
 
   /**
    * Sign in from a manually pasted code. Unlike {@link receive} this skips the
@@ -1221,8 +1320,16 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
 
   const syncNow = useCallback(() => {
     const id = activeIdRef.current;
-    if (id && token) void activateRef.current(id, token);
-  }, [token]);
+    if (!id) return;
+    if (token) {
+      void activateRef.current(id, token);
+      return;
+    }
+    if (identityOnly) {
+      const assertion = tokensRef.current.get(id);
+      if (assertion) void ableRefreshRef.current(id, assertion);
+    }
+  }, [token, identityOnly]);
 
   const setActiveAccount = useCallback(
     (id: string) => {
@@ -1253,6 +1360,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         email: r.email,
         accountUrl: r.accountUrl,
         status: r.id === activeAccountId ? status : 'connected',
+        identityOnly: r.identityOnly === true,
       })),
     [accounts, activeAccountId, status],
   );
@@ -1278,6 +1386,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       lastSyncedAt,
       error,
       accountUrl: activeAccountUrl,
+      ableMode,
       signIn,
       submitCode,
       cancel,
@@ -1301,6 +1410,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       lastSyncedAt,
       error,
       activeAccountUrl,
+      ableMode,
       signIn,
       submitCode,
       cancel,

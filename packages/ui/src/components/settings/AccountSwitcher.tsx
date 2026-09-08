@@ -58,6 +58,7 @@ export default function AccountSwitcher() {
 
   const lastSynced = lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : t('account.signin.never');
   const multiple = accounts.length > 1;
+  const activeIdentityOnly = accounts.find((account) => account.id === activeAccountId)?.identityOnly === true;
 
   return (
     <>
@@ -93,7 +94,9 @@ export default function AccountSwitcher() {
                   <AccountMonogram seed={acc.name} />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-medium">{acc.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{accountHost(acc.accountUrl)}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {acc.identityOnly ? t('account.switcher.openBookIdentity') : accountHost(acc.accountUrl)}
+                    </span>
                   </span>
                   <StatusPill active={active} status={acc.status} />
                   {active && <CheckIcon className="h-4 w-4 shrink-0 text-brand" />}
@@ -127,18 +130,26 @@ export default function AccountSwitcher() {
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-muted-foreground">{t('account.signin.connectedAs')}</dt>
             <dd className="truncate font-medium">{deviceName}</dd>
-            <dt className="text-muted-foreground">{t('account.signin.lastSynced')}</dt>
-            <dd className="font-medium">{lastSynced}</dd>
+            {!activeIdentityOnly && (
+              <>
+                <dt className="text-muted-foreground">{t('account.signin.lastSynced')}</dt>
+                <dd className="font-medium">{lastSynced}</dd>
+              </>
+            )}
           </dl>
           <div className="mt-1 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={syncNow} disabled={status === 'syncing'}>
-              <ArrowPathIcon className="h-4 w-4" />
-              {t('account.signin.syncNow')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => openExternal(`${accountUrl}/dashboard`)}>
-              <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-              {t('account.signin.openDashboard')}
-            </Button>
+            {!activeIdentityOnly && (
+              <>
+                <Button variant="outline" size="sm" onClick={syncNow} disabled={status === 'syncing'}>
+                  <ArrowPathIcon className="h-4 w-4" />
+                  {t('account.signin.syncNow')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => openExternal(`${accountUrl}/dashboard`)}>
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  {t('account.signin.openDashboard')}
+                </Button>
+              </>
+            )}
             <Button variant="ghost" size="sm" onClick={signOut} className="text-destructive hover:text-destructive">
               {t('account.signin.signOut')}
             </Button>
@@ -147,9 +158,15 @@ export default function AccountSwitcher() {
       </SettingsSection>
 
       <SettingsSection>
-        <p className="text-xs text-muted-foreground">{t('account.signin.whatSyncs')}</p>
         <p className="text-xs text-muted-foreground">
-          {multiple ? t('account.switcher.signOutActiveHint') : t('account.signin.signOutHint')}
+          {t(activeIdentityOnly ? 'account.signin.able.whatSyncs' : 'account.signin.whatSyncs')}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {activeIdentityOnly
+            ? t('account.signin.able.signOutHint')
+            : multiple
+              ? t('account.switcher.signOutActiveHint')
+              : t('account.signin.signOutHint')}
         </p>
       </SettingsSection>
     </>
