@@ -60,7 +60,16 @@ export type {
   PageGraphNode,
   PageGraphEdge,
 } from './types';
-export {emptyPageSnapshot, PAGE_VISIBILITIES, AGENT_EDITS_MODES, AGENT_EDITS_POLICIES, resolveAgentEdits} from './types';
+export {
+  emptyPageSnapshot,
+  PAGE_VISIBILITIES,
+  MEMBER_ROLES,
+  MEMBER_STATUSES,
+  ACL_LEVELS,
+  AGENT_EDITS_MODES,
+  AGENT_EDITS_POLICIES,
+  resolveAgentEdits,
+} from './types';
 export {API, type ApiError, type CompactResult} from './routes';
 export {
   FormSubmissionError,

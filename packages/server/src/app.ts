@@ -7,6 +7,7 @@ import {streamSSE} from 'hono/streaming';
 import type {StatusCode} from 'hono/utils/http-status';
 import {
   API,
+  ACL_LEVELS,
   AGENT_EDITS_MODES,
   AGENT_EDITS_POLICIES,
   ASSET_IMAGE_MIMES,
@@ -27,6 +28,8 @@ import {
   validateRowAgainstForm,
   validateSubmission,
   PAGE_VISIBILITIES,
+  MEMBER_ROLES,
+  MEMBER_STATUSES,
   TITLE_PROPERTY_ID,
   type AclLevel,
   type AgentEditsPolicy,
@@ -94,7 +97,7 @@ import {AwarenessRelay, awarenessUser, stampAwarenessIdentity} from './collabAwa
 import {mountAiRoutes} from './ai/routes';
 import {mountPluginRoutes} from './pluginRoutes';
 import {guestGate, isLocalOwnerRequest, recoverAudienceLockedPrincipal, resolvePrincipal, type IdentityProvider} from './principal';
-import {isAuthenticatedPrincipal, requireAccess, requireCreate, requireDbAccess, requireInstanceAdmin, requireInstanceOwner, streamGates} from './access';
+import {isAuthenticatedPrincipal, requireAccess, requireCreate, requireDbAccess, requireInstanceAdmin, requireInstanceOwner, requireRosterMutation, streamGates} from './access';
 import {
   AGENT_FAILED_RATE_LIMIT,
   AGENT_RATE_WINDOW_MS,
@@ -2264,8 +2267,14 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   });
 
   app.post(API.members, async (c) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     const body = await c.req.json<{invitee?: string; role?: MemberRole; status?: MemberStatus}>();
+    if (body.role !== undefined && !MEMBER_ROLES.includes(body.role)) {
+      return c.json({error: 'role must be a valid member role'}, 400);
+    }
+    if (body.status !== undefined && !MEMBER_STATUSES.includes(body.status)) {
+      return c.json({error: 'status must be a valid member status'}, 400);
+    }
     const resolved = await resolveInvitee(body.invitee ?? '', opts.handleResolver);
     // By-email ⇒ an unclaimed persona (default 'invited'); by-subject ⇒ an already
     // known identity (default 'active').
@@ -2282,16 +2291,23 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   });
 
   app.patch(`${API.members}/:id`, async (c) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     const patch = await c.req.json<{role?: MemberRole; status?: MemberStatus}>();
-    const member = await store.updateMember(c.req.param('id'), patch);
+    if (patch.role !== undefined && !MEMBER_ROLES.includes(patch.role)) {
+      return c.json({error: 'role must be a valid member role'}, 400);
+    }
+    if (patch.status !== undefined && !MEMBER_STATUSES.includes(patch.status)) {
+      return c.json({error: 'status must be a valid member status'}, 400);
+    }
+    const {role, status} = patch;
+    const member = await store.updateMember(c.req.param('id'), {role, status});
     if (!member) return c.json({error: 'member not found'}, 404);
     logEdit(c, null, 'member.update', member.id);
     return c.json(member);
   });
 
   app.delete(`${API.members}/:id`, async (c) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     const removed = await store.removeMember(c.req.param('id'));
     if (!removed) return c.json({error: 'member not found'}, 404);
     logEdit(c, null, 'member.revoke', c.req.param('id'));
@@ -2314,7 +2330,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   };
 
   const rosterSyncHandler = async (c: Context<AppEnv>) => {
-    await requireCreate(c, store);
+    await requireRosterMutation(c, store);
     if (!opts.roster) return c.json({error: 'roster sync is not available on this instance'}, 501);
     try {
       const result = await opts.roster.syncNow();
@@ -2360,6 +2376,9 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     await requireAccess(c, store, 'write', id);
     await rejectManagedPage(id);
     const body = await c.req.json<{invitee?: string; level?: AclLevel}>();
+    if (body.level !== undefined && !ACL_LEVELS.includes(body.level)) {
+      return c.json({error: 'level must be a valid ACL level'}, 400);
+    }
     const resolved = await resolveInvitee(body.invitee ?? '', opts.handleResolver);
     const grant = await store.setPageAcl(id, {
       email: resolved.email ?? null,
@@ -2381,6 +2400,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     if (!subject && !email) return c.json({error: 'a subject or email query param is required'}, 400);
     const removed = await store.removePageAcl(id, subject ? {subject} : {email: email as string});
     if (!removed) return c.json({error: 'acl grant not found'}, 404);
+    logEdit(c, id, 'acl.unshare', subject ?? (email as string));
     return c.body(null, 204);
   });
 
