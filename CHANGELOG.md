@@ -1,3 +1,20 @@
+## 3.18.0 (2026-09-12)
+
+### 🚀 Features
+
+- **server,ui:** whitelabel OIDC sign-in via account.able.online (ABLE-1) ([#361](https://github.com/lab255/OpenBook/pull/361))
+- **server,ui:** able sign-in follow-ups — whitelabel copy/i18n + assertion renewal (ABLE-2) ([#362](https://github.com/lab255/OpenBook/pull/362))
+
+### 🩹 Fixes
+
+- **ci,server:** nightly libs cache includes mcp; able oidc test clock-independent (OPS-2) ([#364](https://github.com/lab255/OpenBook/pull/364))
+- **server:** fail-closed owner-only settings on unclaimed instances (SEC-1) ([#363](https://github.com/lab255/OpenBook/pull/363))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
 ## 3.17.0 (2026-09-07)
 
 ### 🚀 Features
