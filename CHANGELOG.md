@@ -1,3 +1,13 @@
+## 3.18.1 (2026-09-15)
+
+### 🩹 Fixes
+
+- **server,sdk:** fail-closed roster mutations on unclaimed instances + enum validation + ACL audit (SEC-3) ([#365](https://github.com/lab255/OpenBook/pull/365))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.18.0 (2026-09-12)
 
 ### 🚀 Features
