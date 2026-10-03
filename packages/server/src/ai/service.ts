@@ -97,6 +97,7 @@ interface DownloadState {
 }
 
 export class TranscriptionConfigError extends Error {}
+export class ModelDownloadConfigError extends Error {}
 
 export class AiService {
   private config: AiConfig = DEFAULT_CONFIG;
@@ -339,8 +340,13 @@ export class AiService {
   async startDownload(url = DEFAULT_MODEL_URL): Promise<DownloadState> {
     await this.loadConfig();
     if (this.download && !this.download.done && !this.download.error) return this.download;
-    const fileName = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'model.gguf');
-    if (fileName !== path.basename(fileName) || fileName === '.' || fileName === '..' || fileName.includes('\\')) throw new Error('Invalid model filename');
+    let fileName: string;
+    try {
+      fileName = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'model.gguf');
+    } catch {
+      throw new ModelDownloadConfigError('Invalid model download URL or filename encoding.');
+    }
+    if (fileName !== path.basename(fileName) || fileName === '.' || fileName === '..' || fileName.includes('\\')) throw new ModelDownloadConfigError('Invalid model filename');
     mkdirSync(this.modelsDir, {recursive: true});
     const dest = path.join(this.modelsDir, fileName);
     const state: DownloadState = {url, received: 0, total: null, done: false};

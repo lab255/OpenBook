@@ -12,7 +12,8 @@ import {MockEngine, OpenAiCompatEngine} from './ai/providers';
 import {AiUsageLog} from './ai/usage';
 import {LocalDataClient} from './localClient';
 import {LocalWhisper, WHISPER_MODEL, WHISPER_MODEL_URL} from './ai/whisper';
-import {readFile, readdir} from 'node:fs/promises';
+import {LOCAL_TRANSCRIPTION_RATE_LIMIT} from './ai/routes';
+import {readFile, readdir, writeFile} from 'node:fs/promises';
 
 let db: PgliteDb;
 let store: PageStore;
@@ -149,6 +150,82 @@ describe('transcription contract', () => {
     expect((await service.getConfig()).model).toBeUndefined();
     expect(await readdir(dir)).not.toContain(`${WHISPER_MODEL}.part`);
     await service.dispose();
+  });
+
+  it('caps parallel local HTTP jobs across anonymous readers at two, returning 429 with Retry-After', async () => {
+    await store.updateInstanceConfig({ownerSubject: 'test#owner', guestAccess: 'read'});
+    await store.setPageVisibility(pageId, 'public');
+    const ffmpeg = join(dir, 'ffmpeg');
+    const whisper = join(dir, 'whisper');
+    const release = join(dir, 'release');
+    await writeFile(ffmpeg, `#!${process.execPath}\nprocess.exit(0);`, {mode: 0o700});
+    await writeFile(whisper, `#!${process.execPath}\nconst fs = require('node:fs'); const args = process.argv.slice(2); const output = args[args.indexOf('-of') + 1]; fs.writeFileSync(${JSON.stringify(dir)} + '/' + process.pid + '.started', ''); setInterval(() => { if (fs.existsSync(${JSON.stringify(release)})) { fs.writeFileSync(output + '.json', JSON.stringify({transcription: [{offsets: {from: 0, to: 1001}, text: 'Local'}]})); process.exit(0); } }, 10);`, {mode: 0o700});
+    await writeFile(join(dir, WHISPER_MODEL), 'test model');
+    const local = new LocalWhisper(dir, whisper, ffmpeg);
+    const service = new AiService(db, dir, () => local.resolve(), local);
+    const app = appWith(service);
+    const request = (ip: string) => app.request(API.aiTranscribe, {
+      method: 'POST', headers: {...headers, [FORWARDED_HEADER]: '1'}, body: JSON.stringify({assetId, pageId}),
+    }, {incoming: {socket: {remoteAddress: ip}}});
+    const accepted = [request('192.0.2.1'), request('192.0.2.2')];
+    try {
+      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length).toBe(2);
+      const busy = await request('192.0.2.3');
+      expect(busy.status).toBe(429);
+      expect(busy.headers.get('Retry-After')).toBe('5');
+      await writeFile(release, 'go');
+      for (const response of await Promise.all(accepted)) {
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({text: 'Local', durationMs: 1001});
+      }
+      expect((await request('192.0.2.3')).status).toBe(200);
+    } finally {
+      await service.dispose();
+      await Promise.all(accepted);
+    }
+  });
+
+  it('rate-limits local requests per socket IP, ignores spoofed forwarding headers, and leaves mock/cloud untouched', async () => {
+    const engine = new MockEngine();
+    const transcribe = vi.spyOn(engine, 'transcribe');
+    let available = true;
+    const service = new AiService(db, dir, async () => available ? engine : null);
+    const app = appWith(service);
+    const request = (ip = '192.0.2.1', forwardedFor = '') => app.request(API.aiTranscribe, {
+      method: 'POST', headers: {...headers, [LOCAL_OWNER_HEADER]: secret, 'x-forwarded-for': forwardedFor}, body: JSON.stringify({assetId, pageId}),
+    }, {incoming: {socket: {remoteAddress: ip}}});
+    for (let i = 0; i < LOCAL_TRANSCRIPTION_RATE_LIMIT; i++) expect((await request()).status).toBe(200);
+    const denied = await request('192.0.2.1', '198.51.100.1');
+    expect(denied.status).toBe(429);
+    expect(denied.headers.get('Retry-After')).toBe('60');
+    expect(transcribe).toHaveBeenCalledTimes(LOCAL_TRANSCRIPTION_RATE_LIMIT);
+    expect((await request('192.0.2.2')).status).toBe(200);
+    available = false;
+    await service.setConfig({provider: 'mock'});
+    expect((await request()).status).toBe(200);
+    await service.setConfig({provider: 'off', transcription: {provider: 'openai-compat'}});
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({text: 'Cloud'}))));
+    expect((await request()).status).toBe(200);
+    available = true;
+    await service.setConfig({provider: 'off', transcription: {provider: 'local'}});
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+    expect((await request()).status).toBe(200);
+    await service.dispose();
+  });
+
+  it('returns 400 for malformed percent-encoding in model download filenames without fetching', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const app = appWith();
+    for (const filename of ['bad%.bin', 'bad%ZZ.bin', 'bad%E0%A4%A.bin']) {
+      const response = await app.request(API.aiModelDownload, {
+        method: 'POST', headers: {...headers, [LOCAL_OWNER_HEADER]: secret},
+        body: JSON.stringify({url: `https://example.test/${filename}`}),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({error: 'Invalid model download URL or filename encoding.'});
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect((await ai.status()).download).toBeUndefined();
   });
 
   // Opt-in: OPENBOOK_TEST_WHISPER=1, OPENBOOK_MODELS_DIR containing ggml-base.bin,

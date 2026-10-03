@@ -6,6 +6,15 @@ import path from 'node:path';
 import type {AiStatus, AiTranscriptionResult} from '@book.dev/sdk';
 import type {TranscriptionEngine, TranscribeOptions} from './providers';
 
+export const LOCAL_TRANSCRIPTION_MAX_JOBS = 2;
+
+export class LocalTranscriptionBusyError extends Error {
+  readonly retryAfterSeconds = 5;
+  constructor() {
+    super('Local transcription is busy. Please retry shortly.');
+  }
+}
+
 export const WHISPER_MODEL = 'ggml-base.bin';
 export const WHISPER_MODEL_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
 
@@ -47,6 +56,7 @@ export async function runWhisperProcess(command: string, args: string[], signal:
 export function parseWhisperOutput(value: unknown): AiTranscriptionResult {
   const data = value as {transcription?: {offsets?: {from?: number; to?: number}; text?: string}[]};
   if (!data || !Array.isArray(data.transcription)) throw new Error('Invalid whisper output');
+  let durationMs = 0;
   const segments = data.transcription.map((segment) => {
     const start = segment?.offsets?.from;
     const end = segment?.offsets?.to;
@@ -54,9 +64,10 @@ export function parseWhisperOutput(value: unknown): AiTranscriptionResult {
       || typeof end !== 'number' || !Number.isFinite(end) || end < start || typeof segment.text !== 'string') {
       throw new Error('Invalid whisper segment');
     }
+    durationMs = Math.max(durationMs, end);
     return {start: start / 1000, end: end / 1000, text: segment.text.trim()};
   });
-  return {text: segments.map((s) => s.text).join(' ').trim(), segments, durationMs: Math.max(0, ...segments.map((s) => s.end * 1000))};
+  return {text: segments.map((s) => s.text).join(' ').trim(), segments, durationMs: Math.round(durationMs)};
 }
 
 /** Optional whisper.cpp + FFmpeg runtime. Models live beside chat models, but
@@ -91,6 +102,11 @@ export class LocalWhisper implements TranscriptionEngine {
   }
 
   transcribe(bytes: Uint8Array, opts: TranscribeOptions = {}): Promise<AiTranscriptionResult> {
+    if (opts.signal?.aborted) return Promise.reject(opts.signal.reason);
+    // This set is a non-queuing semaphore shared by all requests to this server.
+    // Reserve synchronously, before any await or temporary-file/process creation;
+    // keep the permit until perform's finally has removed the scratch directory.
+    if (this.active.size >= LOCAL_TRANSCRIPTION_MAX_JOBS) return Promise.reject(new LocalTranscriptionBusyError());
     const controller = new AbortController();
     const signal = opts.signal ? AbortSignal.any([opts.signal, controller.signal]) : controller.signal;
     this.active.add(controller);

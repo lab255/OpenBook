@@ -526,6 +526,18 @@ export const zh: PartialMessages = {
     localNetwork: '局域网',
   },
   ai: {
+    transcription: {
+      title: '本地转录',
+      description: '录音默认使用 Whisper 在本地转录，无需云端密钥。Whisper base 支持多种语言（约142 MiB）。',
+      modelPresent: '模型已下载。',
+      modelAbsent: '模型尚未下载。',
+      ready: '已准备好转录。',
+      runtimeMissing: '请在服务器上安装 whisper-cli 和 FFmpeg 以启用本地转录。',
+      modelMissing: '请下载下方模型以启用本地转录。',
+      download: '下载 Whisper base',
+      downloading: '正在下载…',
+      downloadingProgress: '正在下载 {progress}%',
+    },
     title: 'AI',
     description: '可选的本地模型支持笔记搜索、任务分解和文档补全。一切都在你的设备上运行。',
     providerLabel: '引擎',

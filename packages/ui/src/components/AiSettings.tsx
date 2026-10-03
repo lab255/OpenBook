@@ -274,10 +274,10 @@ export default function AiSettings() {
   return (
     <SettingsScreen title={t('ai.title')} description={t('ai.description')} scope="library">
       {status?.transcription && (
-        <SettingsSection title="Local transcription" description="Recordings use Whisper locally by default, with no cloud key. Whisper base is multilingual (~142 MiB).">
-          <p className="text-sm text-muted-foreground">{status.transcription.modelPresent ? 'Model downloaded.' : 'Model not downloaded.'} {status.transcription.ready ? 'Ready to transcribe.' : status.transcription.detail}</p>
+        <SettingsSection title={t('ai.transcription.title')} description={t('ai.transcription.description')}>
+          <p className="text-sm text-muted-foreground">{t(status.transcription.modelPresent ? 'ai.transcription.modelPresent' : 'ai.transcription.modelAbsent')} {t(status.transcription.ready ? 'ai.transcription.ready' : status.transcription.runtimeAvailable ? 'ai.transcription.modelMissing' : 'ai.transcription.runtimeMissing')}</p>
           <Button size="sm" variant="outline" disabled={downloading || status.transcription.modelPresent} onClick={() => void client.aiDownloadModel(status.transcription?.downloadUrl).then(() => refresh())}>
-            {downloading ? (progress === null ? 'Downloading…' : `Downloading ${progress}%`) : 'Download Whisper base'}
+            {downloading && download?.url === status.transcription.downloadUrl ? (progress === null ? t('ai.transcription.downloading') : t('ai.transcription.downloadingProgress', {progress})) : t('ai.transcription.download')}
           </Button>
           {download?.url === status.transcription.downloadUrl && download.error && <p className="text-xs text-destructive">{download.error}</p>}
         </SettingsSection>

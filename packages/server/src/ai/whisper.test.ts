@@ -2,7 +2,7 @@ import {mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
-import {LocalWhisper, parseWhisperOutput, runWhisperProcess, WHISPER_MODEL} from './whisper';
+import {LocalWhisper, LocalTranscriptionBusyError, parseWhisperOutput, runWhisperProcess, WHISPER_MODEL} from './whisper';
 
 let dir: string;
 beforeEach(async () => { dir = await mkdtemp(path.join(tmpdir(), 'meet3-test-')); });
@@ -53,6 +53,40 @@ describe('optional local whisper runtime', () => {
     await rejected;
     expect(() => process.kill(started.pid, 0)).toThrow();
     await expect(readdir(started.dir)).rejects.toThrow();
+  });
+
+  it.each(['abort', 'failure'] as const)('limits jobs to two and releases permits after %s', async (outcome) => {
+    const mode = path.join(dir, 'mode');
+    await writeFile(mode, 'wait');
+    const ffmpeg = await script('ffmpeg', 'process.exit(0);');
+    const whisper = await script('whisper', `const fs = require('node:fs'); const args = process.argv.slice(2); const output = args[args.indexOf('-of') + 1]; fs.writeFileSync(${JSON.stringify(dir)} + '/' + process.pid + '.started', ''); setInterval(() => { const mode = fs.readFileSync(${JSON.stringify(mode)}, 'utf8'); if (mode === 'fail') process.exit(1); if (mode === 'ok') { fs.writeFileSync(output + '.json', JSON.stringify({transcription: []})); process.exit(0); } }, 10);`);
+    const local = new LocalWhisper(dir, whisper, ffmpeg);
+    const controller = new AbortController();
+    const jobs = Promise.allSettled([0, 1].map(() => local.transcribe(new Uint8Array([1]), {signal: controller.signal})));
+    try {
+      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length).toBe(2);
+      await expect(local.transcribe(new Uint8Array([1]))).rejects.toBeInstanceOf(LocalTranscriptionBusyError);
+      if (outcome === 'abort') controller.abort();
+      else await writeFile(mode, 'fail');
+      const results = await jobs;
+      for (const result of results) {
+        expect(result.status).toBe('rejected');
+        if (result.status === 'rejected') expect(result.reason.message).toContain(outcome === 'abort' ? 'abort' : 'Local audio processing failed');
+      }
+      await writeFile(mode, 'ok');
+      const recovered = await Promise.all([0, 1].map(() => local.transcribe(new Uint8Array([1]))));
+      expect(recovered).toEqual([{text: '', segments: [], durationMs: 0}, {text: '', segments: [], durationMs: 0}]);
+    } finally {
+      await local.dispose();
+      await jobs;
+    }
+  });
+
+  it.each([1001, 1000.6])('keeps duration integer milliseconds without a seconds round-trip (%s)', (end) => {
+    expect(parseWhisperOutput({transcription: [
+      {offsets: {from: 0, to: end}, text: 'First'},
+      {offsets: {from: 0, to: 900}, text: 'Second'},
+    ]}).durationMs).toBe(1001);
   });
 
   it('rejects pre-aborted work, spawn failures, failed processes and malformed output', async () => {
