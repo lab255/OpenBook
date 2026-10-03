@@ -142,6 +142,65 @@ describe('asset routes — open instance', () => {
     expect(Array.from(roundTrip)).toEqual(Array.from(bytes));
   });
 
+  it.each(['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/wav'])(
+    'round-trips %s through binary and base64-JSON uploads with safe headers and caching',
+    async (mime) => {
+      const a = app();
+      const page = await store.upsertPage({name: `audio-${seq}`, data: snapshot()});
+      for (const json of [false, true]) {
+        const bytes = new Uint8Array([0, 255, 128, 42, json ? 1 : 0]);
+        const inputMime = `${mime.toUpperCase()}; codecs=opus`;
+        const res = json
+          ? await a.request(`/api/assets?pageId=${page.id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+            body: JSON.stringify({data: Buffer.from(bytes).toString('base64'), mime: inputMime}),
+          })
+          : await upload(a, page.id, bytes, inputMime);
+        expect(res.status).toBe(201);
+        const {id} = await res.json() as {id: string};
+        expect(await store.getAsset(id)).toMatchObject({mime, size: bytes.length, bytes});
+        expect(await store.pagesReferencingAsset(id)).toEqual([page.id]);
+
+        const raw = await a.request(`/api/assets/${id}`);
+        expect(raw.status).toBe(200);
+        expect(raw.headers.get('Content-Type')).toBe(mime);
+        expect(raw.headers.get('Content-Disposition')).toBe('attachment');
+        expect(raw.headers.get('X-Content-Type-Options')).toBe('nosniff');
+        expect(new Uint8Array(await raw.arrayBuffer())).toEqual(bytes);
+        const base64 = await a.request(`/api/assets/${id}?encoding=base64`);
+        expect(base64.status).toBe(200);
+        expect(await base64.json()).toEqual({id, mime, size: bytes.length, data: Buffer.from(bytes).toString('base64')});
+        for (const response of [raw, base64]) {
+          expect(response.headers.get('ETag')).toBe(`"${id}"`);
+          expect(response.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable');
+        }
+        for (const suffix of ['', '?encoding=base64']) {
+          const cached = await a.request(`/api/assets/${id}${suffix}`, {headers: {'If-None-Match': `"${id}"`}});
+          expect(cached.status).toBe(304);
+          expect(await cached.text()).toBe('');
+          expect(cached.headers.get('ETag')).toBe(`"${id}"`);
+          expect(cached.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable');
+        }
+      }
+    },
+  );
+
+  it.each([false, true])('rejects over-cap audio with 413 (base64-JSON: %s)', async (json) => {
+    const a = app();
+    const page = await store.upsertPage({name: `audio-cap-${seq}`, data: snapshot()});
+    const bytes = new Uint8Array(10 * 1024 * 1024 + 1);
+    const res = json
+      ? await a.request(`/api/assets?pageId=${page.id}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+        body: JSON.stringify({data: Buffer.from(bytes).toString('base64'), mime: 'audio/webm'}),
+      })
+      : await upload(a, page.id, bytes, 'audio/webm');
+    expect(res.status).toBe(413);
+    expect(await store.assetStorageBytes()).toBe(0);
+  });
+
   it('the base64 variant is byte-exact with the raw binary', async () => {
     const a = app();
     const page = await store.upsertPage({name: `p-${seq}`, data: snapshot()});
@@ -360,6 +419,29 @@ describe('asset routes — claimed instance read-gate (no leak)', () => {
     });
     expect(res.status).toBe(201);
     assetId = ((await res.json()) as {id: string}).id;
+  });
+
+  it('applies the same read and write gates to audio, including conditional and base64 GETs', async () => {
+    const a = app();
+    const uploadAudio = async (sub: string) => a.request(`/api/assets?pageId=${restr}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'audio/webm', [IDENTITY_HEADER]: await idFor(sub)},
+      body: new Uint8Array([0, 255, 42]),
+    });
+    expect((await uploadAudio('granted')).status).toBe(403);
+    expect((await uploadAudio('stranger')).status).toBe(404);
+    const uploaded = await uploadAudio('owner');
+    expect(uploaded.status).toBe(201);
+    const {id} = await uploaded.json() as {id: string};
+    for (const suffix of ['', '?encoding=base64']) {
+      expect((await req(a, `/api/assets/${id}${suffix}`, await idFor('granted'))).status).toBe(200);
+      const denied = await a.request(`/api/assets/${id}${suffix}`, {
+        headers: {'If-None-Match': `"${id}"`, 'X-OpenBook-Client': '1'},
+      });
+      expect(denied.status).toBe(404);
+      expect(denied.headers.get('ETag')).toBeNull();
+      expect(denied.headers.get('Cache-Control')).toBe('no-store');
+    }
   });
 
   it('serves the bytes to a reader of the referencing page (owner + ACL grantee)', async () => {

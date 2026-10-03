@@ -650,6 +650,8 @@ export {
   IMAGE_BLOCK_TYPE,
   DEFAULT_MAX_ASSET_BYTES,
   ASSET_IMAGE_MIMES,
+  ASSET_AUDIO_MIMES,
+  ASSET_MIMES,
   type RehydrateUrlOptions,
   type RehydrateStoredClient,
   type RehydrateStoredOptions,
