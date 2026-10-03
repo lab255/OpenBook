@@ -3941,10 +3941,10 @@ a.obe-mention {
 .ob-map-cluster-wrap:hover .ob-map-cluster { border-color: hsl(var(--ring) / 0.55); }
 
 /* Meeting recorder: native playback, copyable transcript and ordinary note rows. */
-.obe-meeting { border: 1px solid var(--color-border); border-radius: 8px; padding: 16px; }
+.obe-meeting { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; }
 .obe-meeting header, .obe-meeting-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .obe-meeting header { justify-content: space-between; }
-.obe-meeting button { border: 1px solid var(--color-border); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.obe-meeting button { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 12px; cursor: pointer; }
 .obe-meeting button:disabled { opacity: 0.5; cursor: default; }
 .obe-meeting button:focus-visible, .obe-meeting a:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
 .obe-meeting-chunks { display: grid; gap: 12px; margin-block: 12px; }

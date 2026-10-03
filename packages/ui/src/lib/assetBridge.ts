@@ -21,10 +21,16 @@ export interface AssetBridgeImpl {
 }
 
 let bridge: AssetBridgeImpl | null = null;
+const listeners = new Set<() => void>();
+export const subscribeAssetBridge = (listener: () => void): (() => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
 
 /** Install (or clear) the live asset bridge. The app calls this from a client-aware host. */
 export const setAssetBridge = (next: AssetBridgeImpl | null): void => {
   bridge = next;
+  listeners.forEach((listener) => listener());
 };
 
 /** The bridge actions, safe to call before the host mounts (upload rejects; get resolves null). */

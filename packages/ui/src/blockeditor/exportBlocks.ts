@@ -8,16 +8,14 @@ import {resolveOptionsFromProps, varNameFromLabel} from './kit/options';
 import {statusOf, type ExportCell} from './kit/scope';
 import type {DbChartSeriesMap} from './kit/chartData';
 import {formSchemaFromProps} from './formBlock';
+import {meetingTime} from './meetingTime';
 
 /** Minimal meeting projection; audio export is intentionally a separate feature. */
 function meetingParagraphs(b: BlockJSON): string[] {
   const p = b.props ?? {};
   const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
-  return [String(p.title || t('meetingBlock.label')), String(p.status ?? 'idle'),
-    ...segments.map((segment) => {
-      const seconds = Math.floor(segment.startMs / 1000);
-      return `[${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}] ${segment.text}`;
-    }), ...(p.summary ? [String(p.summary)] : [])];
+  return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
+    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? [String(p.summary)] : [])];
 }
 
 // TextRun is referenced in the kit emit cases below.

@@ -294,6 +294,8 @@ const CommonFields: React.FC<{block: BlockMap; editor: BlockEditorController; de
 );
 
 export interface KitFrameProps {
+  /** Existing display-name prop for containers with their own title contract. */
+  labelKey?: string;
   block: BlockMap;
   editor: BlockEditorController;
   /** Adds the `obe-kit-{kind}` class and is the block's value type. */
@@ -317,6 +319,7 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   block,
   editor,
   kind,
+  labelKey = 'label',
   defaultName,
   control,
   config,
@@ -326,7 +329,7 @@ export const KitFrame: React.FC<KitFrameProps> = ({
 }) => {
   const id = blockId(block);
   const explicitName = blockProp<string>(block, 'name') ?? '';
-  const displayLabel = blockProp<string>(block, 'label') ?? '';
+  const displayLabel = blockProp<string>(block, labelKey) ?? '';
   // The symbol the block publishes under: explicit name, else derived from the
   // display label, else the type's fallback. Mirrors scope.ts `publishedName`.
   const name = explicitName.trim() || varNameFromLabel(displayLabel) || defaultName;
@@ -355,7 +358,7 @@ export const KitFrame: React.FC<KitFrameProps> = ({
             placeholder={name}
             readOnly={editor.readOnly}
             ariaLabel="Display name"
-            onCommit={(v) => kitSet(editor, block, 'label', v)}
+            onCommit={(v) => kitSet(editor, block, labelKey, v)}
           />
           {/* Only render the inline description when it HAS content — an empty
               field that unfurled on hover shifted the layout. Add/edit a

@@ -1,10 +1,11 @@
-import {useEffect, useState, useSyncExternalStore} from 'react';
+import {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
 import {t} from '@/i18n';
-import {assetBridge} from '@/lib/assetBridge';
+import {assetBridge, subscribeAssetBridge} from '@/lib/assetBridge';
 import {getPageIdForDoc} from '@/lib/aiBridge';
 import {blockChildren, blockProp, insertBlock} from './model';
 import type {CustomBlockDef, CustomBlockProps} from './registry';
 import {useKitLock} from './kit/lock';
+import {KitFrame, NameDescriptionFields} from './kit/KitFrame';
 import {chunkKey, meetingRecorder, meetingTime, type MeetingAudio, type MeetingSegment} from './meetingRecorder';
 
 function ChunkAudio({audio, blob}: {audio: MeetingAudio; blob?: Blob}) {
@@ -22,7 +23,7 @@ function ChunkAudio({audio, blob}: {audio: MeetingAudio; blob?: Blob}) {
     return () => { disposed = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [audio.assetId, blob]);
   return url ? <>
-    <audio controls preload="metadata" src={url} aria-label={t('meetingBlock.playback')} />
+    <audio controls preload="metadata" src={url} aria-label={t('meetingBlock.playback', {time: meetingTime(audio.startedAtMs ?? 0)})} />
     {blob && <a href={url} download={`meeting-${audio.startedAtMs ?? 0}.${blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`}>{t('meetingBlock.saveAudio')}</a>}
   </> : null;
 }
@@ -31,29 +32,42 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
   const locked = useKitLock();
   const readOnly = editor.readOnly || pageReadOnly || locked;
   const session = meetingRecorder(editor, block, getPageIdForDoc(editor.doc) ?? '');
+  session.readOnly = readOnly;
+  const chromeEditor = useMemo(() => ({...editor, readOnly}), [editor, readOnly]);
   useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
   const [, tick] = useState(0);
+  const active = session.active;
   useEffect(() => {
+    if (!active) return;
     const timer = setInterval(() => tick((n) => n + 1), 1000);
-    return () => { clearInterval(timer); session.stop(); };
-  }, [session]);
+    return () => clearInterval(timer);
+  }, [active]);
+  useEffect(() => () => session.stop(), [session]);
   useEffect(() => { if (readOnly) session.stop(); }, [readOnly, session]);
   const saved = blockProp<MeetingAudio[]>(block, 'audioChunks') ?? [];
   const completed = blockProp<string[]>(block, 'transcriptionCompleted') ?? [];
   const transcript = blockProp<MeetingSegment[]>(block, 'transcript') ?? [];
-  const startedAt = blockProp<number>(block, 'startedAt');
-  const elapsed = session.active && startedAt != null ? Date.now() - startedAt
-    : Math.max(0, ...saved.map((audio) => (audio.startedAtMs ?? 0) + audio.durationMs));
+  const elapsed = session.elapsedMs;
   const status = session.active ? session.mode : blockProp<string>(block, 'status') ?? 'idle';
   const statusLabel = t(`meetingBlock.${status as 'idle' | 'recording' | 'processing' | 'done' | 'paused' | 'requesting'}`);
-  const canTranscribe = assetBridge.canTranscribe();
-  return <section className="obe-meeting" aria-label={t('meetingBlock.label')}>
-    <header><strong>{blockProp<string>(block, 'title') || t('meetingBlock.label')}</strong>
-      <span role="status" aria-live="polite">{statusLabel} · {meetingTime(elapsed)}</span></header>
+  const canTranscribe = useSyncExternalStore(subscribeAssetBridge, assetBridge.canTranscribe, assetBridge.canTranscribe);
+  const control = <section className="obe-meeting" aria-label={t('meetingBlock.label')}>
+    <header>
+      <span role="status" aria-live="polite">{statusLabel}</span>
+      <span className="obe-meeting-elapsed" aria-hidden="true">{meetingTime(elapsed)}</span>
+    </header>
+    {readOnly && <p className="obe-meeting-lock">{t(!pageReadOnly && locked ? 'meetingBlock.locked' : 'meetingBlock.readOnly')}</p>}
+    {session.recordingElsewhere && <p>{t('meetingBlock.elsewhere')}</p>}
     <div className="obe-meeting-controls">
-      {!session.active && <button type="button" disabled={readOnly || session.mode === 'processing'} onClick={() => void session.start()}>{t('meetingBlock.record')}</button>}
-      {session.mode === 'recording' && <button type="button" disabled={readOnly} onClick={() => session.pause()}>{t('meetingBlock.pause')}</button>}
-      {session.mode === 'paused' && <button type="button" disabled={readOnly} onClick={() => session.resume()}>{t('meetingBlock.resume')}</button>}
+      <button type="button" disabled={readOnly || session.mode === 'processing' || session.recordingElsewhere}
+        aria-busy={session.mode === 'requesting'}
+        onClick={() => {
+          if (session.mode === 'recording') session.pause();
+          else if (session.mode === 'paused') session.resume();
+          else void session.start();
+        }}>
+        {t(`meetingBlock.${session.mode === 'recording' ? 'pause' : session.mode === 'paused' ? 'resume' : session.mode === 'requesting' ? 'requesting' : 'record'}`)}
+      </button>
       {session.active && <button type="button" disabled={readOnly} onClick={() => session.stop()}>{t('meetingBlock.stop')}</button>}
     </div>
     {session.error && <p role="alert">{session.error}</p>}
@@ -70,7 +84,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
           {!done && <button type="button" disabled={readOnly || !canTranscribe || progress?.busy} onClick={() => session.retry(audio)}>{t('meetingBlock.retryTranscription')}</button>}
         </li>;
       })}
-      {session.chunks.filter((chunk) => chunk.blob).map((chunk, index) => <li key={`pending-${index}`}>
+      {session.chunks.filter((chunk) => chunk.blob).map((chunk) => <li key={chunk.id}>
         <span role="status">{t(`meetingBlock.${chunk.phase === 'uploadFailed' ? 'uploadFailed' : 'uploading'}`)}</span>
         <ChunkAudio audio={chunk.audio} blob={chunk.blob} />
         {chunk.phase === 'uploadFailed' && <button type="button" disabled={readOnly} onClick={() => void session.upload(chunk)}>{t('meetingBlock.retryUpload')}</button>}
@@ -87,6 +101,9 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
         if (notes) insertBlock(editor.doc, notes, 0, {type: 'paragraph'});
       }, 'local')}>{t('meetingBlock.addNote')}</button>}</section>
   </section>;
+  return <KitFrame block={block} editor={chromeEditor} kind="meeting" defaultName={t('meetingBlock.label')}
+    labelKey="title" symbol={false} control={control}
+    config={<NameDescriptionFields block={block} editor={chromeEditor} nameKey="title" namePlaceholder={t('meetingBlock.label')} />} />;
 }
 
 export const MEETING_BLOCK: CustomBlockDef = {
