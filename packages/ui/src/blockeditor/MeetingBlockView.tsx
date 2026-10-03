@@ -68,7 +68,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
         }}>
         {t(`meetingBlock.${session.mode === 'recording' ? 'pause' : session.mode === 'paused' ? 'resume' : session.mode === 'requesting' ? 'requesting' : 'record'}`)}
       </button>
-      {session.active && <button type="button" disabled={readOnly} onClick={() => session.stop()}>{t('meetingBlock.stop')}</button>}
+      <button type="button" disabled={readOnly || !session.active} onClick={() => session.stop()}>{t('meetingBlock.stop')}</button>
     </div>
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}

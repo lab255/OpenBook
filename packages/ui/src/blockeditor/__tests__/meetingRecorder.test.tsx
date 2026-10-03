@@ -318,7 +318,9 @@ describe('MEET-5 review regressions', () => {
     expect(timer.textContent).toBe('0:02'); expect(status.textContent).toBe('Paused');
     await act(async () => { fireEvent.click(toggle); await flush(); });
     expect(screen.getByRole('button', {name: 'Pause'})).toBe(toggle); expect(document.activeElement).toBe(toggle);
-    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
+    const stop = screen.getByRole('button', {name: 'Stop'}); stop.focus();
+    await act(async () => { fireEvent.click(stop); await flush(); });
+    expect(document.activeElement).toBe(stop);
     expect(vi.getTimerCount()).toBe(0); interval.mockRestore(); unregister();
   });
 
