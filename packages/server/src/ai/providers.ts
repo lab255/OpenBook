@@ -1,7 +1,7 @@
 import {spawn, type ChildProcess} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
-import {providerSettings, type AiConfig, type AiProvider} from '@book.dev/sdk';
+import {providerSettings, type AiConfig, type AiProvider, type AiTranscriptionResult} from '@book.dev/sdk';
 
 /**
  * Inference engines behind one interface. Generation streams tokens;
@@ -84,7 +84,19 @@ export interface GenerateOptions {
   signal?: AbortSignal;
 }
 
+export interface TranscribeOptions {
+  filename?: string;
+  mime?: string;
+  signal?: AbortSignal;
+}
+
+/** MEET-3 implements this capability; no chat/embedding engine is required. */
+export interface TranscriptionEngine {
+  transcribe(bytes: Uint8Array, opts?: TranscribeOptions): Promise<AiTranscriptionResult>;
+}
+
 export interface AiEngine {
+  transcribe?: TranscriptionEngine['transcribe'];
   readonly kind: string;
   /** Throws (with a user-readable message) when the engine can't run. */
   ensureReady(): Promise<void>;
@@ -107,6 +119,12 @@ export interface AiEngine {
  *  Keeps the whole AI surface testable without any model. */
 export class MockEngine implements AiEngine {
   readonly kind = 'mock';
+
+  async transcribe(bytes: Uint8Array, opts: TranscribeOptions = {}): Promise<AiTranscriptionResult> {
+    opts.signal?.throwIfAborted();
+    const text = `Mock transcription (${bytes.byteLength} bytes).`;
+    return {text, segments: [{start: 0, end: 1, text}], durationMs: 1000};
+  }
 
   async ensureReady(): Promise<void> {
     // always ready
@@ -199,8 +217,38 @@ export class OpenAiCompatEngine implements AiEngine {
     private readonly baseUrl: string,
     private readonly model: string,
     kind = 'openai',
+    private readonly apiKey?: string | null,
   ) {
     this.kind = kind;
+  }
+
+  async transcribe(bytes: Uint8Array, opts: TranscribeOptions = {}): Promise<AiTranscriptionResult> {
+    const form = new FormData();
+    const extensions: Record<string, string> = {'audio/webm': 'webm', 'video/webm': 'webm', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/flac': 'flac'};
+    const filename = opts.filename || `audio.${extensions[opts.mime?.split(';')[0] ?? ''] ?? 'bin'}`;
+    form.append('file', new Blob([new Uint8Array(bytes)], {type: opts.mime || 'application/octet-stream'}), filename);
+    form.append('model', this.model || 'whisper-1');
+    form.append('response_format', 'verbose_json');
+    form.append('timestamp_granularities[]', 'segment');
+    const base = this.baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '');
+    const res = await fetch(`${base}/v1/audio/transcriptions`, {
+      method: 'POST',
+      headers: this.apiKey ? {Authorization: `Bearer ${this.apiKey}`} : {},
+      body: form,
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(300_000)]) : AbortSignal.timeout(300_000),
+    });
+    // Do not echo upstream bodies: they can contain credentials or recording text.
+    if (!res.ok) throw new Error(`Transcription provider returned HTTP ${res.status}`);
+    const data = await res.json() as {text?: unknown; duration?: unknown; segments?: unknown};
+    if (typeof data.text !== 'string') throw new Error('Invalid transcription provider response');
+    const segments: AiTranscriptionResult['segments'] = Array.isArray(data.segments)
+      ? data.segments.filter((s): s is {start: number; end: number; text: string} =>
+        s && Number.isFinite(s.start) && s.start >= 0 && Number.isFinite(s.end) && s.end >= s.start && typeof s.text === 'string')
+        .map(({start, end, text}) => ({start, end, text}))
+      : undefined;
+    const duration = typeof data.duration === 'number' && Number.isFinite(data.duration) && data.duration >= 0
+      ? data.duration : segments?.reduce((end, s) => Math.max(end, s.end), 0) ?? 0;
+    return {text: data.text, ...(segments ? {segments} : {}), durationMs: Math.round(duration * 1000)};
   }
 
   async ensureReady(): Promise<void> {
