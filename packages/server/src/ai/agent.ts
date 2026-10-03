@@ -19,6 +19,7 @@ import {
   CONTAINER_BLOCK_TYPES,
   findUnknownBlockType,
   invalidBlockProps,
+  invalidBlockTreeProps,
   KIT_VALUE_BLOCK_TYPES,
   providerSettings,
   movePageTool,
@@ -1060,6 +1061,8 @@ export class AgentRunner {
           if (structural) return structural;
           const bad = unknownBlockTypeMessage(findUnknownBlockType(blocks, {installedPluginIds: await this.installedPluginIds()}));
           if (bad) return bad;
+          const propError = invalidBlockTreeProps(blocks);
+          if (propError) return propError;
           const normalizeBlockText = (value: unknown): unknown => {
             if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
             const block = value as Record<string, unknown>;

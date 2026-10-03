@@ -94,7 +94,7 @@ export const TEXT_BLOCKS: ReadonlySet<BlockType> = TEXT_BLOCK_TYPES;
 
 /** Block types whose `children` hold ordinary blocks — the catalogue's
  *  `container` nature. */
-export const CONTAINER_BLOCKS: ReadonlySet<BlockType> = CONTAINER_BLOCK_TYPES;
+export const CONTAINER_BLOCKS: ReadonlySet<AnyBlockType> = CONTAINER_BLOCK_TYPES;
 
 export type BlockMap = Y.Map<unknown>;
 

@@ -261,3 +261,28 @@ describe('list_block_types', () => {
     expect(afterCatalogue.pluginBlocks.every((entry: {category: string}) => entry.category === 'plugin')).toBe(true);
   });
 });
+
+
+describe('meeting agent surface (MEET-4)', () => {
+  it('accepts notes and structured props, rejects malformed creation and updates', async () => {
+    const page = await store.upsertPage({name: `meeting-${seq}`, data: {
+      editor: 'blocks', blockdoc: {blocks: [{id: 'meeting1', type: 'meeting'}]}, editorjs: {blocks: []}, values: [], names: [],
+    }});
+    const props = {status: 'done', audioChunks: [{assetId: 'audio-1', durationMs: 500}], transcript: [{startMs: 0, endMs: 500, text: 'Hello'}]};
+    const added = await runTool('add_blocks', {pageId: page.id, blocks: [{type: 'meeting', props, children: [{type: 'paragraph', text: 'Notes'}]}]});
+    expect(added.result).toContain('SUGGESTED for review');
+    expect((await runTool('update_block_props', {pageId: page.id, blockId: 'meeting1', props})).result).toContain('SUGGESTED for review');
+    for (const invalid of [{status: 'paused'}, {audioChunks: [{assetId: 'a', durationMs: -1}]}, {transcript: [{startMs: 2, endMs: 1, text: 'Reversed'}]}]) {
+      for (const [tool, args] of [
+        ['add_blocks', {pageId: page.id, blocks: [{type: 'meeting', props: invalid}]}],
+        ['update_block_props', {pageId: page.id, blockId: 'meeting1', props: invalid}],
+      ] as const) {
+        const response = await runTool(tool, args);
+        expect(response.result).toContain('Invalid prop');
+        expect(response.events.some((event) => event.type === 'suggestions')).toBe(false);
+      }
+    }
+    const listed = JSON.parse((await runTool('list_block_types', {types: ['meeting']})).result);
+    expect(listed.blocks.find((block: {type: string}) => block.type === 'meeting').propsSchema.properties.transcript.items.required).toEqual(['startMs', 'endMs', 'text']);
+  });
+});

@@ -157,6 +157,22 @@ async function main(): Promise<void> {
   check('an invalid structured option is refused with a typed error naming opts',
     isError(badOpts) && /"opts"/.test(resultText(badOpts)) && /object/i.test(resultText(badOpts)));
 
+  const meetingProps = {status: 'done', audioChunks: [{assetId: 'audio-1', durationMs: 500, startedAtMs: 0}], transcript: [{startMs: 0, endMs: 500, text: 'Hello'}], summary: 'Agreed', startedAt: 1234, title: 'Review'};
+  const meetingPage = await seed.savePage({name: 'Meeting target', data: {editor: 'blocks', blockdoc: {blocks: [{id: 'meeting1', type: 'meeting', children: [{id: 'note1', type: 'paragraph', text: [{t: 'Notes'}]}]}]}, editorjs: {blocks: []}, values: [], names: []}});
+  const meetingUpdate = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: meetingPage.id, blockId: 'meeting1', props: meetingProps}});
+  check('meeting structured props update is accepted', !isError(meetingUpdate));
+  const meetingCreate = await mcp.client.callTool({name: 'append_blocks', arguments: {pageId: meetingPage.id, blocks: [{type: 'meeting', props: meetingProps, children: [{type: 'paragraph', text: 'Manual notes'}]}]}});
+  check('meeting creation with manual note children is accepted', !isError(meetingCreate));
+  for (const props of [{status: 'paused'}, {audioChunks: [{assetId: 'a', durationMs: -1}]}, {transcript: [{startMs: 2, endMs: 1, text: 'Reversed'}]}]) {
+    const badCreate = await mcp.client.callTool({name: 'append_blocks', arguments: {pageId: meetingPage.id, blocks: [{type: 'meeting', props}]}});
+    const badUpdate = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: meetingPage.id, blockId: 'meeting1', props}});
+    check(`meeting rejects invalid creation and update: ${JSON.stringify(props)}`, isError(badCreate) && isError(badUpdate));
+  }
+  const meetingListing = JSON.parse(resultText(await mcp.client.callTool({name: 'list_block_types', arguments: {types: ['meeting']}})));
+  assert.equal(meetingListing.blocks.length, 1);
+  assert.deepEqual(meetingListing.blocks[0].propsSchema.properties.transcript.items.required, ['startMs', 'endMs', 'text']);
+  check('meeting listing publishes container nature and structured propsSchema', meetingListing.blocks[0].nature === 'container');
+
   console.log('\nAPI-2: plugin block types — rejected while uninstalled, accepted once installed');
   const uninstalled = await mcp.client.callTool({
     name: 'create_artifact_page',

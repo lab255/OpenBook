@@ -17,6 +17,7 @@ import {
   CONTAINER_BLOCK_TYPES,
   findUnknownBlockType,
   invalidBlockProps,
+  invalidBlockTreeProps,
   isPluginBlockType,
   KNOWN_BLOCK_TYPE_IDS,
   MAX_BLOCK_DEPTH,
@@ -240,5 +241,50 @@ describe('generated tool text', () => {
   it('add_blocks guidance names every catalogued type (the old prose drifted)', () => {
     const guidance = addBlocksGuidance();
     for (const type of KNOWN_BLOCK_TYPE_IDS) expect(guidance).toContain(type);
+  });
+});
+
+
+describe('meeting representation contract (MEET-4)', () => {
+  it('is a kit container with typed structured props and no reactive value', () => {
+    expect(blockTypeInfo('meeting')).toMatchObject({category: 'kit', nature: 'container', kitValue: false});
+    expect(blockTreeError([{type: 'meeting', children: [{type: 'paragraph', text: 'Manual notes'}]}])).toBeNull();
+    for (const status of ['idle', 'recording', 'processing', 'done']) {
+      expect(invalidBlockProps('meeting', {status, startedAt: 1234, title: 'Review', summary: 'Agreed.',
+        audioChunks: [{assetId: 'audio-1', durationMs: 500, startedAtMs: 0}, {assetId: 'audio-2', durationMs: 250}],
+        transcript: [{startMs: 0, endMs: 500, text: 'Hello'}],
+      })).toBeNull();
+    }
+    expect(invalidBlockProps('meeting', {})).toBeNull();
+    expect(invalidBlockProps('meeting', {status: null, audioChunks: null, transcript: null, summary: null, startedAt: null, title: null})).toBeNull();
+  });
+
+  it.each([
+    {status: 'paused'}, {startedAt: -1}, {startedAt: '2026-01-01'}, {summary: []}, {title: 1},
+    {audioChunks: ['asset']}, {audioChunks: [{assetId: 'a'}]}, {audioChunks: [{assetId: '', durationMs: 1}]},
+    {audioChunks: [{assetId: 'a', durationMs: -1}]}, {audioChunks: [{assetId: 'a', durationMs: 1, startedAtMs: -1}]},
+    {audioChunks: [{assetId: 'a', durationMs: Infinity}]}, {audioChunks: [{assetId: 'a', durationMs: 1, extra: true}]},
+    {transcript: [{startMs: 0, text: 'Missing end'}]}, {transcript: [{startMs: 2, endMs: 1, text: 'Reversed'}]},
+    {transcript: [{startMs: -1, endMs: 1, text: 'Negative'}]}, {transcript: [{startMs: 0, endMs: 1, text: 1}]},
+  ])('rejects malformed props: %j', (props) => {
+    expect(invalidBlockProps('meeting', props)).toContain('Invalid prop');
+  });
+
+  it('publishes nested item schemas and required fields to agents', () => {
+    const {blocks} = JSON.parse(blockCatalogueText([], ['meeting']));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].propsSchema.properties.status.enum).toEqual(['idle', 'recording', 'processing', 'done']);
+    expect(blocks[0].propsSchema.properties.audioChunks.items.required).toEqual(['assetId', 'durationMs']);
+    expect(blocks[0].propsSchema.properties.transcript.items.required).toEqual(['startMs', 'endMs', 'text']);
+  });
+});
+
+
+describe('creation prop validation', () => {
+  it('validates nested blocks with the same schemas as prop updates', () => {
+    expect(invalidBlockTreeProps([{type: 'group', children: [{type: 'meeting', props: {status: 'paused'}}]}])).toContain('Invalid prop "status"');
+    expect(invalidBlockTreeProps([{type: 'heading', props: {level: 'two'}}])).toContain('Invalid prop "level"');
+    expect(invalidBlockTreeProps([{type: 'meeting', props: []}])).toContain('expected an object');
+    expect(invalidBlockTreeProps([{type: 'meeting'}, {type: 'plugin/widget', props: {anything: true}}, {type: 'meeting', props: {title: null, future: {x: 1}}}])).toBeNull();
   });
 });
