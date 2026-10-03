@@ -137,6 +137,7 @@ export const API = {
   aiTasks: '/api/ai/tasks',
   /** Continue/complete document text: `POST` `{text, instruction?}` → SSE. */
   aiComplete: '/api/ai/complete',
+  aiTranscribe: '/api/ai/transcribe',
   /** Download a model file for the in-process engine: `POST` `{url?}`. */
   aiModelDownload: '/api/ai/models/download',
   /** The agent harness: `POST` `{messages, effort?, thinking?, skills?}` → SSE tool/reasoning/proposal/final events. */

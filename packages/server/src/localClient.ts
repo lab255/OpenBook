@@ -5,6 +5,7 @@ import type {
   AgentTokenList,
   CreatedAgentToken,
   AiConfig,
+  AiTranscriptionResult,
   AiPricingResponse,
   AiPricingTable,
   AiUsageResponse,
@@ -917,6 +918,10 @@ export class LocalDataClient implements DataClient {
   }
 
   aiDownloadModel(): Promise<AiStatus['download']> {
+    return Promise.reject(this.aiUnavailable());
+  }
+
+  transcribeAsset(): Promise<AiTranscriptionResult> {
     return Promise.reject(this.aiUnavailable());
   }
 
