@@ -43,15 +43,7 @@ export const IMAGE_BLOCK_TYPE = 'image';
  */
 export const DEFAULT_MAX_ASSET_BYTES = 10 * 1024 * 1024;
 
-/**
- * Mime types an asset may be STORED and SERVED as (everything else is coerced
- * to `application/octet-stream`, which — with `nosniff` + attachment
- * disposition on the served response — can never execute). Single-sourced here
- * (LGR-15) so the upload door (`app.ts` `safeAssetMime`) and the backup-restore
- * door (`store.ts`) can never drift: an allowlist that exists twice is an
- * allowlist that will eventually disagree. Grow this list (never add
- * `svg+xml`, never `text/html`) if v2 serves more types.
- */
+/** Raster image MIME types supported by the asset store. */
 export const ASSET_IMAGE_MIMES: ReadonlySet<string> = new Set([
   'image/png',
   'image/jpeg',
@@ -60,6 +52,26 @@ export const ASSET_IMAGE_MIMES: ReadonlySet<string> = new Set([
   'image/avif',
   'image/apng',
 ]);
+
+/** Audio MIME types supported by the asset store (MEET-1). */
+export const ASSET_AUDIO_MIMES: ReadonlySet<string> = new Set([
+  'audio/webm',
+  'audio/ogg',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/wav',
+]);
+
+/**
+ * Mime types an asset may be STORED and SERVED as (everything else is coerced
+ * to `application/octet-stream`, which — with `nosniff` + attachment
+ * disposition on the served response — can never execute). Single-sourced here
+ * (LGR-15) so the upload door (`app.ts` `safeAssetMime`) and the backup-restore
+ * door (`store.ts`) can never drift: an allowlist that exists twice is an
+ * allowlist that will eventually disagree. Never add `image/svg+xml` or
+ * `text/html`: those types can execute scripts.
+ */
+export const ASSET_MIMES: ReadonlySet<string> = new Set([...ASSET_IMAGE_MIMES, ...ASSET_AUDIO_MIMES]);
 
 // ── ref classification ───────────────────────────────────────────────────────
 

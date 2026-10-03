@@ -54,7 +54,7 @@ import type {
   VerifiedVia,
 } from '@book.dev/sdk';
 import {AGENT_EDITS_POLICIES, authorize, BACKUP_VERSION, dateStart, DEFAULT_ACCOUNT_URL, DEFAULT_BACKUP_CONFIG, DEFAULT_INSTANCE_CONFIG, emptyPageSnapshot, extractMentionIds, extractPropertyReferenceIds, FORM_SUBMISSION_PROPERTY_ID, isEmailAuthoritative, latestSnapshotAuthor, PAGE_VISIBILITIES, parseDay, projectExports, propertiesReferencePage, remapBundle, resolveAutoExpiry, stampSnapshotAuthors, stampSnapshotAuthorsPerBlock, stampSnapshotMtimes, verifiedSubject, type Decision, type EffectiveVisibility, type PageGraph, type PageGraphEdge, type PluginPackage, type StoredPlugin} from '@book.dev/sdk';
-import {LedgerError, LEDGER_AUDIT_ACTIONS, ASSET_IMAGE_MIMES, DEFAULT_MAX_ASSET_BYTES, canonicalLedgerJson, ledgerAuditEventHash, ledgerRestorePayloadContent, verifyLedgerAuditChain} from '@book.dev/sdk';
+import {LedgerError, LEDGER_AUDIT_ACTIONS, ASSET_MIMES, DEFAULT_MAX_ASSET_BYTES, canonicalLedgerJson, ledgerAuditEventHash, ledgerRestorePayloadContent, verifyLedgerAuditChain} from '@book.dev/sdk';
 import {compareSemver, isSemver} from '@book.dev/sdk';
 import {authoredSubject} from './agentWriteGate';
 import {AbleOidcError} from './ableOidcError';
@@ -677,7 +677,7 @@ function safeBackupMime(raw: unknown, assetId: string): string {
     throw new BackupFormatError(`invalid backup: asset ${assetId} carries a control character in its mime`);
   }
   const base = value.split(';', 1)[0].trim().toLowerCase();
-  return ASSET_IMAGE_MIMES.has(base) ? base : 'application/octet-stream';
+  return ASSET_MIMES.has(base) ? base : 'application/octet-stream';
 }
 
 function partialRestoreDiagnostic(version: 1 | 2): BackupRestoreDiagnostic {
@@ -2149,7 +2149,7 @@ export class PageStore {
       // The SAME mime discipline as the upload door's `safeAssetMime` (app.ts),
       // against the same sdk allowlist: control characters refuse the bundle
       // (header-injection shape — nothing legitimate produces one); anything
-      // not an allowlisted image stores as octet-stream, which nosniff +
+      // not an allowlisted image or audio stores as octet-stream, which nosniff +
       // attachment disposition can never execute. Without this, a bundle could
       // plant `text/html` bytes an image block then serves from the app origin.
       const rawMime = typeof asset.mime === 'string' ? asset.mime : '';
@@ -2158,7 +2158,7 @@ export class PageStore {
         throw new Error(`invalid ledger backup: asset ${asset.id} carries a control character in its mime`);
       }
       const base = rawMime.split(';', 1)[0].trim().toLowerCase();
-      const mime = ASSET_IMAGE_MIMES.has(base) ? base : 'application/octet-stream';
+      const mime = ASSET_MIMES.has(base) ? base : 'application/octet-stream';
       // The budget-guarded insert `putAsset` uses, on THIS transaction: the row
       // lands only if the content already exists (dedup) or the running total
       // plus this asset stays within budget. See putAsset for the $5/$6 note.
@@ -5391,7 +5391,7 @@ export class PageStore {
    * gates the upload and refs the asset to a page.
    *
    * `mime` MUST already be a sanitized, safe-to-serve type (the route runs
-   * `safeAssetMime` before calling in — an allowlisted image or
+   * `safeAssetMime` before calling in — an allowlisted image or audio or
    * `application/octet-stream`). Because only sanitized mimes are ever stored, the
    * first-seen-mime dedup above can never be poisoned into serving an executable
    * type (the stored-XSS defense; see the upload route).

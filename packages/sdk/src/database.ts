@@ -865,7 +865,7 @@ export function projectExports(snapshot: Pick<PageSnapshot, 'values' | 'names'>)
  * an `image/*` `data:` URL (inline bytes an `<img src>` shows directly), or a URL
  * whose extension names a known image type. Display-only — a `data:` URL in an
  * `<img>` never executes script, and this is separate from the asset store's
- * upload allowlist (which excludes `svg+xml`; see the server's `ASSET_IMAGE_MIMES`).
+ * upload allowlist (which excludes `svg+xml`; see the server's `ASSET_MIMES`).
  */
 export function isImageUrl(url: string): boolean {
   const u = url.trim();

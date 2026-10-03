@@ -568,8 +568,7 @@ describe('able OIDC relying party', () => {
       issuer: 'local',
       scope: 'read',
       createdBy: 'test',
-      // PAT expiry uses the database wall clock, not the injected OIDC clock.
-      // Keep this valid-PAT fixture valid after the fixed OIDC date has passed.
+      // PAT validation uses the database clock, not the injected OIDC clock.
       expiresAt: new Date(Date.now() + 60_000),
     });
     const app = createApp(store, undefined, new PageHub(), {
