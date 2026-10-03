@@ -1,3 +1,5 @@
+import type {AiTranscriptionResult} from '@book.dev/sdk';
+
 /**
  * Bridge between the (provider-less) block editor and the app's data client for
  * binary assets — the same singleton pattern as `aiBridge` / `pageLinks`. The
@@ -11,6 +13,7 @@
  */
 
 export interface AssetBridgeImpl {
+  transcribeAsset?: (assetId: string, pageId: string) => Promise<AiTranscriptionResult>;
   /** Upload bytes → the content-addressed store, ref'd to `pageId`; resolves `{id}`. */
   putAsset: (bytes: Uint8Array, mime: string, pageId: string) => Promise<{id: string}>;
   /** Resolve an asset's bytes + mime by content-hash id (or `null` if unreachable). */
@@ -26,6 +29,9 @@ export const setAssetBridge = (next: AssetBridgeImpl | null): void => {
 
 /** The bridge actions, safe to call before the host mounts (upload rejects; get resolves null). */
 export const assetBridge = {
+  canTranscribe: (): boolean => bridge?.transcribeAsset != null,
+  transcribeAsset: (assetId: string, pageId: string): Promise<AiTranscriptionResult> =>
+    bridge?.transcribeAsset ? bridge.transcribeAsset(assetId, pageId) : Promise.reject(new Error('Transcription unavailable')),
   /** Whether an asset store is wired up (⇒ ingest can upload rather than inline a data-URL). */
   ready: (): boolean => bridge != null,
   putAsset: (bytes: Uint8Array, mime: string, pageId: string): Promise<{id: string}> =>
