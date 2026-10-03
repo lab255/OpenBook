@@ -568,7 +568,8 @@ describe('able OIDC relying party', () => {
       issuer: 'local',
       scope: 'read',
       createdBy: 'test',
-      expiresAt: new Date(NOW + 60_000),
+      // PAT authentication uses wall-clock time, independently of the OIDC clock.
+      expiresAt: new Date(Date.now() + 60_000),
     });
     const app = createApp(store, undefined, new PageHub(), {
       ableOidc: {...idp.options, discoveryTtlMs: 0},
