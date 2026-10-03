@@ -196,6 +196,16 @@ describe('meeting asynchronous boundaries', () => {
     expect(blockProp(block, 'status')).toBe('done');
   });
 
+  it('ignores a stale permission rejection after a new recording has started', async () => {
+    let deny!: (error: Error) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((_resolve, reject) => { deny = reject; }));
+    const {session} = harness(); const oldRequest = session.start(); session.stop();
+    await session.start(); expect(session.mode).toBe('recording');
+    deny(new Error('old permission denied')); await oldRequest;
+    expect(session.mode).toBe('recording'); expect(session.error).toBe('');
+    session.stop(); await flush();
+  });
+
   it('waits for the final asynchronous data event before declaring done', async () => {
     const {session, block} = harness(); await session.start();
     const recorder = Recorder.instances[0];

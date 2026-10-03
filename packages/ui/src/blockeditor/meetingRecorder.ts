@@ -86,6 +86,7 @@ export class MeetingRecorder {
       this.beginChunk();
       this.write({status: 'recording'});
     } catch {
+      if (generation !== this.generation) return;
       this.release(); this.mode = 'idle'; this.error = t('meetingBlock.permission'); this.changed();
     }
   }
