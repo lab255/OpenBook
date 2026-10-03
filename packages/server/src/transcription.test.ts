@@ -11,6 +11,8 @@ import {AiService} from './ai/service';
 import {MockEngine, OpenAiCompatEngine} from './ai/providers';
 import {AiUsageLog} from './ai/usage';
 import {LocalDataClient} from './localClient';
+import {LocalWhisper, WHISPER_MODEL, WHISPER_MODEL_URL} from './ai/whisper';
+import {readFile, readdir} from 'node:fs/promises';
 
 let db: PgliteDb;
 let store: PageStore;
@@ -118,6 +120,58 @@ describe('transcription contract', () => {
     expect((await service.transcriptionBackend()).provider).toBe('openai-compat');
     expect(local).toHaveBeenCalledOnce();
   });
+
+  it('uses the managed resolver fallback and exposes actionable local state through aiStatus', async () => {
+    const local = new LocalWhisper(dir, join(dir, 'missing'), join(dir, 'missing-ffmpeg'));
+    const service = new AiService(db, dir, () => local.resolve(), local);
+    const app = appWith(service);
+    expect((await post(app)).status).toBe(400);
+    expect((await (await post(app)).json()).error).toContain('Settings → AI');
+    const status = await app.request(API.aiStatus, {headers: {...headers, [LOCAL_OWNER_HEADER]: secret}});
+    expect((await status.json()).transcription).toMatchObject({modelPresent: false, runtimeAvailable: false, ready: false, downloadUrl: WHISPER_MODEL_URL});
+    await service.setConfig({provider: 'mock'});
+    expect((await post(app)).status).toBe(200);
+    await service.dispose();
+  });
+
+  it('logs local transcription as free and downloads its model without selecting it for chat', async () => {
+    const service = new AiService(db, dir, async () => new MockEngine());
+    const usage = new AiUsageLog(store);
+    expect((await post(appWith(service, usage))).status).toBe(200);
+    expect((await usage.report()).rows?.[0]).toMatchObject({provider: 'local', model: WHISPER_MODEL, kind: 'transcribe', cost: 0});
+    await service.setConfig({provider: 'llama'});
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('model bytes')));
+    const app = appWith(service);
+    const download = await app.request(API.aiModelDownload, {method: 'POST', headers: {...headers, [LOCAL_OWNER_HEADER]: secret}, body: JSON.stringify({url: WHISPER_MODEL_URL})});
+    expect(download.status).toBe(200);
+    await expect.poll(async () => (await service.status()).download?.done).toBe(true);
+    expect(await readFile(join(dir, WHISPER_MODEL), 'utf8')).toBe('model bytes');
+    expect((await service.getConfig()).model).toBeUndefined();
+    expect(await readdir(dir)).not.toContain(`${WHISPER_MODEL}.part`);
+    await service.dispose();
+  });
+
+  // Opt-in: OPENBOOK_TEST_WHISPER=1, OPENBOOK_MODELS_DIR containing ggml-base.bin,
+  // whisper-cli + ffmpeg on PATH (or OPENBOOK_WHISPER_BIN / OPENBOOK_FFMPEG_BIN).
+  it.skipIf(process.env.OPENBOOK_TEST_WHISPER !== '1')('native whisper: POST transcribes synthesized WAV with no cloud keys', async () => {
+    const local = new LocalWhisper(process.env.OPENBOOK_MODELS_DIR || join(dir, 'models'));
+    expect((await local.status()).ready).toBe(true);
+    const wav = Buffer.alloc(44 + 16000 * 2);
+    wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8);
+    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+    wav.writeUInt32LE(16000, 24); wav.writeUInt32LE(32000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+    wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
+    assetId = (await store.putAsset(wav, 'audio/wav')).id;
+    await store.refAsset(assetId, pageId);
+    const service = new AiService(db, dir, () => local.resolve(), local);
+    try {
+      const response = await post(appWith(service));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({text: expect.any(String), segments: expect.any(Array), durationMs: expect.any(Number)});
+    } finally {
+      await service.dispose();
+    }
+  }, 120_000);
 
   it('returns identical 404s for missing, unreadable, unreferenced, and unrelated assets/pages', async () => {
     await ai.setConfig({provider: 'mock'});

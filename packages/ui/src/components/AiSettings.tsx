@@ -27,7 +27,7 @@ function normalize(c: AiConfig): AiConfig {
     // the `apiKeySet` signal so the form knows a key is stored without holding it.
     providers[c.provider] = {model: c.model, baseUrl: c.baseUrl, apiKeySet: c.apiKeySet, autoStart: c.autoStart};
   }
-  return {provider: c.provider, providers, effort: c.effort, thinking: c.thinking};
+  return {provider: c.provider, providers, effort: c.effort, thinking: c.thinking, transcription: c.transcription};
 }
 
 /**
@@ -273,6 +273,15 @@ export default function AiSettings() {
 
   return (
     <SettingsScreen title={t('ai.title')} description={t('ai.description')} scope="library">
+      {status?.transcription && (
+        <SettingsSection title="Local transcription" description="Recordings use Whisper locally by default, with no cloud key. Whisper base is multilingual (~142 MiB).">
+          <p className="text-sm text-muted-foreground">{status.transcription.modelPresent ? 'Model downloaded.' : 'Model not downloaded.'} {status.transcription.ready ? 'Ready to transcribe.' : status.transcription.detail}</p>
+          <Button size="sm" variant="outline" disabled={downloading || status.transcription.modelPresent} onClick={() => void client.aiDownloadModel(status.transcription?.downloadUrl).then(() => refresh())}>
+            {downloading ? (progress === null ? 'Downloading…' : `Downloading ${progress}%`) : 'Download Whisper base'}
+          </Button>
+          {download?.url === status.transcription.downloadUrl && download.error && <p className="text-xs text-destructive">{download.error}</p>}
+        </SettingsSection>
+      )}
       <SettingsSection title={t('ai.defaultEngine')} description={t('ai.defaultEngineHint')}>
         <div className="flex flex-col gap-1.5" role="radiogroup" aria-label={t('ai.providerLabel')}>
           {providers.map((p) => (

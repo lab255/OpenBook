@@ -5,6 +5,7 @@ import {providerSettings, type AiConfig, type AiProvider, type AiProviderSetting
 import type {Db} from '../db';
 import {createEngine, MockEngine, OpenAiCompatEngine, type TranscriptionEngine, type AiEngine, type GenerateOptions} from './providers';
 import {assembleSearchResults, bm25Scores, buildIndex, cosine, pageRowsToDocs, parseTaskList, type Bm25Index} from './search';
+import {WHISPER_MODEL, WHISPER_MODEL_URL} from './whisper';
 import {SkillStore} from './skills';
 
 /**
@@ -114,6 +115,7 @@ export class AiService {
     private readonly modelsDir: string,
     /** MEET-3: lazily resolve the managed local audio backend. */
     private readonly localTranscription?: () => Promise<TranscriptionEngine | null>,
+    private readonly localLifecycle?: {status(): Promise<NonNullable<AiStatus['transcription']>>; dispose(): Promise<void>},
   ) {
     this.skills = new SkillStore(db);
   }
@@ -162,9 +164,9 @@ export class AiService {
       return {engine: new OpenAiCompatEngine(audio.baseUrl?.trim() || 'https://api.openai.com', audio.model?.trim() || 'whisper-1', 'openai', audio.apiKey), provider: 'openai-compat', model: audio.model?.trim() || 'whisper-1'};
     }
     const local = await this.localTranscription?.();
-    if (local) return {engine: local, provider: 'local', model: audio?.model ?? 'local'};
+    if (local) return {engine: local, provider: 'local', model: WHISPER_MODEL};
     if (config.provider === 'mock') return {engine: new MockEngine(), provider: 'mock', model: 'mock'};
-    throw new TranscriptionConfigError('Local transcription is unavailable. Configure transcription in Settings → AI.');
+    throw new TranscriptionConfigError('Local transcription is unavailable. Download the Whisper model and check the local runtime in Settings → AI.');
   }
 
   async status(): Promise<AiStatus> {
@@ -183,6 +185,7 @@ export class AiService {
     }
     return {
       config: this.config,
+      transcription: await this.localLifecycle?.status(),
       ready,
       embeddings,
       detail,
@@ -337,6 +340,7 @@ export class AiService {
     await this.loadConfig();
     if (this.download && !this.download.done && !this.download.error) return this.download;
     const fileName = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'model.gguf');
+    if (fileName !== path.basename(fileName) || fileName === '.' || fileName === '..' || fileName.includes('\\')) throw new Error('Invalid model filename');
     mkdirSync(this.modelsDir, {recursive: true});
     const dest = path.join(this.modelsDir, fileName);
     const state: DownloadState = {url, received: 0, total: null, done: false};
@@ -367,7 +371,7 @@ export class AiService {
           state.done = true;
         }
         // Auto-select the downloaded model for the llama provider.
-        if (this.config.provider === 'llama' && !this.config.model) {
+        if (url !== WHISPER_MODEL_URL && this.config.provider === 'llama' && !this.config.model) {
           await this.setConfig({...this.config, model: fileName});
         }
       } catch (err) {
@@ -381,5 +385,6 @@ export class AiService {
 
   async dispose(): Promise<void> {
     await this.engine?.dispose().catch(() => undefined);
+    await this.localLifecycle?.dispose();
   }
 }
