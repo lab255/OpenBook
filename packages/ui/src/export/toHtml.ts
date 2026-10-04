@@ -26,6 +26,7 @@ import type {DatabaseProperty, DatabaseRow, DatabaseSchema, PageSnapshot} from '
 import {assetsIslandScript, isSafeHref, pageIslandScript, libraryIslandScript, type ExportAssetEntry} from '@book.dev/sdk';
 import {DATA_COLOR_SCHEMES, DATA_PALETTE, DATA_STROKE, DEFAULT_DATA_COLOR_SCHEME, hexAlpha, isDataColorToken, statusColor, type DataColorScheme} from '@book.dev/sdk';
 import {formToStaticHtml, projectSnapshotForExport} from '../blockeditor/exportBlocks';
+import {AUDIO_DATA_URI_RE} from '../blockeditor/meetingAudio';
 import {formOriginUrl, formSchemaFromProps} from '../blockeditor/formBlock';
 import {describeUnknownBlock} from '../blockeditor/unknownBlock';
 import type {DbChartSeriesMap} from '../blockeditor/kit/chartData';
@@ -236,7 +237,8 @@ function runToHtml(r: InlineRun, ctx: RenderCtx): string {
   // scheme (javascript:/data:/…) degrades to inert text. See sdk isSafeHref.
   // Only standalone audio bytes may use a data-URI download; executable data
   // documents still fail the ordinary link scheme gate.
-  if (r.link && /^data:(?:audio\/(?:webm|ogg|mp4|mpeg|wav)|video\/webm)(?:;codecs=[\w.-]+)?;base64,[A-Za-z0-9+/]*={0,2}$/.test(r.link)) {
+  // Intentionally before isSafeHref: anchored audio-MIME, base64-only URIs are download-attributed.
+  if (r.link && AUDIO_DATA_URI_RE.test(r.link)) {
     return `<a download href="${escapeHtml(r.link)}">${html}</a>`;
   }
   if (r.link && isSafeHref(r.link)) html = `<a href="${escapeHtml(r.link)}">${html}</a>`;
@@ -1082,9 +1084,9 @@ export function toSlideDeck(
   scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME,
   dbSeries?: DbChartSeriesMap,
 ): string {
-  const {images} = normalizeAssets(assets);
+  const {images, audio} = normalizeAssets(assets);
   const originPageUrl = formOriginUrl(meta.id ?? '');
-  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {originPageUrl, audioAssets: normalizeAssets(assets).audio});
+  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {originPageUrl, audioAssets: audio});
   const values = new Map<string, unknown>();
   const nameByCell = new Map<string, string>();
   loadSnapshot(snapshot, values, nameByCell);

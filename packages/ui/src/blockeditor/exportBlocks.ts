@@ -9,6 +9,8 @@ import {statusOf, type ExportCell} from './kit/scope';
 import type {DbChartSeriesMap} from './kit/chartData';
 import {formSchemaFromProps} from './formBlock';
 import {meetingTime} from './meetingTime';
+import {AUDIO_DATA_URI_RE, withMeetingAudioOffsets} from './meetingAudio';
+import type {MeetingAudio} from './meetingRecorder';
 
 /** Meeting text remains readable even when audio assets cannot be resolved. */
 function meetingParagraphs(b: BlockJSON): string[] {
@@ -18,13 +20,15 @@ function meetingParagraphs(b: BlockJSON): string[] {
     ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? String(p.summary).split('\n').filter(Boolean) : [])];
 }
 
-function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions): string[] {
-  const chunks = Array.isArray(b.props?.audioChunks) ? b.props.audioChunks as {assetId: string; startedAtMs?: number}[] : [];
-  return chunks.map((chunk) => {
-    const label = `${t('meetingBlock.exportAudio')} (${meetingTime(chunk.startedAtMs ?? 0)})`;
+function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions, format: 'html' | 'markdown' = 'html'): string[] {
+  const chunks = Array.isArray(b.props?.audioChunks) ? b.props.audioChunks as MeetingAudio[] : [];
+  return withMeetingAudioOffsets(chunks).map((chunk) => {
+    const label = `${t('meetingBlock.exportAudio')} (${meetingTime(chunk.startedAtMs)})`;
     const uri = opts.audioAssets?.get(chunk.assetId);
-    return uri && /^data:(?:audio\/(?:webm|ogg|mp4|mpeg|wav)|video\/webm)(?:;codecs=[\w.-]+)?;base64,[A-Za-z0-9+/]*={0,2}$/.test(uri)
-      ? `<a download href="${escapeHtml(uri)}">${escapeHtml(label)}</a>` : escapeHtml(label);
+    const escapedLabel = format === 'markdown' ? escapeMd(label) : escapeHtml(label);
+    if (!uri || !AUDIO_DATA_URI_RE.test(uri)) return escapedLabel;
+    return format === 'markdown' ? `[${escapedLabel}](${uri})`
+      : `<a download href="${escapeHtml(uri)}">${escapedLabel}</a>`;
   });
 }
 
@@ -593,7 +597,7 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
       break;
     }
     case 'meeting':
-      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), ...meetingAudioLinks(b, opts), blocksToMarkdown(b.children ?? [], opts));
+      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), ...meetingAudioLinks(b, opts, 'markdown'), blocksToMarkdown(b.children ?? [], opts));
       break;
     case 'form':
       out.push(formToMarkdown(formSchemaFromProps(b.props)));

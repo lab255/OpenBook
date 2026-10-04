@@ -12,7 +12,7 @@ import type {SiteBundle} from '../exportSite';
 const snapshot: PageSnapshot = {
   editor: 'blocks', blockdoc: encodeSnapshot(createDoc([{type: 'columns', children: [{type: 'column', children: [{type: 'meeting', props: {
     title: 'Team sync', status: 'done', transcript: [{startMs: 0, endMs: 100, text: 'Ship on Friday'}],
-    summary: 'Decision: ship\nOwner: Alex', audioChunks: [{assetId: 'audio-a', durationMs: 100}, {assetId: 'audio-a', durationMs: 100}],
+    summary: 'Decision: ship\nOwner: Alex', audioChunks: [{assetId: 'audio-a', durationMs: 45000}, {assetId: 'audio-a', durationMs: 45000}],
   }, children: [{type: 'paragraph', text: 'Manual notes'}]}]}]}])), editorjs: {blocks: []}, values: [], names: [],
 };
 const bytes = new Uint8Array([0, 1, 2, 255]);
@@ -42,7 +42,7 @@ describe('MEET-7 document audio integration', () => {
     root.innerHTML = new DOMParser().parseFromString(html, 'text/html').querySelector('main')!.innerHTML;
     staticizeForms(root); // PDF consumes this same static HTML before browser layout/SVG rendering.
     for (const output of [markdown, root.textContent!]) {
-      for (const text of ['Ship on Friday', 'Decision: ship', 'Owner: Alex', 'Manual notes', 'Export audio']) expect(output).toContain(text);
+      for (const text of ['Ship on Friday', 'Decision: ship', 'Owner: Alex', 'Manual notes', 'Export audio (0:00)', 'Export audio (0:45)']) expect(output).toContain(text);
       expect(output).not.toContain('[object Object]');
     }
     expect(markdown).toContain('data:audio/webm;base64,AAEC/w==');

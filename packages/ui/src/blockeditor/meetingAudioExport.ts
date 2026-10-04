@@ -1,6 +1,8 @@
 import {zipSync} from 'fflate';
 import {assetBridge} from '@/lib/assetBridge';
 import {downloadBlob, safeFilename} from '@/lib/download';
+import {withMeetingAudioOffsets} from './meetingAudio';
+import {meetingTime} from './meetingTime';
 import type {MeetingAudio} from './meetingRecorder';
 
 const extension = (mime: string): string => {
@@ -11,23 +13,18 @@ const extension = (mime: string): string => {
 /** Preserve standalone chunks byte-for-byte; stitching would require remuxing or re-encoding. */
 export async function exportMeetingAudio(chunks: MeetingAudio[], title: string): Promise<void> {
   if (!chunks.length) return;
-  let offset = 0;
-  const ordered = chunks.map((chunk) => {
-    const start = chunk.startedAtMs ?? offset;
-    offset = start + chunk.durationMs;
-    return {...chunk, startedAtMs: start};
-  }).sort((a, b) => a.startedAtMs - b.startedAtMs);
+  const ordered = withMeetingAudioOffsets(chunks).sort((a, b) => a.startedAtMs - b.startedAtMs);
   const files: Record<string, Uint8Array> = {};
   for (const [index, chunk] of ordered.entries()) {
     const asset = await assetBridge.getAsset(chunk.assetId);
     if (!asset) throw new Error('Audio unavailable');
-    const timestamp = `${String(Math.max(0, Math.round(chunk.startedAtMs))).padStart(6, '0')}ms`;
+    const timestamp = meetingTime(chunk.startedAtMs, true);
     if (ordered.length === 1) {
       downloadBlob(`${safeFilename(title, 'Meeting')}-${timestamp}.${extension(asset.mime)}`,
         new Blob([new Uint8Array(asset.bytes)], {type: asset.mime}));
       return;
     }
-    files[`${String(index + 1).padStart(2, '0')}-${timestamp}.${extension(asset.mime)}`] = asset.bytes;
+    files[`${String(index + 1).padStart(3, '0')}-${timestamp}.${extension(asset.mime)}`] = asset.bytes;
   }
-  downloadBlob(`${safeFilename(title, 'Meeting')}-audio.zip`, new Blob([new Uint8Array(zipSync(files, {level: 0}))], {type: 'application/zip'}));
+  downloadBlob(`${safeFilename(title, 'Meeting')}-audio.zip`, new Blob([zipSync(files, {level: 0}) as BlobPart], {type: 'application/zip'}));
 }

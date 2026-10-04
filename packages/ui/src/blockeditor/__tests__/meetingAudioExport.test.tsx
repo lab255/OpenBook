@@ -12,7 +12,7 @@ import type {MeetingAudio} from '../meetingRecorder';
 
 vi.mock('@/lib/download', async (original) => ({...await original<typeof import('@/lib/download')>(), downloadBlob: vi.fn()}));
 const getAsset = vi.fn(async (id: string) => ({bytes: new Uint8Array(id === 'a' ? [1, 2] : [3, 4]), mime: 'audio/webm;codecs=opus'}));
-const chunks = [{assetId: 'a', startedAtMs: 0, durationMs: 45}, {assetId: 'b', startedAtMs: 45, durationMs: 20}];
+const chunks = [{assetId: 'a', startedAtMs: 0, durationMs: 45000}, {assetId: 'b', startedAtMs: 45000, durationMs: 20000}];
 function harness(audioChunks: MeetingAudio[], readOnly = false, pageReadOnly = false) {
   const doc = createDoc([{type: 'meeting', props: {title: 'Team / sync', audioChunks}}]);
   const block = rootBlocks(doc).get(0);
@@ -35,7 +35,7 @@ describe('MEET-7 audio export', () => {
     const doc = harness([chunks[0]], readOnly, pageReadOnly);
     const before = docToJSON(doc);
     await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Export audio'})));
-    expect(downloadBlob).toHaveBeenCalledWith('Team - sync-000000ms.webm', expect.any(Blob));
+    expect(downloadBlob).toHaveBeenCalledWith('Team - sync-00h00m00s.webm', expect.any(Blob));
     const blob = vi.mocked(downloadBlob).mock.calls[0][1];
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(new Uint8Array([1, 2]));
     expect(blob.type).toBe('audio/webm;codecs=opus');
@@ -46,14 +46,18 @@ describe('MEET-7 audio export', () => {
     await exportMeetingAudio([...chunks].reverse(), 'Team');
     expect(downloadBlob).toHaveBeenCalledWith('Team-audio.zip', expect.any(Blob));
     const entries = unzipSync(new Uint8Array(await vi.mocked(downloadBlob).mock.calls[0][1].arrayBuffer()));
-    expect(Object.keys(entries)).toEqual(['01-000000ms.webm', '02-000045ms.mp4']);
-    expect(entries['01-000000ms.webm']).toEqual(new Uint8Array([1, 2]));
-    expect(entries['02-000045ms.mp4']).toEqual(new Uint8Array([3, 4]));
+    expect(Object.keys(entries)).toEqual(['001-00h00m00s.webm', '002-00h00m45s.mp4']);
+    expect(entries['001-00h00m00s.webm']).toEqual(new Uint8Array([1, 2]));
+    expect(entries['002-00h00m45s.mp4']).toEqual(new Uint8Array([3, 4]));
+  });
+  it('renders zero-padded hours for long recordings', async () => {
+    await exportMeetingAudio([{assetId: 'a', startedAtMs: 43245000, durationMs: 20000}], 'Team');
+    expect(downloadBlob).toHaveBeenCalledWith('Team-12h00m45s.webm', expect.any(Blob));
   });
   it('derives missing timestamps from preceding durations without dropping repeated assets', async () => {
-    await exportMeetingAudio([{assetId: 'a', durationMs: 45}, {assetId: 'a', durationMs: 20}], 'Team');
+    await exportMeetingAudio([{assetId: 'a', durationMs: 45000}, {assetId: 'a', durationMs: 20000}], 'Team');
     const entries = unzipSync(new Uint8Array(await vi.mocked(downloadBlob).mock.calls[0][1].arrayBuffer()));
-    expect(Object.keys(entries)).toEqual(['01-000000ms.webm', '02-000045ms.webm']);
+    expect(Object.keys(entries)).toEqual(['001-00h00m00s.webm', '002-00h00m45s.webm']);
   });
   it.each(['denied', 'missing'])('surfaces %s assets without partial downloads and permits retry', async (failure) => {
     harness(chunks, true);
