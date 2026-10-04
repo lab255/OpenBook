@@ -22,9 +22,7 @@ See [local transcription](local-transcription.md) for Whisper installation,
 model download, and the current integration limitation. If local transcription
 is unavailable, recording and manual notes still work; OpenBook does not silently
 fall back to a cloud service. Cloud transcription requires explicit opt-in; the
-intended control is **Settings → AI**. In this branch the server accepts a
-separate transcription configuration, but its settings panel and local engine
-wiring have not landed yet. Selecting a cloud chat model alone does not opt audio
+intended control is **Settings → AI**. The local Whisper engine and its Settings → AI transcription controls ship with MEET-3 (PR #370); until that lands, the server accepts the transcription configuration but has no local engine wired. Selecting a cloud chat model alone does not opt audio
 into cloud transcription.
 
 ## Summaries and notes

@@ -330,9 +330,7 @@ Transcription resolves separately from chat: explicit off rejects; an explicit
 OpenAI-compatible transcription provider opts into that endpoint; otherwise the
 local resolver runs, followed by the deterministic mock fallback only when chat
 provider is mock. An unavailable local engine returns a configuration error,
-never implicit cloud fallback. Local engine wiring and the transcription
-settings panel are pending in this branch; see
-[local transcription setup](docs/local-transcription.md).
+never implicit cloud fallback. Local engine wiring and the transcription settings panel land with MEET-3 (PR #370); see [local transcription setup](docs/local-transcription.md).
 
 Audio export downloads a single original file or an ordered timestamped ZIP of
 chunks, without remuxing or deleting library assets. Markdown and HTML exports
