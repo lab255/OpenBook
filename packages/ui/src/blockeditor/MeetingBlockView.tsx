@@ -4,6 +4,7 @@ import {assetBridge, subscribeAssetBridge} from '@/lib/assetBridge';
 import {getPageIdForDoc} from '@/lib/aiBridge';
 import {blockChildren, blockProp, insertBlock} from './model';
 import type {CustomBlockDef, CustomBlockProps} from './registry';
+import {exportMeetingAudio} from './meetingAudioExport';
 import {MeetingSummary} from './MeetingSummary';
 import {useKitLock} from './kit/lock';
 import {KitFrame, NameDescriptionFields} from './kit/KitFrame';
@@ -30,6 +31,8 @@ function ChunkAudio({audio, blob}: {audio: MeetingAudio; blob?: Blob}) {
 }
 
 export function MeetingBlockView({block, editor, pageReadOnly, children}: CustomBlockProps) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
   const locked = useKitLock();
   const readOnly = editor.readOnly || pageReadOnly || locked;
   const session = meetingRecorder(editor, block, getPageIdForDoc(editor.doc) ?? '');
@@ -71,6 +74,13 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
       </button>
       <button type="button" disabled={readOnly || !session.active} onClick={() => session.stop()}>{t('meetingBlock.stop')}</button>
     </div>
+    {saved.length > 0 && <button type="button" disabled={exporting} aria-busy={exporting} onClick={async () => {
+      setExporting(true); setExportError(false);
+      try { await exportMeetingAudio(saved, blockProp<string>(block, 'title') || t('meetingBlock.label')); }
+      catch { setExportError(true); }
+      finally { setExporting(false); }
+    }}>{t('meetingBlock.exportAudio')}</button>}
+    {exportError && <p role="alert">{t('meetingBlock.exportAudioFailed')}</p>}
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}
     <ol className="obe-meeting-chunks">

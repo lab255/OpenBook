@@ -234,6 +234,11 @@ function runToHtml(r: InlineRun, ctx: RenderCtx): string {
   }
   // Scheme-gate the link href (escapeHtml doesn't touch the scheme); an unsafe
   // scheme (javascript:/data:/…) degrades to inert text. See sdk isSafeHref.
+  // Only standalone audio bytes may use a data-URI download; executable data
+  // documents still fail the ordinary link scheme gate.
+  if (r.link && /^data:(?:audio\/(?:webm|ogg|mp4|mpeg|wav)|video\/webm)(?:;codecs=[\w.-]+)?;base64,[A-Za-z0-9+/]*={0,2}$/.test(r.link)) {
+    return `<a download href="${escapeHtml(r.link)}">${html}</a>`;
+  }
   if (r.link && isSafeHref(r.link)) html = `<a href="${escapeHtml(r.link)}">${html}</a>`;
   return html;
 }
@@ -927,15 +932,19 @@ function normalizeAssets(assets: ExportAssetsLike | undefined): ExportAssets {
   return assets instanceof Map ? {images: assets, artifactText: new Map()} : assets;
 }
 
-/** Build the assets island for the artifact documents these snapshots actually
+/** Build the assets island for the artifact documents and meeting audio these snapshots actually
  *  reference (filtered so an unrelated resolution entry never leaks into the
  *  file), or '' when there is nothing to carry. Hydrate-path only: the island
- *  feeds the viewer's sandboxed renderer; placeholder-only surfaces (decks,
+ *  feeds the viewer's asset bridge; placeholder-only surfaces (decks,
  *  the legacy runtime) have no consumer for the bytes. */
-function artifactAssetsIsland(snapshots: PageSnapshot[], artifactText: Map<string, string>): string {
-  if (artifactText.size === 0) return '';
+function resolvedAssetsIsland(snapshots: PageSnapshot[], artifactText: Map<string, string>, audio = new Map<string, string>()): string {
+  if (artifactText.size === 0 && audio.size === 0) return '';
   const entries: Record<string, ExportAssetEntry> = {};
   for (const snapshot of snapshots) {
+    for (const id of collectExportAssetIds(snapshot).audio) {
+      const match = audio.get(id)?.match(/^data:([^,]+);base64,(.*)$/);
+      if (match) entries[id] = {mime: match[1], encoding: 'base64', data: match[2]};
+    }
     for (const id of collectExportAssetIds(snapshot).artifacts) {
       const text = artifactText.get(id);
       if (text !== undefined && !(id in entries)) entries[id] = {mime: 'text/html', encoding: 'utf8', data: text};
@@ -967,9 +976,9 @@ export function toHtml(
   scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME,
   dbSeries?: DbChartSeriesMap,
 ): string {
-  const {images, artifactText} = normalizeAssets(assets);
+  const {images, artifactText, audio} = normalizeAssets(assets);
   const originPageUrl = formOriginUrl(meta.id ?? '');
-  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {originPageUrl});
+  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {originPageUrl, audioAssets: audio});
   const values = new Map<string, unknown>();
   const nameByCell = new Map<string, string>();
   loadSnapshot(snapshot, values, nameByCell);
@@ -1001,7 +1010,7 @@ export function toHtml(
   const hydrate = hasBlockdoc(rawSnapshot);
   return document_(body, title, ctx, {
     island: pageIsland(rawSnapshot, title, icon, meta),
-    assetsIsland: hydrate ? artifactAssetsIsland([rawSnapshot], artifactText) : '',
+    assetsIsland: hydrate ? resolvedAssetsIsland([rawSnapshot], artifactText, audio) : '',
     hydrate,
   });
 }
@@ -1075,7 +1084,7 @@ export function toSlideDeck(
 ): string {
   const {images} = normalizeAssets(assets);
   const originPageUrl = formOriginUrl(meta.id ?? '');
-  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {originPageUrl});
+  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {originPageUrl, audioAssets: normalizeAssets(assets).audio});
   const values = new Map<string, unknown>();
   const nameByCell = new Map<string, string>();
   loadSnapshot(snapshot, values, nameByCell);
@@ -1140,7 +1149,7 @@ export function toHtmlSite(
   assets: ExportAssetsLike = emptyExportAssets(),
   scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME,
 ): string {
-  const {images, artifactText} = normalizeAssets(assets);
+  const {images, artifactText, audio} = normalizeAssets(assets);
   const byId = new Map(bundle.pages.map((p) => [p.id, p]));
   const values = new Map<string, unknown>();
   const nameByCell = new Map<string, string>();
@@ -1187,7 +1196,7 @@ export function toHtmlSite(
     .map((page, i) => {
       ctx.anchorPrefix = `p${i}-`;
       ctx.originPageUrl = page.originUrl ?? formOriginUrl(page.id);
-      const blocks = (page.snapshot.editorjs as {blocks?: ExportBlock[]} | undefined)?.blocks ?? [];
+      const blocks = (projectSnapshotForExport(page.snapshot, undefined, undefined, {originPageUrl: ctx.originPageUrl, audioAssets: audio}).editorjs as {blocks?: ExportBlock[]} | undefined)?.blocks ?? [];
       const bodyHtml = renderBlocks(blocks, ctx);
       const dbHtml = page.database ? renderDatabaseTable(page.database, ctx) : '';
       const hidden = page.id === bundle.rootId ? '' : ' hidden';
@@ -1224,7 +1233,7 @@ export function toHtmlSite(
   return document_(`<main>\n${sections}\n</main>`, rootTitle, ctx, {
     rootId: bundle.rootId,
     island,
-    assetsIsland: hydrate ? artifactAssetsIsland(bundle.pages.map((p) => p.snapshot), artifactText) : '',
+    assetsIsland: hydrate ? resolvedAssetsIsland(bundle.pages.map((p) => p.snapshot), artifactText, audio) : '',
     hydrate,
   });
 }

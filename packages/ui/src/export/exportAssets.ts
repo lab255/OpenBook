@@ -20,6 +20,7 @@
  * resolution — the renderers use it directly; only `assetId`s are fetched here.
  */
 import type {DataClient, PageSnapshot} from '@book.dev/sdk';
+import type {BlockJSON} from '../blockeditor/model';
 import {projectSnapshotForExport} from '../blockeditor/exportBlocks';
 
 /** Resolved image assets for one export: `assetId` → a base64 `data:` URI. */
@@ -29,12 +30,14 @@ export type AssetMap = Map<string, string>;
 export interface ExportAssets {
   /** Image `assetId` → `data:` URI (visible body, document model, PDF). */
   images: AssetMap;
+  /** Meeting audio as data URIs, also carried in the HTML assets island. */
+  audio?: AssetMap;
   /** `htmlArtifact` `assetId` → UTF-8 document text (assets island / viewer). */
   artifactText: Map<string, string>;
 }
 
 /** An empty resolution — for tests and asset-store-less callers. */
-export const emptyExportAssets = (): ExportAssets => ({images: new Map(), artifactText: new Map()});
+export const emptyExportAssets = (): ExportAssets => ({images: new Map(), audio: new Map(), artifactText: new Map()});
 
 /**
  * Base64-encode bytes in 32 KiB chunks — `btoa(String.fromCharCode(...bytes))`
@@ -63,6 +66,7 @@ interface ExportBlock {
 interface CollectedIds {
   images: Set<string>;
   artifacts: Set<string>;
+  audio: Set<string>;
 }
 
 /** Walk projected export blocks (recursing `columns`) collecting asset ids
@@ -70,6 +74,9 @@ interface CollectedIds {
 function collectFromBlocks(blocks: ExportBlock[], out: CollectedIds): void {
   for (const block of blocks) {
     const d = block.data ?? {};
+    if (block.type === 'meeting' && Array.isArray(d.audioChunks)) {
+      for (const chunk of d.audioChunks) if (chunk && typeof chunk.assetId === 'string' && chunk.assetId) out.audio.add(chunk.assetId);
+    }
     if (typeof d.assetId === 'string' && d.assetId) {
       if (block.type === 'image') out.images.add(d.assetId);
       else if (block.type === 'htmlArtifact') out.artifacts.add(d.assetId);
@@ -86,15 +93,26 @@ function collectFromBlocks(blocks: ExportBlock[], out: CollectedIds): void {
 export function collectExportAssetIds(rawSnapshot: PageSnapshot): CollectedIds {
   const snapshot = projectSnapshotForExport(rawSnapshot);
   const blocks = (snapshot.editorjs as {blocks?: ExportBlock[]} | undefined)?.blocks ?? [];
-  const out: CollectedIds = {images: new Set(), artifacts: new Set()};
+  const out: CollectedIds = {images: new Set(), artifacts: new Set(), audio: new Set()};
   collectFromBlocks(blocks, out);
+  const visit = (list: BlockJSON[]): void => {
+    for (const block of list) {
+      if (block.type === 'meeting' && Array.isArray(block.props?.audioChunks)) {
+        for (const chunk of block.props.audioChunks) {
+          if (chunk && typeof chunk.assetId === 'string' && chunk.assetId) out.audio.add(chunk.assetId);
+        }
+      }
+      if (block.children) visit(block.children);
+    }
+  };
+  visit((rawSnapshot.blockdoc as {blocks?: Parameters<typeof visit>[0]} | undefined)?.blocks ?? []);
   return out;
 }
 
-/** Every asset id referenced by a page snapshot (both kinds, deduplicated). */
+/** Every asset id referenced by a page snapshot (all kinds, deduplicated). */
 export function collectAssetIds(rawSnapshot: PageSnapshot): string[] {
-  const {images, artifacts} = collectExportAssetIds(rawSnapshot);
-  return [...new Set([...images, ...artifacts])];
+  const {images, artifacts, audio} = collectExportAssetIds(rawSnapshot);
+  return [...new Set([...images, ...artifacts, ...audio])];
 }
 
 /**
@@ -112,16 +130,19 @@ export async function resolveExportAssets(
   if (!client?.getAsset) return out;
   const images = new Set<string>();
   const artifacts = new Set<string>();
+  const audio = new Set<string>();
   for (const s of snapshots) {
     const ids = collectExportAssetIds(s);
     for (const id of ids.images) images.add(id);
+    for (const id of ids.audio) audio.add(id);
     for (const id of ids.artifacts) artifacts.add(id);
   }
   await Promise.all(
-    [...new Set([...images, ...artifacts])].map(async (id) => {
+    [...new Set([...images, ...artifacts, ...audio])].map(async (id) => {
       try {
         const asset = await client.getAsset(id);
         if (!asset) return;
+        if (audio.has(id)) out.audio!.set(id, bytesToDataUri(asset.bytes, asset.mime));
         if (images.has(id)) out.images.set(id, bytesToDataUri(asset.bytes, asset.mime));
         if (artifacts.has(id)) out.artifactText.set(id, new TextDecoder('utf-8').decode(asset.bytes));
       } catch {

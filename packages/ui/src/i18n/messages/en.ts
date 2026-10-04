@@ -1078,6 +1078,8 @@ export const en = {
     noDatabases: 'No databases found',
   },
   meetingBlock: {
+    exportAudio: 'Export audio',
+    exportAudioFailed: 'Audio could not be exported. Check access and try again.',
     summary: 'Summary',
     summaryOffer: 'Your transcript is ready to summarize.',
     generateSummary: 'Generate summary',

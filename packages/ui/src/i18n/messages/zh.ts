@@ -629,6 +629,8 @@ export const zh: PartialMessages = {
     urlLabel: '链接地址',
   },
   meetingBlock: {
+    exportAudio: '导出音频',
+    exportAudioFailed: '无法导出音频。请检查访问权限后重试。',
     summary: '摘要',
     summaryOffer: '转录已准备好，可以生成摘要。',
     generateSummary: '生成摘要',

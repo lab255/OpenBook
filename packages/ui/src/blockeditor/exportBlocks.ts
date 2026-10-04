@@ -10,12 +10,22 @@ import type {DbChartSeriesMap} from './kit/chartData';
 import {formSchemaFromProps} from './formBlock';
 import {meetingTime} from './meetingTime';
 
-/** Minimal meeting projection; audio export is intentionally a separate feature. */
+/** Meeting text remains readable even when audio assets cannot be resolved. */
 function meetingParagraphs(b: BlockJSON): string[] {
   const p = b.props ?? {};
   const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
   return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
     ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? [String(p.summary)] : [])];
+}
+
+function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions): string[] {
+  const chunks = Array.isArray(b.props?.audioChunks) ? b.props.audioChunks as {assetId: string; startedAtMs?: number}[] : [];
+  return chunks.map((chunk) => {
+    const label = `${t('meetingBlock.exportAudio')} (${meetingTime(chunk.startedAtMs ?? 0)})`;
+    const uri = opts.audioAssets?.get(chunk.assetId);
+    return uri && /^data:(?:audio\/(?:webm|ogg|mp4|mpeg|wav)|video\/webm)(?:;codecs=[\w.-]+)?;base64,[A-Za-z0-9+/]*={0,2}$/.test(uri)
+      ? `<a download href="${escapeHtml(uri)}">${escapeHtml(label)}</a>` : escapeHtml(label);
+  });
 }
 
 // TextRun is referenced in the kit emit cases below.
@@ -116,6 +126,7 @@ function databaseFormReference(props: Record<string, unknown> | undefined): Data
 
 interface DatabaseFormExportOptions {
   originPageUrl?: string | null;
+  audioAssets?: Map<string, string>;
 }
 
 const databaseFormAttributes = (reference: DatabaseFormReference | null): string => reference
@@ -408,7 +419,7 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
       i += 1;
       break;
     case 'meeting':
-      parts.push(`<section>${meetingParagraphs(b).map((line) => `<p>${escapeHtml(line)}</p>`).join('')}${blocksToHtml(b.children ?? [], opts)}</section>`);
+      parts.push(`<section>${meetingParagraphs(b).map((line) => `<p>${escapeHtml(line)}</p>`).join('')}${meetingAudioLinks(b, opts).map((link) => `<p>${link}</p>`).join('')}${blocksToHtml(b.children ?? [], opts)}</section>`);
       i += 1;
       break;
     case 'form':
@@ -582,7 +593,7 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
       break;
     }
     case 'meeting':
-      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), blocksToMarkdown(b.children ?? [], opts));
+      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), meetingAudioLinks(b, opts).join('\n\n'), blocksToMarkdown(b.children ?? [], opts));
       break;
     case 'form':
       out.push(formToMarkdown(formSchemaFromProps(b.props)));
@@ -1097,6 +1108,7 @@ export function projectBlocksForExport(
       }
       case 'meeting': {
         for (const line of meetingParagraphs(b)) sink.push({type: 'paragraph', data: {text: textHtml([{t: line}])}});
+        for (const link of meetingAudioLinks(b, opts)) sink.push({type: 'paragraph', data: {text: link}});
         emit(b.children ?? [], sink);
         i += 1;
         break;
