@@ -6,6 +6,7 @@ import {PageStore, PAGE_VERSION_KEEP, PAGE_VERSION_MAX_AGE_MS} from './store';
 import {PageHub} from './hub';
 import {BookMirror, MirrorLockedError, WriteBudgetError} from './mirror';
 import {AiService} from './ai/service';
+import {LocalWhisper} from './ai/whisper';
 import {McpClientManager} from './ai/mcpClients';
 import {AiUsageLog} from './ai/usage';
 import {IdentityService} from './instanceConfig';
@@ -436,7 +437,8 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   // (server mode). The subsystem is inert until configured via /api/ai.
   const modelsDir = process.env.OPENBOOK_MODELS_DIR
     || (opts.dataDir ? path.join(opts.dataDir, 'models') : path.join(os.homedir(), '.openbook', 'models'));
-  const ai = new AiService(db, modelsDir);
+  const whisper = new LocalWhisper(modelsDir);
+  const ai = new AiService(db, modelsDir, () => whisper.resolve(), whisper);
   // External-tools (MCP client) manager (AGENT-3): owned beside AiService, pools
   // connections to admin-registered MCP servers and hands the agent route
   // namespaced `mcp__*` tools. Inert until an admin configures + enables a server

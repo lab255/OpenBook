@@ -212,6 +212,8 @@ export interface AiUsageResponse {
 }
 
 export interface AiStatus {
+  /** Local audio capability is independent of the chat provider. */
+  transcription?: {model: string; modelPresent: boolean; runtimeAvailable: boolean; ready: boolean; downloadUrl: string; detail?: string};
   config: AiConfig;
   /** The engine can generate text right now. */
   ready: boolean;

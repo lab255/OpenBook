@@ -17,13 +17,14 @@ until processing completes. Failed uploads retain an in-session audio copy with
 save/retry controls; transcription failures preserve uploaded audio and offer
 **Retry transcription**. Leaving the page can lose audio that has not uploaded.
 
-Transcription defaults to **local** resolution, independently of the chat model.
-See [local transcription](local-transcription.md) for Whisper installation,
-model download, and the current integration limitation. If local transcription
+Local Whisper transcription ships by default, independently of the chat model.
+In **Settings → AI**, select **Download Whisper base** to download the model.
+See [local transcription](local-transcription.md) for the required Whisper and
+FFmpeg installation, model setup, and runtime checks. If local transcription
 is unavailable, recording and manual notes still work; OpenBook does not silently
-fall back to a cloud service. Cloud transcription requires explicit opt-in; the
-intended control is **Settings → AI**. The local Whisper engine and its Settings → AI transcription controls ship with MEET-3 (PR #370); until that lands, the server accepts the transcription configuration but has no local engine wired. Selecting a cloud chat model alone does not opt audio
-into cloud transcription.
+fall back to a cloud service. Cloud transcription requires explicit opt-in in
+**Settings → AI**. Selecting a cloud chat model alone does not opt audio into
+cloud transcription.
 
 ## Summaries and notes
 

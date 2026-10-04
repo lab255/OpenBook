@@ -18,6 +18,17 @@ describe('t', () => {
     expect(t('common.cancel')).toBe('取消');
   });
 
+  it('ships local transcription copy and progress in all four locales', () => {
+    for (const catalog of [en, de, ja, zh]) {
+      expect(Object.keys(catalog.ai?.transcription ?? {}).sort()).toEqual(Object.keys(en.ai.transcription).sort());
+      expect(Object.values(catalog.ai?.transcription ?? {}).every((value) => typeof value === 'string' && value.length > 0)).toBe(true);
+    }
+    for (const locale of ['en', 'de', 'ja', 'zh'] as const) {
+      setLocale(locale);
+      expect(t('ai.transcription.downloadingProgress', {progress: 42})).toContain('42%');
+    }
+  });
+
   it('interpolates {var} placeholders', () => {
     setLocale('en');
     expect(t('mention.create', {name: 'Roadmap'})).toBe('Create subpage “Roadmap”');
