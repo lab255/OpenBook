@@ -6,10 +6,15 @@ import type {PageStore} from '../store';
 import type {AppEnv} from '../appEnv';
 import {isLocalInstanceOwner, requireAuthenticatedRead, requireCreate, requireInstanceAdmin, requireInstanceOwner} from '../access';
 import {AgentRunner, type AgentMessage} from './agent';
-import {TranscriptionConfigError, type AiService} from './service';
+import {ModelDownloadConfigError, TranscriptionConfigError, type AiService} from './service';
 import {McpConfigError, type ExternalAgentTool, type McpClientManager} from './mcpClients';
+import {FixedWindowLimiter, clientIpKey} from '../agentTokens';
+import {LocalTranscriptionBusyError} from './whisper';
 import type {TokenUsage} from './providers';
 import type {AiUsageLog, UsageKind} from './usage';
+
+export const LOCAL_TRANSCRIPTION_RATE_LIMIT = 6;
+const LOCAL_TRANSCRIPTION_RATE_WINDOW_MS = 60_000;
 
 /**
  * The `/api/ai/*` surface. Generation endpoints stream tokens as SSE
@@ -22,6 +27,7 @@ import type {AiUsageLog, UsageKind} from './usage';
  * logging failure never breaks the request.
  */
 export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore, onPagesChanged?: () => Promise<void>, aiUsage?: AiUsageLog, mcp?: McpClientManager): void {
+  const localTranscriptionLimiter = new FixedWindowLimiter(LOCAL_TRANSCRIPTION_RATE_LIMIT, LOCAL_TRANSCRIPTION_RATE_WINDOW_MS);
   /**
    * Log a single generate/complete usage row against the effective provider/model.
    * Best-effort (the logger swallows its own errors); does nothing without a logger
@@ -195,12 +201,20 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     try {
       const {engine, provider, model} = await ai.transcriptionBackend();
       await requirePaidInferenceAccess(c, store, provider === 'openai-compat' ? 'openai' : 'off');
+      if (provider === 'local' && localTranscriptionLimiter.exceeded(clientIpKey(c))) {
+        c.header('Retry-After', String(LOCAL_TRANSCRIPTION_RATE_WINDOW_MS / 1000));
+        return c.json({error: 'Too many local transcription requests. Please retry shortly.'}, 429);
+      }
       const result = await engine.transcribe(asset.bytes, {mime: asset.mime, signal: c.req.raw.signal});
       // Audio backends do not report token counts. Keep unknown cloud cost null.
       await aiUsage?.log({provider, model, kind: 'transcribe', principal, usage: {inputTokens: 0, outputTokens: 0}});
       return c.json(result);
     } catch (err) {
       if (err instanceof HTTPException) throw err;
+      if (err instanceof LocalTranscriptionBusyError) {
+        c.header('Retry-After', String(err.retryAfterSeconds));
+        return c.json({error: err.message}, 429);
+      }
       if (err instanceof TranscriptionConfigError) return c.json({error: err.message}, 400);
       return c.json({error: 'Transcription failed. Check the provider in Settings → AI and retry.'}, 502);
     }
@@ -211,7 +225,12 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     // surface) — only the trusted instance owner may supply it.
     await requireInstanceOwner(c, store);
     const {url} = (await c.req.json().catch(() => ({}))) as {url?: string};
-    return c.json(await ai.startDownload(url));
+    try {
+      return c.json(await ai.startDownload(url));
+    } catch (err) {
+      if (err instanceof ModelDownloadConfigError) return c.json({error: err.message}, 400);
+      throw err;
+    }
   });
 
   // The agent harness: runs the tool loop against the library and streams

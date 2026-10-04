@@ -527,6 +527,18 @@ export const ja: PartialMessages = {
     localNetwork: 'ローカルネットワーク',
   },
   ai: {
+    transcription: {
+      title: 'ローカル文字起こし',
+      description: '録音は標準でWhisperを使ってローカルで文字起こしされます。クラウドのAPIキーは不要です。Whisper baseは多言語対応です（約142 MiB）。',
+      modelPresent: 'モデルをダウンロード済みです。',
+      modelAbsent: 'モデルが未ダウンロードです。',
+      ready: '文字起こしの準備ができています。',
+      runtimeMissing: 'ローカル文字起こしを有効にするには、サーバーにwhisper-cliとFFmpegをインストールしてください。',
+      modelMissing: 'ローカル文字起こしを有効にするには、以下のモデルをダウンロードしてください。',
+      download: 'Whisper baseをダウンロード',
+      downloading: 'ダウンロード中…',
+      downloadingProgress: 'ダウンロード中 {progress}%',
+    },
     title: 'AI',
     description: 'オプションのローカルモデルで、ノート検索・タスク分解・文書補完ができます。すべて端末内で動作します。',
     providerLabel: 'エンジン',

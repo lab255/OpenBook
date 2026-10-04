@@ -532,6 +532,18 @@ export const de: PartialMessages = {
     localNetwork: 'Lokales Netzwerk',
   },
   ai: {
+    transcription: {
+      title: 'Lokale Transkription',
+      description: 'Aufnahmen werden standardmäßig lokal mit Whisper transkribiert, ohne Cloud-Schlüssel. Whisper base ist mehrsprachig (~142 MiB).',
+      modelPresent: 'Modell heruntergeladen.',
+      modelAbsent: 'Modell nicht heruntergeladen.',
+      ready: 'Bereit zur Transkription.',
+      runtimeMissing: 'Installiere whisper-cli und FFmpeg auf dem Server, um die lokale Transkription zu aktivieren.',
+      modelMissing: 'Lade unten das Modell herunter, um die lokale Transkription zu aktivieren.',
+      download: 'Whisper base herunterladen',
+      downloading: 'Wird heruntergeladen…',
+      downloadingProgress: 'Download: {progress}%',
+    },
     title: 'KI',
     description: 'Ein optionales lokales Modell ermöglicht Notizsuche, Aufgabenplanung und Textvervollständigung. Alles läuft auf deinem Gerät.',
     providerLabel: 'Engine',
