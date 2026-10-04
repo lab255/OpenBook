@@ -58,3 +58,25 @@ a fresh bounded run.
 Crash-loop exhaustion, the 1/2/4/8/16-second bound, healthy reset, deliberate
 stop suppression, and repair reset are deterministic unit tests in
 `src-tauri/src/sidecar_supervision.rs` (`cargo test sidecar_supervision`).
+
+## Meeting microphone manual checks
+
+1. Launch the desktop app, open a saved page, type `/meeting`, and select
+   **Meeting**. Click **Record** and accept the OS microphone permission prompt.
+   On macOS, check **System Settings → Privacy & Security → Microphone** if the
+   prompt was previously denied; reopen OpenBook after changing permission.
+2. Speak, pause, and confirm a playable audio chunk appears. Resume, speak again,
+   then stop. Confirm both chunks play and the elapsed time excludes the pause.
+3. With a supported transcription backend configured, confirm transcript lines
+   appear as chunks complete. If no backend is available, confirm audio and notes
+   remain usable and transcription offers retry. See
+   [local transcription setup](../../docs/local-transcription.md) for the current
+   local-engine integration limitation.
+4. Generate a summary, cancel a regeneration, and confirm the previous summary
+   survives. Type a manual note. Export audio and Markdown; check the ZIP's
+   individual recordings and the Markdown transcript, summary, and note.
+5. Revoke microphone access and reopen the app. Attempt recording: confirm a
+   permission error appears, Stop stays disabled, and manual notes still work.
+
+These checks require the actual desktop webview and OS permission system. The
+web e2e's oscillator stream does not validate desktop entitlements or hardware.

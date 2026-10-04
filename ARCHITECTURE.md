@@ -309,6 +309,38 @@ The FORM-7 MCP surface in `packages/mcp/src/server.ts` provides `list_forms`,
 through the resolved per-page agent-edits policy (suggest by default), and key
 regeneration is intentionally author-UI-only.
 
+### Meeting blocks
+
+Meetings are native `type:'meeting'` container blocks registered by
+`packages/ui/src/blockeditor/MeetingBlockView.tsx`. The
+[representation contract](docs/meeting-block.md) defines audio asset references,
+timestamped transcript segments, summary, title, and status props. Manual notes
+remain ordinary CRDT child blocks; generated transcript and summary are prop
+snapshots. The user workflow is in [meeting notes](docs/meeting-notes.md).
+
+`MeetingRecorder` restarts MediaRecorder every 45 seconds and on pause/resume.
+Each uploaded chunk has its own container header, unlike recorder timeslices,
+so playback, retries, transcription, and export work on standalone files.
+Uploads use page-associated assets; `POST /api/ai/transcribe` receives the asset
+and page IDs, enforces access, and records usage. Completed chunks append
+transcript segments progressively. Summary generation is an explicit streamed
+AI request; cancellation preserves the previous durable summary.
+
+Transcription resolves separately from chat: explicit off rejects; an explicit
+OpenAI-compatible transcription provider opts into that endpoint; otherwise the
+local resolver runs, followed by the deterministic mock fallback only when chat
+provider is mock. An unavailable local engine returns a configuration error,
+never implicit cloud fallback. Local engine wiring and the transcription
+settings panel are pending in this branch; see
+[local transcription setup](docs/local-transcription.md).
+
+Audio export downloads a single original file or an ordered timestamped ZIP of
+chunks, without remuxing or deleting library assets. Markdown and HTML exports
+include transcript, summary, and child notes with audio references; audio bytes
+are exported separately. The browser epic proof is
+`packages/web/e2e/meeting-epic.spec.ts`, using a WebAudio microphone substitute
+with real recording, asset, transcription, generation, and download paths.
+
 ### Optional local AI (`packages/server/src/ai/`)
 
 An opt-in, local-only model subsystem (Settings → AI). Pluggable engines
