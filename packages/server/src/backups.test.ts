@@ -414,6 +414,33 @@ describe('BackupScheduler', () => {
     expect(errorLog).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves audio MIME types and bytes through backup restore', async () => {
+    const assets = [];
+    for (const mime of ['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/wav']) {
+      const bytes = new TextEncoder().encode(mime);
+      const {id} = await store.putAsset(bytes, mime);
+      assets.push({id, mime, bytes});
+    }
+    await store.upsertPage({
+      name: `audio-backup-${seq}`,
+      data: {
+        ...snapshot(),
+        blockdoc: {v: 1, update: '', blocks: assets.map(({id}) => ({id, type: 'audio', props: {assetId: id}}))},
+      },
+    });
+    const bundle = await store.exportAll();
+    const restoreDir = join(tmpdir(), `ob-audio-restore-${process.pid}-${seq}`);
+    const restored = new PageStore(await PgliteDb.create(restoreDir));
+    try {
+      await restored.migrate();
+      await restored.importBundle({...bundle, mode: 'copy', installForeignPageAccess: true});
+      for (const {id, mime, bytes} of assets) expect(await restored.getAsset(id)).toMatchObject({mime, bytes});
+    } finally {
+      await restored.close();
+      await rm(restoreDir, {recursive: true, force: true});
+    }
+  });
+
   it('keeps backup reachability aligned with GC for future asset URL shapes', async () => {
     const bytes = Uint8Array.from([7, 8, 9]);
     const {id} = await store.putAsset(bytes, 'image/png');

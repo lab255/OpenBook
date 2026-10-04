@@ -31,7 +31,7 @@ export {BLOCK_PROP_JSON_SCHEMAS, BLOCK_PROP_SCHEMAS} from './blockPropSchemas';
 
 /** How a block stores content: `container` blocks carry child blocks in
  *  `children`, `text` blocks carry rich text in `text`, `void` blocks carry
- *  only `props` (all kit widgets are void). */
+ *  only `props`. Kit blocks may also be containers. */
 export type BlockNature = 'container' | 'text' | 'void';
 
 /** The value shapes per-type prop validation understands. Deliberately coarse
@@ -109,6 +109,7 @@ const CATALOGUE_LITERAL = [
   {type: 'tooltipcard', category: 'kit', nature: 'void', props: {term: 'string', tip: 'string'}, hint: '{term,tip}'},
   {type: 'dbview', category: 'kit', nature: 'void', props: {pageId: 'string'}, hint: 'embedded live database view {pageId} — the page hosting the database'},
   {type: 'dbform', category: 'kit', nature: 'void', props: {databaseId: 'string', viewId: 'string'}, hint: 'embedded database form {databaseId,viewId} — a live reference, never a copied schema or capability'},
+  {type: 'meeting', category: 'kit', nature: 'container', kitValue: false, props: {status: 'string', audioChunks: 'array', transcript: 'array', summary: 'string', startedAt: 'number', title: 'string'}, hint: 'meeting recording {status?,audioChunks?:[{assetId,durationMs,startedAtMs?}],transcript?:[{startMs,endMs,text}],summary?,startedAt?,title?}; times in ms, startedAt is Unix epoch; children hold manual notes; see docs/meeting-block.md'},
   {type: 'form', category: 'kit', nature: 'void', kitValue: false, props: {formId: 'string', submissionKey: 'string', enabled: 'boolean', databaseId: 'string', schema: 'object', label: 'string', description: 'string'}, hint: 'public form definition {formId,submissionKey,enabled,databaseId?,schema}'},
 ] as const satisfies readonly BlockTypeInfo[];
 
@@ -134,9 +135,9 @@ export const KIT_VALUE_BLOCK_TYPES: ReadonlySet<string> = new Set(
   BLOCK_TYPE_CATALOGUE.filter((entry) => entry.kitValue === true).map((entry) => entry.type),
 );
 
-/** Core types whose `children` hold ordinary blocks. */
-export const CONTAINER_BLOCK_TYPES: ReadonlySet<CoreBlockType> = new Set(
-  BLOCK_TYPE_CATALOGUE.filter((e) => e.nature === 'container').map((e) => e.type as CoreBlockType),
+/** Catalogued types whose `children` hold ordinary blocks (including kit containers). */
+export const CONTAINER_BLOCK_TYPES: ReadonlySet<string> = new Set(
+  BLOCK_TYPE_CATALOGUE.filter((e) => e.nature === 'container').map((e) => e.type),
 );
 
 /** Core types that carry editable rich text. */
@@ -284,7 +285,7 @@ export function blockTreeError(
           structural = parentType
             ? `A "${type}" block must be a direct child of a "${needs}" block, not a "${parentType}" block (at "${here}").`
             : `A "${type}" block can't be top-level — it belongs directly inside a "${needs}" block (at "${here}").`;
-        } else if (hasChildren && !CONTAINER_BLOCK_TYPES.has(type as CoreBlockType)) {
+        } else if (hasChildren && !CONTAINER_BLOCK_TYPES.has(type)) {
           structural = `A "${type}" block can't hold children — only container blocks (${[...CONTAINER_BLOCK_TYPES].join(', ')}) do (at "${here}"). The nested blocks would be dropped.`;
         } else if (type === 'table' && hasChildren) {
           structural = raggedTableError(children, here);
@@ -339,6 +340,30 @@ export function invalidBlockProps(type: string, props: Record<string, unknown>):
   return `Invalid prop "${prop}" of a "${type}" block: ${issue.message} (got ${clipJson(props[prop])}).`;
 }
 
+/** Validate declared props throughout a creation payload. Call blockTreeError
+ * first to enforce structure/size limits. Plugin and unknown props retain the
+ * same permissive behavior as update_block_props. */
+export function invalidBlockTreeProps(blocks: readonly unknown[], depth = 1): string | null {
+  if (depth > TYPE_WALK_MAX_DEPTH) return null; // structure validation owns depth errors
+  for (const raw of blocks) {
+    if (!raw || typeof raw !== 'object') continue;
+    const block = raw as {type?: unknown; props?: unknown; children?: unknown};
+    const type = String(block.type ?? '');
+    if (block.props !== undefined) {
+      if (!block.props || typeof block.props !== 'object' || Array.isArray(block.props)) {
+        return `Invalid props of a "${type}" block: expected an object.`;
+      }
+      const error = invalidBlockProps(type, block.props as Record<string, unknown>);
+      if (error) return error;
+    }
+    if (Array.isArray(block.children)) {
+      const error = invalidBlockTreeProps(block.children, depth + 1);
+      if (error) return error;
+    }
+  }
+  return null;
+}
+
 const clipJson = (v: unknown): string => {
   const s = JSON.stringify(v) ?? String(v);
   return s.length > 40 ? `${s.slice(0, 40)}…` : s;
@@ -388,10 +413,10 @@ export function addBlocksGuidance(): string {
     'Append rich blocks to a page — text, layouts, tables, media, interactive inputs, and charts. User approves before they are added.',
     'Each block is {type, text?, props?, children?}. `text` is a plain string (or rich runs [{"t","a":{b,i,u,s,c,a}}]); `children` nests blocks inside containers. Call list_block_types for the full catalogue including installed plugin blocks.',
     `TEXT: ${core.filter((e) => e.nature === 'text' && !e.parent).map(hinted).join('; ')}.`,
-    `CONTAINERS (use children): ${core.filter((e) => e.nature === 'container' || e.parent).map(hinted).join('; ')}. Give every table row the same number of cells.`,
+    `CONTAINERS (use children): ${BLOCK_TYPE_CATALOGUE.filter((e) => e.nature === 'container' || e.parent).map(hinted).join('; ')}. Give every table row the same number of cells.`,
     `MEDIA/OTHER: ${core.filter((e) => e.nature === 'void').map(hinted).join('; ')}.`,
     `INPUTS (each publishes props.name into the reactive scope): ${kit.filter((e) => e.kitValue).map(hinted).join('; ')}.`,
-    `REACTIVE DISPLAY/ACTIONS (props.source is a JS expression over input names): ${kit.filter((e) => !e.kitValue).map(hinted).join('; ')}.`,
+    `REACTIVE DISPLAY/ACTIONS (props.source is a JS expression over input names): ${kit.filter((e) => !e.kitValue && e.nature !== 'container').map(hinted).join('; ')}.`,
     'Example: a budget widget → [{"type":"heading","text":"Budget","props":{"level":2}},{"type":"columns","children":[{"type":"column","props":{"span":5},"children":[{"type":"slider","props":{"name":"spent","label":"Spent","value":80,"min":0,"max":200}},{"type":"number","props":{"name":"budget","label":"Budget","value":120}}]},{"type":"column","props":{"span":7},"children":[{"type":"kitchart","props":{"kind":"bar","title":"Spent vs budget","labels":"Spent, Budget","source":"[spent, budget]"}},{"type":"statuslight","props":{"label":"On track","source":"budget - spent","okAt":0,"warnAt":-20}}]}]}].',
   ].join('\n');
 }

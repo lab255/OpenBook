@@ -43,6 +43,22 @@ const opts = array(option, 'Structured selectable options.');
 const attrs = object({b: boolean(), i: boolean(), u: boolean(), s: boolean(), c: boolean(), a: string('Safe http, https, or mailto link.')});
 const run = object({t: string('Run text.'), a: attrs}, 'One rich-text run.', ['t']);
 const runs = array(run, 'Rich-text runs.');
+// MEET-4 representation contract: docs/meeting-block.md. Nested objects are
+// strict; top-level props retain the catalogue's nullable patch semantics.
+const audioChunk = object({
+  assetId: {schema: z.string().min(1).max(512), json: {type: 'string', minLength: 1, maxLength: 512}},
+  durationMs: number('Chunk duration in milliseconds.', 0),
+  startedAtMs: number('Offset from the meeting start in milliseconds.', 0),
+}, 'One audio asset in capture order.', ['assetId', 'durationMs']);
+const transcriptSegment = object({
+  startMs: number('Inclusive offset from the meeting start in milliseconds.', 0),
+  endMs: number('Exclusive offset from the meeting start in milliseconds; must be >= startMs.', 0),
+  text: string('Plain transcript text.'),
+}, 'One transcript segment in display order.', ['startMs', 'endMs', 'text']);
+transcriptSegment.schema = transcriptSegment.schema.refine(
+  (segment) => segment.endMs >= segment.startMs,
+  {message: 'endMs must be greater than or equal to startMs', path: ['endMs']},
+);
 const common = {bg: text};
 const frame = {name: text, label: text, description: text, compact: boolean(), interactive: boolean()};
 const inputText = {...frame, value: text, placeholder: text};
@@ -71,6 +87,14 @@ const fields = {
   formula: {...frame, source: expression('Expression evaluated over the reactive scope.')},
   linkcard: {title: text, url: text, description: text}, tooltipcard: {term: text, tip: text},
   dbview: {pageId: id}, dbform: {databaseId: id, viewId: id},
+  meeting: {
+    status: enumeration(['idle', 'recording', 'processing', 'done'], 'Absent means idle.'),
+    audioChunks: array(audioChunk, 'Audio chunks in capture order; replace the entire array when updating.'),
+    transcript: array(transcriptSegment, 'Plain-text segments in display order; replace the entire array when updating.'),
+    summary: string('Plain-text summary.'),
+    startedAt: number('Meeting start as Unix epoch milliseconds.', 0),
+    title: text,
+  },
   form: {formId: id, submissionKey: text, enabled: boolean(), databaseId: id, schema: freeObject, label: text, description: text},
 } satisfies Record<string, Record<string, Field>>;
 

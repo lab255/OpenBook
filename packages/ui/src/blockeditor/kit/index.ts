@@ -4,6 +4,7 @@ import {INPUT2_BLOCKS} from './inputs2';
 import {PROGRESS_BLOCKS} from './progress';
 import {CHART_BLOCKS} from './charts';
 import {CARD_BLOCKS} from './cards';
+import {MEETING_BLOCK} from '../MeetingBlockView';
 
 export {evalExpr, formatValue, inputScope, INPUT_TYPES} from './scope';
 export {CHART_KINDS} from './charts';
@@ -17,7 +18,7 @@ export {CHART_KINDS} from './charts';
  * out of reusable, collaborative blocks.
  */
 export function registerArtifactKit(): void {
-  for (const def of [...INPUT_BLOCKS, ...INPUT2_BLOCKS, ...PROGRESS_BLOCKS, ...CHART_BLOCKS, ...CARD_BLOCKS]) {
+  for (const def of [...INPUT_BLOCKS, ...INPUT2_BLOCKS, ...PROGRESS_BLOCKS, ...CHART_BLOCKS, ...CARD_BLOCKS, MEETING_BLOCK]) {
     const d = def as unknown as CustomBlockDef;
     // Tag the built-ins so the slash menu files them under "Interactive blocks"
     // (third-party plugin blocks fall through to "Extensions").

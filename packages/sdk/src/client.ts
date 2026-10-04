@@ -209,6 +209,8 @@ export interface DataClient {
   aiSearch(query: string, limit?: number): Promise<AiSearchResponse>;
   aiTasks(goal: string, context?: string): Promise<AiTasksResponse>;
   aiDownloadModel(url?: string): Promise<AiStatus['download']>;
+  /** False for clients without a transcription transport (for example the local store). */
+  readonly supportsTranscription?: boolean;
   transcribeAsset(assetId: string, pageId: string): Promise<AiTranscriptionResult>;
   aiComplete(text: string, onToken: (token: string) => void, opts?: {instruction?: string; signal?: AbortSignal}): Promise<string>;
   aiGenerate(prompt: string, onToken: (token: string) => void, opts?: {system?: string; maxTokens?: number; signal?: AbortSignal}): Promise<string>;
