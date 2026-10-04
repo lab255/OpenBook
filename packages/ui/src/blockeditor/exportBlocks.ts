@@ -593,7 +593,7 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
       break;
     }
     case 'meeting':
-      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), meetingAudioLinks(b, opts).join('\n\n'), blocksToMarkdown(b.children ?? [], opts));
+      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), ...meetingAudioLinks(b, opts), blocksToMarkdown(b.children ?? [], opts));
       break;
     case 'form':
       out.push(formToMarkdown(formSchemaFromProps(b.props)));
