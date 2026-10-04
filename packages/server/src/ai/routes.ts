@@ -6,7 +6,7 @@ import type {PageStore} from '../store';
 import type {AppEnv} from '../appEnv';
 import {isLocalInstanceOwner, requireAuthenticatedRead, requireCreate, requireInstanceAdmin, requireInstanceOwner} from '../access';
 import {AgentRunner, type AgentMessage} from './agent';
-import type {AiService} from './service';
+import {TranscriptionConfigError, type AiService} from './service';
 import {McpConfigError, type ExternalAgentTool, type McpClientManager} from './mcpClients';
 import type {TokenUsage} from './providers';
 import type {AiUsageLog, UsageKind} from './usage';
@@ -60,6 +60,22 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     const body = (await c.req.json()) as AiConfig;
     if (!['off', 'mock', 'llama', 'mlx', 'openai', 'claude'].includes(body.provider)) {
       return c.json({error: `Unknown provider: ${String(body.provider)}`}, 400);
+    }
+    if (body.transcription !== undefined) {
+      const audio = body.transcription;
+      if (!audio || !['off', 'local', 'openai-compat'].includes(audio.provider)
+        || [audio.baseUrl, audio.model].some((v) => v !== undefined && typeof v !== 'string')
+        || (audio.apiKey !== undefined && audio.apiKey !== null && typeof audio.apiKey !== 'string')) {
+        return c.json({error: 'Invalid transcription configuration'}, 400);
+      }
+      if (audio.baseUrl) {
+        try {
+          const url = new URL(audio.baseUrl);
+          if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error();
+        } catch {
+          return c.json({error: 'Transcription baseUrl must be an HTTP(S) URL without embedded credentials'}, 400);
+        }
+      }
     }
     // Redact the echoed config too: a blank-on-save PRESERVES the stored key
     // (see `AiService.setConfig`), so returning the saved config raw would hand a
@@ -158,6 +174,36 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
       }
       await logUsage('complete', principal, usage);
     });
+  });
+
+  app.post(API.aiTranscribe, async (c) => {
+    const body = await c.req.json().catch(() => null) as {assetId?: unknown; pageId?: unknown} | null;
+    if (typeof body?.assetId !== 'string' || typeof body.pageId !== 'string' || !body.assetId || !body.pageId) {
+      return c.json({error: 'assetId and pageId are required'}, 400);
+    }
+    const {assetId, pageId} = body;
+    if (!/^[0-9a-f]{64}$/.test(assetId) || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(pageId)) {
+      return c.json({error: 'asset not found'}, 404);
+    }
+    const principal = c.get('principal');
+    if (!await store.getPageFor(principal, pageId)
+      || !(await store.pagesReferencingAsset(assetId)).includes(pageId)) {
+      return c.json({error: 'asset not found'}, 404);
+    }
+    const asset = await store.getAssetFor(principal, assetId);
+    if (!asset) return c.json({error: 'asset not found'}, 404);
+    try {
+      const {engine, provider, model} = await ai.transcriptionBackend();
+      await requirePaidInferenceAccess(c, store, provider === 'openai-compat' ? 'openai' : 'off');
+      const result = await engine.transcribe(asset.bytes, {mime: asset.mime, signal: c.req.raw.signal});
+      // Audio backends do not report token counts. Keep unknown cloud cost null.
+      await aiUsage?.log({provider, model, kind: 'transcribe', principal, usage: {inputTokens: 0, outputTokens: 0}});
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof HTTPException) throw err;
+      if (err instanceof TranscriptionConfigError) return c.json({error: err.message}, 400);
+      return c.json({error: 'Transcription failed. Check the provider in Settings → AI and retry.'}, 502);
+    }
   });
 
   app.post(API.aiModelDownload, async (c) => {
@@ -378,6 +424,12 @@ function redactAiConfig(config: AiConfig): AiConfig {
   delete redacted.apiKey;
   if (hasKey(config.apiKey)) redacted.apiKeySet = true;
   else delete redacted.apiKeySet;
+  if (config.transcription) {
+    redacted.transcription = {...config.transcription};
+    delete redacted.transcription.apiKey;
+    if (hasKey(config.transcription.apiKey)) redacted.transcription.apiKeySet = true;
+    else delete redacted.transcription.apiKeySet;
+  }
   if (config.providers) {
     redacted.providers = Object.fromEntries(
       Object.entries(config.providers).map(([p, settings]) => {

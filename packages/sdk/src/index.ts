@@ -692,6 +692,8 @@ export type {
   InterviewStep,
   AiProvider,
   AiConfig,
+  AiTranscriptionConfig,
+  AiTranscriptionResult,
   AiProviderSettings,
   AiEffort,
   AiSkill,

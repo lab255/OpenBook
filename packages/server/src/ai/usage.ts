@@ -68,11 +68,11 @@ const PROP = {
 } as const;
 
 /** The kinds of model call we attribute. */
-export type UsageKind = 'agent' | 'complete' | 'generate';
+export type UsageKind = 'agent' | 'complete' | 'generate' | 'transcribe';
 
 /** One model call to attribute: what ran, how many tokens, and for whom. */
 export interface UsageEvent {
-  provider: AiProvider;
+  provider: AiProvider | 'local' | 'openai-compat';
   model: string;
   kind: UsageKind;
   usage: TokenUsage;
@@ -364,7 +364,7 @@ export class AiUsageLog {
       // A claude call with no configured model runs on the engine's default — price
       // (and log) against that so cost isn't spuriously null.
       const model = event.model || (event.provider === 'claude' ? AnthropicEngine.DEFAULT_MODEL : '');
-      const cost = this.computeCost(event.provider, model, event.usage, effective);
+      const cost = event.provider === 'openai-compat' ? null : event.provider === 'local' ? 0 : this.computeCost(event.provider, model, event.usage, effective);
       const properties: Record<string, unknown> = {
         [PROP.time]: new Date().toISOString(),
         [PROP.user]: formatUser(event.principal),
