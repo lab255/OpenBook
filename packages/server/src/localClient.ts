@@ -921,6 +921,8 @@ export class LocalDataClient implements DataClient {
     return Promise.reject(this.aiUnavailable());
   }
 
+  readonly supportsTranscription = false;
+
   transcribeAsset(): Promise<AiTranscriptionResult> {
     return Promise.reject(this.aiUnavailable());
   }

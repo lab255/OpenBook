@@ -4,7 +4,7 @@ import {INPUT2_BLOCKS} from './inputs2';
 import {PROGRESS_BLOCKS} from './progress';
 import {CHART_BLOCKS} from './charts';
 import {CARD_BLOCKS} from './cards';
-import {MEETING_BLOCK} from '../MeetingBlockPlaceholder';
+import {MEETING_BLOCK} from '../MeetingBlockView';
 
 export {evalExpr, formatValue, inputScope, INPUT_TYPES} from './scope';
 export {CHART_KINDS} from './charts';

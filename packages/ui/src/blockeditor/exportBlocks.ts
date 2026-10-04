@@ -8,6 +8,15 @@ import {resolveOptionsFromProps, varNameFromLabel} from './kit/options';
 import {statusOf, type ExportCell} from './kit/scope';
 import type {DbChartSeriesMap} from './kit/chartData';
 import {formSchemaFromProps} from './formBlock';
+import {meetingTime} from './meetingTime';
+
+/** Minimal meeting projection; audio export is intentionally a separate feature. */
+function meetingParagraphs(b: BlockJSON): string[] {
+  const p = b.props ?? {};
+  const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
+  return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
+    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? [String(p.summary)] : [])];
+}
 
 // TextRun is referenced in the kit emit cases below.
 
@@ -251,8 +260,10 @@ const escapeMd = (s: string): string => s.replace(/([\\`*_[\]<>])/g, '\\$1');
 
 /**
  * Whether a block type that fell through the export projection's switch is a
- * CORE type carrying nothing but text — a bare `paragraph` (which has no case
- * of its own), or a container child (`cell`, `tab`, …) orphaned from its parent.
+ * Catalogue text or container type eligible for the fallback text projection.
+ * CONTAINER_BLOCKS includes kit containers, not only core types. Containers
+ * with meaningful props/children (including meeting) need explicit cases above
+ * this fallback; orphaned structural children can use the text projection.
  * Those keep the plain-text projection; every OTHER unhandled type is
  * plugin-contributed or from a newer version and must keep its identity so the
  * renderers can label it instead of silently flattening it (LX-1).
@@ -394,6 +405,10 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
       break;
     case 'dbform':
       parts.push(`<p>${databaseFormHtml(databaseFormReference(b.props), opts.originPageUrl)}</p>`);
+      i += 1;
+      break;
+    case 'meeting':
+      parts.push(`<section>${meetingParagraphs(b).map((line) => `<p>${escapeHtml(line)}</p>`).join('')}${blocksToHtml(b.children ?? [], opts)}</section>`);
       i += 1;
       break;
     case 'form':
@@ -566,6 +581,9 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
         : `**📋 ${escapeMd(t('slash.custom.dbform.label'))}**`);
       break;
     }
+    case 'meeting':
+      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), blocksToMarkdown(b.children ?? [], opts));
+      break;
     case 'form':
       out.push(formToMarkdown(formSchemaFromProps(b.props)));
       break;
@@ -1074,6 +1092,12 @@ export function projectBlocksForExport(
           type: 'paragraph',
           data: {text: databaseFormHtml(reference, opts.originPageUrl)},
         });
+        i += 1;
+        break;
+      }
+      case 'meeting': {
+        for (const line of meetingParagraphs(b)) sink.push({type: 'paragraph', data: {text: textHtml([{t: line}])}});
+        emit(b.children ?? [], sink);
         i += 1;
         break;
       }
