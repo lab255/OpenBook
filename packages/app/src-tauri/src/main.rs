@@ -15,6 +15,13 @@
 //! dev` the host is unmanaged and the webview talks to the external `pnpm dev`
 //! server over loopback instead. Preferences (publish, token, book folder)
 //! persist in `host-config.json` under the app-data dir.
+//!
+//! Microphone permissions: the locked Wry 0.55.1 already implements
+//! `WKUIDelegate::requestMediaCapturePermissionForOrigin` and grants the webview
+//! layer's request. macOS still asks for and persists the user's OS permission;
+//! Info.plist supplies its purpose string and entitlements.plist enables audio
+//! input under the hardened runtime. Keep Wry's delegate (including its other
+//! callbacks); replacing it would duplicate upstream behavior. See README.md.
 
 mod ipc;
 mod sidecar_supervision;
