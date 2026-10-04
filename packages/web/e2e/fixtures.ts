@@ -74,6 +74,9 @@ type WorkerFixtures = {
 };
 
 type TestFixtures = {
+  /** Opt into deterministic AI through the real server routes. */
+  mockAi: boolean;
+  _mockAiConfig: void;
   /**
    * Opt a spec into structural per-test workspace isolation (OB-223). Set once
    * per file with `test.use({freshWorkspace: true})`: before EACH test the
@@ -134,6 +137,23 @@ async function ensureAnyPage(serverUrl: string): Promise<void> {
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   freshWorkspace: [false, {option: true}],
+  mockAi: [false, {option: true}],
+  _mockAiConfig: [
+    async ({mockAi, ownerRequest}, use) => {
+      if (!mockAi) { await use(); return; }
+      // The owner admin API writes settings key 'ai'. MockEngine keeps real
+      // upload/transcribe and streamed generation routes deterministic without
+      // a microphone device, model download, or external paid service.
+      const configured = await ownerRequest.put('/api/ai/config', {data: {provider: 'mock'}});
+      expect(configured.ok()).toBeTruthy();
+      try { await use(); }
+      finally {
+        const reset = await ownerRequest.put('/api/ai/config', {data: {provider: 'off'}});
+        expect(reset.ok()).toBeTruthy();
+      }
+    },
+    {auto: true},
+  ],
   ownerGatedRequests: [false, {option: true}],
 
   // UI specs that exercise Settings mutations opt into the desktop host's
