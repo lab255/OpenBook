@@ -27,7 +27,7 @@ function normalize(c: AiConfig): AiConfig {
     // the `apiKeySet` signal so the form knows a key is stored without holding it.
     providers[c.provider] = {model: c.model, baseUrl: c.baseUrl, apiKeySet: c.apiKeySet, autoStart: c.autoStart};
   }
-  return {provider: c.provider, providers, effort: c.effort, thinking: c.thinking};
+  return {provider: c.provider, providers, effort: c.effort, thinking: c.thinking, transcription: c.transcription};
 }
 
 /**
@@ -273,6 +273,15 @@ export default function AiSettings() {
 
   return (
     <SettingsScreen title={t('ai.title')} description={t('ai.description')} scope="library">
+      {status?.transcription && (
+        <SettingsSection title={t('ai.transcription.title')} description={t('ai.transcription.description')}>
+          <p className="text-sm text-muted-foreground">{t(status.transcription.modelPresent ? 'ai.transcription.modelPresent' : 'ai.transcription.modelAbsent')} {t(status.transcription.ready ? 'ai.transcription.ready' : status.transcription.runtimeAvailable ? 'ai.transcription.modelMissing' : 'ai.transcription.runtimeMissing')}</p>
+          <Button size="sm" variant="outline" disabled={downloading || status.transcription.modelPresent} onClick={() => void client.aiDownloadModel(status.transcription?.downloadUrl).then(() => refresh())}>
+            {downloading && download?.url === status.transcription.downloadUrl ? (progress === null ? t('ai.transcription.downloading') : t('ai.transcription.downloadingProgress', {progress})) : t('ai.transcription.download')}
+          </Button>
+          {download?.url === status.transcription.downloadUrl && download.error && <p className="text-xs text-destructive">{download.error}</p>}
+        </SettingsSection>
+      )}
       <SettingsSection title={t('ai.defaultEngine')} description={t('ai.defaultEngineHint')}>
         <div className="flex flex-col gap-1.5" role="radiogroup" aria-label={t('ai.providerLabel')}>
           {providers.map((p) => (

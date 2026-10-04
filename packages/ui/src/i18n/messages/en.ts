@@ -846,6 +846,18 @@ export const en = {
     removeBody: 'This only removes it from this device’s library list. The server and its data are untouched.',
   },
   ai: {
+    transcription: {
+      title: 'Local transcription',
+      description: 'Recordings use Whisper locally by default, with no cloud key. Whisper base is multilingual (~142 MiB).',
+      modelPresent: 'Model downloaded.',
+      modelAbsent: 'Model not downloaded.',
+      ready: 'Ready to transcribe.',
+      runtimeMissing: 'Install whisper-cli and FFmpeg on the server to enable local transcription.',
+      modelMissing: 'Download the model below to enable local transcription.',
+      download: 'Download Whisper base',
+      downloading: 'Downloading…',
+      downloadingProgress: 'Downloading {progress}%',
+    },
     title: 'AI',
     description: 'An optional model powers note search, task breakdown, and writing help. Run it locally — nothing leaves your machine — or connect the Claude API.',
     providerLabel: 'Engine',
