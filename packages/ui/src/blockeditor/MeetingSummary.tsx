@@ -41,7 +41,7 @@ export function MeetingSummary({block, editor, readOnly, status, transcript}: {
     } catch (cause) {
       if (abort.signal.aborted) return;
       const forbidden = (cause as {status?: number} | null)?.status === 403 || /\b403\b/.test(String(cause));
-      setError(t(forbidden ? 'meetingBlock.forbidden' : 'meetingBlock.summaryFailed'));
+      setError(t(forbidden ? 'meetingBlock.summaryForbidden' : 'meetingBlock.summaryFailed'));
     } finally {
       if (pending.current === abort) { pending.current = null; setStream(null); }
     }
@@ -51,8 +51,8 @@ export function MeetingSummary({block, editor, readOnly, status, transcript}: {
     <h4>{t('meetingBlock.summary')}</h4>
     {hasTranscript && <>
       {status === 'done' && !summary && stream === null && <p>{t('meetingBlock.summaryOffer')}</p>}
-      <button type="button" disabled={readOnly || !available || stream !== null} onClick={() => void generate()}>
-        {t(summary ? 'meetingBlock.regenerateSummary' : 'meetingBlock.generateSummary')}
+      <button type="button" disabled={stream === null && (readOnly || !available)} onClick={() => stream !== null ? pending.current?.abort() : void generate()}>
+        {t(stream !== null ? 'meetingBlock.cancelSummary' : summary ? 'meetingBlock.regenerateSummary' : 'meetingBlock.generateSummary')}
       </button>
       {!available && <p>{t('meetingBlock.summaryUnavailable')}</p>}
     </>}

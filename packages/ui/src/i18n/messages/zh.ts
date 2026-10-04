@@ -635,8 +635,10 @@ export const zh: PartialMessages = {
     summaryOffer: '转录已准备好，可以生成摘要。',
     generateSummary: '生成摘要',
     regenerateSummary: '重新生成摘要',
+    cancelSummary: '取消',
     generatingSummary: '正在生成摘要…',
     summaryUnavailable: '连接 OpenBook 服务器并在设置 → AI 中配置 AI，以生成会议摘要。',
+    summaryForbidden: '生成摘要需要付费或符合条件的套餐、已登录的账号以及页面访问权限。',
     summaryFailed: '摘要生成失败。原有摘要未更改，请重试。',
 
     locked: '会议已被所在分区锁定',

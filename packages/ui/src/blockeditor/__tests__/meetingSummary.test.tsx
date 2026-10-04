@@ -66,12 +66,50 @@ describe('MEET-6 meeting summary', () => {
     expect((screen.getByRole('button', {name: 'Generate summary'}) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(t('meetingBlock.summaryUnavailable'))).toBeTruthy();
   });
-  it.each([new Error('403 Forbidden'), Object.assign(new Error('Denied'), {status: 403}), new Error('Stream disconnected')])('preserves prior summary on errors: %s', async (error) => {
+  it.each([new Error('403 Forbidden'), Object.assign(new Error('Denied'), {status: 403}), new Error('Stream disconnected'), new Error('OpenBook request failed (400 Bad Request): AI is not configured')])('preserves prior summary on errors: %s', async (error) => {
     generate.mockImplementation(async (_prompt, token) => { token('Incomplete'); throw error; });
     const {doc} = harness({summary: 'Old summary'}); const before = docToJSON(doc);
     await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Regenerate summary'})));
     expect(docToJSON(doc)).toEqual(before); expect(screen.getByText('Old summary')).toBeTruthy();
-    expect(screen.getByRole('alert').textContent).toBe(t(error.message.includes('403') || 'status' in error ? 'meetingBlock.forbidden' : 'meetingBlock.summaryFailed'));
+    expect(screen.getByRole('alert').textContent).toBe(t(error.message.includes('403') || 'status' in error ? 'meetingBlock.summaryForbidden' : 'meetingBlock.summaryFailed'));
+  });
+  it('keeps the button enabled and focused during streaming and cancels without replacing the summary', async () => {
+    let finish!: (text: string) => void;
+    let token!: (text: string) => void;
+    let signal!: AbortSignal;
+    generate.mockImplementation((_prompt, onToken, opts) => {
+      token = onToken; signal = opts!.signal!;
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    const {doc} = harness({summary: 'Old summary'});
+    const before = docToJSON(doc);
+    const button = screen.getByRole('button', {name: 'Regenerate summary'}) as HTMLButtonElement;
+    button.focus();
+    fireEvent.click(button);
+    act(() => token('Partial summary'));
+    expect(screen.getByRole('button', {name: t('meetingBlock.cancelSummary')})).toBe(button);
+    expect(button.disabled).toBe(false);
+    expect(button.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(button);
+    fireEvent.click(button);
+    expect(signal.aborted).toBe(true);
+    await act(async () => { token('Late token'); finish('Late result'); });
+    expect(docToJSON(doc)).toEqual(before);
+    expect(screen.getByText('Old summary')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', {name: 'Regenerate summary'})).toBe(button);
+    expect(button.disabled).toBe(false);
+    expect(document.activeElement).toBe(button);
+  });
+  it('exports nonempty summary lines as separate HTML and Markdown paragraphs', () => {
+    const {doc} = harness({summary: 'Meeting recap.\n\nDecision: ship Friday.\nAction: Alex will ship.\n'});
+    const blocks = docToJSON(doc);
+    const html = document.createElement('div');
+    html.innerHTML = blocksToHtml(blocks);
+    const paragraphs = Array.from(html.querySelectorAll('p'), (paragraph) => paragraph.textContent);
+    expect(paragraphs.slice(-4)).toEqual(['Meeting recap.', 'Decision: ship Friday.', 'Action: Alex will ship.', 'Private manual notes']);
+    expect(paragraphs).not.toContain('');
+    expect(blocksToMarkdown(blocks)).toContain('Meeting recap.\n\nDecision: ship Friday.\n\nAction: Alex will ship.\n\nPrivate manual notes');
   });
   it('aborts on unmount and ignores even late tokens and completion', async () => {
     let finish!: (text: string) => void;
