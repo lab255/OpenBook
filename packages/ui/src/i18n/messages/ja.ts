@@ -636,8 +636,10 @@ export const ja: PartialMessages = {
     summaryOffer: '文字起こしを要約できます。',
     generateSummary: '要約を生成',
     regenerateSummary: '要約を再生成',
+    cancelSummary: 'キャンセル',
     generatingSummary: '要約を生成中…',
     summaryUnavailable: 'OpenBook サーバーに接続し、設定 → AI で AI を構成すると会議を要約できます。',
+    summaryForbidden: '要約には、有料または対象のプラン、アカウントへのログイン、およびページへのアクセス権が必要です。',
     summaryFailed: '要約の生成に失敗しました。以前の要約は変更されていません。再試行してください。',
 
     locked: 'セクションにより会議がロックされています',

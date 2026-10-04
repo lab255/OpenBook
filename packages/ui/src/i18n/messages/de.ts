@@ -641,8 +641,10 @@ export const de: PartialMessages = {
     summaryOffer: 'Dein Transkript kann jetzt zusammengefasst werden.',
     generateSummary: 'Zusammenfassung erstellen',
     regenerateSummary: 'Zusammenfassung neu erstellen',
+    cancelSummary: 'Abbrechen',
     generatingSummary: 'Zusammenfassung wird erstellt…',
     summaryUnavailable: 'Verbinde einen OpenBook-Server und konfiguriere KI unter Einstellungen → KI, um dieses Meeting zusammenzufassen.',
+    summaryForbidden: 'Zusammenfassungen erfordern einen kostenpflichtigen oder berechtigten Tarif, ein angemeldetes Konto und Zugriff auf die Seite.',
     summaryFailed: 'Die Zusammenfassung konnte nicht erstellt werden. Die bisherige Zusammenfassung bleibt erhalten; versuche es erneut.',
 
     locked: 'Besprechung durch ihren Abschnitt gesperrt',
