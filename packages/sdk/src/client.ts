@@ -5,6 +5,7 @@ import type {
   AgentChatMessage,
   AgentChatOptions,
   AiConfig,
+  AiTranscriptionResult,
   AiPricingResponse,
   AiPricingTable,
   AiUsageResponse,
@@ -208,6 +209,7 @@ export interface DataClient {
   aiSearch(query: string, limit?: number): Promise<AiSearchResponse>;
   aiTasks(goal: string, context?: string): Promise<AiTasksResponse>;
   aiDownloadModel(url?: string): Promise<AiStatus['download']>;
+  transcribeAsset(assetId: string, pageId: string): Promise<AiTranscriptionResult>;
   aiComplete(text: string, onToken: (token: string) => void, opts?: {instruction?: string; signal?: AbortSignal}): Promise<string>;
   aiGenerate(prompt: string, onToken: (token: string) => void, opts?: {system?: string; maxTokens?: number; signal?: AbortSignal}): Promise<string>;
   /**
@@ -2144,6 +2146,10 @@ export class HttpDataClient implements DataClient {
 
   async aiTasks(goal: string, context?: string): Promise<AiTasksResponse> {
     return this.request<AiTasksResponse>('POST', API.aiTasks, {goal, context});
+  }
+
+  async transcribeAsset(assetId: string, pageId: string): Promise<AiTranscriptionResult> {
+    return this.request<AiTranscriptionResult>('POST', API.aiTranscribe, {assetId, pageId});
   }
 
   async aiDownloadModel(url?: string): Promise<AiStatus['download']> {

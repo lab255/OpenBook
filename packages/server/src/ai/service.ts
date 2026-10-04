@@ -3,7 +3,7 @@ import {rename, unlink} from 'node:fs/promises';
 import path from 'node:path';
 import {providerSettings, type AiConfig, type AiProvider, type AiProviderSettings, type AiSearchResponse, type AiStatus, type AiTasksResponse} from '@book.dev/sdk';
 import type {Db} from '../db';
-import {createEngine, type AiEngine, type GenerateOptions} from './providers';
+import {createEngine, MockEngine, OpenAiCompatEngine, type TranscriptionEngine, type AiEngine, type GenerateOptions} from './providers';
 import {assembleSearchResults, bm25Scores, buildIndex, cosine, pageRowsToDocs, parseTaskList, type Bm25Index} from './search';
 import {SkillStore} from './skills';
 
@@ -73,6 +73,13 @@ function mergeStoredKeys(prev: AiConfig, next: AiConfig): AiConfig {
     }
     merged.providers = out as AiConfig['providers'];
   }
+  if (next.transcription || prev.transcription) {
+    merged.transcription = {...(next.transcription ?? prev.transcription!)};
+    delete merged.transcription.apiKeySet;
+    const key = resolveKey(prev.transcription?.apiKey, next.transcription?.apiKey);
+    if (key === undefined) delete merged.transcription.apiKey;
+    else merged.transcription.apiKey = key;
+  }
   return merged;
 }
 
@@ -87,6 +94,8 @@ interface DownloadState {
   done: boolean;
   error?: string;
 }
+
+export class TranscriptionConfigError extends Error {}
 
 export class AiService {
   private config: AiConfig = DEFAULT_CONFIG;
@@ -103,6 +112,8 @@ export class AiService {
   constructor(
     private readonly db: Db,
     private readonly modelsDir: string,
+    /** MEET-3: lazily resolve the managed local audio backend. */
+    private readonly localTranscription?: () => Promise<TranscriptionEngine | null>,
   ) {
     this.skills = new SkillStore(db);
   }
@@ -138,6 +149,22 @@ export class AiService {
     );
     this.engine = createEngine(this.config, this.modelsDir);
     return this.config;
+  }
+
+  /** Resolve once per request so config changes cannot bypass the paid gate. */
+  async transcriptionBackend(): Promise<{engine: TranscriptionEngine; provider: 'local' | 'mock' | 'openai-compat'; model: string}> {
+    const config = await this.getConfig();
+    const audio = config.transcription;
+    if (audio?.provider === 'off') {
+      throw new TranscriptionConfigError('Transcription is off. Enable it in Settings → AI.');
+    }
+    if (audio?.provider === 'openai-compat') {
+      return {engine: new OpenAiCompatEngine(audio.baseUrl?.trim() || 'https://api.openai.com', audio.model?.trim() || 'whisper-1', 'openai', audio.apiKey), provider: 'openai-compat', model: audio.model?.trim() || 'whisper-1'};
+    }
+    const local = await this.localTranscription?.();
+    if (local) return {engine: local, provider: 'local', model: audio?.model ?? 'local'};
+    if (config.provider === 'mock') return {engine: new MockEngine(), provider: 'mock', model: 'mock'};
+    throw new TranscriptionConfigError('Local transcription is unavailable. Configure transcription in Settings → AI.');
   }
 
   async status(): Promise<AiStatus> {
