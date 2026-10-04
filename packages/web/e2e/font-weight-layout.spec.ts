@@ -47,6 +47,28 @@ async function sidebarSelectionRail(row: Locator) {
   });
 }
 
+async function settledSidebarBackground(row: Locator) {
+  let background = '';
+  await expect
+    .poll(async () => {
+      const sample = await row.evaluate(async (element) => {
+        const active = () => element.getAnimations().some((animation) => animation.playState !== 'finished' && animation.playState !== 'idle');
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const before = getComputedStyle(element).backgroundColor;
+        const wasActive = active();
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const after = getComputedStyle(element).backgroundColor;
+        // Identical colors alone can be two samples of a stalled transition
+        // under worker contention. Require the transition to finish as well.
+        return {background: after, settled: !wasActive && !active() && before === after};
+      });
+      background = sample.background;
+      return sample.settled;
+    })
+    .toBe(true);
+  return background;
+}
+
 // The tinted selection treatment (APPFIT-3.9) is painted through the
 // `--color-sidebar-selection*` tokens, which resolve to the primary wash / ink /
 // rail on the default sidebar and to the sheet's veil + flipped foreground on
@@ -55,24 +77,38 @@ async function sidebarSelectionRail(row: Locator) {
 async function expectPersistentSidebarSelection(row: Locator) {
   await expect(row).toHaveClass(/\bbg-sidebar-selection-wash(?!-)/);
   await expect(row).toHaveClass(/\bbefore:bg-sidebar-selection\b/);
-  let previousBackground: string | undefined;
-  let restingBackground = '';
-  await expect
-    .poll(async () => {
-      const background = await row.evaluate((element) => getComputedStyle(element).backgroundColor);
-      const settled = background === previousBackground;
-      previousBackground = background;
-      if (settled) restingBackground = background;
-      return settled;
-    })
-    .toBe(true);
+  // Clicking selects and hovers the row; explicitly leave it before taking
+  // the resting baseline, including after changing the color mode.
+  await row.page().mouse.move(0, 0);
+  const restingBackground = await settledSidebarBackground(row);
+  const expectedBackground = await row.evaluate((element) => {
+    // Resolve the sheet-relative tokens through CSS so the browser serializes
+    // them in the same color space as the row's computed background.
+    const probe = document.createElement('span');
+    probe.hidden = true;
+    element.append(probe);
+    try {
+      probe.style.backgroundColor = 'var(--color-sidebar-selection-wash)';
+      const resting = getComputedStyle(probe).backgroundColor;
+      probe.style.backgroundColor = 'var(--color-sidebar-selection-wash-strong)';
+      return {resting, hovered: getComputedStyle(probe).backgroundColor};
+    } finally {
+      probe.remove();
+    }
+  });
+  expect(restingBackground).toBe(expectedBackground.resting);
 
   const rail = await sidebarSelectionRail(row);
   expect(rail.width).toBe('2px');
   expect(rail.background).not.toBe(restingBackground);
 
   await row.hover();
-  await expect.poll(() => row.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(restingBackground);
+  // The selected row deliberately deepens its wash on hover. Comparing that
+  // state to a baseline captured with an incidental pointer position races
+  // both hover and the 180ms transition, especially after the theme menu closes.
+  expect(await settledSidebarBackground(row)).toBe(expectedBackground.hovered);
+  await row.page().mouse.move(0, 0);
+  expect(await settledSidebarBackground(row)).toBe(restingBackground);
 }
 
 async function newDatabase(page: Page): Promise<void> {
@@ -99,6 +135,7 @@ test('selecting a truncated sidebar row preserves row and text metrics', {tag: [
   await expect(second).not.toHaveClass(/\bbg-sidebar-selection-wash(?!-)/);
   await expect(second).not.toHaveClass(/\bbefore:bg-sidebar-selection\b/);
 
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   const before = await Promise.all([sidebarMetrics(first), sidebarMetrics(second)]);
   expect(before[0].text.scrollWidth).toBeGreaterThan(before[0].text.clientWidth);
   expect(before[1].text.scrollWidth).toBeGreaterThan(before[1].text.clientWidth);
