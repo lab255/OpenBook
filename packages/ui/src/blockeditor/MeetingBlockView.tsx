@@ -4,6 +4,7 @@ import {assetBridge, subscribeAssetBridge} from '@/lib/assetBridge';
 import {getPageIdForDoc} from '@/lib/aiBridge';
 import {blockChildren, blockProp, insertBlock} from './model';
 import type {CustomBlockDef, CustomBlockProps} from './registry';
+import {MeetingSummary} from './MeetingSummary';
 import {useKitLock} from './kit/lock';
 import {KitFrame, NameDescriptionFields} from './kit/KitFrame';
 import {chunkKey, meetingRecorder, meetingTime, type MeetingAudio, type MeetingSegment} from './meetingRecorder';
@@ -94,7 +95,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
       <h4>{t('meetingBlock.transcript')}</h4>
       {transcript.map((segment, index) => <p key={index}><time>{meetingTime(segment.startMs)}</time> {segment.text}</p>)}
     </section>
-    {blockProp<string>(block, 'summary') && <p className="obe-meeting-summary">{blockProp<string>(block, 'summary')}</p>}
+    <MeetingSummary block={block} editor={editor} readOnly={readOnly} status={status} transcript={transcript} />
     <section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}><h4>{t('meetingBlock.notes')}</h4>{children}
       {!readOnly && !blockChildren(block)?.length && <button type="button" onClick={() => editor.doc.transact(() => {
         const notes = blockChildren(block);

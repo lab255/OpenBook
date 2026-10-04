@@ -1078,6 +1078,14 @@ export const en = {
     noDatabases: 'No databases found',
   },
   meetingBlock: {
+    summary: 'Summary',
+    summaryOffer: 'Your transcript is ready to summarize.',
+    generateSummary: 'Generate summary',
+    regenerateSummary: 'Regenerate summary',
+    generatingSummary: 'Generating summary…',
+    summaryUnavailable: 'Connect an OpenBook server and configure AI in Settings → AI to summarize this meeting.',
+    summaryFailed: 'Summary generation failed. Your previous summary is unchanged; try again.',
+
     locked: 'Meeting locked by its section',
     readOnly: 'Read-only meeting',
     elsewhere: 'Recording or processing on another client.',

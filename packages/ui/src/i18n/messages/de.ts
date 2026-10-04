@@ -637,6 +637,14 @@ export const de: PartialMessages = {
     urlLabel: 'Link-URL',
   },
   meetingBlock: {
+    summary: 'Zusammenfassung',
+    summaryOffer: 'Dein Transkript kann jetzt zusammengefasst werden.',
+    generateSummary: 'Zusammenfassung erstellen',
+    regenerateSummary: 'Zusammenfassung neu erstellen',
+    generatingSummary: 'Zusammenfassung wird erstellt…',
+    summaryUnavailable: 'Verbinde einen OpenBook-Server und konfiguriere KI unter Einstellungen → KI, um dieses Meeting zusammenzufassen.',
+    summaryFailed: 'Die Zusammenfassung konnte nicht erstellt werden. Die bisherige Zusammenfassung bleibt erhalten; versuche es erneut.',
+
     locked: 'Besprechung durch ihren Abschnitt gesperrt',
     readOnly: 'Schreibgeschützte Besprechung',
     elsewhere: 'Aufnahme oder Verarbeitung auf einem anderen Client.',

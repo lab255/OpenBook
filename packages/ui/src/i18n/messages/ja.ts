@@ -632,6 +632,14 @@ export const ja: PartialMessages = {
     urlLabel: 'リンク URL',
   },
   meetingBlock: {
+    summary: '要約',
+    summaryOffer: '文字起こしを要約できます。',
+    generateSummary: '要約を生成',
+    regenerateSummary: '要約を再生成',
+    generatingSummary: '要約を生成中…',
+    summaryUnavailable: 'OpenBook サーバーに接続し、設定 → AI で AI を構成すると会議を要約できます。',
+    summaryFailed: '要約の生成に失敗しました。以前の要約は変更されていません。再試行してください。',
+
     locked: 'セクションにより会議がロックされています',
     readOnly: '読み取り専用の会議',
     elsewhere: '別のクライアントで録音または処理中です。',

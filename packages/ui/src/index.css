@@ -3952,5 +3952,5 @@ a.obe-mention {
 .obe-meeting audio { max-width: 100%; }
 .obe-meeting-transcript { user-select: text; white-space: pre-wrap; }
 .obe-meeting time { color: var(--color-muted-foreground); font-variant-numeric: tabular-nums; }
-.obe-meeting-summary { white-space: pre-wrap; margin-block: 12px; }
+.obe-meeting-summary { user-select: text; white-space: pre-wrap; margin-block: 12px; }
 .obe-meeting-notes { border-top: 1px solid var(--color-border); margin-top: 16px; padding-top: 12px; }

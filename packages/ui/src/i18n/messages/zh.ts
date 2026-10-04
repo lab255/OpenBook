@@ -629,6 +629,14 @@ export const zh: PartialMessages = {
     urlLabel: '链接地址',
   },
   meetingBlock: {
+    summary: '摘要',
+    summaryOffer: '转录已准备好，可以生成摘要。',
+    generateSummary: '生成摘要',
+    regenerateSummary: '重新生成摘要',
+    generatingSummary: '正在生成摘要…',
+    summaryUnavailable: '连接 OpenBook 服务器并在设置 → AI 中配置 AI，以生成会议摘要。',
+    summaryFailed: '摘要生成失败。原有摘要未更改，请重试。',
+
     locked: '会议已被所在分区锁定',
     readOnly: '只读会议',
     elsewhere: '正在其他客户端上录音或处理。',
