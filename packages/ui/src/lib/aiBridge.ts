@@ -94,6 +94,7 @@ export interface AiBridgeImpl {
   /** Engine is configured and was ready at the last status poll. */
   ready: () => boolean;
   complete: (text: string, onToken: (token: string) => void) => Promise<string>;
+  generate?: DataClient['aiGenerate'];
   tasks: (goal: string, context?: string) => Promise<string[]>;
   /** Apply an approved set of agent proposals. */
   applyProposals: (proposals: AgentProposal[]) => Promise<ProposalApplyResult>;
@@ -649,6 +650,9 @@ export const subscribeAiBridge = (cb: () => void): (() => void) => {
 
 export const aiBridge = {
   ready: (): boolean => bridge?.ready() ?? false,
+  canGenerate: (): boolean => !!bridge?.generate && bridge.ready(),
+  generate: (...args: Parameters<DataClient['aiGenerate']>): Promise<string> =>
+    bridge?.generate ? bridge.generate(...args) : Promise.reject(new Error('AI not available')),
   complete: (text: string, onToken: (token: string) => void): Promise<string> =>
     bridge ? bridge.complete(text, onToken) : Promise.reject(new Error('AI not available')),
   tasks: (goal: string, context?: string): Promise<string[]> =>

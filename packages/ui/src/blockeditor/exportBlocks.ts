@@ -15,7 +15,7 @@ function meetingParagraphs(b: BlockJSON): string[] {
   const p = b.props ?? {};
   const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
   return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
-    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? [String(p.summary)] : [])];
+    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? String(p.summary).split('\n').filter(Boolean) : [])];
 }
 
 // TextRun is referenced in the kit emit cases below.
