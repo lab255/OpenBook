@@ -6,10 +6,9 @@ import {SERVER} from './seed';
 // someone by email, and change their role — all driving the OB-191 roster API
 // (`listMembers` / `inviteMember` / `updateMember`).
 //
-// The worker's data server is a fresh, unclaimed instance with the default
-// `guestAccess: 'write'`, so the (anonymous) browser passes the `requireCreate`
-// gate that fronts every roster route — it counts as a manager and sees the full
-// surface, exactly the local-first / self-host default.
+// Roster mutations fail closed on an unclaimed instance, so this spec drives the
+// browser and its API assertions through the desktop host's local-owner transport.
+// The worker remains fresh/unclaimed; no fake account claim is needed.
 
 async function openMembers(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/');
@@ -19,7 +18,7 @@ async function openMembers(page: import('@playwright/test').Page): Promise<void>
   await expect(page.getByRole('heading', {name: 'Members', exact: true})).toBeVisible();
 }
 
-test('members: list, invite by email, and change a role', {tag: ['@sharing', '@visual']}, async ({page, request}, testInfo) => {
+test('members: list, invite by email, and change a role', {tag: ['@sharing', '@visual']}, async ({ownerPage: page, ownerRequest}, testInfo) => {
   await openMembers(page);
 
   // A fresh instance starts with an empty roster + the invite affordance.
@@ -37,13 +36,13 @@ test('members: list, invite by email, and change a role', {tag: ['@sharing', '@v
   await expect(row).toBeVisible();
   await expect(row.getByText('Invited')).toBeVisible();
   await expect
-    .poll(async () => (await (await request.get(`${SERVER}/api/members`)).json()).length)
+    .poll(async () => (await (await ownerRequest.get(`${SERVER}/api/members`)).json()).length)
     .toBe(1);
 
   // 2. Change the member's role viewer → admin via the row's role picker →
   //    persisted via updateMember.
   await chooseValue(page, row.getByRole('combobox'), 'admin');
   await expect
-    .poll(async () => (await (await request.get(`${SERVER}/api/members`)).json())[0].role)
+    .poll(async () => (await (await ownerRequest.get(`${SERVER}/api/members`)).json())[0].role)
     .toBe('admin');
 });

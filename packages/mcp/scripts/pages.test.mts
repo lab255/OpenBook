@@ -5,6 +5,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {COVER_GRADIENTS, COVER_PROPERTY_ID, HttpDataClient} from '@book.dev/sdk';
 import {startServer} from '@book.dev/server';
+import {localOwnerTestClient, TEST_LOCAL_OWNER_SECRET} from './localOwnerTestClient.mts';
 
 const DATA_DIR = '/tmp/openbook-mcp-pages-test';
 let passed = 0;
@@ -27,9 +28,10 @@ async function connect(url: string): Promise<{client: Client; close: () => Promi
 
 async function main(): Promise<void> {
   rmSync(DATA_DIR, {recursive: true, force: true});
-  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4410});
+  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4410, localOwnerSecret: TEST_LOCAL_OWNER_SECRET});
   const seed = new HttpDataClient(server.url);
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  const ownerSeed = localOwnerTestClient(server.url);
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const parent = await seed.savePage({name: 'Parent', data: {editorjs: {blocks: []}, values: [], names: []}});
   const child = await seed.savePage({name: 'Child', data: {editorjs: {blocks: []}, values: [], names: []}});
   const connection = await connect(server.url);
@@ -71,7 +73,7 @@ async function main(): Promise<void> {
   const invalidProperty = await connection.client.callTool({name: 'set_page_properties', arguments: {pageId: child.id, properties: {sys_backlinks: ['x']}}});
   check('computed/unknown property writes are typed refusals', invalidProperty.isError === true && resultText(invalidProperty).includes('[invalid_input]'));
 
-  await seed.setInstancePolicy({guestAccess: 'read'});
+  await ownerSeed.setInstancePolicy({guestAccess: 'read'});
   const readOnly = await connection.client.callTool({name: 'set_page_properties', arguments: {pageId: child.id, properties: {sys_owner: 'Nope'}}});
   check('read-only instance refuses writes with a typed error', readOnly.isError === true && resultText(readOnly).includes('[permission_denied]'));
   check('read-only refusal leaves properties unchanged', (await seed.getPage(child.id))?.properties.sys_owner === 'Eliot');

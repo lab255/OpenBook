@@ -3,10 +3,14 @@ import {rmSync} from 'node:fs';
 import {join} from 'node:path';
 import type {Browser, BrowserContext, Page} from '@playwright/test';
 import type {DatabaseSchema, StoredDatabase} from '@book.dev/sdk';
-import {mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
+import {LOCAL_OWNER_HEADER, mintIdentityKeypair, signIdentity} from '../../sdk/src/identity';
 import {chooseValue, expect, test, WORKER_DATA_DIR_PREFIX} from './fixtures';
 
 const FORM_PUBLISH_BASE_PORT = 4740;
+/** Per-run secret for the server's trusted local-owner transport: owner-only
+ * setup writes (trusting the e2e issuer while UNCLAIMED) authenticate as the
+ * machine owner, exactly like the desktop host's IPC bridge. */
+const F5_LOCAL_OWNER_SECRET = 'openbook-web-e2e-f5-local-owner';
 const ISSUER = 'https://account.book.pub';
 const FORM_VIEW_ID = 'f5-public-form';
 const OTHER_VIEW_ID = 'f5-private-table';
@@ -32,7 +36,11 @@ async function startClaimedInstance(workerIndex: number): Promise<ClaimedInstanc
   let child: ChildProcess | null = spawn(
     process.execPath,
     ['--import', 'tsx', 'src/bin.ts', '--data-dir', dataDir, '--port', String(port)],
-    {cwd: join(__dirname, '..', '..', 'server'), stdio: ['ignore', 'ignore', 'pipe']},
+    {
+      cwd: join(__dirname, '..', '..', 'server'),
+      env: {...process.env, OPENBOOK_LOCAL_OWNER_SECRET: F5_LOCAL_OWNER_SECRET},
+      stdio: ['ignore', 'ignore', 'pipe'],
+    },
   );
   let stderrTail = '';
   child.stderr?.on('data', (chunk: Buffer) => {
@@ -70,9 +78,11 @@ async function startClaimedInstance(workerIndex: number): Promise<ClaimedInstanc
       keys.publicJwk.kid,
     );
     const ownerHeaders = {...anonymousHeaders, 'X-OpenBook-Identity': assertion};
+    // Owner-only settings write: unclaimed instances fail closed for anonymous
+    // callers, so trusting the issuer rides the local-owner hatch (machine owner).
     const trust = await fetch(`${url}/api/instance`, {
       method: 'PUT',
-      headers: anonymousHeaders,
+      headers: {...anonymousHeaders, [LOCAL_OWNER_HEADER]: F5_LOCAL_OWNER_SECRET},
       body: JSON.stringify({trustedIssuers: [{issuer: ISSUER, jwks: {keys: [keys.publicJwk]}}]}),
     });
     if (!trust.ok) throw new Error(`could not trust F-5 issuer: ${trust.status}`);

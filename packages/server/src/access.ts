@@ -157,6 +157,27 @@ export async function requireInstanceAdmin(c: Ctx, store: PageStore): Promise<vo
 }
 
 /**
+ * Gate instance-wide roster mutations. A claimed owner/admin and the trusted
+ * local machine owner may manage members; an unclaimed instance fails closed
+ * unless the caller proves local-owner authority. This deliberately differs
+ * from {@link requireInstanceAdmin}: import/export retain their legacy
+ * unclaimed create-gate fallback, while remote roster mutation never does.
+ */
+export async function requireRosterMutation(c: Ctx, store: PageStore): Promise<void> {
+  if (c.get('localOwner')) return;
+  const principal = c.get('principal');
+  if (principal.verifiedVia === 'local') return;
+  const config = await store.getInstanceConfig();
+  if (!config.ownerSubject) {
+    throw new HTTPException(403, {message: 'only the local instance owner can manage the roster before claim'});
+  }
+  const isOwner = principal.verifiedVia === 'jws' && principal.subject === config.ownerSubject;
+  const role = isOwner ? null : await store.resolveMemberRole(principal, config);
+  if (isOwner || role === 'admin') return;
+  throw new HTTPException(403, {message: 'only the instance owner or an admin can manage the roster'});
+}
+
+/**
  * Gate a database route on its HOST PAGE's decision (a database inherits the
  * access of the page that hosts it). 404s a missing or unreadable database.
  */

@@ -21,7 +21,7 @@ const TOKEN_URL = `${UPSTREAM_ISSUER}/oauth2/token`;
 const JWKS_URL = `${UPSTREAM_ISSUER}/oauth2/jwks`;
 const CLIENT_ID = 'openbook';
 const CLIENT_SECRET = 'test client:secret+never/log';
-const NOW = Date.UTC(2026, 8, 8, 12, 0, 0);
+const NOW = Date.now();
 
 let store: PageStore;
 let dir: string;

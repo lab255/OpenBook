@@ -16,6 +16,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {
+  LOCAL_OWNER_HEADER,
   mintIdentityKeypair,
   signIdentity,
   type IdentityClaims,
@@ -31,6 +32,7 @@ import {IDENTITY_HEADER} from './principal';
 import {assertExposureSafe, isLoopbackHost, startServer} from './server';
 
 const ISS = 'https://account.book.pub';
+const LOCAL_OWNER_SECRET = 'owner-claim-local-secret';
 let store: PageStore;
 let dir: string;
 let seq = 0;
@@ -61,7 +63,8 @@ afterEach(async () => {
   rmSync(dir, {recursive: true, force: true});
 });
 
-const app = () => createApp(store, undefined, new PageHub(), {identity: new IdentityService(store)});
+const app = (localOwnerSecret?: string) =>
+  createApp(store, undefined, new PageHub(), {identity: new IdentityService(store), localOwnerSecret});
 
 const putInstance = (a: ReturnType<typeof app>, body: unknown, jws?: string) =>
   a.request('/api/instance', {
@@ -143,15 +146,59 @@ describe('PUT /api/instance owner-claim (route)', () => {
     expect((await store.getInstanceConfig()).ownerSubject).toBeUndefined();
   });
 
-  it('a non-claim policy update on an unclaimed instance still works (back-compat)', async () => {
+  it('an anonymous non-claim policy update on an unclaimed instance fails closed', async () => {
     const res = await putInstance(app(), {guestAccess: 'read'});
-    expect(res.status).toBe(200);
-    expect((await res.json()).guestAccess).toBe('read');
+    expect(res.status).toBe(403);
+    expect((await store.getInstanceConfig()).guestAccess).toBe('write');
     expect((await store.getInstanceConfig()).ownerSubject).toBeUndefined(); // still unclaimed
   });
 
-  it('a claim may carry extra policy fields, applied after the CAS', async () => {
+  it('a remote claim cannot carry extra policy fields through the claim exception', async () => {
     const res = await putInstance(app(), {ownerSubject: 'x', guestAccess: 'off'}, await idFor('alice'));
+    expect(res.status).toBe(403);
+    const cfg = await store.getInstanceConfig();
+    expect(cfg.ownerSubject).toBeUndefined();
+    expect(cfg.guestAccess).toBe('write');
+  });
+
+  it('the local-owner first-run flow may set policy and claim ownership', async () => {
+    const a = app(LOCAL_OWNER_SECRET);
+    const headers = {[LOCAL_OWNER_HEADER]: LOCAL_OWNER_SECRET};
+
+    const policy = await a.request('/api/instance', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...headers},
+      body: JSON.stringify({guestAccess: 'off'}),
+    });
+    expect(policy.status).toBe(200);
+    expect((await store.getInstanceConfig()).guestAccess).toBe('off');
+
+    const claim = await a.request('/api/instance', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-OpenBook-Client': '1',
+        [IDENTITY_HEADER]: await idFor('alice'),
+        ...headers,
+      },
+      body: JSON.stringify({ownerSubject: 'ignored-by-server'}),
+    });
+    expect(claim.status).toBe(200);
+    expect((await store.getInstanceConfig()).ownerSubject).toBe(`${ISS}#alice`);
+  });
+
+  it('a local-owner claim may carry another policy field', async () => {
+    const a = app(LOCAL_OWNER_SECRET);
+    const res = await a.request('/api/instance', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-OpenBook-Client': '1',
+        [LOCAL_OWNER_HEADER]: LOCAL_OWNER_SECRET,
+        [IDENTITY_HEADER]: await idFor('alice'),
+      },
+      body: JSON.stringify({ownerSubject: 'ignored-by-server', guestAccess: 'off'}),
+    });
     expect(res.status).toBe(200);
     const cfg = await store.getInstanceConfig();
     expect(cfg.ownerSubject).toBe(`${ISS}#alice`);

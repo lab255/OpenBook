@@ -4,6 +4,7 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {HttpDataClient} from '@book.dev/sdk';
 import {startServer} from '@book.dev/server';
+import {localOwnerTestClient, TEST_LOCAL_OWNER_SECRET} from './localOwnerTestClient.mts';
 
 const DATA_DIR = '/tmp/openbook-mcp-databases-test';
 let passed = 0;
@@ -18,9 +19,10 @@ const json = <T>(result: {content?: unknown}): T => JSON.parse(resultText(result
 
 async function main(): Promise<void> {
   rmSync(DATA_DIR, {recursive: true, force: true});
-  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4416});
+  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4416, localOwnerSecret: TEST_LOCAL_OWNER_SECRET});
   const seed = new HttpDataClient(server.url);
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  const ownerSeed = localOwnerTestClient(server.url);
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const transport = new StdioClientTransport({command: process.execPath, args: ['--import', 'tsx', 'src/bin.ts'],
     env: {...process.env, OPENBOOK_URL: server.url}, stderr: 'pipe'});
   const client = new Client({name: 'api-9-databases-test', version: '0.0.0'});

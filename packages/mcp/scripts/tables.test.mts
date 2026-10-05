@@ -42,6 +42,7 @@ import {
   type TableOpKind,
 } from '@book.dev/sdk';
 import {startServer} from '@book.dev/server';
+import {localOwnerTestClient, TEST_LOCAL_OWNER_SECRET} from './localOwnerTestClient.mts';
 
 const DATA_DIR = '/tmp/openbook-mcp-tables-test';
 
@@ -142,11 +143,12 @@ function parseTable(out: string): TableReport {
 
 async function main(): Promise<void> {
   rmSync(DATA_DIR, {recursive: true, force: true});
-  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4412});
+  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4412, localOwnerSecret: TEST_LOCAL_OWNER_SECRET});
   console.log(`\nOpenBook server up at ${server.url}`);
   const seed = new HttpDataClient(server.url);
+  const ownerSeed = localOwnerTestClient(server.url);
 
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const page = await seed.savePage(blockPage('Table target'));
   const mcp = await connect(server.url);
   const call = (name: string, args: Record<string, unknown>) => mcp.client.callTool({name, arguments: args});
@@ -295,7 +297,7 @@ async function main(): Promise<void> {
 
   // ── SUGGEST mode: review parity, and payload replay equivalence. ──────────────
   console.log('\nPolicy gate: every table op queues a reviewable table-op suggestion');
-  await seed.setInstancePolicy({agentEdits: 'suggest'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'suggest'});
   const rPage = await seed.savePage(blockPage('Table review target'));
   // Seed the table by DIRECT store write so both mode branches start from the same
   // projection (append_blocks under suggest would only queue a suggestion).
@@ -356,7 +358,7 @@ async function main(): Promise<void> {
   console.log('\nAn accepted suggestion applies IDENTICALLY to a direct write');
   // Same op, once through each mode; then replay the queued payload the way the
   // editor bridge does (resolve → validate → apply) and compare the grids.
-  await seed.setInstancePolicy({agentEdits: 'direct'});
+  await ownerSeed.setInstancePolicy({agentEdits: 'direct'});
   const dPage = await seed.savePage({...blockPage('Direct twin'), data: seededData as unknown as PageSnapshot});
   const direct = await connect(server.url);
   await direct.client.callTool({name: 'table_move_row', arguments: {pageId: dPage.id, tableId: 'tbl', rowIndex: 2, toIndex: 1}});

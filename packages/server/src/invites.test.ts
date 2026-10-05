@@ -138,16 +138,21 @@ describe('roster invite routes (create / list / revoke)', () => {
     expect(member).toMatchObject({subject: `${ISS}#sam`, email: null, status: 'active', role: 'admin'});
   });
 
-  it('PATCH suspends a member (role no longer resolves)', async () => {
+  it('PATCH updates only role/status and cannot rebind the member subject', async () => {
     const a = app();
     const member = await (await post(a, '/api/members', {invitee: `${ISS}#sue`, role: 'admin'}, await idFor('owner'))).json();
     expect(await store.resolveMemberRole({kind: 'user', subject: `${ISS}#sue`, issuer: ISS, name: 'sue', verifiedVia: 'jws'})).toBe('admin');
     const patched = await a.request(`/api/members/${member.id}`, {
       method: 'PATCH',
       headers: {'Content-Type': 'application/json', [IDENTITY_HEADER]: await idFor('owner')},
-      body: JSON.stringify({status: 'suspended'}),
+      body: JSON.stringify({role: 'viewer', status: 'suspended', subject: `${ISS}#attacker`}),
     });
-    expect((await patched.json()).status).toBe('suspended');
+    expect(await patched.json()).toEqual({...member, role: 'viewer', status: 'suspended'});
+    expect((await store.listMembers()).find((row) => row.id === member.id)).toEqual({
+      ...member,
+      role: 'viewer',
+      status: 'suspended',
+    });
     expect(await store.resolveMemberRole({kind: 'user', subject: `${ISS}#sue`, issuer: ISS, name: 'sue', verifiedVia: 'jws'})).toBeNull();
   });
 
@@ -157,6 +162,30 @@ describe('roster invite routes (create / list / revoke)', () => {
     const res = await post(app(resolver), '/api/members', {invitee: 'ziggy'}, await idFor('admin'));
     expect(res.status).toBe(201);
     expect((await res.json()).subject).toBe(`${ISS}#ziggy`);
+  });
+
+  it.each([
+    ['role', 'operator'],
+    ['status', 'pending'],
+  ])('POST rejects an invalid %s without adding a member', async (field, value) => {
+    const before = await store.listMembers();
+    const res = await post(app(), '/api/members', {invitee: 'invalid@example.com', [field]: value}, await idFor('admin'));
+    expect(res.status).toBe(400);
+    expect(await store.listMembers()).toEqual(before);
+  });
+
+  it.each([
+    ['role', 'operator'],
+    ['status', 'pending'],
+  ])('PATCH rejects an invalid %s without changing the member', async (field, value) => {
+    const member = await store.addMember({subject: `${ISS}#unchanged`, role: 'viewer', status: 'active'});
+    const res = await app().request(`/api/members/${member.id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json', [IDENTITY_HEADER]: await idFor('admin')},
+      body: JSON.stringify({[field]: value}),
+    });
+    expect(res.status).toBe(400);
+    expect((await store.listMembers()).find((row) => row.id === member.id)).toEqual(member);
   });
 
   it('only an instance writer manages the roster (viewer + guest 403)', async () => {
@@ -189,6 +218,11 @@ describe('per-page ACL share routes', () => {
       headers: {[IDENTITY_HEADER]: await idFor('admin')},
     })).status).toBe(204);
     expect(await (await get(a, `/api/pages/${restricted}/acl`, await idFor('admin'))).json()).toHaveLength(0);
+    await new Promise((resolve) => setTimeout(resolve, 10)); // edit-log writes are fire-after-commit
+    expect((await store.listEdits(restricted)).find((edit) => edit.kind === 'acl.unshare')).toMatchObject({
+      summary: 'eve@x.test',
+      authorSubject: `${ISS}#admin`,
+    });
   });
 
   it('a non-writer of the page cannot read or manage its ACL (404 hides existence)', async () => {
@@ -196,6 +230,17 @@ describe('per-page ACL share routes', () => {
     // A stranger can't even see the restricted page exists → 404 on the ACL route.
     expect((await get(a, `/api/pages/${restricted}/acl`, await idFor('stranger'))).status).toBe(404);
     expect((await post(a, `/api/pages/${restricted}/acl`, {invitee: 'x@y.test'}, await idFor('stranger'))).status).toBe(404);
+  });
+
+  it('rejects an invalid ACL level without adding a grant', async () => {
+    const res = await post(
+      app(),
+      `/api/pages/${restricted}/acl`,
+      {invitee: 'invalid@example.com', level: 'owner'},
+      await idFor('admin'),
+    );
+    expect(res.status).toBe(400);
+    expect(await store.getPageAcl(restricted)).toEqual([]);
   });
 });
 

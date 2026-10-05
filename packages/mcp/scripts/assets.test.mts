@@ -11,6 +11,7 @@ import {
 } from '@book.dev/sdk';
 import {startServer} from '@book.dev/server';
 import {AgentRunner} from '../../server/src/ai/agent';
+import {localOwnerTestClient, TEST_LOCAL_OWNER_SECRET} from './localOwnerTestClient.mts';
 
 const DATA_DIR = '/tmp/openbook-mcp-assets-test';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Xqg9WQAAAABJRU5ErkJggg==';
@@ -89,9 +90,10 @@ async function main(): Promise<void> {
   check('in-app agent refuses upload_asset after external-tool taint', taintedDenied === 'read-only: Uploads apply immediately, so they need direct edit access. Call request_edit_access first.');
 
   rmSync(DATA_DIR, {recursive: true, force: true});
-  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4512});
+  const server = await startServer({dataDir: DATA_DIR, host: '127.0.0.1', port: 4512, localOwnerSecret: TEST_LOCAL_OWNER_SECRET});
   const sdk = new HttpDataClient(server.url);
-  await sdk.setInstancePolicy({agentEdits: 'direct'});
+  const ownerSdk = localOwnerTestClient(server.url);
+  await ownerSdk.setInstancePolicy({agentEdits: 'direct'});
   const page = await sdk.savePage({name: 'Asset blocks', data: {editor: 'blocks', blockdoc: {blocks: []}, editorjs: {blocks: []}, values: [], names: []}});
   const transport = new StdioClientTransport({command: process.execPath, args: ['--import', 'tsx', 'src/bin.ts'], env: {...process.env, OPENBOOK_URL: server.url}, stderr: 'pipe'});
   const client = new Client({name: 'assets-test', version: '0'});
@@ -120,7 +122,7 @@ async function main(): Promise<void> {
   const missing = await client.callTool({name: 'upload_asset', arguments: {pageId: '00000000-0000-0000-0000-000000000000', mime: 'image/png', base64: 'YQ=='}});
   check('missing page returns a typed error', missing.isError === true && text(missing).includes('page-not-found'));
 
-  await sdk.setInstancePolicy({agentEdits: 'suggest'});
+  await ownerSdk.setInstancePolicy({agentEdits: 'suggest'});
   const readonly = await client.callTool({name: 'upload_asset', arguments: {pageId: page.id, mime: 'image/png', base64: 'YQ=='}});
   check('suggest/read-only policy refuses immediate upload', readonly.isError === true && text(readonly).includes(
     'read-only: Uploads apply immediately and are never queued as suggestions, so this page needs direct agent-edit access.',
