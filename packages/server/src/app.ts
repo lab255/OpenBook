@@ -10,7 +10,7 @@ import {
   ACL_LEVELS,
   AGENT_EDITS_MODES,
   AGENT_EDITS_POLICIES,
-  ASSET_IMAGE_MIMES,
+  ASSET_MIMES,
   CLIENT_HEADER,
   FORWARDED_HEADER,
   FORM_SUBMISSION_PROPERTY_ID,
@@ -315,7 +315,7 @@ function denyPatPolicy(c: Context<AppEnv>): void {
   }
 }
 
-// The served-asset image-mime allowlist (`ASSET_IMAGE_MIMES`) is single-sourced
+// The served-asset MIME allowlist (`ASSET_MIMES`) is single-sourced
 // in the sdk since LGR-15: the backup-restore door (`store.ts`) sanitizes
 // bundle-carried asset mimes against the SAME list, and an allowlist that
 // exists twice will eventually disagree. `image/svg+xml` stays excluded there
@@ -327,7 +327,7 @@ function denyPatPolicy(c: Context<AppEnv>): void {
  * the upload `Content-Type` header or the JSON `mime` field). Returns `null` when
  * the raw value carries a control char / CR / LF — a header-injection or
  * header-set-throw (500) risk — so the route rejects it (400). Otherwise the
- * parameter-stripped, lowercased base type when it's an allowlisted image, else
+ * parameter-stripped, lowercased base type when it's an allowlisted image or audio, else
  * `application/octet-stream`. Because every path stores only a sanitized mime, the
  * `ON CONFLICT DO NOTHING` first-seen-mime dedup can never be poisoned into serving
  * an executable type.
@@ -336,7 +336,7 @@ function safeAssetMime(raw: string): string | null {
   // eslint-disable-next-line no-control-regex -- intentionally rejecting control chars (CR/LF/NUL/etc)
   if (/[\u0000-\u001f\u007f]/.test(raw)) return null;
   const base = raw.split(';', 1)[0].trim().toLowerCase();
-  return ASSET_IMAGE_MIMES.has(base) ? base : 'application/octet-stream';
+  return ASSET_MIMES.has(base) ? base : 'application/octet-stream';
 }
 
 /** Strict base64 decoder for the public form-upload envelope. */
@@ -1485,6 +1485,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   // 10 MiB per upload, measured on the DECODED bytes. A single embedded image /
   // attachment is comfortably under this; the cap stops an authed-but-hostile
   // writer inflating the store with one giant asset.
+  // Meeting-recording chunks are sized under this per-asset cap (MEET-1).
   const ASSET_MAX_BYTES = 10 * 1024 * 1024;
   // The request BODY can be base64 (the in-webview / desktop-IPC transports send
   // `{data: base64, mime}`), which inflates the payload ~4/3 plus a small JSON
@@ -1613,7 +1614,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
       if (bytes.byteLength > ASSET_MAX_BYTES) return c.json({error: 'request body too large'}, 413);
 
       // Stored-XSS defense: the uploader controls `mime` (the upload Content-Type or
-      // the JSON `mime` field). Canonicalize it to a safe, allowlisted image type (or
+      // the JSON `mime` field). Canonicalize it to a safe, allowlisted image or audio type (or
       // `application/octet-stream`) before it's stored, and reject a malformed one
       // (control chars / CR/LF → header-injection / 500) rather than echo it later as
       // a response Content-Type. Only sanitized mimes ever land in the store, so the

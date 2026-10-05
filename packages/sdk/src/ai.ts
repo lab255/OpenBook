@@ -63,7 +63,26 @@ export interface AiProviderSettings {
   autoStart?: boolean;
 }
 
+/** Audio configuration is independent of the chat engine. Omitted means local.
+ * Keys follow AiProviderSettings.apiKey preserve/set/clear semantics. */
+export interface AiTranscriptionConfig {
+  provider: 'off' | 'local' | 'openai-compat';
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string | null;
+  apiKeySet?: boolean;
+}
+
+export interface AiTranscriptionResult {
+  text: string;
+  /** Segment offsets are seconds from the start of the recording. */
+  segments?: Array<{start: number; end: number; text: string}>;
+  /** Audio duration in milliseconds (0 if the backend does not report it). */
+  durationMs: number;
+}
+
 export interface AiConfig {
+  transcription?: AiTranscriptionConfig;
   /** The default provider — used unless an agent run overrides it. */
   provider: AiProvider;
   /** Per-provider settings, so every provider can be configured at once. */
