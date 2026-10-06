@@ -847,7 +847,13 @@ export const en = {
   },
   ai: {
     transcription: {
-      title: 'Local transcription',
+      title: 'Transcription',
+      provider: 'Transcription provider',
+      local: 'Default (local)',
+      cloud: 'Cloud (OpenAI-compatible)',
+      localHint: 'Local is the default and requires the Whisper runtime on the server.',
+      localDocs: 'Local transcription setup',
+      privacy: 'Cloud transcription sends meeting audio to the configured endpoint. Only enable it if you trust that service with your recordings.',
       description: 'Recordings use Whisper locally by default, with no cloud key. Whisper base is multilingual (~142 MiB).',
       modelPresent: 'Model downloaded.',
       modelAbsent: 'Model not downloaded.',

@@ -528,7 +528,13 @@ export const ja: PartialMessages = {
   },
   ai: {
     transcription: {
-      title: 'ローカル文字起こし',
+      title: '文字起こし',
+      provider: '文字起こしプロバイダー',
+      local: 'デフォルト（ローカル）',
+      cloud: 'クラウド（OpenAI互換）',
+      localHint: 'デフォルトはローカル処理です。サーバーにWhisperランタイムが必要です。',
+      localDocs: 'ローカル文字起こしの設定',
+      privacy: 'クラウド文字起こしでは会議の音声を設定したエンドポイントに送信します。録音を預けられる信頼できるサービスの場合のみ有効にしてください。',
       description: '録音は標準でWhisperを使ってローカルで文字起こしされます。クラウドのAPIキーは不要です。Whisper baseは多言語対応です（約142 MiB）。',
       modelPresent: 'モデルをダウンロード済みです。',
       modelAbsent: 'モデルが未ダウンロードです。',

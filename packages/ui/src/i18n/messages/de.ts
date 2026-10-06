@@ -533,7 +533,13 @@ export const de: PartialMessages = {
   },
   ai: {
     transcription: {
-      title: 'Lokale Transkription',
+      title: 'Transkription',
+      provider: 'Transkriptionsanbieter',
+      local: 'Standard (lokal)',
+      cloud: 'Cloud (OpenAI-kompatibel)',
+      localHint: 'Standardmäßig erfolgt die Transkription lokal und benötigt die Whisper-Laufzeit auf dem Server.',
+      localDocs: 'Lokale Transkription einrichten',
+      privacy: 'Die Cloud-Transkription sendet Meeting-Audio an den konfigurierten Endpunkt. Aktiviere sie nur, wenn du diesem Dienst deine Aufnahmen anvertrauen möchtest.',
       description: 'Aufnahmen werden standardmäßig lokal mit Whisper transkribiert, ohne Cloud-Schlüssel. Whisper base ist mehrsprachig (~142 MiB).',
       modelPresent: 'Modell heruntergeladen.',
       modelAbsent: 'Modell nicht heruntergeladen.',
