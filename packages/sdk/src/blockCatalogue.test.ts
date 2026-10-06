@@ -253,10 +253,11 @@ describe('meeting representation contract (MEET-4)', () => {
       expect(invalidBlockProps('meeting', {status, startedAt: 1234, title: 'Review', summary: 'Agreed.',
         audioChunks: [{assetId: 'audio-1', durationMs: 500, startedAtMs: 0}, {assetId: 'audio-2', durationMs: 250}],
         transcript: [{startMs: 0, endMs: 500, text: 'Hello'}],
+        transcriptionCompleted: ['0:audio-1', '500:audio-2'],
       })).toBeNull();
     }
     expect(invalidBlockProps('meeting', {})).toBeNull();
-    expect(invalidBlockProps('meeting', {status: null, audioChunks: null, transcript: null, summary: null, startedAt: null, title: null})).toBeNull();
+    expect(invalidBlockProps('meeting', {status: null, audioChunks: null, transcript: null, transcriptionCompleted: null, summary: null, startedAt: null, title: null})).toBeNull();
   });
 
   it.each([
@@ -270,9 +271,27 @@ describe('meeting representation contract (MEET-4)', () => {
     expect(invalidBlockProps('meeting', props)).toContain('Invalid prop');
   });
 
+  it.each([[], ['0:legacy-asset'], ['001:asset:with:colons', '001:asset:with:colons']].map((keys) => ({keys})))(
+    'accepts optional completion keys without rewriting legacy values: %j', ({keys}) => {
+      expect(invalidBlockProps('meeting', {transcriptionCompleted: keys})).toBeNull();
+    },
+  );
+
+  it.each(['0:asset', {}, [1], [null], [''], ['asset'], [':asset'], ['-1:asset'], ['1.5:asset'], ['1:'], ['x:asset']].map((value) => ({value})))(
+    'rejects malformed completion keys: %j', ({value}) => {
+      expect(invalidBlockProps('meeting', {transcriptionCompleted: value})).toContain('Invalid prop "transcriptionCompleted"');
+    },
+  );
+
   it('publishes nested item schemas and required fields to agents', () => {
     const {blocks} = JSON.parse(blockCatalogueText([], ['meeting']));
     expect(blocks).toHaveLength(1);
+    expect(blockTypeInfo('meeting')?.props?.transcriptionCompleted).toBe('array');
+    expect(blocks[0].description).toContain('transcriptionCompleted');
+    expect(blocks[0].propsSchema.properties.transcriptionCompleted).toMatchObject({
+      type: 'array', nullable: true, items: {type: 'string', pattern: '^\\d+:.+$'},
+    });
+    expect(blocks[0].propsSchema.required).toBeUndefined();
     expect(blocks[0].propsSchema.properties.status.enum).toEqual(['idle', 'recording', 'processing', 'done']);
     expect(blocks[0].propsSchema.properties.audioChunks.items.required).toEqual(['assetId', 'durationMs']);
     expect(blocks[0].propsSchema.properties.transcript.items.required).toEqual(['startMs', 'endMs', 'text']);

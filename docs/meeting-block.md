@@ -16,6 +16,7 @@ Unknown top-level props remain allowed for forward compatibility.
 | `status` | `'idle' \| 'recording' \| 'processing' \| 'done'`. Validation checks the enum, not state transitions. |
 | `audioChunks` | Ordered array of `{assetId: string, durationMs: number, startedAtMs?: number}`. `assetId` is a nonempty asset reference (max 512 characters), never inline audio. `durationMs` is the chunk duration; optional `startedAtMs` is an offset from meeting start, **not** Unix time. Array order is capture/playback order. |
 | `transcript` | Ordered array of `{startMs: number, endMs: number, text: string}`. Offsets are relative to meeting start; `endMs >= startMs`. Text is plain text. Array order is display order; overlapping segments are allowed. |
+| `transcriptionCompleted` | Optional `string[]` of successfully transcribed chunk keys, each `startedAtMs:assetId` (digits, a colon, then a nonempty asset ID). The recorder’s `chunkKey` uses `0` when `startedAtMs` is absent. Used to skip already transcribed chunks on retry, including chunks with empty transcription results. Missing means an empty list; `null` removes the prop. Existing keys are preserved unchanged; duplicates and non-UUID asset IDs are allowed. Updates replace the whole array. |
 | `summary` | Plain string; no rich-text runs or Markdown interpretation is required. |
 | `startedAt` | Unix epoch milliseconds, a finite nonnegative number. |
 | `title` | Optional plain string. |

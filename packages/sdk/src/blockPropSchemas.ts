@@ -50,6 +50,10 @@ const audioChunk = object({
   durationMs: number('Chunk duration in milliseconds.', 0),
   startedAtMs: number('Offset from the meeting start in milliseconds.', 0),
 }, 'One audio asset in capture order.', ['assetId', 'durationMs']);
+const transcriptionChunkKey: Field = {
+  schema: z.string().regex(/^\d+:.+$/, 'must be a startedAtMs:assetId chunk key'),
+  json: {type: 'string', pattern: '^\\d+:.+$', description: 'Chunk offset in integer milliseconds followed by a colon and a nonempty asset ID.'},
+};
 const transcriptSegment = object({
   startMs: number('Inclusive offset from the meeting start in milliseconds.', 0),
   endMs: number('Exclusive offset from the meeting start in milliseconds; must be >= startMs.', 0),
@@ -91,6 +95,7 @@ const fields = {
     status: enumeration(['idle', 'recording', 'processing', 'done'], 'Absent means idle.'),
     audioChunks: array(audioChunk, 'Audio chunks in capture order; replace the entire array when updating.'),
     transcript: array(transcriptSegment, 'Plain-text segments in display order; replace the entire array when updating.'),
+    transcriptionCompleted: array(transcriptionChunkKey, 'Successfully transcribed chunk keys (startedAtMs:assetId); absent means empty. Replace the entire array when updating.'),
     summary: string('Plain-text summary.'),
     startedAt: number('Meeting start as Unix epoch milliseconds.', 0),
     title: text,

@@ -93,7 +93,7 @@ Call `list_block_types` for the machine-readable source of truth: every entry ha
 | `tooltipcard` | `term:string`, `tip:string` |
 | `dbview` | `pageId:string` |
 | `dbform` | `databaseId:string`, `viewId:string` |
-| `meeting` | `status:"idle"/"recording"/"processing"/"done"`, `audioChunks:[{assetId:string,durationMs:number,startedAtMs?:number}]`, `transcript:[{startMs:number,endMs:number,text:string}]`, `summary:string`, `startedAt:number`, `title:string`; container children are manual notes; [representation contract](../../docs/meeting-block.md) |
+| `meeting` | `status:"idle"/"recording"/"processing"/"done"`, `audioChunks:[{assetId:string,durationMs:number,startedAtMs?:number}]`, `transcript:[{startMs:number,endMs:number,text:string}]`, `transcriptionCompleted?:string[]` (completed chunk keys: digits + `:` + nonempty asset ID; absent means empty, `null` removes), `summary:string`, `startedAt:number`, `title:string`; container children are manual notes; [representation contract](../../docs/meeting-block.md) |
 | `form` | `formId:string`, `submissionKey:string`, `enabled:boolean`, `databaseId:string`, `schema:object`, `label:string`, `description:string` |
 
 Shared input/frame props are `name`, `label`, and `description` strings plus `compact` and `interactive` booleans. A structured option's `value` defaults to a slug of its `label`; `selected` contains those string values.
