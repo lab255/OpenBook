@@ -1,3 +1,4 @@
+import {t} from '@/i18n';
 import {Fragment, useEffect, useMemo, useState} from 'react';
 import {useData} from '@/data';
 import {useTranslation} from '@/providers';
@@ -39,6 +40,7 @@ export function blockTypeLabel(type: string): string {
     chart: 'Chart',
     dbview: 'Database view',
     form: 'Form',
+    meeting: t('meetingBlock.label'),
     slider: 'Slider',
     formula: 'Formula',
     status: 'Status',

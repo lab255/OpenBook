@@ -3939,3 +3939,18 @@ a.obe-mention {
   transition: border-color 0.12s ease;
 }
 .ob-map-cluster-wrap:hover .ob-map-cluster { border-color: hsl(var(--ring) / 0.55); }
+
+/* Meeting recorder: native playback, copyable transcript and ordinary note rows. */
+.obe-meeting { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; }
+.obe-meeting header, .obe-meeting-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.obe-meeting header { justify-content: space-between; }
+.obe-meeting button { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 12px; cursor: pointer; }
+.obe-meeting button:disabled { opacity: 0.5; cursor: default; }
+.obe-meeting button:focus-visible, .obe-meeting a:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.obe-meeting-chunks { display: grid; gap: 12px; margin-block: 12px; }
+.obe-meeting-chunks li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.obe-meeting audio { max-width: 100%; }
+.obe-meeting-transcript { user-select: text; white-space: pre-wrap; }
+.obe-meeting time { color: var(--color-muted-foreground); font-variant-numeric: tabular-nums; }
+.obe-meeting-summary { user-select: text; white-space: pre-wrap; margin-block: 12px; }
+.obe-meeting-notes { border-top: 1px solid var(--color-border); margin-top: 16px; padding-top: 12px; }

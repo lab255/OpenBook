@@ -25,6 +25,7 @@ import {
   findUnknownBlockType,
   FORM_FIELD_KINDS,
   invalidBlockProps,
+  invalidBlockTreeProps,
   insertBlocks,
   isHttpUrl,
   KIT_VALUE_BLOCK_TYPES,
@@ -609,7 +610,7 @@ function nestedBlockSchema(typeDesc: string, propsDesc: string): z.ZodType<Neste
 }
 
 /**
- * Validate a nested payload's STRUCTURE — the container parent/child contract
+ * Validate a nested payload's declared props and STRUCTURE — the container parent/child contract
  * (a `children` array only on a container-nature type; a child-only type only
  * under its matching container; every table square), plus the
  * {@link MAX_BLOCK_DEPTH} / {@link MAX_BLOCK_NODES} caps. Returns an error
@@ -618,14 +619,14 @@ function nestedBlockSchema(typeDesc: string, propsDesc: string): z.ZodType<Neste
  * payload is refused with a clear message instead of silently dropping to a
  * wall of "Unsupported block" placeholders.
  *
- * The rules are the SDK block-type catalogue's (`blockTreeError`) — one source
+ * The rules are the SDK block-type catalogue's (`blockTreeError` and
+ * `invalidBlockTreeProps`) — one source
  * shared with the in-app agent. Block TYPES are otherwise unvalidated here for
  * `append_blocks` (the apply layer is type-agnostic so custom/plugin leaves
- * keep working) — only the STRUCTURE the model would silently discard is
- * rejected. `create_artifact_page` additionally gates types (see below).
+ * keep working). Declared prop values are validated at every depth. `create_artifact_page` additionally gates types (see below).
  */
 const blockPayloadError = (blocks: NestedBlockInput[]): string | null =>
-  blockTreeError(blocks, {maxDepth: MAX_BLOCK_DEPTH, maxNodes: MAX_BLOCK_NODES});
+  blockTreeError(blocks, {maxDepth: MAX_BLOCK_DEPTH, maxNodes: MAX_BLOCK_NODES}) ?? invalidBlockTreeProps(blocks);
 
 /**
  * The write-tool kind an MCP mutation maps to (the same identifiers the in-app

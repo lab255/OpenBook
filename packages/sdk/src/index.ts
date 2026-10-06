@@ -563,6 +563,7 @@ export {
   unknownBlockTypeMessage,
   blockTreeError,
   invalidBlockProps,
+  invalidBlockTreeProps,
   blockCatalogueText,
   addBlocksGuidance,
   type BlockNature,

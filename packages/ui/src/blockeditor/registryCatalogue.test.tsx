@@ -27,7 +27,7 @@ import {registeredBlockTypes} from './registry';
 import {registerArtifactKit} from './kit';
 import {registerReactiveBlocks} from './reactiveBlocks';
 import {INPUT_TYPES, inputValue} from './kit/scope';
-import {CONTAINER_BLOCKS, createDoc, rootBlocks, TEXT_BLOCKS} from './model';
+import {blockToJSON, CONTAINER_BLOCKS, createDoc, rootBlocks, TEXT_BLOCKS} from './model';
 import {registerDatabaseBlock} from '@/components/database/InlineDatabaseBlock';
 import {registerDatabaseFormBlock} from '@/components/database/DatabaseFormBlock';
 import {registerFormBlock} from './FormBlockView';
@@ -60,6 +60,15 @@ describe('registry ↔ catalogue drift guard', () => {
       expect(BLOCK_TYPE_CATALOGUE.find((e) => e.type === t)?.category, t).not.toBe('core');
     }
     expect(KNOWN_BLOCK_TYPE_IDS.size).toBe(BLOCK_TYPE_CATALOGUE.length);
+  });
+
+  it('meeting container notes and structured props survive the UI model round trip', () => {
+    const props = {status: 'done', audioChunks: [{assetId: 'audio-1', durationMs: 500}], transcript: [{startMs: 0, endMs: 500, text: 'Hello'}]};
+    const doc = createDoc([{type: 'meeting', props, children: [{type: 'paragraph', text: 'Manual notes'}]}]);
+    const json = blockToJSON(rootBlocks(doc).get(0));
+    expect(json.props).toEqual(props);
+    expect(json.children).toHaveLength(1);
+    expect(json.children?.[0]).toMatchObject({type: 'paragraph', text: [{t: 'Manual notes'}]});
   });
 
   it('the model\'s nature sets ARE the catalogue\'s', () => {

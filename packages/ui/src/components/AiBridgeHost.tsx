@@ -1,7 +1,7 @@
 import {useEffect, useRef} from 'react';
 import type {AgentProposal, StoredSuggestion} from '@book.dev/sdk';
 import {useData} from '@/data';
-import {applyProposal, setAiBridge, suggestionToProposal, type ProposalApplyResult} from '@/lib/aiBridge';
+import {applyProposal, setAiBridge, suggestionToProposal, type AiBridgeImpl, type ProposalApplyResult} from '@/lib/aiBridge';
 
 /**
  * Installs the AI bridge (lib/aiBridge) for the provider-less block editor
@@ -23,6 +23,7 @@ export function AiBridgeHost() {
 
   useEffect(() => {
     let cancelled = false;
+    readyRef.current = false;
     const probe = async (): Promise<void> => {
       try {
         const status = await client.aiStatus();
@@ -30,6 +31,7 @@ export function AiBridgeHost() {
       } catch {
         if (!cancelled) readyRef.current = false;
       }
+      if (!cancelled) setAiBridge(bridge);
     };
     void probe();
     const onFocus = (): void => void probe();
@@ -58,13 +60,15 @@ export function AiBridgeHost() {
       await applyProposal(client, suggestionToProposal(suggestion));
     };
 
-    setAiBridge({
+    const bridge: AiBridgeImpl = {
       ready: () => readyRef.current,
+      generate: (prompt, onToken, opts) => client.aiGenerate(prompt, onToken, opts),
       complete: (text, onToken) => client.aiComplete(text, onToken),
       tasks: async (goal, context) => (await client.aiTasks(goal, context)).tasks,
       applyProposals,
       applySuggestion,
-    });
+    };
+    setAiBridge(bridge);
     return () => {
       cancelled = true;
       window.removeEventListener('focus', onFocus);

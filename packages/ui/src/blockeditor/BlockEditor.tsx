@@ -2584,7 +2584,10 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
               stays live for a reader; `pageReadOnly` is the document's real
               lock, which that override must not hide from a block that offers
               to write somewhere else. See {@link CustomBlockProps.pageReadOnly}. */}
-          <Custom block={block} editor={kitEditor} pageReadOnly={editor.readOnly} />
+          <Custom block={block} editor={kitEditor} pageReadOnly={editor.readOnly}>
+            {custom.type === 'meeting' && blockChildren(block) &&
+              <BlockList list={blockChildren(block)!} {...shared} editor={textEditor} depth={shared.depth + 1} container="group" />}
+          </Custom>
         </div>
       );
     }
