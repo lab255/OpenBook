@@ -55,12 +55,17 @@ describe('AI transcription settings', () => {
     for (const provider of ['openai-compat', 'off', 'local']) {
       fireEvent.click(picker);
       fireEvent.click(await screen.findByRole('option', {name: provider === 'local' ? 'Default (local)' : provider === 'off' ? 'Off' : 'Cloud (OpenAI-compatible)'}));
-      await waitFor(() => expect(picker.disabled).toBe(false));
+      await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
       expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, transcription: expect.objectContaining({provider})});
       expect(Boolean(audio.queryByLabelText('API key'))).toBe(provider === 'openai-compat');
+      expect(Boolean(audio.queryByRole('button', {name: 'Download Whisper base'}))).toBe(provider === 'local');
+      expect(Boolean(audio.queryByText(/Model not downloaded/))).toBe(provider === 'local');
+      if (provider !== 'local') expect(audio.getByText('Local Whisper is not used with this provider.')).toBeTruthy();
       if (provider === 'openai-compat') {
-        expect((audio.getByLabelText('Server URL') as HTMLInputElement).value).toBe('https://api.openai.com');
-        expect((audio.getByLabelText('Model') as HTMLInputElement).value).toBe('whisper-1');
+        expect((audio.getByLabelText('Server URL') as HTMLInputElement).value).toBe('');
+        expect((audio.getByLabelText('Model') as HTMLInputElement).value).toBe('');
+        expect((audio.getByLabelText('Server URL') as HTMLInputElement).placeholder).toBe('https://api.openai.com');
+        expect((audio.getByLabelText('Model') as HTMLInputElement).placeholder).toBe('whisper-1');
         expect(audio.getByText(/sends meeting audio to the configured endpoint/)).toBeTruthy();
       }
     }
@@ -80,7 +85,7 @@ describe('AI transcription settings', () => {
     expect(audio.getByText(/Leave blank to keep the current key/)).toBeTruthy();
     fireEvent.change(input, {target: {value: typed}});
     fireEvent.blur(input);
-    await waitFor(() => expect(picker.disabled).toBe(false));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
     expect(aiSetConfig.mock.lastCall?.[0].transcription?.apiKey ?? '').toBe(typed);
     expect(input.value).toBe('');
     expect(audio.getByRole('button', {name: 'Clear key'})).toBeTruthy();
@@ -90,12 +95,12 @@ describe('AI transcription settings', () => {
     const {aiSetConfig} = setup({...chat, transcription: cloud});
     const {audio, picker} = await section();
     fireEvent.click(audio.getByRole('button', {name: 'Clear key'}));
-    await waitFor(() => expect(picker.disabled).toBe(false));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
     expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, transcription: {...cloud, apiKey: null, apiKeySet: false}});
     expect(audio.queryByRole('button', {name: 'Clear key'})).toBeNull();
     fireEvent.click(picker);
     fireEvent.click(await screen.findByRole('option', {name: 'Off'}));
-    await waitFor(() => expect(picker.disabled).toBe(false));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
     expect(aiSetConfig.mock.lastCall?.[0].transcription?.apiKey).toBeUndefined();
   });
 
@@ -105,17 +110,17 @@ describe('AI transcription settings', () => {
     const url = audio.getByLabelText('Server URL');
     fireEvent.change(url, {target: {value: 'https://new.example'}});
     fireEvent.blur(url);
-    await waitFor(() => expect(picker.disabled).toBe(false));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
     const updated = {...cloud, baseUrl: 'https://new.example'};
     expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, transcription: updated});
     const model = audio.getByLabelText('Model');
     fireEvent.change(model, {target: {value: 'new-model'}});
     fireEvent.blur(model);
-    await waitFor(() => expect(picker.disabled).toBe(false));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
     updated.model = 'new-model';
     expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, transcription: updated});
     fireEvent.click(screen.getByRole('radio', {name: /Off No model/}));
-    await waitFor(() => expect(picker.disabled).toBe(false));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
     expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, provider: 'off', transcription: updated});
     view.unmount();
     mount();
@@ -124,4 +129,78 @@ describe('AI transcription settings', () => {
     expect((reloaded.audio.getByLabelText('Server URL') as HTMLInputElement).value).toBe(updated.baseUrl);
     expect((reloaded.audio.getByLabelText('Model') as HTMLInputElement).value).toBe(updated.model);
   });
+  it.each(['ftp://audio.example', 'https://user:password@audio.example'])('surfaces rejected URL %s and restores the saved draft', async (baseUrl) => {
+    const {aiSetConfig} = setup({...chat, transcription: cloud});
+    const {audio, picker} = await section();
+    const error = 'Transcription baseUrl must be an HTTP(S) URL without embedded credentials';
+    aiSetConfig.mockRejectedValueOnce(new Error(error));
+    const input = audio.getByLabelText('Server URL') as HTMLInputElement;
+    fireEvent.change(input, {target: {value: baseUrl}});
+    fireEvent.blur(input);
+    expect((await audio.findByRole('alert')).textContent).toBe(error);
+    expect(input.value).toBe(cloud?.baseUrl);
+    expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false');
+
+    fireEvent.change(input, {target: {value: 'https://valid.example'}});
+    fireEvent.blur(input);
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
+    expect(audio.queryByRole('alert')).toBeNull();
+    expect(input.value).toBe('https://valid.example');
+  });
+
+  it.each([
+    ['transcription', 'save'],
+    ['transcription', 'status'],
+    ['chat', 'save'],
+    ['chat', 'status'],
+  ])('scrubs the %s key when the %s request rejects without inventing key-set state', async (target, failure) => {
+    const {aiSetConfig, aiStatus} = setup({
+      ...chat, providers: {claude: {model: 'chat-model', apiKeySet: false}},
+      transcription: {...cloud!, apiKeySet: false},
+    });
+    const {audio, picker} = await section();
+    const keySection = target === 'transcription' ? audio : within(document.getElementById('ai-section-claude')!);
+    const input = keySection.getByLabelText('API key') as HTMLInputElement;
+    if (failure === 'save') aiSetConfig.mockRejectedValueOnce(new Error('Save rejected'));
+    else aiStatus.mockRejectedValueOnce(new Error('Status unavailable'));
+    fireEvent.change(input, {target: {value: 'new-secret'}});
+    fireEvent.blur(input);
+    expect((await audio.findByRole('alert')).textContent).toBe(failure === 'save' ? 'Save rejected' : 'Status unavailable');
+    expect(input.value).toBe('');
+    expect(keySection.queryByRole('button', {name: 'Clear key'})).toBeNull();
+    expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false');
+
+    fireEvent.blur(audio.getByLabelText('Server URL'));
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
+    expect(aiSetConfig.mock.lastCall?.[0].transcription?.apiKey).toBeUndefined();
+    expect(aiSetConfig.mock.lastCall?.[0].providers?.claude?.apiKey).toBeUndefined();
+  });
+
+  it('retains picker focus while saving and ignores re-entrant selections', async () => {
+    const {aiSetConfig} = setup({...chat, transcription: cloud});
+    const {picker} = await section();
+    const persist = aiSetConfig.getMockImplementation()!;
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    aiSetConfig.mockImplementationOnce(async (config) => {
+      await pending;
+      return persist(config);
+    });
+    picker.focus();
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole('option', {name: 'Off'}));
+    expect(picker.disabled).toBe(false);
+    expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('true');
+    await waitFor(() => expect(document.activeElement).toBe(picker));
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByRole('option', {name: 'Default (local)'}));
+    expect(aiSetConfig).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(document.activeElement).toBe(picker));
+
+    release();
+    await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
+    expect(picker.dataset.value).toBe('off');
+    expect(document.activeElement).toBe(picker);
+  });
+
 });

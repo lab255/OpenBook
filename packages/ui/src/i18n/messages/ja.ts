@@ -528,6 +528,7 @@ export const ja: PartialMessages = {
   },
   ai: {
     transcription: {
+      localInactive: 'このプロバイダーではローカルのWhisperは使用されません。',
       title: '文字起こし',
       provider: '文字起こしプロバイダー',
       local: 'デフォルト（ローカル）',

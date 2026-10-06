@@ -527,13 +527,14 @@ export const zh: PartialMessages = {
   },
   ai: {
     transcription: {
+      localInactive: '此提供商不使用本地 Whisper。',
       title: '转录',
       provider: '转录提供商',
       local: '默认（本地）',
       cloud: '云端（兼容 OpenAI）',
       localHint: '默认使用本地转录，需要在服务器上安装 Whisper 运行时。',
       localDocs: '本地转录设置',
-      privacy: '云端转录会将会议音频发送到配置的端点。仅在信任该服务能够处理您的录音时启用。',
+      privacy: '云端转录会将会议音频发送到配置的端点。仅在信任该服务能够处理你的录音时启用。',
       description: '录音默认使用 Whisper 在本地转录，无需云端密钥。Whisper base 支持多种语言（约142 MiB）。',
       modelPresent: '模型已下载。',
       modelAbsent: '模型尚未下载。',

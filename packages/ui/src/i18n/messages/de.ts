@@ -533,6 +533,7 @@ export const de: PartialMessages = {
   },
   ai: {
     transcription: {
+      localInactive: 'Lokales Whisper wird mit diesem Anbieter nicht verwendet.',
       title: 'Transkription',
       provider: 'Transkriptionsanbieter',
       local: 'Standard (lokal)',

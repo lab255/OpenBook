@@ -847,6 +847,7 @@ export const en = {
   },
   ai: {
     transcription: {
+      localInactive: 'Local Whisper is not used with this provider.',
       title: 'Transcription',
       provider: 'Transcription provider',
       local: 'Default (local)',
