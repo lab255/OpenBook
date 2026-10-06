@@ -271,13 +271,13 @@ describe('meeting representation contract (MEET-4)', () => {
     expect(invalidBlockProps('meeting', props)).toContain('Invalid prop');
   });
 
-  it.each([[], ['0:legacy-asset'], ['001:asset:with:colons', '001:asset:with:colons']].map((keys) => ({keys})))(
+  it.each([[], ['0:legacy-asset'], ['1.5:asset'], ['1e-7:asset', '1e+21:asset', '1.5e21:asset'], ['001:asset:with:colons', '001:asset:with:colons']].map((keys) => ({keys})))(
     'accepts optional completion keys without rewriting legacy values: %j', ({keys}) => {
       expect(invalidBlockProps('meeting', {transcriptionCompleted: keys})).toBeNull();
     },
   );
 
-  it.each(['0:asset', {}, [1], [null], [''], ['asset'], [':asset'], ['-1:asset'], ['1.5:asset'], ['1:'], ['x:asset']].map((value) => ({value})))(
+  it.each(['0:asset', {}, [1], [null], [''], ['asset'], [':asset'], ['-1:asset'], ['1:'], ['x:asset']].map((value) => ({value})))(
     'rejects malformed completion keys: %j', ({value}) => {
       expect(invalidBlockProps('meeting', {transcriptionCompleted: value})).toContain('Invalid prop "transcriptionCompleted"');
     },
@@ -289,7 +289,7 @@ describe('meeting representation contract (MEET-4)', () => {
     expect(blockTypeInfo('meeting')?.props?.transcriptionCompleted).toBe('array');
     expect(blocks[0].description).toContain('transcriptionCompleted');
     expect(blocks[0].propsSchema.properties.transcriptionCompleted).toMatchObject({
-      type: 'array', nullable: true, items: {type: 'string', pattern: '^\\d+:.+$'},
+      type: 'array', nullable: true, items: {type: 'string', pattern: '^\\d+(\\.\\d+)?(e[+-]?\\d+)?:.+$'},
     });
     expect(blocks[0].propsSchema.required).toBeUndefined();
     expect(blocks[0].propsSchema.properties.status.enum).toEqual(['idle', 'recording', 'processing', 'done']);

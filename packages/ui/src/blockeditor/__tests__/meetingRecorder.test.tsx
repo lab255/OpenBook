@@ -90,6 +90,15 @@ describe('meeting recording and recovery', () => {
     expect(track.stop).toHaveBeenCalled();
   });
 
+  it.each([1.5, 1e-7, 1e21])('persists schema-valid completion keys when retrying a chunk starting at %s ms', async (startedAtMs) => {
+    const audio = {assetId: 'saved-audio', durationMs: 1000, startedAtMs};
+    const {session, block} = harness({status: 'done', audioChunks: [audio]});
+    session.retry(audio); await flush();
+    const completed = blockProp(block, 'transcriptionCompleted');
+    expect(completed).toEqual([chunkKey(audio)]);
+    expect(invalidBlockProps('meeting', {transcriptionCompleted: completed})).toBeNull();
+  });
+
   it('keeps audio on upload failure, retries with exponential backoff, then permits manual recovery', async () => {
     putAsset.mockRejectedValue(new Error('offline'));
     const {session, block} = harness();

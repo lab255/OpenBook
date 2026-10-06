@@ -51,8 +51,8 @@ const audioChunk = object({
   startedAtMs: number('Offset from the meeting start in milliseconds.', 0),
 }, 'One audio asset in capture order.', ['assetId', 'durationMs']);
 const transcriptionChunkKey: Field = {
-  schema: z.string().regex(/^\d+:.+$/, 'must be a startedAtMs:assetId chunk key'),
-  json: {type: 'string', pattern: '^\\d+:.+$', description: 'Chunk offset in integer milliseconds followed by a colon and a nonempty asset ID.'},
+  schema: z.string().regex(/^\d+(\.\d+)?(e[+-]?\d+)?:.+$/, 'must be a startedAtMs:assetId chunk key'),
+  json: {type: 'string', pattern: '^\\d+(\\.\\d+)?(e[+-]?\\d+)?:.+$', description: 'Chunk offset in milliseconds followed by a colon and a nonempty asset ID.'},
 };
 const transcriptSegment = object({
   startMs: number('Inclusive offset from the meeting start in milliseconds.', 0),
