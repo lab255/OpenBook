@@ -1,3 +1,18 @@
+## 3.19.0 (2026-10-06)
+
+### 🚀 Features
+
+- **sdk,mcp,server,ui,web,desktop:** meeting block — recorder, local whisper, summary, audio export, e2e (MEET-3..MEET-9) ([#376](https://github.com/lab255/OpenBook/pull/376))
+- **server,sdk:** audio assets + transcription service (MEET-1, MEET-2) ([#366](https://github.com/lab255/OpenBook/pull/366), [#367](https://github.com/lab255/OpenBook/issues/367))
+
+### 🩹 Fixes
+
+- **web:** settle sidebar selection color assertions (INF-4) ([#375](https://github.com/lab255/OpenBook/pull/375))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.18.1 (2026-09-15)
 
 ### 🩹 Fixes
