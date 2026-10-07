@@ -4,9 +4,11 @@ import {providerSettings, type AiConfig, type AiProvider, type AiProviderSetting
 import type {Db} from '../db';
 import {createEngine, MockEngine, OpenAiCompatEngine, type TranscriptionEngine, type AiEngine, type GenerateOptions} from './providers';
 import {assembleSearchResults, bm25Scores, buildIndex, cosine, pageRowsToDocs, parseTaskList, type Bm25Index} from './search';
-import {WHISPER_MODEL, WHISPER_MODEL_URL} from './whisper';
+import {WHISPER_MODEL} from './whisper';
 import {SkillStore} from './skills';
 import {downloadFile} from './download';
+import {downloadPinned} from './pinnedDownload';
+import {WHISPER_MODEL_PIN} from './runtimeManifest';
 
 /**
  * The optional local-AI subsystem: holds the configured engine, the note
@@ -354,7 +356,11 @@ export class AiService {
 
     void (async () => {
       try {
-        if (existsSync(dest)) {
+        if (fileName === WHISPER_MODEL) {
+          // Never allow an arbitrary URL to populate the managed Whisper filename.
+          await downloadPinned(WHISPER_MODEL_PIN, dest, (progress) => Object.assign(state, progress));
+          state.done = true;
+        } else if (existsSync(dest)) {
           state.done = true;
           state.received = state.total ?? 0;
         } else {
@@ -362,7 +368,7 @@ export class AiService {
           state.done = true;
         }
         // Auto-select the downloaded model for the llama provider.
-        if (url !== WHISPER_MODEL_URL && this.config.provider === 'llama' && !this.config.model) {
+        if (fileName !== WHISPER_MODEL && this.config.provider === 'llama' && !this.config.model) {
           await this.setConfig({...this.config, model: fileName});
         }
       } catch (err) {
