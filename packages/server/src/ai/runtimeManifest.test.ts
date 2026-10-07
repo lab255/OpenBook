@@ -31,6 +31,14 @@ describe('pinned runtime manifest', () => {
     }
   });
 
+  it('includes the Windows whisper companion DLL directory', () => {
+    const artifact = RUNTIME_MANIFEST['x86_64-pc-windows-msvc']['whisper-cli'];
+    expect(artifact.status).toBe('supported');
+    if (artifact.status !== 'supported') throw new Error('Windows whisper must be supported');
+    expect(artifact.extractDir).toBe('Release');
+    expect(artifact.binaryPath.startsWith(`${artifact.extractDir}/`)).toBe(true);
+  });
+
   it('pins the base model to an immutable repository revision', () => {
     checkPin(WHISPER_MODEL_PIN);
     expect(WHISPER_MODEL_PIN.fileName).toBe('ggml-base.bin');

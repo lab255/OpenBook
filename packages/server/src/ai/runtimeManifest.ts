@@ -21,6 +21,7 @@ export type RuntimeArtifact = (ArtifactPin & {
   status: 'supported';
   archive: 'zip' | 'tar.xz';
   binaryPath: string;
+  extractDir?: string;
 }) | {
   status: 'unsupported';
   reason: 'no-upstream-cli' | 'no-native-prebuilt';
@@ -66,6 +67,8 @@ export const RUNTIME_MANIFEST: Record<ReleaseTarget, Record<RuntimeTool, Runtime
       url: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip',
       sha256: 'b1514ebc099765e39fa37eb780b92a140a94c86bb0b3b3d98226b38825979732',
       size: 3832432, archive: 'zip', binaryPath: 'Release/whisper-cli.exe',
+      /** Install the ENTIRE directory beside the executable, including companion DLLs. */
+      extractDir: 'Release',
     },
     ffmpeg: {
       status: 'supported', version: '8.1.2',
