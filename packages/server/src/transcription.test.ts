@@ -179,7 +179,8 @@ describe('transcription contract', () => {
     }, {incoming: {socket: {remoteAddress: ip}}});
     const accepted = [request('192.0.2.1'), request('192.0.2.2')];
     try {
-      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length).toBe(2);
+      // Two Node children may take longer than the default 1s under full-suite load.
+      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length, {timeout: 10_000}).toBe(2);
       const busy = await request('192.0.2.3');
       expect(busy.status).toBe(429);
       expect(busy.headers.get('Retry-After')).toBe('5');
