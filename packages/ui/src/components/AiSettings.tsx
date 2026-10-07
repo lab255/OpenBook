@@ -1,6 +1,6 @@
-import {useCallback, useEffect, useState, type ReactNode} from 'react';
+import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {ChevronDown, ChevronRight, Trash2} from 'lucide-react';
-import {providerSettings, type AiConfig, type AiEffort, type AiProvider, type AiProviderSettings, type AiSkill, type AiStatus} from '@book.dev/sdk';
+import {providerSettings, type AiConfig, type AiEffort, type AiProvider, type AiProviderSettings, type AiSkill, type AiStatus, type AiTranscriptionConfig} from '@book.dev/sdk';
 import {ScopeChip, SettingsField, SettingsScreen, SettingsSection, SettingsToggle, SETTINGS_CONTROL_CLASS} from '@/components/settings/primitives';
 import {Button} from '@/components/ui/button';
 import {Select} from '@/components/ui/select';
@@ -44,6 +44,10 @@ export default function AiSettings() {
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [draft, setDraft] = useState<AiConfig | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saving = useRef(false);
+  const lastGoodConfig = useRef<AiConfig | null>(null);
+  const transcriptionPicker = useRef<HTMLButtonElement>(null);
   const [indexing, setIndexing] = useState(false);
   const [skills, setSkills] = useState<AiSkill[]>([]);
   // Which provider accordions are expanded. The default provider's opens
@@ -53,6 +57,7 @@ export default function AiSettings() {
   const refresh = useCallback(async () => {
     try {
       const next = await client.aiStatus();
+      lastGoodConfig.current = normalize(next.config);
       setStatus(next);
       setDraft((d) => d ?? normalize(next.config));
     } catch {
@@ -89,12 +94,25 @@ export default function AiSettings() {
   }, [status, refresh]);
 
   const apply = async (config: AiConfig): Promise<void> => {
+    if (saving.current) return;
+    saving.current = true;
     setBusy(true);
+    setSaveError(null);
     try {
       await client.aiSetConfig(config);
-      setDraft(config);
-      await refresh();
+      // Re-read the redacted config: neither new keys nor explicit-clear nulls
+      // should be replayed by a later save in the other settings section.
+      const next = await client.aiStatus();
+      lastGoodConfig.current = normalize(next.config);
+      setStatus(next);
+      setDraft(lastGoodConfig.current);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+      // Roll back rejected edits and scrub typed keys even when the post-save
+      // status read fails. Only server-redacted, last-known-good state survives.
+      setDraft(lastGoodConfig.current);
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   };
@@ -126,21 +144,12 @@ export default function AiSettings() {
     ...draft,
     providers: {...draft.providers, [p]: {...providerSettings(draft, p), ...patch}},
   });
-  // Persist a write-only API-key field on blur, then SCRUB the raw entry from
-  // local state so the secret never lingers in React: a non-empty entry is now
-  // stored on the server (surface it as a masked "key set"), while a blank is a
-  // no-op that leaves the stored key untouched. Explicit removal uses "Clear key".
-  const saveKey = (p: AiProvider): void => {
-    const typed = providerSettings(draft, p).apiKey;
-    void apply(draft).then(() => {
-      const stored = typeof typed === 'string' && typed.trim().length > 0;
-      setDraft((d) => {
-        if (!d) return d;
-        const cur = providerSettings(d, p);
-        return {...d, providers: {...d.providers, [p]: {...cur, apiKey: undefined, apiKeySet: stored || (cur.apiKeySet ?? false)}}};
-      });
-    });
-  };
+  const audio: AiTranscriptionConfig = draft.transcription ?? {provider: 'local'};
+  const setAudio = (patch: Partial<AiTranscriptionConfig>): AiConfig => ({
+    ...draft,
+    transcription: {...audio, ...patch},
+  });
+  const showAudioKeySet = Boolean(audio.apiKeySet) && audio.apiKey == null;
   const modelInput = (p: AiProvider, placeholder: string, hint: string) => (
     <SettingsField label={t('ai.modelName')} hint={hint}>
       <input
@@ -240,7 +249,7 @@ export default function AiSettings() {
                     value={typed}
                     placeholder={showKeySet ? t('ai.apiKeySet') : 'sk-ant-…'}
                     onChange={(e) => setDraft(set(p, {apiKey: e.target.value}))}
-                    onBlur={() => saveKey(p)}
+                    onBlur={() => void apply(draft)}
                   />
                   {showKeySet && (
                     <Button
@@ -273,15 +282,92 @@ export default function AiSettings() {
 
   return (
     <SettingsScreen title={t('ai.title')} description={t('ai.description')} scope="library">
-      {status?.transcription && (
-        <SettingsSection title={t('ai.transcription.title')} description={t('ai.transcription.description')}>
-          <p className="text-sm text-muted-foreground">{t(status.transcription.modelPresent ? 'ai.transcription.modelPresent' : 'ai.transcription.modelAbsent')} {t(status.transcription.ready ? 'ai.transcription.ready' : status.transcription.runtimeAvailable ? 'ai.transcription.modelMissing' : 'ai.transcription.runtimeMissing')}</p>
-          <Button size="sm" variant="outline" disabled={downloading || status.transcription.modelPresent} onClick={() => void client.aiDownloadModel(status.transcription?.downloadUrl).then(() => refresh())}>
-            {downloading && download?.url === status.transcription.downloadUrl ? (progress === null ? t('ai.transcription.downloading') : t('ai.transcription.downloadingProgress', {progress})) : t('ai.transcription.download')}
-          </Button>
-          {download?.url === status.transcription.downloadUrl && download.error && <p className="text-xs text-destructive">{download.error}</p>}
-        </SettingsSection>
-      )}
+      <SettingsSection title={t('ai.transcription.title')} description={t('ai.transcription.description')} aria-busy={busy}>
+        <SettingsField label={t('ai.transcription.provider')} htmlFor="ai-transcription-provider">
+          <Select
+            id="ai-transcription-provider"
+            ref={transcriptionPicker}
+            value={audio.provider}
+            onChange={(e) => {
+              transcriptionPicker.current?.focus();
+              void apply(setAudio({provider: e.target.value as AiTranscriptionConfig['provider']}));
+            }}
+          >
+            <option value="local">{t('ai.transcription.local')}</option>
+            <option value="off">{t('ai.provider.off')}</option>
+            <option value="openai-compat">{t('ai.transcription.cloud')}</option>
+          </Select>
+        </SettingsField>
+        <p className="text-xs text-muted-foreground">
+          {t('ai.transcription.localHint')}{' '}
+          <a className="underline" href="https://github.com/lab255/OpenBook/blob/main/docs/local-transcription.md" target="_blank" rel="noreferrer">
+            {t('ai.transcription.localDocs')}
+          </a>
+        </p>
+        {audio.provider === 'openai-compat' && (
+          <>
+            <p className="text-sm text-muted-foreground">{t('ai.transcription.privacy')}</p>
+            <SettingsField label={t('ai.baseUrl')} htmlFor="ai-transcription-url">
+              <input
+                id="ai-transcription-url"
+                className={SETTINGS_CONTROL_CLASS}
+                value={audio.baseUrl ?? ''}
+                placeholder="https://api.openai.com"
+                onChange={(e) => setDraft(setAudio({baseUrl: e.target.value}))}
+                onBlur={() => void apply(draft)}
+              />
+            </SettingsField>
+            <SettingsField label={t('ai.modelName')} htmlFor="ai-transcription-model">
+              <input
+                id="ai-transcription-model"
+                className={SETTINGS_CONTROL_CLASS}
+                value={audio.model ?? ''}
+                placeholder="whisper-1"
+                onChange={(e) => setDraft(setAudio({model: e.target.value}))}
+                onBlur={() => void apply(draft)}
+              />
+            </SettingsField>
+            <SettingsField label={t('ai.apiKey')} hint={t('ai.apiKeyHint')} htmlFor="ai-transcription-apikey">
+              <div className="flex items-center gap-2">
+                <input
+                  id="ai-transcription-apikey"
+                  type="password"
+                  autoComplete="off"
+                  aria-label={t('ai.apiKey')}
+                  aria-describedby={showAudioKeySet ? 'ai-transcription-apikey-status' : undefined}
+                  className={SETTINGS_CONTROL_CLASS}
+                  value={typeof audio.apiKey === 'string' ? audio.apiKey : ''}
+                  placeholder={showAudioKeySet ? t('ai.apiKeySet') : 'sk-…'}
+                  onChange={(e) => setDraft(setAudio({apiKey: e.target.value}))}
+                  onBlur={() => void apply(draft)}
+                />
+                {showAudioKeySet && (
+                  <Button size="xs" variant="outline" className="shrink-0" disabled={busy}
+                    onClick={() => void apply(setAudio({apiKey: null, apiKeySet: false}))}>
+                    {t('ai.apiKeyClear')}
+                  </Button>
+                )}
+              </div>
+              {showAudioKeySet && (
+                <p id="ai-transcription-apikey-status" className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{t('ai.apiKeySetStatus')}</span> · {t('ai.apiKeyKeepHint')}
+                </p>
+              )}
+            </SettingsField>
+          </>
+        )}
+        {audio.provider === 'local' && status?.transcription && (
+          <>
+            <p className="text-sm text-muted-foreground">{t(status.transcription.modelPresent ? 'ai.transcription.modelPresent' : 'ai.transcription.modelAbsent')} {t(status.transcription.ready ? 'ai.transcription.ready' : status.transcription.runtimeAvailable ? 'ai.transcription.modelMissing' : 'ai.transcription.runtimeMissing')}</p>
+            <Button size="sm" variant="outline" disabled={downloading || status.transcription.modelPresent} onClick={() => void client.aiDownloadModel(status.transcription?.downloadUrl).then(() => refresh())}>
+              {downloading && download?.url === status.transcription.downloadUrl ? (progress === null ? t('ai.transcription.downloading') : t('ai.transcription.downloadingProgress', {progress})) : t('ai.transcription.download')}
+            </Button>
+            {download?.url === status.transcription.downloadUrl && download.error && <p className="text-xs text-destructive">{download.error}</p>}
+          </>
+        )}
+        {audio.provider !== 'local' && <p className="text-xs text-muted-foreground">{t('ai.transcription.localInactive')}</p>}
+        {saveError && <p role="alert" className="text-xs text-destructive">{saveError}</p>}
+      </SettingsSection>
       <SettingsSection title={t('ai.defaultEngine')} description={t('ai.defaultEngineHint')}>
         <div className="flex flex-col gap-1.5" role="radiogroup" aria-label={t('ai.providerLabel')}>
           {providers.map((p) => (

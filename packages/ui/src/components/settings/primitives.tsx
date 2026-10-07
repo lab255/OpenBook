@@ -76,6 +76,7 @@ export function SettingsSection({
   subdued,
   tabIndex,
   sectionRef,
+  'aria-busy': ariaBusy,
   children,
   className,
 }: {
@@ -91,6 +92,7 @@ export function SettingsSection({
    *  here for keyboard / screen-reader users, not just scroll the viewport. */
   tabIndex?: number;
   sectionRef?: Ref<HTMLElement>;
+  'aria-busy'?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -98,6 +100,7 @@ export function SettingsSection({
     <section
       id={id}
       ref={sectionRef}
+      aria-busy={ariaBusy}
       tabIndex={tabIndex}
       className={cn('flex flex-col gap-2 focus:outline-none', className)}
     >
