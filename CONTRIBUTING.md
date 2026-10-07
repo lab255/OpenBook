@@ -13,7 +13,8 @@ Issues and contributions are welcome.
 
 - Keep each change focused.
 - Use conventional commits.
-- Run `pnpm verify`. It must pass. For UI changes also run `pnpm test:e2e:web` (first time: `pnpm --filter @book.dev/web exec playwright install chromium`).
+- Match the fast PR gate locally: `pnpm run build:libs && pnpm run test:eslint-rules && pnpm run check:gen && pnpm run typecheck && pnpm run lint && pnpm --filter @book.dev/sdk --filter @book.dev/ui --filter @book.dev/app --filter @book.dev/mcp --if-present run test`.
+- Full `pnpm verify` (including server tests and server/mcp e2e) runs nightly and on demand through the **Nightly verify** workflow; run it locally for server changes. PRs and pushes to main use the fast gate plus the existing CI jobs. For UI changes also run `pnpm test:e2e:web` (first time: `pnpm --filter @book.dev/web exec playwright install chromium`).
 - Add before-and-after evidence for visual changes.
 - Update tests and docs when behavior changes.
 
