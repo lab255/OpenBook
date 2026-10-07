@@ -54,8 +54,9 @@ jobs:
           set -euo pipefail
           title='Nightly verify failing'
           # REST pagination avoids search-index lag and includes every open issue.
-          issue=$(gh api --paginate --slurp "repos/$GH_REPO/issues?state=open&per_page=100" \
-            --jq '[.[][] | select(.pull_request == null and .title == "Nightly verify failing")] | first | .number // empty')
+          matches=$(gh api --paginate "repos/$GH_REPO/issues?state=open&per_page=100" \
+            --jq '.[] | select(.pull_request == null and .title == "Nightly verify failing") | .number')
+          issue=${matches%%$'\n'*}
           if [[ "$VERIFY_RESULT" == failure ]]; then
             printf 'Full verify failed: %s\n' "$RUN_URL" > "$RUNNER_TEMP/nightly-verify-issue.md"
             if [[ -z "$issue" ]]; then
@@ -69,17 +70,17 @@ jobs:
               -f query='query($id: ID!) { node(id: $id) { ... on Issue { isPinned } } }' --jq .data.node.isPinned)
             if [[ "$pinned" != true ]]; then
               gh api graphql -f id="$issue_id" \
-                -f query='mutation($id: ID!) { pinIssue(input: {issueId: $id}) { issue { id } } }'
+                -f query='mutation($id: ID!) { pinIssue(input: {issueId: $id}) { issue { id } } }' || echo "::warning::pinIssue failed (non-fatal)"
             fi
           elif [[ -n "$issue" ]]; then
             printf 'Full verify recovered: %s\n' "$RUN_URL" > "$RUNNER_TEMP/nightly-verify-issue.md"
             gh issue comment "$issue" --body-file "$RUNNER_TEMP/nightly-verify-issue.md"
-            gh issue close "$issue"
             issue_id=$(gh api "repos/$GH_REPO/issues/$issue" --jq .node_id)
             pinned=$(gh api graphql -f id="$issue_id" \
               -f query='query($id: ID!) { node(id: $id) { ... on Issue { isPinned } } }' --jq .data.node.isPinned)
             if [[ "$pinned" == true ]]; then
               gh api graphql -f id="$issue_id" \
-                -f query='mutation($id: ID!) { unpinIssue(input: {issueId: $id}) { issue { id } } }'
+                -f query='mutation($id: ID!) { unpinIssue(input: {issueId: $id}) { issue { id } } }' || echo "::warning::unpinIssue failed (non-fatal)"
             fi
+            gh issue close "$issue"
           fi
