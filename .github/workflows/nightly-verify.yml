@@ -1,0 +1,85 @@
+name: Nightly verify
+
+on:
+  schedule:
+    # 06:30 UTC daily, before nightly browser e2e.
+    - cron: "30 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Serialize scheduled and manual runs so issue updates cannot race.
+concurrency:
+  group: nightly-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Full verify (including server tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard — no committed private-key material
+        run: bash scripts/check-no-private-keys.sh
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # Server vitest uses embedded PGlite; no Postgres service is needed.
+      - name: Verify
+        run: pnpm run verify
+
+  report:
+    name: Track nightly verify failures
+    needs: [verify]
+    if: always() && (needs.verify.result == 'failure' || needs.verify.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Update pinned tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='Nightly verify failing'
+          # REST pagination avoids search-index lag and includes every open issue.
+          issue=$(gh api --paginate --slurp "repos/$GH_REPO/issues?state=open&per_page=100" \
+            --jq '[.[][] | select(.pull_request == null and .title == "Nightly verify failing")] | first | .number // empty')
+          if [[ "$VERIFY_RESULT" == failure ]]; then
+            printf 'Full verify failed: %s\n' "$RUN_URL" > "$RUNNER_TEMP/nightly-verify-issue.md"
+            if [[ -z "$issue" ]]; then
+              issue_url=$(gh issue create --title "$title" --body-file "$RUNNER_TEMP/nightly-verify-issue.md")
+              issue=${issue_url##*/}
+            else
+              gh issue comment "$issue" --body-file "$RUNNER_TEMP/nightly-verify-issue.md"
+            fi
+            issue_id=$(gh api "repos/$GH_REPO/issues/$issue" --jq .node_id)
+            pinned=$(gh api graphql -f id="$issue_id" \
+              -f query='query($id: ID!) { node(id: $id) { ... on Issue { isPinned } } }' --jq .data.node.isPinned)
+            if [[ "$pinned" != true ]]; then
+              gh api graphql -f id="$issue_id" \
+                -f query='mutation($id: ID!) { pinIssue(input: {issueId: $id}) { issue { id } } }'
+            fi
+          elif [[ -n "$issue" ]]; then
+            printf 'Full verify recovered: %s\n' "$RUN_URL" > "$RUNNER_TEMP/nightly-verify-issue.md"
+            gh issue comment "$issue" --body-file "$RUNNER_TEMP/nightly-verify-issue.md"
+            gh issue close "$issue"
+            issue_id=$(gh api "repos/$GH_REPO/issues/$issue" --jq .node_id)
+            pinned=$(gh api graphql -f id="$issue_id" \
+              -f query='query($id: ID!) { node(id: $id) { ... on Issue { isPinned } } }' --jq .data.node.isPinned)
+            if [[ "$pinned" == true ]]; then
+              gh api graphql -f id="$issue_id" \
+                -f query='mutation($id: ID!) { unpinIssue(input: {issueId: $id}) { issue { id } } }'
+            fi
+          fi
