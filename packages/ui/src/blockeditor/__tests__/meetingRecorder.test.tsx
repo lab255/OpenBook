@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import {setLocale, t} from '@/i18n';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
-import type {AiTranscriptionResult} from '@book.dev/sdk';
+import {invalidBlockProps, type AiTranscriptionResult} from '@book.dev/sdk';
 import {setAssetBridge} from '@/lib/assetBridge';
 import {registerBlockEditorDoc} from '@/lib/aiBridge';
 import {AssetBridgeHost} from '@/components/AssetBridgeHost';
@@ -84,8 +84,19 @@ describe('meeting recording and recovery', () => {
     expect(blockProp(block, 'transcript')).toEqual([
       {startMs: 250, endMs: 1500, text: 'hello'}, {startMs: 45250, endMs: 46500, text: 'hello'}, {startMs: 47250, endMs: 48500, text: 'hello'},
     ]);
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual(['0:asset-2', '45000:asset-2', '47000:asset-3']);
+    expect(invalidBlockProps('meeting', {transcriptionCompleted: blockProp(block, 'transcriptionCompleted')})).toBeNull();
     expect(docToJSON(decodeSnapshot(encodeSnapshot(doc)))).toEqual(docToJSON(doc));
     expect(track.stop).toHaveBeenCalled();
+  });
+
+  it.each([1.5, 1e-7, 1e21])('persists schema-valid completion keys when retrying a chunk starting at %s ms', async (startedAtMs) => {
+    const audio = {assetId: 'saved-audio', durationMs: 1000, startedAtMs};
+    const {session, block} = harness({status: 'done', audioChunks: [audio]});
+    session.retry(audio); await flush();
+    const completed = blockProp(block, 'transcriptionCompleted');
+    expect(completed).toEqual([chunkKey(audio)]);
+    expect(invalidBlockProps('meeting', {transcriptionCompleted: completed})).toBeNull();
   });
 
   it('keeps audio on upload failure, retries with exponential backoff, then permits manual recovery', async () => {
