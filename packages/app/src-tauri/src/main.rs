@@ -930,13 +930,19 @@ fn update_target() -> UpdateTarget {
 /// Whether `url` is the app's own document origin — the only origin the webview
 /// is ever allowed to navigate to. Covers the release custom protocol
 /// (`tauri://localhost` on macOS/Linux; `http(s)://tauri.localhost` on
-/// Windows/Android, incl. `useHttpsScheme`) and the dev server / loopback
-/// (`http://localhost:1420`). Everything else is refused (see `nav_guard`).
+/// Windows/Android, incl. `useHttpsScheme`). Debug builds also allow the dev
+/// server / loopback (`http://localhost:1420`). Release must not trust pages
+/// served by other local processes with the webview's microphone permission.
 fn is_app_origin(url: &tauri::Url) -> bool {
+    is_app_origin_for_build(url, cfg!(debug_assertions))
+}
+
+/// Explicit build policy so both release and dev semantics are tested together.
+fn is_app_origin_for_build(url: &tauri::Url, is_debug: bool) -> bool {
     match (url.scheme(), url.host_str().unwrap_or("")) {
         ("tauri", "localhost") => true,
         ("http" | "https", "tauri.localhost") => true,
-        ("http" | "https", "localhost" | "127.0.0.1") => true,
+        ("http" | "https", "localhost" | "127.0.0.1") => is_debug,
         _ => false,
     }
 }
@@ -1517,7 +1523,10 @@ fn reap_orphan_sidecar(_data_dir: &str) {
 
 #[cfg(test)]
 mod nav_guard_tests {
-    use super::{is_app_origin, nav_action, rate_limit_allows, NavAction, OPEN_EXTERNAL_MIN_GAP_MS};
+    use super::{
+        is_app_origin, is_app_origin_for_build, nav_action, rate_limit_allows, NavAction,
+        OPEN_EXTERNAL_MIN_GAP_MS,
+    };
 
     fn origin(url: &str) -> bool {
         is_app_origin(&tauri::Url::parse(url).unwrap())
@@ -1534,10 +1543,44 @@ mod nav_guard_tests {
         assert!(origin("tauri://localhost/index.html"));
         assert!(origin("https://tauri.localhost/"));
         assert!(origin("http://tauri.localhost/index.html"));
-        // Dev server (devUrl) + loopback.
-        assert!(origin("http://localhost:1420/"));
-        assert!(origin("http://localhost/"));
-        assert!(origin("http://127.0.0.1:1420/"));
+    }
+
+    #[test]
+    fn loopback_is_trusted_only_in_debug_builds() {
+        for scheme in ["http", "https"] {
+            for host in ["localhost", "127.0.0.1"] {
+                // Default, dev UI, dev API, and arbitrary co-resident ports.
+                for port in ["", ":1420", ":4319", ":54321"] {
+                    let url = tauri::Url::parse(&format!("{scheme}://{host}{port}/page")).unwrap();
+                    assert!(is_app_origin_for_build(&url, true), "{url}");
+                    assert!(!is_app_origin_for_build(&url, false), "{url}");
+                    assert_eq!(is_app_origin(&url), cfg!(debug_assertions), "{url}");
+                    assert_eq!(
+                        nav_action(&url),
+                        if cfg!(debug_assertions) {
+                            NavAction::Allow
+                        } else {
+                            NavAction::OpenExternal
+                        },
+                        "{url}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn custom_protocol_origins_are_trusted_in_both_builds() {
+        for url in [
+            "tauri://localhost/",
+            "http://tauri.localhost/",
+            "https://tauri.localhost/index.html",
+        ] {
+            let url = tauri::Url::parse(url).unwrap();
+            for is_debug in [false, true] {
+                assert!(is_app_origin_for_build(&url, is_debug), "{url}");
+            }
+        }
     }
 
     #[test]
@@ -1562,8 +1605,7 @@ mod nav_guard_tests {
     fn app_origins_navigate_in_place() {
         assert_eq!(action("tauri://localhost/"), NavAction::Allow);
         assert_eq!(action("https://tauri.localhost/index.html"), NavAction::Allow);
-        assert_eq!(action("http://localhost:1420/"), NavAction::Allow);
-        assert_eq!(action("http://127.0.0.1:1420/"), NavAction::Allow);
+        assert_eq!(action("http://tauri.localhost/"), NavAction::Allow);
     }
 
     #[test]
