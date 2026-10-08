@@ -10,11 +10,12 @@ afterEach(cleanup);
 const chat: AiConfig = {provider: 'claude', providers: {claude: {model: 'chat-model', apiKeySet: true}}, effort: 'high', thinking: false};
 const cloud: AiConfig['transcription'] = {provider: 'openai-compat', baseUrl: 'https://audio.example', model: 'audio-model', apiKeySet: true};
 
-function setup(initial: AiConfig = chat) {
+function setup(initial: AiConfig = chat, state: Partial<AiStatus> = {}) {
   let config = structuredClone(initial);
   const aiStatus = vi.fn(async (): Promise<AiStatus> => ({
     config: structuredClone(config), ready: false, embeddings: false, index: {pages: 0, builtAt: null},
     transcription: {model: 'base', modelPresent: false, runtimeAvailable: false, ready: false, downloadUrl: 'https://example.com/base.bin'},
+    ...state,
   }));
   const aiSetConfig = vi.fn(async (next: AiConfig) => {
     // Simulate the server's redaction and preserve/set/clear key contract.
@@ -30,14 +31,15 @@ function setup(initial: AiConfig = chat) {
     config = saved;
     return structuredClone(config);
   });
-  const client = {aiStatus, aiSetConfig, aiSkills: async () => []} as unknown as DataClient;
+  const aiDownloadModel = vi.fn<(_url?: string) => Promise<void>>(async () => {});
+  const client = {aiStatus, aiSetConfig, aiDownloadModel, aiSkills: async () => []} as unknown as DataClient;
   const mount = () => render(
     <I18nProvider><PreferencesProvider><ConfirmProvider><DataProvider client={client}>
       <AiSettings />
     </DataProvider></ConfirmProvider></PreferencesProvider></I18nProvider>,
   );
   const view = mount();
-  return {aiStatus, aiSetConfig, view, mount};
+  return {aiStatus, aiSetConfig, aiDownloadModel, view, mount};
 }
 
 async function section() {
@@ -51,14 +53,14 @@ describe('AI transcription settings', () => {
     let {picker, audio} = await section();
     expect(picker.dataset.value).toBe('local');
     expect(audio.queryByLabelText('API key')).toBeNull();
-    expect(audio.getByRole('link', {name: 'Local transcription setup'}).getAttribute('href')).toContain('docs/local-transcription.md');
+    expect(audio.getByRole('button', {name: 'Enable local transcription'})).toBeTruthy();
     for (const provider of ['openai-compat', 'off', 'local']) {
       fireEvent.click(picker);
       fireEvent.click(await screen.findByRole('option', {name: provider === 'local' ? 'Default (local)' : provider === 'off' ? 'Off' : 'Cloud (OpenAI-compatible)'}));
       await waitFor(() => expect(picker.closest('section')?.getAttribute('aria-busy')).toBe('false'));
       expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, transcription: expect.objectContaining({provider})});
       expect(Boolean(audio.queryByLabelText('API key'))).toBe(provider === 'openai-compat');
-      expect(Boolean(audio.queryByRole('button', {name: 'Download Whisper base'}))).toBe(provider === 'local');
+      expect(Boolean(audio.queryByRole('button', {name: 'Enable local transcription'}))).toBe(provider === 'local');
       expect(Boolean(audio.queryByText(/Model not downloaded/))).toBe(provider === 'local');
       if (provider !== 'local') expect(audio.getByText('Local Whisper is not used with this provider.')).toBeTruthy();
       if (provider === 'openai-compat') {
@@ -203,4 +205,76 @@ describe('AI transcription settings', () => {
     expect(document.activeElement).toBe(picker);
   });
 
+});
+
+const fresh: NonNullable<AiStatus['transcription']> = {
+  model: 'base', modelPresent: false, runtimeAvailable: false, ready: false, downloadUrl: 'https://example.com/base.bin',
+  runtime: {target: 'fixture', tools: {'whisper-cli': {status: 'missing'}, ffmpeg: {status: 'missing'}}},
+};
+
+it('enables once, polls runtime then model progress, and finishes ready', async () => {
+  const state: Partial<AiStatus> = {transcription: structuredClone(fresh)};
+  const {aiDownloadModel} = setup(chat, state);
+  const {audio} = await section();
+  aiDownloadModel.mockImplementation(async () => {
+    state.transcription!.runtime!.tools['whisper-cli'].status = 'provisioning';
+    state.download = {url: fresh.downloadUrl, received: 0, total: null, done: false};
+  });
+  fireEvent.click(audio.getByRole('button', {name: 'Enable local transcription'}));
+  expect(await audio.findByText('whisper-cli: Preparing runtime…')).toBeTruthy();
+  expect((audio.getByRole('button', {name: 'Setting up local transcription…'}) as HTMLButtonElement).disabled).toBe(true);
+  expect(aiDownloadModel).toHaveBeenCalledExactlyOnceWith(fresh.downloadUrl);
+  state.transcription!.runtime!.tools = {'whisper-cli': {status: 'provisioned'}, ffmpeg: {status: 'provisioned'}};
+  state.download = {url: fresh.downloadUrl, received: 50, total: 100, done: false};
+  expect(await audio.findByText('Whisper model: Downloading 50%', {}, {timeout: 2500})).toBeTruthy();
+  state.transcription = {...state.transcription!, modelPresent: true, runtimeAvailable: true, ready: true};
+  state.download.done = true;
+  expect(await audio.findByText('Ready to transcribe.', {}, {timeout: 2500})).toBeTruthy();
+  expect(audio.queryByRole('button', {name: /local transcription/})).toBeNull();
+});
+
+it.each(['model', 'runtime'])('offers an update for stale %s receipts', async (stage) => {
+  const transcription = structuredClone(fresh);
+  if (stage === 'model') transcription.modelUpdateAvailable = true;
+  else transcription.runtime!.tools.ffmpeg = {status: 'missing', installedVersion: '1', version: '2'};
+  setup(chat, {transcription});
+  const {audio} = await section();
+  expect(audio.getByRole('button', {name: 'Update local transcription'})).toBeTruthy();
+});
+
+it('keeps partial unsupported runtime informative and names active and broken overrides', async () => {
+  const transcription = structuredClone(fresh);
+  transcription.runtime!.tools = {'whisper-cli': {status: 'unsupported'}, ffmpeg: {status: 'provisioned'}};
+  const {view} = setup(chat, {transcription});
+  let {audio} = await section();
+  expect(audio.getByText(/whisper-cli: Built-in runtime unavailable.*OPENBOOK_WHISPER_BIN/)).toBeTruthy();
+  expect(audio.queryByRole('alert')).toBeNull();
+  expect(audio.getByText('ffmpeg: Installed')).toBeTruthy();
+  view.unmount();
+  transcription.runtime!.tools = {
+    'whisper-cli': {status: 'unsupported', override: 'OPENBOOK_WHISPER_BIN', available: true},
+    ffmpeg: {status: 'missing', override: 'OPENBOOK_FFMPEG_BIN', available: false},
+  };
+  setup(chat, {transcription});
+  ({audio} = await section());
+  expect(audio.getByText('whisper-cli: Using OPENBOOK_WHISPER_BIN.')).toBeTruthy();
+  expect(audio.getByText(/ffmpeg: OPENBOOK_FFMPEG_BIN is set, but/)).toBeTruthy();
+});
+
+it.each(['runtime', 'model', 'request'])('names the failing %s stage and allows retry', async (stage) => {
+  const transcription = structuredClone(fresh);
+  const state: Partial<AiStatus> = {transcription};
+  if (stage === 'runtime') {
+    transcription.runtime!.tools.ffmpeg = {status: 'failed', detail: 'offline'};
+    state.download = {url: fresh.downloadUrl, received: 100, total: 100, done: true, error: 'ffmpeg: offline'};
+  }
+  if (stage === 'model') state.download = {url: fresh.downloadUrl, received: 0, total: 100, done: false, error: 'checksum mismatch'};
+  const {aiDownloadModel} = setup(chat, state);
+  const {audio} = await section();
+  if (stage === 'request') {
+    aiDownloadModel.mockRejectedValueOnce(new Error('Forbidden'));
+    fireEvent.click(audio.getByRole('button', {name: 'Enable local transcription'}));
+  }
+  expect((await audio.findByRole('alert')).textContent).toBe(stage === 'runtime' ? 'ffmpeg: Failed: offline' : stage === 'model' ? 'Whisper model: checksum mismatch' : 'Could not start local transcription setup: Forbidden');
+  expect((audio.getByRole('button', {name: 'Enable local transcription'}) as HTMLButtonElement).disabled).toBe(false);
 });
