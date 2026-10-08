@@ -1,4 +1,4 @@
-import {readFile, rename, stat, unlink, writeFile} from 'node:fs/promises';
+import {open, readFile, rename, stat, unlink, writeFile} from 'node:fs/promises';
 import {downloadVerified, type DownloadProgress} from './download';
 import type {ArtifactPin} from './runtimeManifest';
 
@@ -9,12 +9,12 @@ export async function downloadPinned(
   pin: ArtifactPin,
   dest: string,
   onProgress?: (progress: DownloadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
+  signal?.throwIfAborted();
   const receipt = `${dest}.verified.json`;
-  const identity = JSON.stringify({version: pin.version, url: pin.url, sha256: pin.sha256, size: pin.size});
-  const current = await readFile(receipt, 'utf8').catch(() => null);
-  const file = await stat(dest).catch(() => null);
-  if (current === identity && file?.isFile() && file.size === pin.size) {
+  const identity = pinIdentity(pin);
+  if (await isPinnedCurrent(pin, dest)) {
     onProgress?.({received: pin.size, total: pin.size});
     return;
   }
@@ -23,11 +23,26 @@ export async function downloadPinned(
     if (error.code !== 'ENOENT') throw error;
   });
   try {
-    await downloadVerified(pin.url, dest, pin, onProgress);
+    await downloadVerified(pin.url, dest, pin, onProgress, signal);
     await writeFile(`${receipt}.part`, identity);
+    const handle = await open(`${receipt}.part`, 'r+');
+    try { await handle.sync(); } finally { await handle.close(); }
+    signal?.throwIfAborted();
     await rename(`${receipt}.part`, receipt);
   } catch (error) {
     await unlink(`${receipt}.part`).catch(() => undefined);
     throw error;
   }
+}
+
+export function pinIdentity(pin: ArtifactPin): string {
+  return JSON.stringify({version: pin.version, url: pin.url, sha256: pin.sha256, size: pin.size});
+}
+
+export async function isPinnedCurrent(pin: ArtifactPin, dest: string): Promise<boolean> {
+  const [receipt, file] = await Promise.all([
+    readFile(`${dest}.verified.json`, 'utf8').catch(() => null),
+    stat(dest).catch(() => null),
+  ]);
+  return receipt === pinIdentity(pin) && Boolean(file?.isFile() && file.size === pin.size);
 }

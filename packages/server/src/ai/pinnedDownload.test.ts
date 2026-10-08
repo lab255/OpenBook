@@ -4,7 +4,7 @@ import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {downloadPinned} from './pinnedDownload';
+import {downloadPinned, isPinnedCurrent} from './pinnedDownload';
 
 const bytes = 'model bytes';
 const pin = {version: 'v1', url: 'https://example.test/model.bin', sha256: createHash('sha256').update(bytes).digest('hex'), size: Buffer.byteLength(bytes)};
@@ -53,4 +53,32 @@ it('does not leave a valid receipt or partial after a failed upgrade, and allows
   for (const suffix of ['.part', '.verified.json', '.verified.json.part']) expect(existsSync(`${dest}${suffix}`)).toBe(false);
   await downloadPinned(next, dest);
   expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+it('readiness requires the current identity and size, including failed upgrades', async () => {
+  expect(await isPinnedCurrent(pin, dest)).toBe(false);
+  await writeFile(dest, bytes);
+  expect(await isPinnedCurrent(pin, dest)).toBe(false);
+  await downloadPinned(pin, dest);
+  expect(await isPinnedCurrent(pin, dest)).toBe(true);
+  const next = {...pin, version: 'next'};
+  expect(await isPinnedCurrent(next, dest)).toBe(false);
+  fetchMock.mockResolvedValueOnce(new Response('bad'));
+  await expect(downloadPinned(next, dest)).rejects.toThrow();
+  expect(await isPinnedCurrent(pin, dest)).toBe(false);
+});
+
+it('cancels streaming and safely overwrites an orphan partial on retry', async () => {
+  const controller = new AbortController();
+  fetchMock.mockResolvedValueOnce(new Response(new ReadableStream({
+    start(stream) { stream.enqueue(new TextEncoder().encode('model')); },
+  })));
+  await expect(downloadPinned(pin, dest, ({received}) => {
+    if (received) controller.abort();
+  }, controller.signal)).rejects.toMatchObject({name: 'AbortError'});
+  expect(await isPinnedCurrent(pin, dest)).toBe(false);
+  expect(existsSync(`${dest}.part`)).toBe(false);
+  await writeFile(`${dest}.part`, 'orphan');
+  await downloadPinned(pin, dest);
+  expect(await isPinnedCurrent(pin, dest)).toBe(true);
 });
