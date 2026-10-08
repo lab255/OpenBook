@@ -28,7 +28,10 @@ case "$TARGET" in
   *linux-gnu)
     args+=(-DGGML_METAL=OFF '-DCMAKE_EXE_LINKER_FLAGS=-static-libgcc -static-libstdc++') ;;
   *windows-msvc)
-    args+=(-DGGML_METAL=OFF -A x64 '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded') ;;
+    # Upstream's cmake_minimum_required predates CMP0091; opt in explicitly
+    # or CMAKE_MSVC_RUNTIME_LIBRARY is ignored and /MD wins.
+    args+=(-DGGML_METAL=OFF -A x64 -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+      '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded') ;;
 esac
 cmake -S whisper -B whisper/build "${args[@]}"
 cmake --build whisper/build --config Release --target whisper-cli --parallel 3
@@ -67,7 +70,10 @@ if [ "$TARGET" = aarch64-apple-darwin ]; then
   cp ffmpeg/LICENSE.md stage/ffmpeg/
   # Enforce the license result rather than relying only on configure flags.
   ffmpeg/ffmpeg -L > stage/ffmpeg/license-output.txt 2>&1
-  grep -q 'GNU Lesser General Public License' stage/ffmpeg/license-output.txt
+  tr '\n' ' ' < stage/ffmpeg/license-output.txt | grep -q 'GNU Lesser General Public License'
+  for feature in GPL NONFREE VERSION3; do
+    grep -qx "#define CONFIG_${feature} 0" ffmpeg/config.h
+  done
   printf 'FFmpeg n7.1.1\nsource=db69d06eeeab4f46da15030a80d539efb4503ca8\ntarget=%s\n' "$TARGET" > stage/ffmpeg/BUILD.txt
   ffmpeg/ffmpeg -buildconf >> stage/ffmpeg/BUILD.txt 2>&1
   clang --version >> stage/ffmpeg/BUILD.txt
@@ -76,6 +82,6 @@ if [ "$TARGET" = aarch64-apple-darwin ]; then
   mkdir -p stage/sources
   git -C whisper archive --format=tar --prefix=whisper/ HEAD > stage/sources/whisper-1.8.2.tar
   git -C ffmpeg archive --format=tar --prefix=ffmpeg/ HEAD > stage/sources/ffmpeg-7.1.1.tar
-  cp "$recipe_dir"/*.patch "$recipe_dir"/build.sh stage/sources/
+  cp "$recipe_dir"/*.patch "$recipe_dir"/build.sh "$recipe_dir"/smoke.sh stage/sources/
   cp "$recipe_dir"/../../../docs/runtime-binaries.md stage/sources/README.md
 fi

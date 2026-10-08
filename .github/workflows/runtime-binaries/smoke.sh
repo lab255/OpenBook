@@ -25,7 +25,18 @@ else
 fi
 if [ -f stage/ffmpeg/ffmpeg ]; then
   python3 - <<'PY'
+import subprocess
 import wave
+binary = 'stage/ffmpeg/ffmpeg'
+required = {
+    '-demuxers': {'matroska', 'webm', 'ogg', 'mov', 'mp4', 'wav'},
+    '-decoders': {'opus', 'vorbis', 'aac', 'pcm_s16le', 'pcm_s24le', 'pcm_s32le', 'pcm_f32le', 'pcm_f64le', 'pcm_u8'},
+    '-encoders': {'pcm_s16le'},
+}
+for option, expected in required.items():
+    output = subprocess.check_output([binary, '-hide_banner', option], text=True)
+    available = {name for line in output.splitlines() if len(line.split()) >= 2 for name in line.split()[1].split(',')}
+    assert expected <= available, (option, expected - available)
 with wave.open('stage/probe.wav', 'wb') as f:
     f.setparams((1, 2, 48000, 4800, 'NONE', 'not compressed'))
     f.writeframes(b'\0\0' * 4800)

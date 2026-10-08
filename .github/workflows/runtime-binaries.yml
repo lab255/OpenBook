@@ -227,6 +227,20 @@ jobs:
       - name: Native smoke tests after signing
         run: bash .github/workflows/runtime-binaries/smoke.sh
 
+      - name: Verify Windows standalone dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbin = & $vswhere -latest -products '*' -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin.exe not found" }
+          $dependencies = & $dumpbin /DEPENDENTS stage/whisper/whisper-cli.exe
+          if ($LASTEXITCODE -ne 0) { throw "dumpbin failed" }
+          $dependencies
+          if ($dependencies -match '(?i)(VCRUNTIME|MSVCP|whisper|ggml|libomp).*\.dll') {
+            throw "Unexpected companion DLL: static runtime build required"
+          }
+
       - name: Package final signed bytes
         run: |
           python - <<'PY'

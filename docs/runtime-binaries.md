@@ -23,13 +23,14 @@ must succeed before the single upload job can create/update a draft.
 - Upstream whisper lacks `--version`; FFmpeg spells it `-version`. The two small
   checked-in patches add the requested probe without changing inference or codec
   behavior. The workflow also runs whisper `--help`, checks Unix dependencies,
-  and converts a generated WAV through FFmpeg.
+  asserts the required demuxers/decoders/encoder, and converts a generated WAV
+  through FFmpeg.
 - `whisper-cli-1.8.2-<target>.zip` (four files) and
   `ffmpeg-7.1.1-aarch64-apple-darwin.zip` contain a root-level executable,
   licenses, `BUILD.txt` and `SIGNING.txt`. No companion whisper DLLs are needed.
   Checksums refer to these **final signed ZIP bytes**, not the inner executables.
 - `runtime-binaries-sources.zip` contains complete pristine source tarballs,
-  patches, this document and the exact `build.sh`. `checksums.txt` and
+  patches, this document and the exact build/smoke scripts. `checksums.txt` and
   `assets.json` list all six ZIPs; the latter includes sizes for manifest pins.
   Source commits and build configuration are reproducible inputs, not a claim
   of byte-identical output across evolving runner SDKs or timestamped signing.
