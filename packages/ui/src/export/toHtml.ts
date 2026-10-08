@@ -54,7 +54,7 @@ import {
   renderLedgerReportBlock,
   type LedgerExportRecords,
 } from './exportLedgerReports';
-import {COLOR_EXPORT_HEX} from '../blockeditor/colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../blockeditor/colors';
 import {kitChartRuntime, kitChartSvg} from './kitChart';
 import {formatValue} from './format';
 import {inlineScriptHash, pageCsp} from './exportCsp';
@@ -1258,9 +1258,7 @@ const SCHEME_DUAL = `
      (the light-theme hex go muddy). Inline runs reference these via var(); when
      this query is inactive the var() falls back to the baked light hex. */
   :root {
-    --obtc-gray: #9ca3af; --obtc-brown: #c8956b; --obtc-orange: #fb923c;
-    --obtc-yellow: #fcd34d; --obtc-green: #4ade80; --obtc-blue: #60a5fa;
-    --obtc-purple: #c084fc; --obtc-pink: #f472b6; --obtc-red: #f87171;
+    ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtc-${token}: ${value.fg};`).join('\n    ')}
   }
   /* The ledger alarm red (#b91c1c) goes muddy on the dark page — lighten it. */
   .ob-ledger-note.is-alarm { color: #f87171; }

@@ -2298,8 +2298,8 @@ a.obe-mention {
 /* Text colours (block `fg`, inline `tc`). */
 .obe-fg-gray { color: hsl(0 0% 45%); }
 .obe-fg-brown { color: hsl(25 35% 38%); }
-.obe-fg-orange { color: hsl(28 80% 42%); }
-.obe-fg-yellow { color: hsl(42 80% 36%); }
+.obe-fg-orange { color: hsl(28 80% 39%); }
+.obe-fg-yellow { color: hsl(42 80% 33%); }
 .obe-fg-green { color: hsl(140 50% 34%); }
 .obe-fg-blue { color: hsl(210 72% 45%); }
 .obe-fg-purple { color: hsl(265 55% 52%); }

@@ -19,8 +19,10 @@ const cellColor = (cell: Element): string | undefined => {
   const raw = (cell as HTMLElement).style.backgroundColor || (cell as HTMLElement).style.background;
   if (!raw) return undefined;
   if (colorByCss.has(raw.toLowerCase())) return colorByCss.get(raw.toLowerCase());
-  const match = raw.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
-  const hex = match ? `#${match.slice(1).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : '';
+  const match = raw.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  const rgb = match ? match.slice(1, 4).map((n) => Number(n).toString(16).padStart(2, '0')).join('') : '';
+  const alpha = match?.[4] === undefined ? '' : Math.round(Number(match[4]) * 255).toString(16).padStart(2, '0');
+  const hex = rgb ? `#${rgb}${alpha}` : '';
   return colorByCss.get(hex);
 };
 

@@ -22,7 +22,13 @@ describe('parseClipboardGrid', () => {
   });
 
   it('preserves an exported cell background token', () => {
-    expect(parseClipboardGrid({html: '<table><tr><td style="background:#dcfce7">A</td></tr></table>'})).toEqual([
+    expect(parseClipboardGrid({html: '<table><tr><td style="background:#31c4624d">A</td></tr></table>'})).toEqual([
+      [{text: 'A', color: 'green'}],
+    ]);
+  });
+
+  it('preserves browser-serialized translucent export colours', () => {
+    expect(parseClipboardGrid({html: '<table><tr><td style="background:rgba(49, 196, 98, 0.302)">A</td></tr></table>'})).toEqual([
       [{text: 'A', color: 'green'}],
     ]);
   });
@@ -102,7 +108,7 @@ describe('tablePasteGrid', () => {
 
   it('applies tint-carrying HTML cells to the destination range', () => {
     const doc = seededTable();
-    const source = parseClipboardGrid({html: '<table><tr><td style="background:#dbeafe">A</td><td style="background:#fee2e2">B</td></tr></table>'})!;
+    const source = parseClipboardGrid({html: '<table><tr><td style="background:#3994ef47">A</td><td style="background:#e4444447">B</td></tr></table>'})!;
     tablePasteGrid(doc, 'tbl', {row: 1, col: 1}, source);
     const grid = tableGrid(findBlock(doc, 'tbl')!.block);
     expect(tableCellOwnColor(grid.cells[1][1]!)).toBe('blue');
