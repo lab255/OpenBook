@@ -21,6 +21,11 @@ args=(
   -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF
   -DGGML_BMI2=OFF -DGGML_SSE42=OFF
 )
+# x86-64-v3 floor; arm64 keeps the existing configuration.
+if [[ "$TARGET" == x86_64-* ]]; then
+  args+=(-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
+    -DGGML_BMI2=ON -DGGML_SSE42=ON)
+fi
 case "$TARGET" in
   *apple-darwin)
     args+=(-DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON
@@ -40,6 +45,9 @@ if [[ "$TARGET" == *windows-msvc ]]; then binary=whisper/build/bin/Release/whisp
 cp "$binary" stage/whisper/
 cp whisper/LICENSE stage/whisper/LICENSE-whisper.txt
 printf 'whisper.cpp v1.8.2\nsource=4979e04f5dcaccb36057e059bbaed8a2f5288315\ntarget=%s\n' "$TARGET" > stage/whisper/BUILD.txt
+if [[ "$TARGET" == x86_64-* ]]; then
+  printf 'cpu_floor=x86-64-v3 (AVX2/FMA/etc; Intel Haswell 2013+/AMD Excavator+)\n' >> stage/whisper/BUILD.txt
+fi
 printf '%q ' cmake "${args[@]}" >> stage/whisper/BUILD.txt
 printf '\n' >> stage/whisper/BUILD.txt
 cmake --version >> stage/whisper/BUILD.txt
@@ -68,6 +76,7 @@ if [ "$TARGET" = aarch64-apple-darwin ]; then
   cp ffmpeg/ffmpeg stage/ffmpeg/
   cp ffmpeg/COPYING.LGPLv2.1 stage/ffmpeg/LICENSE-ffmpeg.txt
   cp ffmpeg/LICENSE.md stage/ffmpeg/
+  printf 'Corresponding source (LGPL-2.1-or-later), patches and build recipe:\nhttps://github.com/%s/releases/download/%s/runtime-binaries-sources.zip\n' "${GITHUB_REPOSITORY:-lab255/OpenBook}" "${RELEASE_TAG:-runtime-binaries-v1}" > stage/ffmpeg/SOURCE.txt
   # Enforce the license result rather than relying only on configure flags.
   ffmpeg/ffmpeg -L > stage/ffmpeg/license-output.txt 2>&1
   tr '\n' ' ' < stage/ffmpeg/license-output.txt | grep -q 'GNU Lesser General Public License'

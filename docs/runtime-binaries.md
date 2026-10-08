@@ -9,8 +9,10 @@ must succeed before the single upload job can create/update a draft.
 ## Build contract
 
 - whisper.cpp **v1.8.2**, commit `4979e04f5dcaccb36057e059bbaed8a2f5288315`:
-  macOS arm64 / Intel, Ubuntu 22.04 x64, Windows x64. No host-native CPU tuning
-  or AVX requirement; static ggml/whisper, embedded Metal source on both Macs,
+  macOS arm64 / Intel, Ubuntu 22.04 x64, Windows x64. No host-native CPU
+  tuning; x86_64 requires x86-64-v3 (AVX2/FMA/etc; Intel Haswell 2013+/AMD
+  Excavator+), recorded in `BUILD.txt` beside `SIGNING.txt`. Arm64 is unchanged.
+  Static ggml/whisper, embedded Metal source on both Macs,
   static C++/GCC runtimes on Linux, static MSVC runtime on Windows. Linux still
   requires glibc 2.35 or newer; macOS deployment target is 13.0. No cross-builds.
 - FFmpeg **7.1.1**, commit `db69d06eeeab4f46da15030a80d539efb4503ca8`:
@@ -42,15 +44,19 @@ the native host architecture before building.
 ## Signing configuration
 
 Build jobs use the existing **publish** environment. Its deployment branch/tag
-policy must allow `runtime-binaries-v*` and the branch used for dispatch (usually
-`main`); the existing `v*` pattern does not match these tags. No extra approval
-gate is introduced by this workflow.
+policy must allow `main` and `runtime-binaries-v*` only; the existing `v*` pattern
+does not match these tags. The prepare job requires the source commit to be on
+`main`. The owner must also add a tag ruleset restricting `runtime-binaries-v*`
+creation to admins. No extra approval gate is introduced by this workflow.
+Enabling GitHub **Immutable releases** is REQUIRED before publishing.
 
 - macOS secrets: `APPLE_CERTIFICATE` (base64 Developer ID Application PKCS#12),
   `APPLE_CERTIFICATE_PASSWORD`. Identity is derived from the imported certificate;
   no extra identity secret is required. A temporary keychain is removed after use.
-  Missing configuration emits a loud warning and records unsigned status; bad
-  credentials or signing failures fail the job. These raw binaries are codesigned
+  Optional variable `MACOS_SIGNING_REQUIRED=1` fails closed if both secrets are
+  absent. Partial configuration always fails. Entirely absent configuration
+  otherwise emits a loud warning and records unsigned status; bad credentials
+  or signing failures fail the job. These raw binaries are codesigned
   with a secure timestamp and hardened runtime, **not notarized**. Notarization
   is a separate follow-up; no Apple account credentials are consumed here.
 - Windows secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`.
@@ -64,7 +70,9 @@ gate is introduced by this workflow.
 
 Before publishing, inspect `SIGNING.txt` in **each** archive, certificate identities,
 checksums and native smoke logs. An unsigned draft is for inspection, not automatic
-production activation. This workflow never publishes a draft automatically.
+production activation. Pins must not be activated from a leg whose `SIGNING.txt`
+says `UNSIGNED` (Linux exempt: no platform signer). This workflow never publishes
+a draft automatically.
 
 ## Activate pins only after publication
 
@@ -76,9 +84,12 @@ status flips**. Do not cherry-pick a replacement of the whole WSP-1 manifest.
 
 1. Merge this workflow, configure signing, dispatch `runtime-binaries-v1`.
 2. Download all six ZIPs plus `assets.json` and `checksums.txt` from the draft.
-   Independently run `shasum -a 256` and check byte sizes; inspect licenses,
-   signing status and source correspondence. Test extraction and execution on
-   each supported OS. Publish the reviewed draft manually.
+   Compute `shasum -a 256` of the downloaded ZIPs yourself and match the digests
+   and byte sizes against the **workflow run's job summary**, not the draft's
+   `checksums.txt`. Any mismatch: discard the draft and rebuild under a new tag.
+   Inspect licenses, signing status and source correspondence. Test extraction
+   and execution on each supported OS. Publish the reviewed draft manually:
+   keep 'pre-release' checked; never set as latest.
 3. Apply the prepared patch with `git apply --check` then `git apply`. For each
    `PENDING_OWN_RUNTIME_ASSETS` entry, replace only the matching tool pin with:
 
@@ -87,7 +98,7 @@ status flips**. Do not cherry-pick a replacement of the whole WSP-1 manifest.
      status: 'supported',
      version: pending.version,
      url: ownRuntimeAssetUrl(pending.asset),
-     sha256: /* literal independently verified ZIP digest from checksums.txt */,
+     sha256: /* literal digest you computed, matched against the run summary */,
      size: /* literal ZIP size in bytes from assets.json */,
      archive: 'zip',
      binaryPath: pending.binaryPath,
@@ -128,7 +139,8 @@ Preserve each mirrored provider's corresponding source and notices as well.
 
 whisper.cpp/ggml are MIT; retain the bundled notices. Our FFmpeg is
 LGPL-2.1-or-later. Distribute the full corresponding source, modifications and
-build recipe beside the executable, retain notices, and permit rebuilding with
+build recipe beside the executable. The bundled FFmpeg `SOURCE.txt` points to
+the corresponding source ZIP for that release. Retain notices, and permit rebuilding with
 modified libraries. These are separate executables invoked by OpenBook, not
 libraries linked into OpenBook. See [FFmpeg's license guidance](https://www.ffmpeg.org/legal.html)
 for distribution requirements; do not label third-party code MIT merely because

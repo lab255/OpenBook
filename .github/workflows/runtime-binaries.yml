@@ -24,6 +24,10 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Validate release tag and refuse a published release
         id: tag
         env:
@@ -42,6 +46,7 @@ jobs:
           if awk -F '\t' -v tag="$tag" '$1 == tag && $2 != "true" {found=1} END {exit !found}' releases.tsv; then
             echo '::error::Release already published; choose a new tag'; exit 1
           fi
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo '::error::Source commit is not on main'; exit 1; }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   build:
@@ -66,7 +71,11 @@ jobs:
         shell: bash
     env:
       TARGET: ${{ matrix.target }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
     steps:
+      - name: Keep LF line endings (Windows)
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -174,9 +183,16 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
         run: |
           set -euo pipefail
-          if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+          if { [ -n "$APPLE_CERTIFICATE" ] && [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; } ||
+             { [ -z "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ]; }; then
+            echo '::error::Apple signing configuration is partial'
+            exit 1
+          fi
+          if [ -z "$APPLE_CERTIFICATE" ] && [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            [ "$(echo "$MACOS_SIGNING_REQUIRED" | xargs)" != 1 ] || { echo '::error::MACOS_SIGNING_REQUIRED=1 but Apple secrets absent'; exit 1; }
             echo '::warning::Runtime binaries are UNSIGNED: set APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD in publish. Review before publishing.'
             for dir in stage/whisper stage/ffmpeg; do
               [ ! -d "$dir" ] || echo 'UNSIGNED: Developer ID secrets missing' > "$dir/SIGNING.txt"
@@ -256,6 +272,17 @@ jobs:
                       if path.is_file():
                           archive.write(path, path.relative_to(root))
           PY
+      - name: Smoke extracted final archives
+        run: |
+          set -euo pipefail
+          for z in dist/whisper-cli-*.zip dist/ffmpeg-*.zip; do
+            [ -f "$z" ] || continue
+            name=$(basename "$z"); tool=${name%%-[0-9]*}
+            d="$RUNNER_TEMP/x-${name%.zip}"; rm -rf "$d"; mkdir -p "$d"
+            if [ "$RUNNER_OS" = Windows ]; then python -m zipfile -e "$z" "$d"; b="$d/$tool.exe"
+            else unzip -q "$z" -d "$d"; b="$d/$tool"; [ -x "$b" ] || { echo "::error::$name lost exec bit"; exit 1; }; fi
+            "$b" --version
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: runtime-${{ matrix.target }}
@@ -293,6 +320,7 @@ jobs:
           (root / 'checksums.txt').write_text(''.join(f"{a['sha256']}  {a['name']}\n" for a in assets))
           PY
           (cd dist && sha256sum --check checksums.txt)
+          { echo '### Final asset SHA-256 / size'; echo '```'; cat dist/checksums.txt; cat dist/assets.json; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Create or update only a draft release
         env:
           SOURCE_COMMIT: ${{ github.sha }}
@@ -303,9 +331,12 @@ jobs:
           if [ -n "$state" ] && [ "$state" != true ]; then
             echo '::error::Refusing to overwrite a published release'; exit 1
           fi
+          notes="Runtime builds from $SOURCE_COMMIT. Inspect each SIGNING.txt before publishing: missing credentials produce UNSIGNED assets. FFmpeg arm64 is LGPL-2.1-or-later; corresponding source, patches and recipe are in runtime-binaries-sources.zip. Verify downloaded ZIP hashes and sizes against the workflow run's job summary. Manifest activation is a separate reviewed change; see docs/runtime-binaries.md."
           if [ -z "$state" ]; then
-            gh release create "$RELEASE_TAG" --draft --target "$SOURCE_COMMIT" \
+            gh release create "$RELEASE_TAG" --draft --prerelease --target "$SOURCE_COMMIT" \
               --title "OpenBook $RELEASE_TAG" \
-              --notes "Runtime builds from $SOURCE_COMMIT. Inspect each SIGNING.txt before publishing: missing credentials produce UNSIGNED assets. FFmpeg arm64 is LGPL-2.1-or-later; corresponding source, patches and recipe are in runtime-binaries-sources.zip. Verify checksums.txt and assets.json. Manifest activation is a separate reviewed change; see docs/runtime-binaries.md."
+              --notes "$notes"
+          else
+            gh release edit "$RELEASE_TAG" --draft --target "$SOURCE_COMMIT" --notes "$notes"
           fi
           gh release upload "$RELEASE_TAG" dist/* --clobber
