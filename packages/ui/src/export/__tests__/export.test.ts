@@ -146,6 +146,20 @@ describe('toMarkdown', () => {
   });
 });
 
+describe('stored callout variants', () => {
+  it.each([
+    ['warn', 'rgba(245,158,11,.12)', '⚠️'],
+    ['success', 'rgba(34,197,94,.12)', '✅'],
+    ['danger', 'rgba(239,68,68,.12)', '🛑'],
+  ])('exports %s with its matching tint and icon', (variant, tint, icon) => {
+    const blocks: BlockJSON[] = [{id: 'callout', type: 'callout', text: [{t: 'Notice'}], props: {variant}}];
+    const html = toHtml(snapshot(projectBlocksForExport(blocks).blocks), 'T', '');
+    expect(html).toContain(`data-variant="${variant}"`);
+    expect(html).toContain(`.callout[data-variant=${variant}] { background: ${tint};`);
+    expect(html).toContain(`.callout[data-variant=${variant}]::before { content: "${icon}"; }`);
+  });
+});
+
 describe('new block types', () => {
   const blocks = [
     {type: 'header', data: {text: 'Alpha', level: 2}},

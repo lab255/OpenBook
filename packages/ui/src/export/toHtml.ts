@@ -1399,11 +1399,11 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .82em; margin: 1px 2px 1px 0; }
 .callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: 1px solid; }
 .callout::before { content: "💡"; }
-.callout[data-variant=warning]::before { content: "⚠️"; }
+.callout[data-variant=warning]::before, .callout[data-variant=warn]::before { content: "⚠️"; }
 .callout[data-variant=success]::before { content: "✅"; }
 .callout[data-variant=danger]::before { content: "🛑"; }
 .callout { background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.35); }
-.callout[data-variant=warning] { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.4); }
+.callout[data-variant=warning], .callout[data-variant=warn] { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.4); }
 .callout[data-variant=success] { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
 .callout[data-variant=danger] { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
 .callout__body { flex: 1; }
