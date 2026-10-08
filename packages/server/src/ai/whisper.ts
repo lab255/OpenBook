@@ -115,12 +115,20 @@ export class LocalWhisper implements TranscriptionEngine {
       isPinnedCurrent(WHISPER_MODEL_PIN, path.join(this.modelsDir, WHISPER_MODEL)),
       this.runtime.status(),
     ]);
+    for (const [tool, override, resolved] of [
+      ['whisper-cli', this.whisperCommand, whisper], ['ffmpeg', this.ffmpegCommand, ffmpeg],
+    ] as const) {
+      runtime.tools[tool].available = Boolean(resolved);
+      if (override) runtime.tools[tool].override = tool === 'whisper-cli' ? 'OPENBOOK_WHISPER_BIN' : 'OPENBOOK_FFMPEG_BIN';
+      else if (resolved && !await this.runtime.binary(tool)) runtime.tools[tool].override = 'PATH';
+    }
+    const modelUpdateAvailable = !modelPresent && await stat(path.join(this.modelsDir, WHISPER_MODEL)).then((file) => file.isFile(), () => false);
     const runtimeAvailable = Boolean(whisper && ffmpeg);
     return {
-      model: WHISPER_MODEL, modelPresent, runtimeAvailable, ready: modelPresent && runtimeAvailable && !this.disposed,
+      model: WHISPER_MODEL, modelPresent, modelUpdateAvailable, runtimeAvailable, ready: modelPresent && runtimeAvailable && !this.disposed,
       downloadUrl: WHISPER_MODEL_URL, runtime,
-      detail: !runtimeAvailable ? 'Install whisper.cpp (whisper-cli) and FFmpeg on the server, then return to Settings → AI.'
-        : !modelPresent ? 'Download Whisper base in Settings → AI to enable local transcription.' : undefined,
+      detail: !runtimeAvailable ? 'Enable local transcription in Settings → AI.'
+        : !modelPresent ? 'Enable local transcription in Settings → AI.' : undefined,
     };
   }
 
