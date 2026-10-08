@@ -1,0 +1,297 @@
+name: Runtime binaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: New numbered runtime release (published assets are never overwritten)
+        default: runtime-binaries-v1
+        required: true
+        type: string
+  push:
+    tags: ['runtime-binaries-v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-binaries
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Validate release tag and refuse a published release
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          REF_TAG: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          tag="$REF_TAG"
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then tag="$INPUT_TAG"; fi
+          [[ "$tag" =~ ^runtime-binaries-v[1-9][0-9]*$ ]] || { echo '::error::Invalid numbered runtime release tag'; exit 1; }
+          # Query all releases so auth/network errors fail instead of masquerading as 404.
+          gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | [.tag_name, .draft] | @tsv' > releases.tsv
+          if awk -F '\t' -v tag="$tag" '$1 == tag && $2 != "true" {found=1} END {exit !found}' releases.tsv; then
+            echo '::error::Release already published; choose a new tag'; exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    environment: publish
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout whisper.cpp v1.8.2
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/whisper.cpp
+          ref: 4979e04f5dcaccb36057e059bbaed8a2f5288315
+          path: whisper
+          persist-credentials: false
+      - name: Checkout FFmpeg n7.1.1
+        if: matrix.target == 'aarch64-apple-darwin'
+        uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: db69d06eeeab4f46da15030a80d539efb4503ca8
+          path: ffmpeg
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned CMake
+        run: python -m pip install cmake==3.31.6
+      - name: Preflight — Windows Authenticode signing configuration
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CONFIG_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          CONFIG_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          CONFIG_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          CONFIG_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          CONFIG_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          CONFIG_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          WINDOWS_SIGNING_REQUIRED: ${{ vars.WINDOWS_SIGNING_REQUIRED }}
+        run: |
+          present=0
+          missing=0
+          for name in CONFIG_TENANT_ID CONFIG_CLIENT_ID CONFIG_CLIENT_SECRET CONFIG_SIGNING_ENDPOINT CONFIG_SIGNING_ACCOUNT CONFIG_SIGNING_PROFILE; do
+            val="${!name}"
+            val="${val//[[:space:]]/}"
+            if [ -z "$val" ]; then
+              missing=$((missing + 1))
+            else
+              present=$((present + 1))
+            fi
+          done
+
+          if [ "$present" -gt 0 ] && [ "$missing" -gt 0 ]; then
+            echo "::error::Windows signing configuration is partial ($present of 6 values set); refusing to build unsigned." >&2
+            exit 1
+          fi
+          if [ "$missing" -eq 6 ]; then
+            signing_required="$(printf '%s' "$WINDOWS_SIGNING_REQUIRED" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if [ "$signing_required" = "1" ]; then
+              echo "::error::WINDOWS_SIGNING_REQUIRED=1 but Windows signing configuration is absent." >&2
+              exit 1
+            fi
+            echo "::warning::Windows build is UNSIGNED — Azure Trusted Signing secrets not configured"
+            echo "win_signing=0" >> "$GITHUB_ENV"
+          else
+            echo "Azure Trusted Signing configuration present — Windows binaries and installers will be signed."
+            echo "win_signing=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install Azure Trusted Signing CLI (windows only)
+        if: runner.os == 'Windows' && env.win_signing == '1'
+        shell: bash
+        run: |
+          # NOTE: upstream deprecated in favor of artifact-signing-cli (rename); pinned 0.9.0 flags verified. Follow-up tracked on the board.
+          cargo install --locked trusted-signing-cli --version 0.9.0
+
+      - name: Resolve Windows signing tools
+        if: runner.os == 'Windows' && env.win_signing == '1'
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Where-Object { $_.Directory.Parent.Name -match '^\d+(\.\d+)+$' } | Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+          if (-not $signtool) {
+            Write-Error "signtool.exe not found"
+            exit 1
+          }
+          "SIGNTOOL_PATH=$($signtool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Seed pinned Azure Trusted Signing dlib
+        if: runner.os == 'Windows' && env.win_signing == '1'
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "Microsoft.Trusted.Signing.Client.1.0.95.zip"
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/1.0.95" -OutFile $package
+          # SHA-256 independently computed from the NuGet package on 2026-08-22.
+          $expectedSha256 = "3bfcf1e0a3cb42af1692f0a8ed45c15de070c2de86f28a59b2795d904d8a920f"
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 $package).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            Write-Error "Trusted Signing dlib SHA-256 mismatch: expected $expectedSha256, got $actualSha256"
+            exit 1
+          }
+          $destination = Join-Path $env:USERPROFILE ".trusted-signing-cli\lib"
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Expand-Archive -LiteralPath $package -DestinationPath $destination -Force
+
+      - name: Build native runtimes
+        run: bash .github/workflows/runtime-binaries/build.sh
+
+      - name: Sign macOS executables when configured
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            echo '::warning::Runtime binaries are UNSIGNED: set APPLE_CERTIFICATE and APPLE_CERTIFICATE_PASSWORD in publish. Review before publishing.'
+            for dir in stage/whisper stage/ffmpeg; do
+              [ ! -d "$dir" ] || echo 'UNSIGNED: Developer ID secrets missing' > "$dir/SIGNING.txt"
+            done
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/runtime-signing.keychain-db"
+          certificate="$RUNNER_TEMP/runtime-signing.p12"
+          trap 'security delete-keychain "$keychain" 2>/dev/null || true; rm -f "$certificate"' EXIT
+          keychain_password=$(openssl rand -hex 32)
+          echo "::add-mask::$keychain_password"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          identity=$(security find-identity -v -p codesigning "$keychain" | sed -n '/"Developer ID Application:/s/.* \([A-F0-9]\{40\}\) .*/\1/p' | head -n 1)
+          [ -n "$identity" ] || { echo '::error::No Developer ID Application identity'; exit 1; }
+          for binary in stage/whisper/whisper-cli stage/ffmpeg/ffmpeg; do
+            [ -f "$binary" ] || continue
+            codesign --force --timestamp --options runtime --keychain "$keychain" --sign "$identity" "$binary"
+            codesign --verify --strict --verbose=2 "$binary"
+            codesign -dv --verbose=4 "$binary" > "$(dirname "$binary")/SIGNING.txt" 2>&1
+          done
+
+      - name: Sign and verify Windows executable
+        if: runner.os == 'Windows' && env.win_signing == '1'
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          AZURE_CONFIG_DIR: ${{ runner.temp }}\azure-signing
+        run: |
+          set -euo pipefail
+          node packages/app/scripts/win-sign.mjs stage/whisper/whisper-cli.exe
+          "$SIGNTOOL_PATH" verify -pa -v stage/whisper/whisper-cli.exe | tee stage/whisper/SIGNING.txt
+
+      - name: Record unsigned platform status
+        if: runner.os == 'Linux' || (runner.os == 'Windows' && env.win_signing != '1')
+        run: |
+          echo 'UNSIGNED: no platform signer configured for this build' > stage/whisper/SIGNING.txt
+          echo '::warning::This runtime leg is unsigned; inspect SIGNING.txt before publishing.'
+
+      - name: Native smoke tests after signing
+        run: bash .github/workflows/runtime-binaries/smoke.sh
+
+      - name: Package final signed bytes
+        run: |
+          python - <<'PY'
+          import os, pathlib, zipfile
+          target = os.environ['TARGET']
+          packages = [('whisper', f'whisper-cli-1.8.2-{target}.zip')]
+          if target == 'aarch64-apple-darwin':
+              packages += [('ffmpeg', f'ffmpeg-7.1.1-{target}.zip'), ('sources', 'runtime-binaries-sources.zip')]
+          for directory, name in packages:
+              root = pathlib.Path('stage') / directory
+              with zipfile.ZipFile(pathlib.Path('dist') / name, 'w', zipfile.ZIP_DEFLATED) as archive:
+                  for path in sorted(root.rglob('*')):
+                      if path.is_file():
+                          archive.write(path, path.relative_to(root))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.target }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: runtime-*
+          merge-multiple: true
+          path: dist
+      - name: Inventory and checksum all final assets
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path('dist')
+          targets = ['aarch64-apple-darwin', 'x86_64-apple-darwin', 'x86_64-unknown-linux-gnu', 'x86_64-pc-windows-msvc']
+          expected = {f'whisper-cli-1.8.2-{target}.zip' for target in targets}
+          expected |= {'ffmpeg-7.1.1-aarch64-apple-darwin.zip', 'runtime-binaries-sources.zip'}
+          assert {p.name for p in root.iterdir()} == expected, 'Incomplete/unexpected release payload'
+          assets = [{'name': p.name, 'size': p.stat().st_size, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(root.iterdir())]
+          (root / 'assets.json').write_text(json.dumps(assets, indent=2) + '\n')
+          (root / 'checksums.txt').write_text(''.join(f"{a['sha256']}  {a['name']}\n" for a in assets))
+          PY
+          (cd dist && sha256sum --check checksums.txt)
+      - name: Create or update only a draft release
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/$GH_REPO/releases" --jq '.[] | [.tag_name, .draft] | @tsv' > releases.tsv
+          state=$(awk -F '\t' -v tag="$RELEASE_TAG" '$1 == tag {print $2}' releases.tsv)
+          if [ -n "$state" ] && [ "$state" != true ]; then
+            echo '::error::Refusing to overwrite a published release'; exit 1
+          fi
+          if [ -z "$state" ]; then
+            gh release create "$RELEASE_TAG" --draft --target "$SOURCE_COMMIT" \
+              --title "OpenBook $RELEASE_TAG" \
+              --notes "Runtime builds from $SOURCE_COMMIT. Inspect each SIGNING.txt before publishing: missing credentials produce UNSIGNED assets. FFmpeg arm64 is LGPL-2.1-or-later; corresponding source, patches and recipe are in runtime-binaries-sources.zip. Verify checksums.txt and assets.json. Manifest activation is a separate reviewed change; see docs/runtime-binaries.md."
+          fi
+          gh release upload "$RELEASE_TAG" dist/* --clobber

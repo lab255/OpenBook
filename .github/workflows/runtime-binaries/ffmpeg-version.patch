@@ -1,0 +1,14 @@
+diff --git a/fftools/ffmpeg.c b/fftools/ffmpeg.c
+index 420ba3c..27aa5e8 100644
+--- a/fftools/ffmpeg.c
++++ b/fftools/ffmpeg.c
+@@ -945,6 +945,9 @@ static int64_t getmaxrss(void)
+ 
+ int main(int argc, char **argv)
+ {
++    /* OpenBook runtime probe: preserve upstream -version behavior. */
++    if (argc == 2 && !strcmp(argv[1], "--version"))
++        argv[1] = "-version";
+     Scheduler *sch = NULL;
+ 
+     int ret;
