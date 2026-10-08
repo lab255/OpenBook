@@ -43,6 +43,9 @@ jobs:
       - name: Build libs
         if: steps.libs-cache.outputs.cache-hit != 'true'
         run: pnpm run build:libs
+      # UI source tests import this gitignored bundle, which is outside the libs cache.
+      - name: Build viewer for UI tests
+        run: pnpm --filter @book.dev/ui run build:viewer
       - name: Test ESLint rules
         run: pnpm run test:eslint-rules
       - name: Check generated files
