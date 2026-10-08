@@ -110,6 +110,8 @@ export class AiService {
   private indexedVersion = -1;
   private download: DownloadState | null = null;
   private loaded = false;
+  private readonly downloadsAbort = new AbortController();
+  private pendingDownload?: Promise<void>;
   /** User-authored prompt/recipe skills (per-library markdown). */
   readonly skills: SkillStore;
 
@@ -118,7 +120,7 @@ export class AiService {
     private readonly modelsDir: string,
     /** MEET-3: lazily resolve the managed local audio backend. */
     private readonly localTranscription?: () => Promise<TranscriptionEngine | null>,
-    private readonly localLifecycle?: {status(): Promise<NonNullable<AiStatus['transcription']>>; dispose(): Promise<void>},
+    private readonly localLifecycle?: {status(): Promise<NonNullable<AiStatus['transcription']>>; dispose(): Promise<void>; provision?(signal?: AbortSignal): Promise<void>},
   ) {
     this.skills = new SkillStore(db);
   }
@@ -136,6 +138,7 @@ export class AiService {
     }
     this.loaded = true;
     this.engine = createEngine(this.config, this.modelsDir);
+    if (this.config.transcription?.provider === 'local') await this.startDownload(WHISPER_MODEL_PIN.url);
   }
 
   async getConfig(): Promise<AiConfig> {
@@ -153,6 +156,7 @@ export class AiService {
       [JSON.stringify(this.config)],
     );
     this.engine = createEngine(this.config, this.modelsDir);
+    if (this.config.transcription?.provider === 'local') await this.startDownload(WHISPER_MODEL_PIN.url);
     return this.config;
   }
 
@@ -340,6 +344,7 @@ export class AiService {
   // ── Model downloads (llama provider) ───────────────────────────────────────
 
   async startDownload(url = DEFAULT_MODEL_URL): Promise<DownloadState> {
+    this.downloadsAbort.signal.throwIfAborted();
     await this.loadConfig();
     if (this.download && !this.download.done && !this.download.error) return this.download;
     let fileName: string;
@@ -354,17 +359,18 @@ export class AiService {
     const state: DownloadState = {url, received: 0, total: null, done: false};
     this.download = state;
 
-    void (async () => {
+    this.pendingDownload = (async () => {
       try {
         if (fileName === WHISPER_MODEL) {
           // Never allow an arbitrary URL to populate the managed Whisper filename.
-          await downloadPinned(WHISPER_MODEL_PIN, dest, (progress) => Object.assign(state, progress));
+          await this.localLifecycle?.provision?.(this.downloadsAbort.signal);
+          await downloadPinned(WHISPER_MODEL_PIN, dest, (progress) => Object.assign(state, progress), this.downloadsAbort.signal);
           state.done = true;
         } else if (existsSync(dest)) {
           state.done = true;
           state.received = state.total ?? 0;
         } else {
-          await downloadFile(url, dest, (progress) => Object.assign(state, progress));
+          await downloadFile(url, dest, (progress) => Object.assign(state, progress), undefined, this.downloadsAbort.signal);
           state.done = true;
         }
         // Auto-select the downloaded model for the llama provider.
@@ -380,7 +386,7 @@ export class AiService {
   }
 
   async dispose(): Promise<void> {
-    await this.engine?.dispose().catch(() => undefined);
-    await this.localLifecycle?.dispose();
+    this.downloadsAbort.abort();
+    await Promise.all([this.pendingDownload, this.engine?.dispose().catch(() => undefined), this.localLifecycle?.dispose()]);
   }
 }
