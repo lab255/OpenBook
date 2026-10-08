@@ -61,15 +61,15 @@ export class ManagedRuntime {
     }));
     return {target: this.target, tools: Object.fromEntries(entries) as Record<RuntimeTool, ManagedToolStatus>};
   }
-  provision(signal?: AbortSignal): Promise<void> {
-    if (!this.pending) this.pending = this.install(signal).finally(() => { this.pending = undefined; });
+  provision(signal?: AbortSignal, skip: Set<RuntimeTool> = new Set()): Promise<void> {
+    if (!this.pending) this.pending = this.install(signal, skip).finally(() => { this.pending = undefined; });
     return this.pending;
   }
-  private async install(signal?: AbortSignal): Promise<void> {
+  private async install(signal: AbortSignal | undefined, skip: Set<RuntimeTool>): Promise<void> {
     for (const tool of tools) {
       signal?.throwIfAborted();
       const pin = this.pins[tool];
-      if (pin.status === 'unsupported' || await this.binary(tool)) continue;
+      if (skip.has(tool) || pin.status === 'unsupported' || await this.binary(tool)) continue;
       const root = path.join(this.binDir, tool);
       await mkdir(root, {recursive: true});
       const archive = path.join(root, `archive.${pin.archive}`);
@@ -83,11 +83,16 @@ export class ManagedRuntime {
         if (pin.archive === 'zip' && process.platform !== 'win32') {
           await exec('unzip', ['-q', archive, '-d', staging], {signal});
         } else {
-          await exec('tar', ['-xf', archive, '-C', staging], {signal});
+          const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+          await exec(tar, ['-xf', archive, '-C', staging], {signal});
         }
         if (pin.extractDir) await cp(path.join(staging, pin.extractDir), install, {recursive: true});
-        else await copyFile(path.join(staging, pin.binaryPath), path.join(install, path.basename(pin.binaryPath)));
+        else {
+          if (!(await lstat(path.join(staging, pin.binaryPath))).isFile()) throw new Error('Runtime binary is not a regular file');
+          await copyFile(path.join(staging, pin.binaryPath), path.join(install, path.basename(pin.binaryPath)));
+        }
         const binary = pin.extractDir ? path.relative(pin.extractDir, pin.binaryPath) : path.basename(pin.binaryPath);
+        if (!(await lstat(path.join(install, binary))).isFile()) throw new Error('Runtime binary is not a regular file');
         await chmod(path.join(install, binary), 0o755);
         if (process.platform === 'darwin') await exec('xattr', ['-dr', 'com.apple.quarantine', install], {signal}).catch(() => undefined);
         const files: Record<string, number> = {};
@@ -99,6 +104,7 @@ export class ManagedRuntime {
             else {
               if (!info.isFile()) throw new Error('Runtime archive contains a non-regular file');
               files[path.relative(install, file)] = info.size;
+              if (!(info.mode & 0o200)) await chmod(file, info.mode | 0o200);
               const handle = await open(file, 'r+');
               try { await handle.sync(); } finally { await handle.close(); }
             }
@@ -114,6 +120,11 @@ export class ManagedRuntime {
         signal?.throwIfAborted();
         await rename(temporary, path.join(root, 'current.json'));
         published = true;
+        try {
+          for (const e of await readdir(root)) if ((e.startsWith('install-') && e !== path.basename(install)) || e.startsWith('.extract-')) await rm(path.join(root, e), {recursive: true, force: true}).catch(() => undefined);
+          await rm(archive, {force: true});
+          await rm(`${archive}.verified.json`, {force: true});
+        } catch { /* Cleanup is best-effort after publication. */ }
       } catch (error) {
         throw new Error(`Failed to install ${tool}: ${error instanceof Error ? error.message : String(error)}`, {cause: error});
       } finally {

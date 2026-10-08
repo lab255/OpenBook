@@ -7,7 +7,7 @@ import type {AiStatus, AiTranscriptionResult} from '@book.dev/sdk';
 import type {TranscriptionEngine, TranscribeOptions} from './providers';
 import {isPinnedCurrent} from './pinnedDownload';
 import {ManagedRuntime} from './runtime';
-import {WHISPER_MODEL_PIN} from './runtimeManifest';
+import {type RuntimeTool, WHISPER_MODEL_PIN} from './runtimeManifest';
 
 export const LOCAL_TRANSCRIPTION_MAX_JOBS = 2;
 
@@ -96,7 +96,10 @@ export class LocalWhisper implements TranscriptionEngine {
 
   provision(signal?: AbortSignal): Promise<void> {
     const combined = signal ? AbortSignal.any([signal, this.provisionAbort.signal]) : this.provisionAbort.signal;
-    this.pendingProvision = this.runtime.provision(combined);
+    const skip = new Set<RuntimeTool>();
+    if (this.whisperCommand) skip.add('whisper-cli');
+    if (this.ffmpegCommand) skip.add('ffmpeg');
+    this.pendingProvision = this.runtime.provision(combined, skip);
     return this.pendingProvision;
   }
 

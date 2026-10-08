@@ -111,3 +111,17 @@ it('rechecks persisted local enablement on startup and refreshes an obsolete mod
     expect(JSON.parse(await readFile(receipt, 'utf8')).version).toBe(WHISPER_MODEL_PIN.version);
   } finally { await restarted.dispose(); }
 });
+
+it('publishes the model receipt even when runtime provisioning rejects', async () => {
+  const provision = vi.fn(async () => { throw new Error('Runtime download failed'); });
+  const enabled = new AiService({query: vi.fn(async () => [])} as unknown as Db, dir, undefined,
+    {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)});
+  try {
+    const state = await enabled.startDownload(WHISPER_MODEL_PIN.url);
+    await expect.poll(() => state.done).toBe(true);
+    expect(state).toMatchObject({done: true, error: 'Runtime download failed', received: 11, total: 11});
+    expect(provision).toHaveBeenCalledOnce();
+    expect(await readFile(path.join(dir, WHISPER_MODEL_PIN.fileName), 'utf8')).toBe('model bytes');
+    expect(JSON.parse(await readFile(path.join(dir, `${WHISPER_MODEL_PIN.fileName}.verified.json`), 'utf8')).version).toBe(WHISPER_MODEL_PIN.version);
+  } finally { await enabled.dispose(); }
+});

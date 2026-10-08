@@ -1,6 +1,6 @@
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
+import {chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
@@ -21,13 +21,18 @@ let dir: string;
 beforeEach(async () => { dir = await mkdtemp(path.join(tmpdir(), 'runtime-test-')); });
 afterEach(async () => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); await rm(dir, {recursive: true, force: true}); });
 
-async function fixture(archive: 'zip' | 'tar.xz'): Promise<{pin: Extract<RuntimeArtifact, {status: 'supported'}>; bytes: Buffer}> {
+async function fixture(archive: 'zip' | 'tar.xz', symlinkBinary = false): Promise<{pin: Extract<RuntimeArtifact, {status: 'supported'}>; bytes: Buffer}> {
   const source = path.join(dir, `source-${archive}`);
   await mkdir(path.join(source, 'Release'), {recursive: true});
   await writeFile(path.join(source, 'Release', 'whisper-cli.exe'), '#!/bin/sh\nexit 0\n');
   await writeFile(path.join(source, 'Release', 'companion.dll'), 'companion');
+  await chmod(path.join(source, 'Release', 'companion.dll'), 0o444);
+  if (symlinkBinary) {
+    await rm(path.join(source, 'Release', 'whisper-cli.exe'));
+    await symlink('companion.dll', path.join(source, 'Release', 'whisper-cli.exe'));
+  }
   const file = path.join(dir, `fixture.${archive}`);
-  if (archive === 'zip') execFileSync('zip', ['-qr', file, 'Release'], {cwd: source});
+  if (archive === 'zip') execFileSync('zip', ['-qry', file, 'Release'], {cwd: source});
   else execFileSync('tar', ['-cJf', file, 'Release'], {cwd: source});
   const bytes = await readFile(file);
   return {bytes, pin: {status: 'supported', version: '1', url: 'https://fixture.test/runtime', archive,
@@ -55,10 +60,17 @@ it.each(['zip', 'tar.xz'] as const)('enables a fresh installation from %s, prese
     const nextPin = {...pin, version: '2'};
     const next = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': nextPin, ffmpeg: {...ffmpegPin, version: '2'}});
     expect((await next.status()).tools['whisper-cli']).toMatchObject({status: 'missing', version: '2', installedVersion: '1'});
+    for (const tool of ['whisper-cli', 'ffmpeg']) {
+      await mkdir(path.join(dir, 'bin', tool, '.extract-crashed'));
+      await mkdir(path.join(dir, 'bin', tool, 'install-crashed'));
+    }
     await next.provision();
     expect(fetch).toHaveBeenCalledTimes(5);
     expect(await next.binary('whisper-cli')).not.toBe(binary);
-    expect(await readFile(binary, 'utf8')).toContain('exit 0');
+    await expect(readFile(binary)).rejects.toMatchObject({code: 'ENOENT'});
+    for (const tool of ['whisper-cli', 'ffmpeg'] as const) {
+      expect(await readdir(path.join(dir, 'bin', tool))).toEqual(['current.json', path.basename(path.dirname((await next.binary(tool))!))]);
+    }
     const override = new LocalWhisper(path.join(dir, 'models'), process.execPath, process.execPath, next);
     expect(await override.status()).toMatchObject({runtimeAvailable: true});
     const invalidOverride = new LocalWhisper(path.join(dir, 'models'), path.join(dir, 'absent'), process.execPath, next);
@@ -126,4 +138,49 @@ it('disposal cancels an in-flight runtime download without publishing an install
   await rejected;
   expect((await runtime.status()).tools['whisper-cli'].status).toBe('missing');
   expect(await readdir(path.join(dir, 'bin', 'whisper-cli'))).toEqual([]);
+});
+
+it.each(['OPENBOOK_WHISPER_BIN', 'OPENBOOK_FFMPEG_BIN'] as const)('skips the archive for the %s override', async (env) => {
+  const {pin, bytes} = await fixture('zip');
+  const fetch = vi.fn(async () => new Response(new Uint8Array(bytes)));
+  vi.stubGlobal('fetch', fetch);
+  vi.stubEnv(env, process.execPath);
+  const runtime = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {
+    'whisper-cli': {...pin, url: 'https://fixture.test/whisper'}, ffmpeg: {...pin, url: 'https://fixture.test/ffmpeg'},
+  });
+  const local = new LocalWhisper(path.join(dir, 'models'), undefined, undefined, runtime);
+  try {
+    await local.provision();
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith(env === 'OPENBOOK_WHISPER_BIN' ? 'https://fixture.test/ffmpeg' : 'https://fixture.test/whisper', expect.anything());
+    expect(await runtime.binary(env === 'OPENBOOK_WHISPER_BIN' ? 'whisper-cli' : 'ffmpeg')).toBeNull();
+  } finally { await local.dispose(); }
+});
+
+it.each([true, false])('rejects a symlink binary via lstat (extractDir: %s)', async (extractDir) => {
+  const {pin, bytes} = await fixture('zip', true);
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bytes))));
+  const runtime = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {
+    'whisper-cli': {...pin, extractDir: extractDir ? pin.extractDir : undefined}, ffmpeg: pin,
+  });
+  await expect(runtime.provision()).rejects.toThrow('Runtime binary is not a regular file');
+  expect(await runtime.binary('whisper-cli')).toBeNull();
+  await expect(readFile(path.join(dir, 'bin', 'whisper-cli', 'current.json'))).rejects.toMatchObject({code: 'ENOENT'});
+});
+
+it('rejects an archive containing parent traversal without writing outside staging', async () => {
+  const {pin, bytes} = await fixture('zip');
+  // Replace equal-length names in both ZIP headers, retaining valid content CRCs.
+  const traversal = Buffer.from(bytes);
+  for (let offset = traversal.indexOf('Release'); offset !== -1; offset = traversal.indexOf('Release', offset + 7)) {
+    traversal.write('../oops', offset);
+  }
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(traversal))));
+  const badPin = {...pin, sha256: createHash('sha256').update(traversal).digest('hex')};
+  const root = path.join(dir, 'bin');
+  const runtime = new ManagedRuntime(root, 'fixture', {'whisper-cli': badPin, ffmpeg: pin});
+  await expect(runtime.provision()).rejects.toThrow('Failed to install whisper-cli');
+  expect(await runtime.binary('whisper-cli')).toBeNull();
+  expect(await readdir(path.join(root, 'whisper-cli'))).toEqual(['archive.zip', 'archive.zip.verified.json']);
+  await expect(readFile(path.join(root, 'whisper-cli', 'oops', 'whisper-cli.exe'))).rejects.toMatchObject({code: 'ENOENT'});
 });

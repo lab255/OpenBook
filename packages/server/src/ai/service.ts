@@ -363,9 +363,11 @@ export class AiService {
       try {
         if (fileName === WHISPER_MODEL) {
           // Never allow an arbitrary URL to populate the managed Whisper filename.
-          await this.localLifecycle?.provision?.(this.downloadsAbort.signal);
+          const runtimeError = await this.localLifecycle?.provision?.(this.downloadsAbort.signal).then(() => undefined, (e: unknown) => e);
+          this.downloadsAbort.signal.throwIfAborted();
           await downloadPinned(WHISPER_MODEL_PIN, dest, (progress) => Object.assign(state, progress), this.downloadsAbort.signal);
           state.done = true;
+          if (runtimeError) state.error = runtimeError instanceof Error ? runtimeError.message : String(runtimeError);
         } else if (existsSync(dest)) {
           state.done = true;
           state.received = state.total ?? 0;
