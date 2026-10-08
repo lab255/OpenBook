@@ -15,6 +15,15 @@ import {LocalWhisper, WHISPER_MODEL, WHISPER_MODEL_URL} from './ai/whisper';
 import {LOCAL_TRANSCRIPTION_RATE_LIMIT} from './ai/routes';
 import {readFile, readdir, writeFile} from 'node:fs/promises';
 
+// Keep the existing model-download fixture small while exercising real verification.
+vi.mock('./ai/runtimeManifest', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ai/runtimeManifest')>();
+  const {createHash} = await import('node:crypto');
+  return {...actual, WHISPER_MODEL_PIN: {...actual.WHISPER_MODEL_PIN,
+    sha256: createHash('sha256').update('model bytes').digest('hex'), size: 11,
+  }};
+});
+
 let db: PgliteDb;
 let store: PageStore;
 let ai: AiService;
@@ -147,6 +156,7 @@ describe('transcription contract', () => {
     expect(download.status).toBe(200);
     await expect.poll(async () => (await service.status()).download?.done).toBe(true);
     expect(await readFile(join(dir, WHISPER_MODEL), 'utf8')).toBe('model bytes');
+    expect(JSON.parse(await readFile(join(dir, `${WHISPER_MODEL}.verified.json`), 'utf8')).size).toBe(11);
     expect((await service.getConfig()).model).toBeUndefined();
     expect(await readdir(dir)).not.toContain(`${WHISPER_MODEL}.part`);
     await service.dispose();
@@ -169,7 +179,8 @@ describe('transcription contract', () => {
     }, {incoming: {socket: {remoteAddress: ip}}});
     const accepted = [request('192.0.2.1'), request('192.0.2.2')];
     try {
-      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length).toBe(2);
+      // Two Node children may take longer than the default 1s under full-suite load.
+      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length, {timeout: 10_000}).toBe(2);
       const busy = await request('192.0.2.3');
       expect(busy.status).toBe(429);
       expect(busy.headers.get('Retry-After')).toBe('5');

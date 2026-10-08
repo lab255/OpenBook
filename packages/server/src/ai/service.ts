@@ -1,12 +1,14 @@
-import {createWriteStream, existsSync, mkdirSync} from 'node:fs';
-import {rename, unlink} from 'node:fs/promises';
+import {existsSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {providerSettings, type AiConfig, type AiProvider, type AiProviderSettings, type AiSearchResponse, type AiStatus, type AiTasksResponse} from '@book.dev/sdk';
 import type {Db} from '../db';
 import {createEngine, MockEngine, OpenAiCompatEngine, type TranscriptionEngine, type AiEngine, type GenerateOptions} from './providers';
 import {assembleSearchResults, bm25Scores, buildIndex, cosine, pageRowsToDocs, parseTaskList, type Bm25Index} from './search';
-import {WHISPER_MODEL, WHISPER_MODEL_URL} from './whisper';
+import {WHISPER_MODEL} from './whisper';
 import {SkillStore} from './skills';
+import {downloadFile} from './download';
+import {downloadPinned} from './pinnedDownload';
+import {WHISPER_MODEL_PIN} from './runtimeManifest';
 
 /**
  * The optional local-AI subsystem: holds the configured engine, the note
@@ -353,36 +355,24 @@ export class AiService {
     this.download = state;
 
     void (async () => {
-      const partial = `${dest}.part`;
       try {
-        if (existsSync(dest)) {
+        if (fileName === WHISPER_MODEL) {
+          // Never allow an arbitrary URL to populate the managed Whisper filename.
+          await downloadPinned(WHISPER_MODEL_PIN, dest, (progress) => Object.assign(state, progress));
+          state.done = true;
+        } else if (existsSync(dest)) {
           state.done = true;
           state.received = state.total ?? 0;
         } else {
-          const res = await fetch(url, {redirect: 'follow'});
-          if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-          state.total = Number(res.headers.get('content-length')) || null;
-          const out = createWriteStream(partial);
-          const reader = res.body.getReader();
-          for (;;) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            state.received += value.byteLength;
-            await new Promise<void>((resolve, reject) => {
-              out.write(value, (err) => (err ? reject(err) : resolve()));
-            });
-          }
-          await new Promise<void>((resolve, reject) => out.end((err: Error | null | undefined) => (err ? reject(err) : resolve())));
-          await rename(partial, dest);
+          await downloadFile(url, dest, (progress) => Object.assign(state, progress));
           state.done = true;
         }
         // Auto-select the downloaded model for the llama provider.
-        if (url !== WHISPER_MODEL_URL && this.config.provider === 'llama' && !this.config.model) {
+        if (fileName !== WHISPER_MODEL && this.config.provider === 'llama' && !this.config.model) {
           await this.setConfig({...this.config, model: fileName});
         }
       } catch (err) {
         state.error = err instanceof Error ? err.message : String(err);
-        await unlink(partial).catch(() => undefined);
       }
     })();
 
