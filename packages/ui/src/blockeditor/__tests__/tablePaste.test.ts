@@ -27,6 +27,12 @@ describe('parseClipboardGrid', () => {
     ]);
   });
 
+  it.each(['#dcfce7', 'rgb(220, 252, 231)'])('preserves legacy exported cell background %s as a token', (background) => {
+    expect(parseClipboardGrid({html: `<table><tr><td style="background:${background}">A</td></tr></table>`})).toEqual([
+      [{text: 'A', color: 'green'}],
+    ]);
+  });
+
   it('preserves browser-serialized translucent export colours', () => {
     expect(parseClipboardGrid({html: '<table><tr><td style="background:rgba(49, 196, 98, 0.302)">A</td></tr></table>'})).toEqual([
       [{text: 'A', color: 'green'}],

@@ -148,6 +148,7 @@ describe('toMarkdown', () => {
 
 describe('stored callout variants', () => {
   it.each([
+    ['info', 'rgba(59,130,246,.10)', '💡'],
     ['warn', 'rgba(245,158,11,.12)', '⚠️'],
     ['success', 'rgba(34,197,94,.12)', '✅'],
     ['danger', 'rgba(239,68,68,.12)', '🛑'],
@@ -155,8 +156,10 @@ describe('stored callout variants', () => {
     const blocks: BlockJSON[] = [{id: 'callout', type: 'callout', text: [{t: 'Notice'}], props: {variant}}];
     const html = toHtml(snapshot(projectBlocksForExport(blocks).blocks), 'T', '');
     expect(html).toContain(`data-variant="${variant}"`);
-    expect(html).toContain(`.callout[data-variant=${variant}] { background: ${tint};`);
-    expect(html).toContain(`.callout[data-variant=${variant}]::before { content: "${icon}"; }`);
+    const selector = variant === 'info' ? '.callout' : `.callout[data-variant=${variant}]`;
+    expect(html).toContain(`${selector} { background: ${tint};`);
+    expect(html).toContain(`${selector}::before { content: "${icon}"; }`);
+    expect(html).toContain('.callout[data-variant=warning], .callout[data-variant=warn] {');
   });
 });
 

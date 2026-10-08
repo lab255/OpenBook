@@ -248,6 +248,7 @@ describe('export block fidelity', () => {
     expect(html).not.toContain('--obtc-red: #e97777'); // no dark override on the light-only hydrate path
     const legacy = toHtml({editorjs: {blocks: [{type: 'paragraph', data: {text: 'x'}}]}, values: [], names: []} as never, 'T', '');
     expect(legacy).toContain('--obtc-red: #e97777'); // dark-capable legacy path keeps it
+    expect(legacy).toContain('mark[style] { color: inherit; }');
     expect(html).toMatch(/<mark style="background:#f9ce1f66">lit<\/mark>/); // yellow highlight tint
     // The document model resolves the run colours so the PDF can use them.
     const model = buildDocumentModel({title: 'T', icon: '', snapshot: snap});
