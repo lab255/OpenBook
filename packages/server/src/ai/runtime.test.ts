@@ -19,9 +19,9 @@ vi.mock('./runtimeManifest', async (importOriginal) => {
 });
 let dir: string;
 beforeEach(async () => { dir = await mkdtemp(path.join(tmpdir(), 'runtime-test-')); });
-afterEach(async () => { vi.unstubAllGlobals(); await rm(dir, {recursive: true, force: true}); });
+afterEach(async () => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); await rm(dir, {recursive: true, force: true}); });
 
-async function fixture(archive: 'zip' | 'tar.xz'): Promise<{pin: RuntimeArtifact; bytes: Buffer}> {
+async function fixture(archive: 'zip' | 'tar.xz'): Promise<{pin: Extract<RuntimeArtifact, {status: 'supported'}>; bytes: Buffer}> {
   const source = path.join(dir, `source-${archive}`);
   await mkdir(path.join(source, 'Release'), {recursive: true});
   await writeFile(path.join(source, 'Release', 'whisper-cli.exe'), '#!/bin/sh\nexit 0\n');
@@ -38,7 +38,8 @@ it.each(['zip', 'tar.xz'] as const)('enables a fresh installation from %s, prese
   const {pin, bytes} = await fixture(archive);
   const fetch = vi.fn(async (url: string | URL | Request) => new Response(String(url) === WHISPER_MODEL_PIN.url ? 'model' : new Uint8Array(bytes)));
   vi.stubGlobal('fetch', fetch);
-  const runtime = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': pin, ffmpeg: pin});
+  const ffmpegPin = {...pin, extractDir: undefined};
+  const runtime = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': pin, ffmpeg: ffmpegPin});
   const local = new LocalWhisper(path.join(dir, 'models'), undefined, undefined, runtime);
   const service = new AiService({query: vi.fn(async () => [])} as unknown as Db, path.join(dir, 'models'), () => local.resolve(), local);
   try {
@@ -48,10 +49,11 @@ it.each(['zip', 'tar.xz'] as const)('enables a fresh installation from %s, prese
     expect(await local.status()).toMatchObject({ready: true, runtime: {tools: {'whisper-cli': {status: 'provisioned', version: '1'}, ffmpeg: {status: 'provisioned'}}}});
     const binary = (await runtime.binary('whisper-cli'))!;
     expect(await readFile(path.join(path.dirname(binary), 'companion.dll'), 'utf8')).toBe('companion');
+    expect(await readdir(path.dirname((await runtime.binary('ffmpeg'))!))).toEqual(['whisper-cli.exe']);
     await runtime.provision();
     expect(fetch).toHaveBeenCalledTimes(3);
     const nextPin = {...pin, version: '2'};
-    const next = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': nextPin, ffmpeg: nextPin});
+    const next = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': nextPin, ffmpeg: {...ffmpegPin, version: '2'}});
     expect((await next.status()).tools['whisper-cli']).toMatchObject({status: 'missing', version: '2', installedVersion: '1'});
     await next.provision();
     expect(fetch).toHaveBeenCalledTimes(5);
@@ -61,6 +63,10 @@ it.each(['zip', 'tar.xz'] as const)('enables a fresh installation from %s, prese
     expect(await override.status()).toMatchObject({runtimeAvailable: true});
     const invalidOverride = new LocalWhisper(path.join(dir, 'models'), path.join(dir, 'absent'), process.execPath, next);
     expect(await invalidOverride.status()).toMatchObject({runtimeAvailable: false});
+    vi.stubEnv('OPENBOOK_WHISPER_BIN', path.join(dir, 'absent'));
+    expect((await new LocalWhisper(path.join(dir, 'models'), undefined, undefined, next).status()).runtimeAvailable).toBe(false);
+    vi.stubEnv('OPENBOOK_WHISPER_BIN', process.execPath);
+    expect((await new LocalWhisper(path.join(dir, 'models'), undefined, undefined, next).status()).runtimeAvailable).toBe(true);
   } finally { await service.dispose(); }
 });
 
