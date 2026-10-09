@@ -1,3 +1,4 @@
+import { OVERLAY_MOTION } from "./overlay-motion"
 import * as React from "react"
 import {Check, ChevronDown} from "lucide-react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
@@ -198,11 +199,8 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
           onKeyDown={onKeyDown}
           className={cn(
             "z-50 max-h-[var(--radix-popover-content-available-height)] min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)]",
-            "overflow-y-auto overflow-x-hidden overscroll-contain rounded-md border bg-popover p-1 text-popover-foreground shadow-overlay outline-hidden",
-            // Entrance only — no exit animation, so the content (and its dismissable
-            // layer) unmounts immediately on close rather than lingering and
-            // interfering with an enclosing popover.
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+            "overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover p-1 text-popover-foreground shadow-overlay outline-hidden",
+            OVERLAY_MOTION.menu,
           )}
         >
           {items.length === 0 && (

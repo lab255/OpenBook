@@ -1,3 +1,4 @@
+import { OVERLAY_MOTION } from "./overlay-motion"
 import * as React from "react"
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"
 import { CheckIcon, ChevronRightIcon } from "@radix-ui/react-icons"
@@ -49,7 +50,8 @@ const ContextMenuSubContent = React.forwardRef<
     <ContextMenuPrimitive.SubContent
       ref={ref}
       className={cn(
-        "z-50 min-w-32 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-overlay data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:pointer-events-none data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        "z-50 min-w-32 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-overlay",
+          OVERLAY_MOTION.menu,
         density === "compact" ? "p-0.5" : "p-1",
         className
       )}
@@ -72,8 +74,8 @@ const ContextMenuContent = React.forwardRef<
           // Match the dropdown: bound to the viewport and scroll rather than
           // clip, so the unified page menu's (CM-2) lower items stay reachable
           // when the right-click opens near the bottom of the screen.
-          "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-32 overflow-y-auto overflow-x-hidden overscroll-contain rounded-md border bg-popover text-popover-foreground shadow-overlay",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:pointer-events-none data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "z-50 max-h-[var(--radix-context-menu-content-available-height)] min-w-32 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover text-popover-foreground shadow-overlay",
+          OVERLAY_MOTION.menu,
           density === "compact" ? "p-0.5" : "p-1",
           className
         )}

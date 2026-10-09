@@ -1269,19 +1269,24 @@ const SCHEME_DUAL = `
 
 const stylesFor = (scheme: DataColorScheme): string => `
 * { box-sizing: border-box; }
-body { margin: 0; background: #fff; color: #1a1a1a; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { margin: 0; background: #fff; color: #1a1a1a; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 main { max-width: 720px; margin: 0 auto; padding: 48px 24px 120px; }
 section.page[hidden] { display: none; }
 .ob-nav { position: sticky; top: 0; z-index: 10; padding: 8px 24px; backdrop-filter: blur(8px); background: rgba(127,127,127,.06); border-bottom: 1px solid rgba(127,127,127,.18); }
 .ob-nav button { font: inherit; font-size: .9rem; cursor: pointer; border: 1px solid rgba(127,127,127,.3); background: transparent; color: inherit; border-radius: 6px; padding: 4px 12px; }
 .ob-nav button:hover { background: rgba(127,127,127,.12); }
-h1.doc-title { font-size: 2.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 1.2rem; }
-h1,h2,h3,h4 { font-weight: 700; line-height: 1.25; margin: 1.6em 0 .4em; }
+h1.doc-title { font-size: 40px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; margin: 0 0 1.2rem; }
+/* DSX §1 light mirrors; foundationTokens.test.ts checks equality with index.css. */
+h1,h2,h3,h4 { font-weight: 600; line-height: 1.3; margin: 0 0 .4em; }
+h1 { font-size: 30px; margin-top: 2rem; }
+h2 { font-size: 24px; margin-top: 1.5rem; }
+h3 { font-size: 20px; margin-top: 1rem; }
 p { margin: .6em 0; }
 ul,ol { margin: .4em 0; padding-left: 1.4em; }
 blockquote { margin: 1em 0; padding: .2em 0 .2em 1em; border-left: 3px solid currentColor; opacity: .85; font-style: italic; }
 pre { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; }
+pre code { font-size: 14px; line-height: 1.5; }
 /* Highlight tints are always light pastels (in both themes), so the marked text
    must stay dark. An inherited colour would be light-on-light (unreadable) in dark mode. */
 mark { background: #fde68a; color: #1c1917; padding: 0 .1em; border-radius: 2px; }
@@ -1397,15 +1402,15 @@ table.db-table a.db-row { display: inline-flex; align-items: center; gap: 6px; c
 table.db-table a.db-row:hover { text-decoration: underline; }
 .db-empty { opacity: .6; font-size: .9em; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .82em; margin: 1px 2px 1px 0; }
-.callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: 1px solid; }
+.callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: none; }
 .callout::before { content: "💡"; }
-.callout[data-variant=warning]::before { content: "⚠️"; }
+.callout[data-variant=warn]::before, .callout[data-variant=warning]::before { content: "⚠️"; }
 .callout[data-variant=success]::before { content: "✅"; }
 .callout[data-variant=danger]::before { content: "🛑"; }
-.callout { background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.35); }
-.callout[data-variant=warning] { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.4); }
-.callout[data-variant=success] { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
-.callout[data-variant=danger] { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
+.callout { background: hsl(40 9% 96%); }
+.callout[data-variant=warn], .callout[data-variant=warning] { background: hsl(45 90% 52% / 0.15); }
+.callout[data-variant=success] { background: hsl(140 55% 45% / 0.13); }
+.callout[data-variant=danger] { background: hsl(0 72% 55% / 0.12); }
 .callout__body { flex: 1; }
 .accordion { margin: 8px 0; border: 1px solid rgba(127,127,127,.25); border-radius: 8px; padding: 4px 12px; }
 .accordion summary { cursor: pointer; font-weight: 600; padding: 4px 0; }

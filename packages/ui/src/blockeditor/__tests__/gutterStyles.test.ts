@@ -115,7 +115,7 @@ describe('column resize styles', () => {
 
   it('keeps a raised, touch-safe one-rem hit zone with a two-pixel hover rule', () => {
     const divider = ruleBody('.obe-col-divider');
-    expect(divider).toMatch(/z-index:\s*4/);
+    expect(divider).toMatch(/z-index:\s*var\(--z-index-pane-overlay\)/);
     expect(divider).toMatch(/width:\s*1rem/);
     expect(divider).toMatch(/touch-action:\s*none/);
     expect(ruleBody('.obe-col-divider::after')).toMatch(/width:\s*2px/);

@@ -1,3 +1,4 @@
+import { OVERLAY_MOTION } from "./overlay-motion"
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Cross2Icon } from "@radix-ui/react-icons"
@@ -33,7 +34,8 @@ const DialogOverlay = React.forwardRef<
     className={cn(
       // Blur strength is driven by the `--overlay-blur` CSS var (set from the
       // appearance "blur overlays" preference; defaults to 0 = no blur).
-      "fixed inset-0 z-50 bg-[hsl(var(--scrim))] backdrop-blur-[var(--overlay-blur)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-[hsl(var(--scrim))] backdrop-blur-[var(--overlay-blur)]",
+      OVERLAY_MOTION.scrim,
       className
     )}
     {...props}
@@ -41,7 +43,7 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-export const DIALOG_EXIT_MS = 180; // follows --default-transition-duration
+export const DIALOG_EXIT_MS = 120; // mirrors --motion-fast; used by delayed dialog teardown
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
@@ -58,7 +60,8 @@ const DialogContent = React.forwardRef<
         className={cn(
           // `min-w-0 [&>*]:min-w-0` removes the panel/direct-child auto minimums so long children cannot widen it past max-w-*; deep content still needs min-w-0/truncate/break-*.
           // The body may scroll; floating content is portaled so it is not clipped. A future direct child's min-w-* loses to `[&>*]:min-w-0` by utility order, not intent.
-          "relative grid max-h-[calc(100vh-4rem)] min-w-0 w-full gap-4 overflow-y-auto rounded-lg border bg-background p-6 shadow-overlay duration-[var(--default-transition-duration)] ease-[var(--ease-out-soft)] [&>*]:min-w-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "relative grid max-h-[calc(100vh-4rem)] min-w-0 w-full gap-4 overflow-y-auto rounded-xl border bg-background p-6 shadow-overlay [&>*]:min-w-0",
+          OVERLAY_MOTION.dialog,
           dialogContentSizes[size],
           className
         )}

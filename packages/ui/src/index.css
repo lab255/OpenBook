@@ -108,12 +108,13 @@
   --height-control-md: 32px;
   --height-control-lg: 36px;
 
+  --radius-xl: calc(var(--radius) + 4px);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-accordion-down: accordion-down var(--motion-base) var(--ease-out-soft);
+  --animate-accordion-up: accordion-up var(--motion-base) var(--ease-out-soft);
 
   --transition-property-height: height;
   --transition-property-spacing: margin, padding;
@@ -152,7 +153,7 @@
      touching call sites. Named eases are exposed as `ease-out-soft` / `ease-spring`
      utilities for entrances and emphasis. Static end-states are unchanged, so
      visual snapshots are unaffected; only the in-between motion is refined. */
-  --default-transition-duration: 180ms;
+  --default-transition-duration: 120ms;
   --default-transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -213,6 +214,95 @@
   }
 
   :root {
+    /* DSX foundation: plain CSS tokens also travel with the standalone viewer. */
+    --motion-fast: 120ms;
+    --motion-base: 180ms;
+    --motion-slow: 240ms;
+    --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --obe-font-size: 16px;
+    --obe-leading: 1.5;
+    --obe-line: calc(var(--obe-font-size) * var(--obe-leading));
+    --obe-title-size: calc(var(--obe-font-size) * 2.5);
+    --obe-title-leading: 1.2;
+    --obe-heading-weight: 600;
+    --obe-code-size: calc(var(--obe-font-size) * 0.875);
+    --obe-code-leading: 1.5;
+    --obe-code-inline: 0.875em;
+    --obe-small-size: calc(var(--obe-font-size) * 0.875);
+    --obe-small-leading: 1.43;
+    --obe-caption-size: calc(var(--obe-font-size) * 0.75);
+    --obe-caption-leading: 1.33;
+    --obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --obe-placeholder: hsl(var(--muted-foreground) / 0.6);
+    --obe-callout-info: hsl(var(--muted));
+    --obe-callout-warn: var(--obe-bg-yellow);
+    --obe-callout-success: var(--obe-bg-green);
+    --obe-callout-danger: var(--obe-bg-red);
+    --obe-code-bg: hsl(var(--muted) / 0.6);
+    --obe-code-border: hsl(var(--border) / 0.7);
+    --obe-code-com: hsl(var(--muted-foreground));
+    --obe-h1-size: calc(var(--obe-font-size) * 1.875);
+    --obe-h1-leading: 1.3;
+    --obe-h1-space: 2rem;
+    --obe-h2-size: calc(var(--obe-font-size) * 1.5);
+    --obe-h2-leading: 1.3;
+    --obe-h2-space: 1.5rem;
+    --obe-h3-size: calc(var(--obe-font-size) * 1.25);
+    --obe-h3-leading: 1.3;
+    --obe-h3-space: 1rem;
+    --z-index-raised: 1;
+    --z-index-control: 2;
+    --z-index-drop-indicator: 3;
+    --z-index-pane-overlay: 4;
+    --z-index-local-overlay: 5;
+    --z-index-presence: 6;
+    --z-index-sticky: 10;
+    --z-index-inline-hint: 20;
+    --z-index-raised-chrome: 30;
+    --z-index-overlay: 40;
+    --z-index-drawer: 45;
+    --z-index-menu: 50;
+    --z-index-nested-menu: 55;
+    --z-index-lightbox: 60;
+    --z-index-toast: 100;
+    --obe-fg-gray: hsl(0 0% 45%);
+    --obe-fg-brown: hsl(25 35% 38%);
+    --obe-fg-orange: hsl(28 80% 42%);
+    --obe-fg-yellow: hsl(42 80% 36%);
+    --obe-fg-green: hsl(140 50% 34%);
+    --obe-fg-blue: hsl(210 72% 45%);
+    --obe-fg-purple: hsl(265 55% 52%);
+    --obe-fg-pink: hsl(330 65% 48%);
+    --obe-fg-red: hsl(0 68% 48%);
+    --obe-bg-gray: hsl(0 0% 50% / 0.1);
+    --obe-bg-brown: hsl(25 45% 50% / 0.13);
+    --obe-bg-orange: hsl(28 85% 52% / 0.13);
+    --obe-bg-yellow: hsl(45 90% 52% / 0.15);
+    --obe-bg-green: hsl(140 55% 45% / 0.13);
+    --obe-bg-blue: hsl(210 80% 55% / 0.13);
+    --obe-bg-purple: hsl(265 60% 58% / 0.14);
+    --obe-bg-pink: hsl(330 70% 58% / 0.13);
+    --obe-bg-red: hsl(0 72% 55% / 0.12);
+    --obe-hl-gray: hsl(0 0% 55% / 0.28);
+    --obe-hl-brown: hsl(25 50% 50% / 0.3);
+    --obe-hl-orange: hsl(30 90% 55% / 0.32);
+    --obe-hl-yellow: hsl(48 95% 55% / 0.4);
+    --obe-hl-green: hsl(140 60% 48% / 0.3);
+    --obe-hl-blue: hsl(210 85% 58% / 0.28);
+    --obe-hl-purple: hsl(265 65% 60% / 0.3);
+    --obe-hl-pink: hsl(330 75% 60% / 0.3);
+    --obe-hl-red: hsl(0 75% 58% / 0.28);
+    --obe-code-kw: hsl(265 55% 48%);
+    --obe-code-str: hsl(140 50% 30%);
+    --obe-code-num: hsl(28 80% 38%);
+    --obe-code-lit: hsl(210 72% 42%);
+
     /* Warm, refined light palette */
     --background: 0 0% 100%;
     --foreground: 34 9% 19%;
@@ -300,6 +390,38 @@
   }
 
   .dark {
+    --obe-fg-gray: hsl(0 0% 66%);
+    --obe-fg-brown: hsl(25 40% 62%);
+    --obe-fg-orange: hsl(28 85% 62%);
+    --obe-fg-yellow: hsl(45 80% 62%);
+    --obe-fg-green: hsl(140 50% 60%);
+    --obe-fg-blue: hsl(210 75% 67%);
+    --obe-fg-purple: hsl(265 65% 73%);
+    --obe-fg-pink: hsl(330 70% 71%);
+    --obe-fg-red: hsl(0 72% 69%);
+    --obe-bg-gray: hsl(0 0% 78% / 0.1);
+    --obe-bg-brown: hsl(25 45% 55% / 0.18);
+    --obe-bg-orange: hsl(28 80% 55% / 0.18);
+    --obe-bg-yellow: hsl(45 80% 55% / 0.18);
+    --obe-bg-green: hsl(140 50% 50% / 0.18);
+    --obe-bg-blue: hsl(210 70% 55% / 0.2);
+    --obe-bg-purple: hsl(265 55% 60% / 0.22);
+    --obe-bg-pink: hsl(330 60% 58% / 0.2);
+    --obe-bg-red: hsl(0 65% 55% / 0.2);
+    --obe-hl-gray: hsl(0 0% 62% / 0.3);
+    --obe-hl-brown: hsl(25 45% 50% / 0.34);
+    --obe-hl-orange: hsl(30 80% 50% / 0.36);
+    --obe-hl-yellow: hsl(48 80% 50% / 0.34);
+    --obe-hl-green: hsl(140 50% 45% / 0.34);
+    --obe-hl-blue: hsl(210 70% 52% / 0.36);
+    --obe-hl-purple: hsl(265 55% 55% / 0.38);
+    --obe-hl-pink: hsl(330 60% 55% / 0.36);
+    --obe-hl-red: hsl(0 65% 52% / 0.36);
+    --obe-code-kw: hsl(265 65% 73%);
+    --obe-code-str: hsl(140 50% 60%);
+    --obe-code-num: hsl(28 85% 62%);
+    --obe-code-lit: hsl(210 75% 67%);
+
     /* Refined dark palette: main surface dark, sidebar slightly lighter.
        Softened 2026-06-13: lifted the base, eased the text, and calmed the
        accent so dark mode reads less harsh (lower contrast, less glare). */
@@ -669,7 +791,7 @@
   font-family: var(--ob-font-heading, var(--ob-font-body, inherit));
 }
 [data-placeholder]:empty::before {
-  color: hsl(var(--muted-foreground) / 0.7);
+  color: var(--obe-placeholder);
   font-style: normal;
 }
 /* A database host page (compact editor) shows its table right below the tiny
@@ -686,7 +808,7 @@
   cursor: pointer;
   white-space: nowrap;
   padding: 0 4px;
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: var(--radius-sm);
   color: inherit;
   font-weight: 500;
   text-decoration: underline;
@@ -697,236 +819,17 @@
   background-color: hsl(var(--accent));
 }
 
-/* ── Reactive blocks (slider / expr / chart) ────────────────────────────── */
-/* Give the interactive blocks a little breathing room within the document
-   flow so they read as distinct cards rather than crowding adjacent text. */
-.reactive-block {
-  margin: 0.25rem 0;
-}
 /* @cell references inside an expression render as inline chips: monospace,
    tinted with the brand color, non-editable as a single atomic token. */
 .cell-token {
   display: inline-block;
   padding: 0 4px;
   margin: 0;
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: var(--radius-sm);
   background-color: hsl(var(--brand-subtle));
   color: hsl(var(--brand));
   font-weight: 600;
   white-space: nowrap;
-}
-/* Observable Plot legend swatches sit inline; keep their labels readable. */
-.reactive-block figure {
-  margin: 0;
-}
-.reactive-block figure > div {
-  color: hsl(var(--muted-foreground));
-  font-size: 0.75rem;
-}
-
-/* ── New block types ──────────────────────────────────────────────────────── */
-
-/* Our custom contenteditable regions need an explicit placeholder — a bare
-   contenteditable doesn't render data-placeholder text natively, so we supply
-   the content here. */
-.block-callout__body[data-placeholder]:empty::before,
-.block-accordion__title[data-placeholder]:empty::before,
-.block-accordion__content[data-placeholder]:empty::before,
-.block-divider__label[data-placeholder]:empty::before {
-  content: attr(data-placeholder);
-  color: hsl(var(--muted-foreground) / 0.6);
-  pointer-events: none;
-}
-
-/* Callout — a tinted box keyed off the variant hue. */
-.block-callout {
-  --callout: 217 91% 60%; /* info */
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.5rem 0;
-  padding: 0.75rem;
-  border: 1px solid hsl(var(--callout) / 0.35);
-  border-radius: var(--radius);
-  background: hsl(var(--callout) / 0.08);
-}
-.block-callout[data-variant='warning'] { --callout: 38 92% 50%; }
-.block-callout[data-variant='success'] { --callout: 142 71% 45%; }
-.block-callout[data-variant='danger'] { --callout: 0 84% 60%; }
-.block-callout__emoji {
-  flex: none;
-  cursor: pointer;
-  border: 0;
-  background: transparent;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  padding: 0;
-}
-.block-callout__body {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.6;
-  outline: none;
-}
-
-/* Accordion — collapsible summary + body with a rotating chevron. */
-.block-accordion {
-  margin: 0.5rem 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  padding: 0.25rem 0.75rem;
-}
-.block-accordion__header {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-.block-accordion__chevron {
-  flex: none;
-  display: flex;
-  cursor: pointer;
-  border: 0;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  padding: 0.25rem 0;
-  transition: transform 0.15s ease;
-}
-.block-accordion[data-open='true'] .block-accordion__chevron {
-  transform: rotate(90deg);
-}
-.block-accordion__title {
-  flex: 1;
-  font-weight: 600;
-  padding: 0.25rem 0;
-  line-height: 1.5;
-  outline: none;
-}
-.block-accordion__content {
-  padding: 0 0 0.5rem 1.5rem;
-  line-height: 1.6;
-  outline: none;
-}
-.block-accordion[data-open='false'] .block-accordion__content {
-  display: none;
-}
-
-/* Divider — a rule whose style is data-driven; `labeled` adds a centred caption. */
-.block-divider {
-  display: flex;
-  align-items: center;
-  margin: 1rem 0;
-}
-.block-divider::before {
-  content: '';
-  flex: 1;
-  border-top: 1px solid hsl(var(--border));
-}
-.block-divider[data-style='dashed']::before { border-top-style: dashed; }
-.block-divider[data-style='dotted']::before { border-top-style: dotted; }
-.block-divider[data-style='thick']::before { border-top-width: 3px; }
-.block-divider__label { display: none; }
-.block-divider[data-style='labeled'] { gap: 0.75rem; }
-.block-divider[data-style='labeled']::after {
-  content: '';
-  flex: 1;
-  border-top: 1px solid hsl(var(--border));
-}
-.block-divider[data-style='labeled'] .block-divider__label {
-  display: block;
-  flex: none;
-  min-width: 1ch;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.8rem;
-  text-align: center;
-  outline: none;
-}
-
-/* Button / link card. */
-.block-button {
-  margin: 0.5rem 0;
-}
-.block-button__fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-/* Once a URL is set, the document shows just the CTA — the label/URL fields
-   fold away until "Edit button" (block settings) or until the URL is cleared. */
-.block-button--configured:not(.block-button--editing) .block-button__fields {
-  display: none;
-}
-.block-button__input {
-  flex: 1;
-  min-width: 8rem;
-  border: 1px solid hsl(var(--input));
-  border-radius: calc(var(--radius) - 2px);
-  background: transparent;
-  color: hsl(var(--foreground));
-  padding: 0.375rem 0.625rem;
-  font-size: 0.85rem;
-  outline: none;
-}
-.block-button__input:focus {
-  border-color: hsl(var(--ring));
-}
-/* Doubled class bumps specificity so a CTA button never inherits
-   link-underline styling and reads as a link. */
-.block-button__cta.block-button__cta {
-  display: inline-block;
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius);
-  font-weight: 600;
-  font-size: 0.9rem;
-  text-decoration: none;
-  cursor: pointer;
-}
-.block-button__cta.is-empty {
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
-  cursor: default;
-}
-
-/* Table of contents. */
-.block-toc {
-  margin: 0.5rem 0;
-  padding: 0.5rem 0.75rem;
-  border-left: 3px solid hsl(var(--border));
-}
-.block-toc__label {
-  margin-bottom: 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: hsl(var(--muted-foreground));
-}
-.block-toc__empty {
-  color: hsl(var(--muted-foreground));
-  font-size: 0.85rem;
-  font-style: italic;
-}
-.block-toc__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.block-toc__item {
-  margin: 0;
-}
-.block-toc__link {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.875rem;
-  padding: 0;
-}
-.block-toc__link:hover {
-  color: hsl(var(--foreground));
-  text-decoration: underline;
 }
 
 /* ── Block editor (obe-*) ─────────────────────────────────────────────────────
@@ -959,8 +862,8 @@
   margin-inline: auto;
   /* stylelint-disable-next-line declaration-property-value-allowed-list -- SPC-2: viewport-relative append zone; manifest section 4. */
   padding: 0.25rem 0 30vh;
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: var(--obe-font-size);
+  line-height: var(--obe-leading);
   color: hsl(var(--foreground));
 }
 
@@ -977,7 +880,7 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0;
 }
 .obe-row-selected {
@@ -993,7 +896,7 @@
   pointer-events: none;
   background: hsl(var(--ring) / 0.14);
   border: 1px solid hsl(var(--ring) / 0.65);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .obe-marqueeing,
 .obe-marqueeing * {
@@ -1009,7 +912,7 @@
   font-weight: 600;
   color: hsl(var(--primary-foreground));
   background: hsl(var(--primary));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: 0 2px 8px hsl(var(--foreground) / 0.25);
   white-space: nowrap;
 }
@@ -1029,7 +932,7 @@
   gap: 4px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 /* Inside columns there's no page gutter — a compact, handle-only grip
    floats in the column gap. Keep the visible grip above the resize divider;
@@ -1080,7 +983,7 @@
   height: 1.5rem;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: hsl(var(--muted-foreground) / 0.7);
   font-size: 14px;
   cursor: pointer;
@@ -1139,16 +1042,16 @@
   color: hsl(var(--muted-foreground) / 0.45);
   pointer-events: none;
 }
-.obe-heading { flex: 1; min-width: 0; font-weight: 650; }
-.obe-h1 .obe-text { font-size: 1.7rem; line-height: 1.25; margin-top: 0.75rem; }
-.obe-h2 .obe-text { font-size: 1.35rem; line-height: 1.3; margin-top: 0.5rem; }
-.obe-h3 .obe-text { font-size: 1.12rem; line-height: 1.35; margin-top: 0.25rem; }
+.obe-heading { flex: 1; min-width: 0; font-weight: var(--obe-heading-weight); }
+.obe-h1 .obe-text { font-size: var(--obe-h1-size); line-height: var(--obe-h1-leading); margin-top: var(--obe-h1-space); }
+.obe-h2 .obe-text { font-size: var(--obe-h2-size); line-height: var(--obe-h2-leading); margin-top: var(--obe-h2-space); }
+.obe-h3 .obe-text { font-size: var(--obe-h3-size); line-height: var(--obe-h3-leading); margin-top: var(--obe-h3-space); }
 
 .obe-code, code.obe-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.875em;
+  font-family: var(--obe-font-mono);
+  font-size: var(--obe-code-inline);
   background: hsl(var(--muted) / 0.7);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0 4px;
   color: hsl(var(--foreground));
 }
@@ -1162,7 +1065,7 @@ a.obe-link {
 a.obe-link:hover { text-decoration-color: hsl(var(--foreground)); }
 a.obe-mention {
   background: hsl(var(--accent) / 0.8);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0 4px;
   text-decoration: none;
   cursor: pointer;
@@ -1207,20 +1110,20 @@ a.obe-mention {
   display: flex;
   min-width: 0;
   gap: 0.5rem;
-  background: hsl(var(--muted) / 0.55);
-  border-radius: 8px;
+  background: var(--obe-callout-info);
+  border-radius: var(--radius-lg);
   padding: 0.75rem;
   margin: 0;
 }
-.obe-callout-warn { background: hsl(40 90% 55% / 0.12); }
-.obe-callout-success { background: hsl(140 60% 45% / 0.1); }
-.obe-callout-danger { background: hsl(0 75% 55% / 0.09); }
+.obe-callout-warn { background: var(--obe-callout-warn); }
+.obe-callout-success { background: var(--obe-callout-success); }
+.obe-callout-danger { background: var(--obe-callout-danger); }
 .obe-callout-icon {
   flex: none;
   font-size: 1.05rem;
   line-height: 1.5;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 0;
 }
 .obe-callout-icon:hover { background: var(--hover); }
@@ -1237,7 +1140,7 @@ a.obe-mention {
   min-width: 0;
   border-left: 3px solid hsl(var(--primary) / 0.4);
   background: hsl(var(--primary) / 0.05);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   padding: 0.5rem 0.75rem;
   margin: 0;
   color: hsl(var(--muted-foreground));
@@ -1273,13 +1176,13 @@ a.obe-mention {
   position: relative;
   display: inline-block;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 .obe-image-img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--muted) / 0.4);
   -webkit-user-select: none;
   user-select: none;
@@ -1293,12 +1196,12 @@ a.obe-mention {
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--background) / 0.86);
   box-shadow: 0 1px 4px hsl(0 0% 0% / 0.16);
   backdrop-filter: blur(6px);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-image-frame:hover .obe-image-tools,
 .obe-image-tools:focus-within { opacity: 1; }
@@ -1331,10 +1234,10 @@ a.obe-mention {
   height: 44px;
   max-height: 60%;
   transform: translateY(-50%);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: ew-resize;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-image-resize::after {
   content: '';
@@ -1343,7 +1246,7 @@ a.obe-mention {
   margin: auto;
   width: 4px;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: hsl(var(--foreground) / 0.35);
   box-shadow: 0 0 0 2px hsl(var(--background) / 0.7);
 }
@@ -1360,7 +1263,7 @@ a.obe-mention {
 }
 .obe-image-alt { font-size: 0.75rem; opacity: 0.85; }
 .obe-image-alt::placeholder,
-.obe-image-caption-input::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
+.obe-image-caption-input::placeholder { color: var(--obe-placeholder); }
 .obe-image-caption {
   color: hsl(var(--muted-foreground));
   font-size: 0.82rem;
@@ -1376,12 +1279,12 @@ a.obe-mention {
   width: 100%;
   padding: 1.5rem 1rem;
   border: 1px dashed hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--muted) / 0.35);
   color: hsl(var(--muted-foreground));
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
+  transition: border-color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
 }
 .obe-image-placeholder:hover {
   border-color: hsl(var(--primary) / 0.5);
@@ -1405,7 +1308,7 @@ a.obe-mention {
 }
 /* External image drag hovering the editor — subtle drop-target confirmation so
    a drop reads as intentional (pairs with the drag/drop handlers). */
-.obe-root.obe-file-dragover { box-shadow: inset 0 0 0 2px hsl(var(--primary) / 0.4); border-radius: 8px; }
+.obe-root.obe-file-dragover { box-shadow: inset 0 0 0 2px hsl(var(--primary) / 0.4); border-radius: var(--radius-lg); }
 .obe-root.obe-file-dragover .obe-image-empty .obe-image-placeholder,
 .obe-root.obe-file-dragover .obe-artifact-empty .obe-image-placeholder {
   border-color: hsl(var(--primary) / 0.7);
@@ -1458,7 +1361,7 @@ a.obe-mention {
   max-height: 100%;
   object-fit: contain;
   transform-origin: center center;
-  border-radius: 6px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 12px 48px hsl(0 0% 0% / 0.55);
   will-change: transform;
   user-select: none;
@@ -1503,7 +1406,7 @@ a.obe-mention {
   color: hsl(0 0% 100% / 0.85);
   background: transparent;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+  transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-lightbox-zoombtn:hover:not(:disabled) {
   background: hsl(0 0% 100% / 0.16);
@@ -1535,11 +1438,11 @@ a.obe-mention {
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: hsl(0 0% 100% / 0.85);
   background: hsl(0 0% 0% / 0.35);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-lightbox-close:hover {
   background: hsl(0 0% 100% / 0.16);
@@ -1582,7 +1485,7 @@ a.obe-mention {
   font-size: 0.82rem;
   font-weight: 500;
 }
-.obe-artifact-title::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
+.obe-artifact-title::placeholder { color: var(--obe-placeholder); }
 .obe-artifact-title-static {
   font-size: 0.82rem;
   font-weight: 500;
@@ -1615,10 +1518,10 @@ a.obe-mention {
   max-width: 60%;
   height: 10px;
   transform: translateX(-50%);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: ns-resize;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-artifact-resize::after {
   content: '';
@@ -1627,7 +1530,7 @@ a.obe-mention {
   margin: auto;
   width: 100%;
   height: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: hsl(var(--foreground) / 0.35);
   box-shadow: 0 0 0 2px hsl(var(--background) / 0.7);
 }
@@ -1644,13 +1547,13 @@ a.obe-mention {
   align-items: center;
   justify-content: center;
   padding: 0.25rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: hsl(var(--muted-foreground));
   background: hsl(var(--background) / 0.85);
   box-shadow: 0 0 0 1px hsl(var(--border));
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-artifact-expand:hover { background: var(--hover); color: hsl(var(--foreground)); }
 /* Keyboard reveal + themed ring live in the shared focus-visible rule below. */
@@ -1702,11 +1605,11 @@ a.obe-mention {
   width: 100%;
   max-width: 56rem;
   margin: auto 0; /* vertically centre short slides; tall ones scroll */
-  animation: ob-slide-in 340ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: ob-slide-in var(--motion-slow) var(--ease-out-soft) both;
 }
-.ob-present-full .ob-slide { font-size: 1.08rem; }
+.ob-present-full .ob-slide { --obe-font-size: 1.08rem; font-size: var(--obe-font-size); }
 @keyframes ob-slide-in {
-  from { opacity: 0; transform: translateY(18px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
 }
 .ob-slide-title { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
@@ -1758,7 +1661,7 @@ a.obe-mention {
   right: 0.9rem;
   z-index: var(--z-index-sticky);
   opacity: 0;
-  transition: opacity 160ms;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .ob-present-full:hover .ob-present-topbar,
 .ob-present-full .ob-present-topbar:focus-within { opacity: 1; }
@@ -1770,11 +1673,11 @@ a.obe-mention {
   align-items: center;
   justify-content: center;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--background));
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft);
 }
 .ob-present-modebtn:hover { background: var(--hover); color: hsl(var(--foreground)); }
 
@@ -1786,7 +1689,7 @@ a.obe-mention {
   left: 50%;
   transform: translateX(-50%);
   opacity: 0;
-  transition: opacity 160ms;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .ob-present-full:hover .ob-present-controls,
 .ob-present-full .ob-present-controls:focus-within { opacity: 1; }
@@ -1797,7 +1700,7 @@ a.obe-mention {
   align-items: center;
   justify-content: center;
   border: 1px solid hsl(var(--border));
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   cursor: pointer;
@@ -1825,7 +1728,7 @@ a.obe-mention {
   overflow: hidden;
   aspect-ratio: 16 / 10;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-xl);
   background: hsl(var(--background));
 }
 .ob-present-next-scale {
@@ -1843,30 +1746,26 @@ a.obe-mention {
 .obe-codeblock {
   flex: 1;
   min-width: 0;
-  background: hsl(var(--muted) / 0.6);
-  border: 1px solid hsl(var(--border) / 0.7);
-  border-radius: 8px;
+  background: var(--obe-code-bg);
+  border: 1px solid var(--obe-code-border);
+  border-radius: var(--radius-lg);
   padding: 0.75rem 1rem;
   margin: 0;
 }
 .obe-codeblock .obe-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-  line-height: 1.55;
+  font-family: var(--obe-font-mono);
+  font-size: var(--obe-code-size);
+  line-height: var(--obe-code-leading);
 }
 
 /* Syntax-highlight tokens (blockeditor/highlight.ts). The tokenizer only wraps
    runs in these spans — never alters the character stream — so highlighting is
    purely cosmetic and the caret math is untouched. */
-.obe-tok-com { color: hsl(var(--muted-foreground)); font-style: italic; }
-.obe-tok-kw { color: hsl(265 60% 46%); }
-.obe-tok-str { color: hsl(140 46% 32%); }
-.obe-tok-num { color: hsl(28 78% 42%); }
-.obe-tok-lit { color: hsl(210 72% 45%); }
-.dark .obe-tok-kw { color: hsl(264 72% 78%); }
-.dark .obe-tok-str { color: hsl(140 48% 66%); }
-.dark .obe-tok-num { color: hsl(30 80% 66%); }
-.dark .obe-tok-lit { color: hsl(208 78% 70%); }
+.obe-tok-com { color: var(--obe-code-com); font-style: italic; }
+.obe-tok-kw { color: var(--obe-code-kw); }
+.obe-tok-str { color: var(--obe-code-str); }
+.obe-tok-num { color: var(--obe-code-num); }
+.obe-tok-lit { color: var(--obe-code-lit); }
 
 /* Columns: a 12-col grid that collapses with its editor container. */
 .obe-columns {
@@ -1915,9 +1814,9 @@ a.obe-mention {
   align-items: center;
   justify-content: center;
   padding: 0.25rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: hsl(var(--muted-foreground));
-  transition: color 120ms, background 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
 }
 .obe-group-btn:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-group-btn-on { color: hsl(var(--primary)); }
@@ -2010,10 +1909,10 @@ a.obe-mention {
   display: grid;
   place-items: center;
   color: hsl(var(--muted-foreground) / 0.55);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
   cursor: pointer;
 }
 .obe-table-wrap:hover .obe-table-add { opacity: 1; }
@@ -2030,14 +1929,14 @@ a.obe-mention {
   color: hsl(var(--muted-foreground));
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-table-wrap:hover .obe-table-tools,
 .obe-table-tools:focus-within { opacity: 1; pointer-events: auto; }
 .obe-table-tools button {
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 4px 8px;
   cursor: pointer;
 }
@@ -2067,7 +1966,7 @@ a.obe-mention {
   color: hsl(var(--muted-foreground) / 0.7);
   border-radius: var(--radius-sm);
   opacity: 0;
-  transition: opacity 120ms ease, background 120ms ease;
+  transition: opacity var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
   cursor: grab; /* explicit for WKWebView — desktop clicks need a pointer cursor */
   z-index: var(--z-index-raised);
   border: 0;
@@ -2132,13 +2031,12 @@ a.obe-mention {
   overscroll-behavior: contain;
   background: hsl(var(--popover));
   border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   /* Quiet elevation: a hairline ring + a soft, tight shadow. */
   box-shadow: var(--shadow-menu);
   padding: 0.25rem;
-  animation: obe-menu-enter var(--default-transition-duration) var(--ease-out-soft);
+  animation: obe-menu-enter var(--motion-base) var(--ease-out-soft);
 }
-@media (prefers-reduced-motion: reduce) { .obe-slash { animation: none; } }
 .obe-slash-item {
   display: flex;
   width: 100%;
@@ -2194,14 +2092,14 @@ a.obe-mention {
   0% { background: hsl(var(--primary) / 0.3); }
   100% { background: hsl(var(--accent)); }
 }
-.ob-flow-pulse { animation: ob-flow-pulse 0.7s ease-out; }
+.ob-flow-pulse { animation: ob-flow-pulse 0.7s var(--ease-out-soft); }
 
 /* Dataflow view: clicking a node walks you to its block in the editor. */
 @keyframes obe-locate-flash {
   0% { background: hsl(var(--primary) / 0.14); }
   100% { background: transparent; }
 }
-.obe-locate-flash { animation: obe-locate-flash 1.2s ease-out; border-radius: 8px; }
+.obe-locate-flash { animation: obe-locate-flash 1.2s var(--ease-out-soft); border-radius: var(--radius-lg); }
 
 /* Database deep links (`?row=`/`?group=`): the targeted row/group header holds a
    soft tint + ring briefly, then fades — a transient "here it is" after scrolling
@@ -2211,11 +2109,11 @@ a.obe-mention {
   0%, 45% { background-color: hsl(var(--primary) / 0.16); box-shadow: 0 0 0 2px hsl(var(--ring) / 0.55); }
   100% { background-color: transparent; box-shadow: 0 0 0 2px transparent; }
 }
-.ob-anchor-flash { border-radius: 6px; }
+.ob-anchor-flash { border-radius: var(--radius-md); }
 /* Motion-safe only: the JS scroll already falls back to `auto` under
    reduced-motion, so keep the flash animation off there too. */
 @media (prefers-reduced-motion: no-preference) {
-  .ob-anchor-flash { animation: ob-anchor-flash 1.8s ease-out both; }
+  .ob-anchor-flash { animation: ob-anchor-flash 1.8s var(--ease-out-soft) both; }
 }
 
 /* Inline toolbar */
@@ -2288,7 +2186,7 @@ a.obe-mention {
    cancelled by an equal negative margin, so the tint bleeds into the margins
    while the text stays aligned with untinted blocks. */
 .obe-blockbody[class*='obe-bg-'] {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 0.25rem 0.5rem;
   margin-inline: -0.5rem;
 }
@@ -2296,65 +2194,38 @@ a.obe-mention {
 .obe-blockbody[class*='obe-bg-'] > .obe-group { background: transparent; }
 
 /* Text colours (block `fg`, inline `tc`). */
-.obe-fg-gray { color: hsl(0 0% 45%); }
-.obe-fg-brown { color: hsl(25 35% 38%); }
-.obe-fg-orange { color: hsl(28 80% 42%); }
-.obe-fg-yellow { color: hsl(42 80% 36%); }
-.obe-fg-green { color: hsl(140 50% 34%); }
-.obe-fg-blue { color: hsl(210 72% 45%); }
-.obe-fg-purple { color: hsl(265 55% 52%); }
-.obe-fg-pink { color: hsl(330 65% 48%); }
-.obe-fg-red { color: hsl(0 68% 48%); }
-.dark .obe-fg-gray { color: hsl(0 0% 66%); }
-.dark .obe-fg-brown { color: hsl(25 40% 62%); }
-.dark .obe-fg-orange { color: hsl(28 85% 62%); }
-.dark .obe-fg-yellow { color: hsl(45 80% 62%); }
-.dark .obe-fg-green { color: hsl(140 50% 60%); }
-.dark .obe-fg-blue { color: hsl(210 75% 67%); }
-.dark .obe-fg-purple { color: hsl(265 65% 73%); }
-.dark .obe-fg-pink { color: hsl(330 70% 71%); }
-.dark .obe-fg-red { color: hsl(0 72% 69%); }
+.obe-fg-gray { color: var(--obe-fg-gray); }
+.obe-fg-brown { color: var(--obe-fg-brown); }
+.obe-fg-orange { color: var(--obe-fg-orange); }
+.obe-fg-yellow { color: var(--obe-fg-yellow); }
+.obe-fg-green { color: var(--obe-fg-green); }
+.obe-fg-blue { color: var(--obe-fg-blue); }
+.obe-fg-purple { color: var(--obe-fg-purple); }
+.obe-fg-pink { color: var(--obe-fg-pink); }
+.obe-fg-red { color: var(--obe-fg-red); }
 
 /* Block backgrounds (subtle tints). */
-.obe-bg-gray { background-color: hsl(0 0% 50% / 0.1); }
-.obe-bg-brown { background-color: hsl(25 45% 50% / 0.13); }
-.obe-bg-orange { background-color: hsl(28 85% 52% / 0.13); }
-.obe-bg-yellow { background-color: hsl(45 90% 52% / 0.15); }
-.obe-bg-green { background-color: hsl(140 55% 45% / 0.13); }
-.obe-bg-blue { background-color: hsl(210 80% 55% / 0.13); }
-.obe-bg-purple { background-color: hsl(265 60% 58% / 0.14); }
-.obe-bg-pink { background-color: hsl(330 70% 58% / 0.13); }
-.obe-bg-red { background-color: hsl(0 72% 55% / 0.12); }
-.dark .obe-bg-gray { background-color: hsl(0 0% 78% / 0.1); }
-.dark .obe-bg-brown { background-color: hsl(25 45% 55% / 0.18); }
-.dark .obe-bg-orange { background-color: hsl(28 80% 55% / 0.18); }
-.dark .obe-bg-yellow { background-color: hsl(45 80% 55% / 0.18); }
-.dark .obe-bg-green { background-color: hsl(140 50% 50% / 0.18); }
-.dark .obe-bg-blue { background-color: hsl(210 70% 55% / 0.2); }
-.dark .obe-bg-purple { background-color: hsl(265 55% 60% / 0.22); }
-.dark .obe-bg-pink { background-color: hsl(330 60% 58% / 0.2); }
-.dark .obe-bg-red { background-color: hsl(0 65% 55% / 0.2); }
+.obe-bg-gray { background-color: var(--obe-bg-gray); }
+.obe-bg-brown { background-color: var(--obe-bg-brown); }
+.obe-bg-orange { background-color: var(--obe-bg-orange); }
+.obe-bg-yellow { background-color: var(--obe-bg-yellow); }
+.obe-bg-green { background-color: var(--obe-bg-green); }
+.obe-bg-blue { background-color: var(--obe-bg-blue); }
+.obe-bg-purple { background-color: var(--obe-bg-purple); }
+.obe-bg-pink { background-color: var(--obe-bg-pink); }
+.obe-bg-red { background-color: var(--obe-bg-red); }
 
 /* Inline highlights (stronger, with their own radius/padding). */
 [class*='obe-hl-'] { border-radius: var(--radius-sm); padding: 0 4px; }
-.obe-hl-gray { background-color: hsl(0 0% 55% / 0.28); }
-.obe-hl-brown { background-color: hsl(25 50% 50% / 0.3); }
-.obe-hl-orange { background-color: hsl(30 90% 55% / 0.32); }
-.obe-hl-yellow { background-color: hsl(48 95% 55% / 0.4); }
-.obe-hl-green { background-color: hsl(140 60% 48% / 0.3); }
-.obe-hl-blue { background-color: hsl(210 85% 58% / 0.28); }
-.obe-hl-purple { background-color: hsl(265 65% 60% / 0.3); }
-.obe-hl-pink { background-color: hsl(330 75% 60% / 0.3); }
-.obe-hl-red { background-color: hsl(0 75% 58% / 0.28); }
-.dark .obe-hl-gray { background-color: hsl(0 0% 62% / 0.3); }
-.dark .obe-hl-brown { background-color: hsl(25 45% 50% / 0.34); }
-.dark .obe-hl-orange { background-color: hsl(30 80% 50% / 0.36); }
-.dark .obe-hl-yellow { background-color: hsl(48 80% 50% / 0.34); }
-.dark .obe-hl-green { background-color: hsl(140 50% 45% / 0.34); }
-.dark .obe-hl-blue { background-color: hsl(210 70% 52% / 0.36); }
-.dark .obe-hl-purple { background-color: hsl(265 55% 55% / 0.38); }
-.dark .obe-hl-pink { background-color: hsl(330 60% 55% / 0.36); }
-.dark .obe-hl-red { background-color: hsl(0 65% 52% / 0.36); }
+.obe-hl-gray { background-color: var(--obe-hl-gray); }
+.obe-hl-brown { background-color: var(--obe-hl-brown); }
+.obe-hl-orange { background-color: var(--obe-hl-orange); }
+.obe-hl-yellow { background-color: var(--obe-hl-yellow); }
+.obe-hl-green { background-color: var(--obe-hl-green); }
+.obe-hl-blue { background-color: var(--obe-hl-blue); }
+.obe-hl-purple { background-color: var(--obe-hl-purple); }
+.obe-hl-pink { background-color: var(--obe-hl-pink); }
+.obe-hl-red { background-color: var(--obe-hl-red); }
 
 /* Swatch buttons (toolbar colour panel). */
 .obe-sw {
@@ -2366,7 +2237,7 @@ a.obe-mention {
   font-weight: 600;
   font-size: 0.85rem;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .obe-sw:hover { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
 .obe-sw-fill { color: transparent; }
@@ -2382,7 +2253,7 @@ a.obe-mention {
   margin-right: 0.5rem;
   display: inline-grid;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid hsl(var(--border));
   font-size: 0.7rem;
   font-weight: 700;
@@ -2397,7 +2268,7 @@ a.obe-mention {
   display: block;
   width: 0.9em;
   height: 3px;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: linear-gradient(90deg, hsl(0 70% 55%), hsl(45 90% 55%), hsl(210 80% 55%));
 }
 .obe-tb-colors {
@@ -2487,20 +2358,20 @@ a.obe-mention {
   gap: 0.5rem;
   background: hsl(var(--muted) / 0.5);
   border: 1px solid hsl(var(--border) / 0.7);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 0.5rem;
 }
 .obe-formula-src {
   flex: 1;
   min-width: 0;
   background: transparent;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.85rem;
   outline: none;
 }
 .obe-formula-eq { color: hsl(var(--muted-foreground) / 0.7); }
 .obe-formula-out {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.9rem;
   font-weight: 600;
   color: hsl(var(--primary));
@@ -2511,7 +2382,7 @@ a.obe-mention {
   color: hsl(var(--muted-foreground));
   font-size: 0.85rem;
   border: 1px dashed hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 0.5rem;
 }
 
@@ -2525,7 +2396,7 @@ a.obe-mention {
   align-items: center;
   gap: 0.75rem;
   border: 1px dashed hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 0.5rem 0.75rem;
   user-select: none;
 }
@@ -2536,7 +2407,7 @@ a.obe-mention {
   width: 2rem;
   height: 2rem;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: hsl(var(--accent) / 0.5);
   font-size: 1.1rem;
   color: hsl(var(--muted-foreground));
@@ -2553,7 +2424,7 @@ a.obe-mention {
 .obe-missing-plugin-meta {
   font-size: 0.7rem;
   color: hsl(var(--muted-foreground) / 0.7);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   margin-top: 0;
 }
 .obe-missing-plugin-error {
@@ -2569,12 +2440,12 @@ a.obe-mention {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid hsl(var(--border));
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-missing-plugin-install:hover {
   background: hsl(var(--accent));
@@ -2661,23 +2532,23 @@ a.obe-mention {
   line-height: inherit;
   color: inherit;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   padding: 0;
   margin: 0;
   cursor: text;
-  transition: border-color 120ms, background 120ms;
+  transition: border-color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-inline:hover { border-color: hsl(var(--border) / 0.6); }
 .obe-kit-inline:focus { outline: none; border-color: hsl(var(--ring)); background: hsl(var(--card)); }
-.obe-kit-inline::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
+.obe-kit-inline::placeholder { color: var(--obe-placeholder); }
 
 /* The inline description edits in place (WYSIWYG) and only renders when it has
    text (see KitFrame) — so it never collapses/unfurls and never shifts the
    layout. An empty description is added from the settings gear. */
 .obe-kit-desc-edit {
   opacity: 0.85;
-  transition: border-color 120ms;
+  transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
 
 /* The de-emphasized reactive symbol in a config card: a muted "Variable `x`"
@@ -2693,7 +2564,7 @@ a.obe-mention {
 }
 .obe-kit-symbol-hint:disabled { cursor: default; }
 .obe-kit-symbol-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   color: hsl(var(--muted-foreground));
   background: hsl(var(--muted) / 0.6);
   border: 1px solid hsl(var(--border) / 0.6);
@@ -2703,7 +2574,7 @@ a.obe-mention {
 .obe-kit-symbol-edit {
   color: hsl(var(--primary));
   opacity: 0;
-  transition: opacity 120ms;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-symbol-hint:hover .obe-kit-symbol-edit { opacity: 1; }
 .obe-kit-spacer { flex: 1; }
@@ -2726,7 +2597,7 @@ a.obe-mention {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms, color 120ms, background 120ms, border-color 120ms;
+  transition: opacity var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit:hover .obe-kit-gear,
 .obe-kit:focus-within .obe-kit-gear,
@@ -2749,7 +2620,7 @@ a.obe-mention {
   gap: 0.5rem 0.75rem;
   border: 1px solid hsl(var(--border) / 0.7);
   background: hsl(var(--muted) / 0.4);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 0.5rem 0.75rem;
 }
 .obe-kit-field {
@@ -2763,15 +2634,15 @@ a.obe-mention {
 .obe-kit-field-grow input { flex: 1; min-width: 0; }
 .obe-kit-name, .obe-kit-num, .obe-kit-options, .obe-kit-select {
   border: 1px solid hsl(var(--border));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.25rem 0.5rem;
   font-size: 0.78rem;
   color: hsl(var(--foreground));
 }
-.obe-kit-name { width: 7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.obe-kit-name { width: 7rem; font-family: var(--obe-font-mono); }
 .obe-kit-num { width: 4rem; font-variant-numeric: tabular-nums; }
-.obe-kit-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.obe-kit-mono { font-family: var(--obe-font-mono); }
 .obe-kit-empty { font-size: 0.78rem; color: hsl(var(--muted-foreground) / 0.7); font-style: italic; }
 
 /* Number stepper */
@@ -2779,7 +2650,7 @@ a.obe-mention {
   display: inline-flex;
   align-items: stretch;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: hsl(var(--card));
 }
@@ -2790,7 +2661,7 @@ a.obe-mention {
   font-size: 1rem;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-stepper button:hover:not(:disabled) { background: var(--hover); color: hsl(var(--foreground)); }
 .obe-kit-stepper input {
@@ -2809,7 +2680,7 @@ a.obe-mention {
   flex: 1;
   min-width: 8rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.375rem 0.625rem;
   font-size: 0.9rem;
@@ -2822,13 +2693,13 @@ a.obe-mention {
   width: 1.8rem;
   height: 1.8rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
   font-size: 0.9rem;
   cursor: pointer;
   text-decoration: none;
-  transition: color 120ms, border-color 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-mini:hover { color: hsl(var(--foreground)); border-color: hsl(var(--ring)); }
 
@@ -2836,13 +2707,13 @@ a.obe-mention {
 .obe-kit-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 .obe-kit-pill {
   border: 1px solid hsl(var(--border));
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--card));
   padding: 0.25rem 0.75rem;
   font-size: 0.82rem;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: color 120ms, background-color 120ms, border-color 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-pill:hover:not(:disabled) { border-color: hsl(var(--ring)); color: hsl(var(--foreground)); }
 .obe-kit-pill-on {
@@ -2898,11 +2769,11 @@ a.obe-mention {
 }
 .obe-form-kind {
   border: 1px solid hsl(var(--border));
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--muted) / 0.55);
   padding: 0 0.5rem;
   color: hsl(var(--muted-foreground));
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.68rem;
 }
 .obe-form-builder {
@@ -2916,7 +2787,7 @@ a.obe-mention {
 }
 .obe-form-empty {
   border: 1px dashed hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 0.75rem;
   color: hsl(var(--muted-foreground));
   font-size: 0.82rem;
@@ -2933,7 +2804,7 @@ a.obe-mention {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--muted) / 0.28);
   padding: 0.375rem 0.5rem;
   color: hsl(var(--muted-foreground));
@@ -2969,7 +2840,7 @@ a.obe-mention {
 }
 .obe-form-state {
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--muted) / 0.35);
   padding: 0.75rem;
   color: hsl(var(--foreground));
@@ -3024,7 +2895,7 @@ a.obe-mention {
   min-width: 0;
   cursor: grab;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--muted) / 0.24);
   padding: 0.375rem 0.5rem;
   color: hsl(var(--foreground));
@@ -3053,7 +2924,7 @@ a.obe-mention {
   align-items: center;
   gap: 0.375rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--card));
   padding: 0.375rem;
   outline: none;
@@ -3079,7 +2950,7 @@ a.obe-mention {
   height: 1.65rem;
   cursor: pointer;
   place-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: hsl(var(--muted-foreground));
 }
 .obe-form-field-grip { cursor: grab; touch-action: none; }
@@ -3096,7 +2967,7 @@ a.obe-mention {
 }
 .obe-form-row-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .obe-form-required {
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--muted) / 0.7);
   padding: 0 0.375rem;
   color: hsl(var(--muted-foreground));
@@ -3136,7 +3007,7 @@ a.obe-mention {
   cursor: pointer;
   align-items: center;
   gap: 0.375rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 0.375rem 0.5rem;
   font-size: var(--text-xs);
   text-align: left;
@@ -3150,7 +3021,7 @@ a.obe-mention {
   align-self: flex-start;
   cursor: pointer;
   border: 1px solid hsl(var(--border));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 0.25rem 0.5rem;
   color: hsl(var(--foreground));
   font-size: var(--text-xs);
@@ -3181,11 +3052,11 @@ a.obe-mention {
   align-items: center;
   gap: 0.5rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--card));
   padding: 0.5rem 0.75rem;
   font-size: 0.88rem;
-  transition: border-color 120ms, background 120ms;
+  transition: border-color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-wide .obe-kit-pill:hover, .obe-kit-wide .obe-kit-check:hover {
   background: hsl(var(--accent));
@@ -3198,7 +3069,7 @@ a.obe-mention {
 .obe-kit-pill-dot {
   width: 0.85rem;
   height: 0.85rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   border: 1.5px solid hsl(var(--muted-foreground) / 0.5);
   flex-shrink: 0;
 }
@@ -3217,12 +3088,12 @@ a.obe-mention {
 .obe-kit-switch {
   width: 2.4rem;
   height: 1.35rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   border: 1px solid hsl(var(--border));
   background: hsl(var(--muted));
   position: relative;
   cursor: pointer;
-  transition: background 150ms;
+  transition: background var(--motion-base) var(--ease-out-soft);
 }
 .obe-kit-switch-on { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
 .obe-kit-knob {
@@ -3231,24 +3102,24 @@ a.obe-mention {
   left: 2px;
   width: 1.1rem;
   height: 1.1rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--background));
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-  transition: transform 150ms;
+  transition: transform var(--motion-base) var(--ease-out-soft);
 }
 .obe-kit-switch-on .obe-kit-knob { transform: translateX(1rem); }
 
 /* Action button */
 .obe-kit-action {
   border: 1px solid hsl(var(--primary));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   padding: 0.25rem 1rem;
   font-size: 0.88rem;
   font-weight: 550;
   cursor: pointer;
-  transition: opacity 120ms, background-color 120ms;
+  transition: opacity var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-action:hover { opacity: 0.9; }
 /* Colour-only press — deepen the fill toward --press-ink (matches Button), no geometry shift. */
@@ -3279,7 +3150,7 @@ a.obe-mention {
 .obe-chart-xlabels text { text-anchor: middle; }
 
 /* Sunburst centre readout (DASH-4): total at rest, hovered slice on hover. */
-.obe-chart-center-value { fill: hsl(var(--foreground)); font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.obe-chart-center-value { fill: hsl(var(--foreground)); font-size: 20px; font-weight: var(--obe-heading-weight); font-variant-numeric: tabular-nums; }
 .obe-chart-center-label { fill: hsl(var(--muted-foreground)); font-size: 11px; }
 .obe-chart-legend text { text-anchor: start; font-size: 11px; }
 .obe-chart-msg { fill: hsl(var(--muted-foreground) / 0.8); font-size: 12px; text-anchor: middle; }
@@ -3287,7 +3158,7 @@ a.obe-mention {
 
 /* KPI / number tile (DASH-5) — the MetricCard look rendered in SVG. */
 .obe-chart-kpi-caption { fill: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-anchor: middle; text-transform: uppercase; }
-.obe-chart-kpi-value { fill: hsl(var(--foreground)); font-size: 60px; font-weight: 650; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.obe-chart-kpi-value { fill: hsl(var(--foreground)); font-size: 60px; font-weight: var(--obe-heading-weight); text-anchor: middle; font-variant-numeric: tabular-nums; }
 .obe-chart-kpi-sub { fill: hsl(var(--muted-foreground)); font-size: 15px; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .obe-chart-kpi-track { fill: hsl(var(--muted)); }
 
@@ -3304,7 +3175,7 @@ a.obe-mention {
 .obe-chart-plot { position: relative; }
 /* Each datum's <g> wrapper. Highlight is shared: the active mark brightens, the
    rest de-emphasise, so every registered kind gets it from the scaffold. */
-.obe-chart-mark { cursor: pointer; outline: none; transition: opacity 0.12s ease, filter 0.12s ease; }
+.obe-chart-mark { cursor: pointer; outline: none; transition: opacity var(--motion-fast) var(--ease-out-soft), filter var(--motion-fast) var(--ease-out-soft); }
 /* Forced-colors users get no cue from the token stroke ring, so restore a real
    focus outline there (the `outline:none` above is fine for everyone else, who
    see the is-active emphasis on focus). */
@@ -3318,7 +3189,7 @@ a.obe-mention {
 .obe-chart-mark.is-active { filter: brightness(1.06); }
 .obe-chart-mark.is-active :is(rect, path, circle) { stroke: hsl(var(--foreground) / 0.55); stroke-width: 1.5px; }
 /* Line/scatter point markers read as part of the line at rest, surfacing on hover/focus. */
-.obe-chart-dot { fill-opacity: 0; transition: fill-opacity 0.12s ease; }
+.obe-chart-dot { fill-opacity: 0; transition: fill-opacity var(--motion-fast) var(--ease-out-soft); }
 .obe-chart-mark.is-active .obe-chart-dot { fill-opacity: 1; }
 
 .obe-chart-tooltip {
@@ -3351,7 +3222,7 @@ a.obe-mention {
 .obe-kit-light {
   width: 0.7rem;
   height: 0.7rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   flex-shrink: 0;
   background: color-mix(in srgb, var(--data-gray, #c3c6cb) 35%, transparent);
   box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12));
@@ -3361,7 +3232,7 @@ a.obe-mention {
 .obe-kit-light-bad { background: var(--data-status-bad, #deaea6); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #deaea6) 25%, transparent); }
 .obe-kit-status-label { font-size: 0.88rem; font-weight: 550; }
 .obe-kit-status-value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.82rem;
   color: hsl(var(--muted-foreground));
 }
@@ -3384,7 +3255,7 @@ a.obe-mention {
   justify-content: center;
   width: 0.95rem;
   height: 0.95rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
   font-size: 0.65rem;
@@ -3400,7 +3271,7 @@ a.obe-mention {
   background: hsl(var(--popover));
   color: hsl(var(--popover-foreground));
   border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
   font-weight: 400;
@@ -3408,9 +3279,9 @@ a.obe-mention {
   box-shadow: var(--shadow-menu);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms;
+  transition: opacity var(--motion-fast) var(--ease-in-out-soft);
 }
-.obe-kit-term:hover .obe-kit-tip, .obe-kit-term:focus .obe-kit-tip { opacity: 1; }
+.obe-kit-term:hover .obe-kit-tip, .obe-kit-term:focus .obe-kit-tip { opacity: 1; transition-timing-function: var(--ease-out-soft); }
 
 /* Link card */
 .obe-kit-linkcard-wrap { flex: 1; }
@@ -3425,7 +3296,7 @@ a.obe-mention {
   padding: 0.5rem 0.75rem;
   text-decoration: none;
   color: inherit;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition: border-color var(--motion-fast) var(--ease-out-soft), box-shadow var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-linkcard:hover { border-color: hsl(var(--ring)); box-shadow: 0 2px 10px rgb(0 0 0 / 0.05); }
 .obe-kit-linkcard-title { font-size: 0.92rem; font-weight: 600; }
@@ -3456,7 +3327,7 @@ a.obe-mention {
   background: hsl(var(--card));
   cursor: pointer;
   text-align: left;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition: border-color var(--motion-fast) var(--ease-out-soft), box-shadow var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-card:hover:not(:disabled) { border-color: hsl(var(--ring)); }
 .obe-kit-card-on { border-color: hsl(var(--primary)); box-shadow: 0 0 0 1px hsl(var(--primary)); }
@@ -3465,7 +3336,7 @@ a.obe-mention {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 10;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background-size: cover;
   background-position: center;
   background-color: hsl(var(--muted) / 0.6);
@@ -3487,7 +3358,7 @@ a.obe-mention {
   justify-content: center;
   width: 1.1rem;
   height: 1.1rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
@@ -3498,7 +3369,7 @@ a.obe-mention {
   min-height: 4.5rem;
   resize: vertical;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.5rem 0.75rem;
   font: inherit;
@@ -3515,12 +3386,12 @@ a.obe-mention {
   width: 1.6rem;
   height: 1.6rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
   font-size: 0.82rem;
   cursor: pointer;
-  transition: color 120ms, border-color 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-richtext-btn:hover { border-color: hsl(var(--ring)); color: hsl(var(--foreground)); }
 .obe-kit-richtext-b { font-weight: 700; }
@@ -3529,7 +3400,7 @@ a.obe-mention {
 .obe-kit-richtext-body {
   min-height: 3rem;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: hsl(var(--card));
   padding: 0.5rem 0.75rem;
   font-size: 0.9rem;
@@ -3545,7 +3416,7 @@ a.obe-mention {
 /* Inline review: a quiet accent on blocks with an open suggestion or a comment,
    plus link styling inside a rendered comment body. Presentation-only. */
 .ob-block-reviewed {
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: inset 2px 0 0 0 hsl(var(--primary) / 0.55);
   background: hsl(var(--primary) / 0.05);
 }
@@ -3574,7 +3445,7 @@ a.obe-mention {
 .obe-rcursor-caret {
   position: absolute;
   width: 2px;
-  border-radius: 999px;
+  border-radius: 9999px;
   pointer-events: none;
 }
 /* A small nub at the caret top so a peer stays locatable after the label fades. */
@@ -3603,14 +3474,14 @@ a.obe-mention {
   /* `color` is set inline per-swatch (readableTextColor) for WCAG AA contrast. */
   pointer-events: none;
   box-shadow: 0 1px 3px hsl(0 0% 0% / 0.18);
-  animation: obe-rcursor-fade 2.8s ease forwards;
+  animation: obe-rcursor-fade 2.8s var(--ease-in-out-soft) forwards;
 }
 @keyframes obe-rcursor-fade {
   0%, 65% { opacity: 1; }
   100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .obe-rcursor-label { animation: none; opacity: 1; }
+  .obe-rcursor-label { opacity: 1; }
 }
 
 /* Searchable select trigger (the popover surface is Radix Command). */
@@ -3622,17 +3493,17 @@ a.obe-mention {
   min-width: 11rem;
   max-width: 100%;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.375rem 0.625rem;
   font-size: 0.88rem;
   color: hsl(var(--foreground));
   cursor: pointer;
-  transition: border-color 120ms;
+  transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-kit-searchtrigger:hover:not(:disabled) { border-color: hsl(var(--ring)); }
 .obe-kit-searchtrigger:disabled { opacity: 0.6; cursor: default; }
-.obe-kit-search-placeholder { color: hsl(var(--muted-foreground) / 0.7); }
+.obe-kit-search-placeholder { color: var(--obe-placeholder); }
 
 /* Tag field: chips + a free-entry input. */
 .obe-kit-tags {
@@ -3642,7 +3513,7 @@ a.obe-mention {
   gap: 0.25rem;
   width: 100%;
   border: 1px solid hsl(var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.25rem 0.5rem;
   min-height: 2rem;
@@ -3651,7 +3522,7 @@ a.obe-mention {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--muted) / 0.7);
   padding: 0 0.25rem 0 0.5rem;
   font-size: 0.8rem;
@@ -3660,7 +3531,7 @@ a.obe-mention {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 9999px;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
 }
@@ -3675,30 +3546,30 @@ a.obe-mention {
   outline: none;
   color: hsl(var(--foreground));
 }
-.obe-kit-tag-input::placeholder { color: hsl(var(--muted-foreground) / 0.6); }
+.obe-kit-tag-input::placeholder { color: var(--obe-placeholder); }
 
 /* Progress bar (display, no published value). */
 .obe-kit-progress { flex-direction: column; align-items: stretch; gap: 0.25rem; }
 .obe-kit-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
 .obe-kit-progress-label { font-size: 0.85rem; font-weight: 550; }
 .obe-kit-progress-value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.8rem;
   color: hsl(var(--muted-foreground));
 }
 .obe-kit-progress-track {
   display: block;
   height: 0.55rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--muted) / 0.7);
   overflow: hidden;
 }
 .obe-kit-progress-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--primary));
-  transition: width 200ms ease;
+  transition: width var(--motion-base) var(--ease-out-soft);
 }
 
 /* ── Tabs & accordion containers ───────────────────────────────────────────── */
@@ -3724,12 +3595,12 @@ a.obe-mention {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 0.25rem 0.5rem;
   font-size: 0.78rem;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: color 120ms, background-color 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-cnt-add:hover { color: hsl(var(--foreground)); background: var(--hover); }
 
@@ -3745,7 +3616,7 @@ a.obe-mention {
   font-size: 0.84rem;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: color 120ms, background-color 120ms, border-color 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-tab:hover:not(:disabled) { background: var(--hover); color: hsl(var(--foreground)); }
 .obe-tab-on {
@@ -3770,7 +3641,7 @@ a.obe-mention {
   align-items: center;
   justify-content: center;
   color: hsl(var(--muted-foreground));
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .obe-acc-toggle:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
@@ -3787,7 +3658,7 @@ a.obe-mention {
   min-width: 1.1rem;
   height: 1.1rem;
   padding: 0 0.25rem;
-  border-radius: 999px;
+  border-radius: 9999px;
   background: hsl(var(--muted) / 0.8);
   color: hsl(var(--muted-foreground));
   font-size: 0.68rem;
@@ -3806,7 +3677,7 @@ a.obe-mention {
   border-bottom: 1px solid hsl(var(--border) / 0.5);
 }
 .obe-code-lang-badge {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.02em;
   text-transform: lowercase;
@@ -3826,7 +3697,7 @@ a.obe-mention {
   padding: 0.25rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: color 120ms, background 120ms, border-color 120ms;
+  transition: color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-code-btn:hover:not(:disabled) { background: var(--hover); color: hsl(var(--foreground)); }
 .obe-code-btn:disabled { opacity: 0.45; cursor: default; }
@@ -3860,7 +3731,7 @@ a.obe-mention {
   display: block;
   padding: 0.25rem 0.75rem;
   border-top: 1px solid hsl(var(--border) / 0.5);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--obe-font-mono);
   font-size: 0.85rem;
   color: hsl(var(--primary));
   font-weight: 600;
@@ -3877,7 +3748,7 @@ a.obe-mention {
 .obe-column { position: relative; }
 .obe-col-divider {
   position: absolute;
-  z-index: 4;
+  z-index: var(--z-index-pane-overlay);
   left: -1.125rem;
   top: 0;
   bottom: 0;
@@ -3895,7 +3766,7 @@ a.obe-mention {
   width: 2px;
   border-radius: var(--radius-sm);
   background: transparent;
-  transition: background 120ms ease;
+  transition: background var(--motion-fast) var(--ease-out-soft);
 }
 .obe-col-divider:hover::after,
 .obe-col-divider:active::after,
@@ -3936,21 +3807,25 @@ a.obe-mention {
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  transition: border-color 0.12s ease;
+  transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
 .ob-map-cluster-wrap:hover .ob-map-cluster { border-color: hsl(var(--ring) / 0.55); }
 
 /* Meeting recorder: native playback, copyable transcript and ordinary note rows. */
-.obe-meeting { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; }
+.obe-meeting { border: 1px solid hsl(var(--border)); border-radius: var(--radius-lg); padding: 16px; }
 .obe-meeting header, .obe-meeting-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .obe-meeting header { justify-content: space-between; }
-.obe-meeting button { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 12px; cursor: pointer; }
+.obe-meeting button { border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; background: hsl(var(--background)); color: hsl(var(--foreground)); transition: background-color var(--motion-fast) var(--ease-out-soft); }
+.obe-meeting button:hover:not(:disabled) { background: var(--hover); }
+.obe-meeting button:active { transition: none; }
+.obe-meeting-elapsed, .obe-meeting-lock { color: hsl(var(--muted-foreground)); font-size: var(--obe-small-size); }
+.obe-meeting-elapsed { font-variant-numeric: tabular-nums; }
 .obe-meeting button:disabled { opacity: 0.5; cursor: default; }
-.obe-meeting button:focus-visible, .obe-meeting a:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.obe-meeting button:focus-visible, .obe-meeting a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .obe-meeting-chunks { display: grid; gap: 12px; margin-block: 12px; }
 .obe-meeting-chunks li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .obe-meeting audio { max-width: 100%; }
 .obe-meeting-transcript { user-select: text; white-space: pre-wrap; }
-.obe-meeting time { color: var(--color-muted-foreground); font-variant-numeric: tabular-nums; }
+.obe-meeting time { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .obe-meeting-summary { user-select: text; white-space: pre-wrap; margin-block: 12px; }
-.obe-meeting-notes { border-top: 1px solid var(--color-border); margin-top: 16px; padding-top: 12px; }
+.obe-meeting-notes { border-top: 1px solid hsl(var(--border)); margin-top: 16px; padding-top: 12px; }
