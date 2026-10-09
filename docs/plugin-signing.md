@@ -127,7 +127,7 @@ registry name are rejected (`addTrustedRegistry`), so a first-party-looking
 ## Guard rails (CI)
 
 - **No private material in git** — `scripts/check-no-private-keys.sh` runs
-  first in the CI verify job and fails on any committed private-key material
+  first in the CI Gate job (and in Nightly verify) and fails on any committed private-key material
   (Ed25519/EC/RSA PKCS#8 base64 DER prefixes, PEM blocks, minisign secret
   keys) outside two allowlisted, deliberately-public test fixtures.
 - **The test key can never become a trust anchor** — the release workflow

@@ -244,16 +244,17 @@ describe('export block fidelity', () => {
     // HYDRATE path is light-only v1 (the viewer bundle has no dark theme), so
     // the var() just falls back; the brighter dark override is only defined on
     // the legacy/no-hydrate path, whose static body honours the OS scheme.
-    expect(html).toContain('color:var(--obtc-red, #b91c1c)');
-    expect(html).not.toContain('--obtc-red: #f87171'); // no dark override on the light-only hydrate path
+    expect(html).toContain('color:var(--obtc-red, #ce2727)');
+    expect(html).not.toContain('--obtc-red: #e97777'); // no dark override on the light-only hydrate path
     const legacy = toHtml({editorjs: {blocks: [{type: 'paragraph', data: {text: 'x'}}]}, values: [], names: []} as never, 'T', '');
-    expect(legacy).toContain('--obtc-red: #f87171'); // dark-capable legacy path keeps it
-    expect(html).toMatch(/<mark style="background:#fef3c7">lit<\/mark>/); // yellow highlight tint
+    expect(legacy).toContain('--obtc-red: #e97777'); // dark-capable legacy path keeps it
+    expect(legacy).toContain('mark[style] { color: inherit; }');
+    expect(html).toMatch(/<mark style="background:#f9ce1f66">lit<\/mark>/); // yellow highlight tint
     // The document model resolves the run colours so the PDF can use them.
     const model = buildDocumentModel({title: 'T', icon: '', snapshot: snap});
     const para = model.blocks.find((b) => b.type === 'paragraph') as {runs: Array<{color?: string; markerColor?: string}>};
-    expect(para.runs.find((r) => r.color)?.color).toBe('#b91c1c');
-    expect(para.runs.find((r) => r.markerColor)?.markerColor).toBe('#fef3c7');
+    expect(para.runs.find((r) => r.color)?.color).toBe('#ce2727');
+    expect(para.runs.find((r) => r.markerColor)?.markerColor).toBe('#f9ce1f66');
   });
 
   it('lays columns side-by-side in HTML but flattens them for Markdown', () => {

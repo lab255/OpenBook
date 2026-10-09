@@ -1,0 +1,15 @@
+diff --git a/fftools/ffmpeg.c b/fftools/ffmpeg.c
+index 420ba3c..3a1b07b 100644
+--- a/fftools/ffmpeg.c
++++ b/fftools/ffmpeg.c
+@@ -950,6 +950,10 @@ int main(int argc, char **argv)
+     int ret;
+     BenchmarkTimeStamps ti;
+ 
++    /* OpenBook runtime probe: preserve upstream -version behavior. */
++    if (argc == 2 && !strcmp(argv[1], "--version"))
++        argv[1]++;
++
+     init_dynload();
+ 
+     setvbuf(stderr,NULL,_IONBF,0); /* win32 runtime needs this */

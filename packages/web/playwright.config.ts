@@ -11,7 +11,8 @@ import {defineConfig, devices} from '@playwright/test';
  *
  * Prerequisite: the workspace libs must be built (`pnpm build:libs`) — Next dev
  * and the tsx servers both resolve `@book.dev/{ui,sdk}` from their dist. CI
- * runs `verify` (which builds libs) before this.
+ * restores the shared built-libs cache in each browser job and runs
+ * `pnpm build:libs` on a cache miss before starting Playwright.
  *
  * Visual diffs: archiving is decoupled from functional runs (OB-222). Tests
  * import from `e2e/fixtures`, which only extends `@chromatic-com/playwright`
