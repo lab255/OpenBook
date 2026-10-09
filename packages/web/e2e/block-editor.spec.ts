@@ -260,6 +260,29 @@ test('block selection: Escape selects, Backspace deletes, undo restores', {tag: 
   await expect(page.locator('.obe-text').nth(1)).toContainText('A scratch document');
 });
 
+for (const level of [1, 2, 3]) {
+  test(`block selection: H${level} wash covers the heading line box`, {tag: ['@editor']}, async ({page}) => {
+    await freshLab(page);
+    // A non-first heading retains the space above that must not inset the wash's bottom.
+    await caretAtEnd(page, 1);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(`${'#'.repeat(level)} Heading wash`);
+    const heading = page.locator(`[data-block-row][data-block-type=heading][data-block-level="${level}"]`).last();
+    await expect(heading.locator('.obe-text')).toHaveText('Heading wash');
+    await page.keyboard.press('Escape');
+    await expect(heading).toHaveClass(/obe-row-selected/);
+
+    const geometry = await heading.evaluate((row) => ({
+      spaceAbove: parseFloat(getComputedStyle(row).paddingTop),
+      washHeight: parseFloat(getComputedStyle(row, '::before').height),
+      lineHeight: parseFloat(getComputedStyle(row.querySelector('.obe-text')!).lineHeight),
+    }));
+    expect(geometry.spaceAbove).toBeGreaterThan(0);
+    expect(geometry.lineHeight).toBeGreaterThan(0);
+    expect(geometry.washHeight).toBeGreaterThanOrEqual(geometry.lineHeight);
+  });
+}
+
 test('todo checkbox toggles and persists through reload', {tag: ['@editor']}, async ({page}) => {
   await freshLab(page);
   const before = await page.evaluate(() => localStorage.getItem('obe-lab-doc'));

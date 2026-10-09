@@ -946,7 +946,7 @@
 .obe-row-selected::before {
   content: '';
   position: absolute;
-  inset: var(--obe-row-space-above, 0px) calc(-1 * var(--obe-block-bleed));
+  inset: var(--obe-row-space-above, 0px) calc(-1 * var(--obe-block-bleed)) 0;
   background: var(--obe-select-wash);
   /* stylelint-disable-next-line design-tokens/role-values -- DSX-7: family role resolves to foundation radius tokens. */
   border-radius: var(--obe-select-radius, var(--radius-sm));
