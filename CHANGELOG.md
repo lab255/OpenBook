@@ -1,3 +1,20 @@
+## 3.20.0 (2026-10-09)
+
+### 🚀 Features
+
+- **server:** checksum-verified downloads + pinned whisper runtime/model manifest (WSP-1) ([#381](https://github.com/lab255/OpenBook/pull/381))
+- **ui:** cloud transcription opt-in in Settings → AI (MEET-12) ([#378](https://github.com/lab255/OpenBook/pull/378))
+
+### 🩹 Fixes
+
+- **desktop:** restrict loopback origins to debug builds (MEET-11) ([#379](https://github.com/lab255/OpenBook/pull/379))
+- **sdk,mcp,ui:** type meeting transcriptionCompleted keys (MEET-10) ([#377](https://github.com/lab255/OpenBook/pull/377))
+- **ui:** palette contrast + export parity + warn-callout export tint (DSX-P) ([#382](https://github.com/lab255/OpenBook/pull/382))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.19.0 (2026-10-06)
 
 ### 🚀 Features

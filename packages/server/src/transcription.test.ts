@@ -1,3 +1,4 @@
+import {WHISPER_MODEL_PIN} from './ai/runtimeManifest';
 import {mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -7,6 +8,7 @@ import {PgliteDb} from './db';
 import {PageStore} from './store';
 import {PageHub} from './hub';
 import {createApp} from './app';
+import {downloadPinned} from './ai/pinnedDownload';
 import {AiService} from './ai/service';
 import {MockEngine, OpenAiCompatEngine} from './ai/providers';
 import {AiUsageLog} from './ai/usage';
@@ -172,6 +174,10 @@ describe('transcription contract', () => {
     await writeFile(whisper, `#!${process.execPath}\nconst fs = require('node:fs'); const args = process.argv.slice(2); const output = args[args.indexOf('-of') + 1]; fs.writeFileSync(${JSON.stringify(dir)} + '/' + process.pid + '.started', ''); setInterval(() => { if (fs.existsSync(${JSON.stringify(release)})) { fs.writeFileSync(output + '.json', JSON.stringify({transcription: [{offsets: {from: 0, to: 1001}, text: 'Local'}]})); process.exit(0); } }, 10);`, {mode: 0o700});
     await writeFile(join(dir, WHISPER_MODEL), 'test model');
     const local = new LocalWhisper(dir, whisper, ffmpeg);
+    expect((await local.status()).modelPresent).toBe(false);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('model bytes')));
+    await downloadPinned(WHISPER_MODEL_PIN, join(dir, WHISPER_MODEL));
+    expect((await local.status()).ready).toBe(true);
     const service = new AiService(db, dir, () => local.resolve(), local);
     const app = appWith(service);
     const request = (ip: string) => app.request(API.aiTranscribe, {
