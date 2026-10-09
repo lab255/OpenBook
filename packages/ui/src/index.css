@@ -1607,7 +1607,19 @@ a.obe-mention {
   margin: auto 0; /* vertically centre short slides; tall ones scroll */
   animation: ob-slide-in var(--motion-slow) var(--ease-out-soft) both;
 }
-.ob-present-full .ob-slide { --obe-font-size: 1.08rem; font-size: var(--obe-font-size); }
+.ob-present-full .ob-slide {
+  --obe-font-size: 1.08rem;
+  /* Recompute derived sizes at the scaling context (CSS variables resolve here). */
+  --obe-title-size: calc(var(--obe-font-size) * 2.5);
+  --obe-code-size: calc(var(--obe-font-size) * 0.875);
+  --obe-small-size: calc(var(--obe-font-size) * 0.875);
+  --obe-caption-size: calc(var(--obe-font-size) * 0.75);
+  --obe-h1-size: calc(var(--obe-font-size) * 1.875);
+  --obe-h2-size: calc(var(--obe-font-size) * 1.5);
+  --obe-h3-size: calc(var(--obe-font-size) * 1.25);
+  --obe-line: calc(var(--obe-font-size) * var(--obe-leading));
+  font-size: var(--obe-font-size);
+}
 @keyframes ob-slide-in {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: none; }
@@ -1844,7 +1856,7 @@ a.obe-mention {
 .obe-table-fixed { table-layout: fixed; width: 100%; }
 .obe-table-col-resizer {
   position: absolute;
-  z-index: calc(var(--z-index-local-overlay) - 1);
+  z-index: var(--z-index-pane-overlay);
   top: 0;
   bottom: 0;
   width: 8px;
@@ -3481,7 +3493,8 @@ a.obe-mention {
   100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .obe-rcursor-label { opacity: 1; }
+  /* The forwards fill would override opacity after the global 0.01ms finish. */
+  .obe-rcursor-label { animation: none; opacity: 1; }
 }
 
 /* Searchable select trigger (the popover surface is Radix Command). */

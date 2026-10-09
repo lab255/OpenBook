@@ -68,6 +68,8 @@ export default tseslint.config(
   {
     // DSX warn rollout: baseline 13 duration + 3 easing utilities, 208 palette
     // utilities, 43 numeric z utilities; preserve existing debt without CI failure.
+    // Measured with these guards at 1d6ef346: motion 33→16, palette 152→152,
+    // z 40→40 (includes primitives; excludes generated/vendor sources).
     files: ['packages/{ui,web}/src/**/*.{ts,tsx}'],
     rules: {
       'tailwind/no-arbitrary-motion': 'warn',

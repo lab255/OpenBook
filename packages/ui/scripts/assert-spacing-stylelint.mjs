@@ -40,13 +40,13 @@ for (const value of [
   'transition-duration: 0s', 'animation-timing-function: linear',
   'color: hsl(var(--foreground) / 0.6)', 'border-radius: var(--radius-lg)',
   'z-index: var(--z-index-menu)', 'font-size: var(--obe-small-size)',
-  '--motion-fast: 120ms', '--obe-code-num: hsl(28 80% 38%)',
+  'font-size: .875em', 'font-size: 1em', '--motion-fast: 120ms', '--obe-code-num: hsl(28 80% 38%)',
 ]) {
   const warnings = await warningsFor(`.obe-control { ${value}; }`);
   if (warnings.length) throw new Error(`DSX allowed ${value}: ${JSON.stringify(warnings)}`);
 }
 for (const value of [
-  'transition: color 120ms ease', 'animation: enter .2s ease-out',
+  'transition: color 120ms ease', 'transition-duration: 0ms', 'animation: enter .2s ease-out',
   'transition-timing-function: cubic-bezier(0, 0, 1, 1)',
   'color: #abcdef', 'border: 1px solid rgb(1 2 3)',
   'border-radius: 4px', 'border-radius: var(--anything)',
@@ -58,7 +58,7 @@ for (const value of [
 const {readFileSync} = await import('node:fs');
 const css = readFileSync(codeFilename, 'utf8');
 const reducedBlocks = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\}/g) ?? [];
-if (reducedBlocks.length !== 2 || !reducedBlocks[0].includes('0.01ms !important') || !reducedBlocks[1].includes('.obe-rcursor-label { opacity: 1; }')) {
+if (reducedBlocks.length !== 2 || !reducedBlocks[0].includes('0.01ms !important') || !reducedBlocks[1].includes('.obe-rcursor-label { animation: none; opacity: 1; }')) {
   throw new Error('Reduced motion must use only the global switch and remote cursor end-state exception');
 }
 console.log('DSX stylelint controls passed');
