@@ -198,13 +198,23 @@ test('drag a block beside another to create columns; a narrow editor container s
   expect(direction).toBe('column');
 });
 
+async function crossGutterClearance(page: import('@playwright/test').Page, row: import('@playwright/test').Locator): Promise<void> {
+  const text = (await row.locator('.obe-text').boundingBox())!;
+  const handle = (await row.locator('.obe-handle').boundingBox())!;
+  const centerY = handle.y + handle.height / 2;
+  await page.mouse.move(text.x + 2, centerY);
+  await expect(row.locator('.obe-gutter')).toHaveCSS('opacity', '1');
+  await page.mouse.move(handle.x + handle.width / 2, centerY, {steps: 20});
+  await expect(row.locator('.obe-gutter')).toHaveCSS('opacity', '1');
+}
+
 test('REAL mouse drag: handle drags a block beside another into columns', {tag: ['@editor']}, async ({page}) => {
   // Regression guard: making the handle a Radix menu trigger killed genuine
   // HTML5 drags (the menu's overlay swallowed them) while synthetic
   // dragstart/drop dispatches kept passing. This test drags for real.
   await freshLab(page);
   const row = page.locator('[data-block-row][data-block-type=todo]');
-  await row.hover();
+  await crossGutterClearance(page, row);
   const target = page.locator('[data-block-row][data-block-type=paragraph]').first();
   const box = (await target.boundingBox())!;
   await row.locator('.obe-handle').dragTo(target, {targetPosition: {x: box.width * 0.95, y: box.height / 2}});
@@ -215,7 +225,7 @@ test('REAL mouse drag: handle drags a block beside another into columns', {tag: 
   // drag handle (the gutter only rendered at the top level) — once a block
   // entered a column it could never leave. Drag it back out below a root row.
   const inColumn = page.locator('.obe-columns [data-block-row][data-block-type=todo]');
-  await inColumn.hover();
+  await crossGutterClearance(page, inColumn);
   await expect(inColumn.locator('.obe-handle')).toBeVisible();
   const lastRoot = page.locator('.obe-root > [data-block-row]').last();
   const rootBox = (await lastRoot.boundingBox())!;
@@ -230,6 +240,17 @@ test('block selection: Escape selects, Backspace deletes, undo restores', {tag: 
   await caretAtEnd(page, 1);
   await page.keyboard.press('Escape');
   await expect(page.locator('.obe-row-selected')).toHaveCount(1);
+  for (const dark of [false, true]) {
+    await page.evaluate((enabled) => document.documentElement.classList.toggle('dark', enabled), dark);
+    const alpha = await page.locator('.obe-row-selected').evaluate((row) => {
+      const background = getComputedStyle(row, '::before').backgroundColor;
+      const match = background.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/);
+      return match ? Number(match[1]) : 1;
+    });
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThanOrEqual(0.2);
+  }
+  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   await page.keyboard.press('Backspace');
   await expect(page.locator('[data-block-type=paragraph]')).toHaveCount(0);

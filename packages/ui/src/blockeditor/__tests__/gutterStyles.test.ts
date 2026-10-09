@@ -143,9 +143,11 @@ describe('block chrome rhythm', () => {
   });
 
   it('sizes the handle independently and pads text inside the caret target', () => {
+    expect(CSS).toMatch(/--obe-gutter-gap:\s*4px/);
+    expect(CSS).toMatch(/--obe-gutter-clear:\s*4px/);
     expect(ruleBody('.obe-handle')).toContain('width: var(--obe-handle-w)');
     expect(ruleBody('.obe-gutter-btn')).toContain('height: var(--obe-gutter-btn)');
-    expect(ruleBody('.obe-row:is([data-block-type=\'paragraph\'], [data-block-type=\'heading\'], [data-block-type=\'list\'], [data-block-type=\'todo\'], [data-block-type=\'quote\']) > .obe-blockbody .obe-text'))
+    expect(ruleBody('.obe-row:is([data-block-type=\'paragraph\'], [data-block-type=\'heading\'], [data-block-type=\'list\'], [data-block-type=\'todo\'], [data-block-type=\'quote\'], [data-block-type=\'notes\']) > .obe-blockbody .obe-text'))
       .toContain('padding-block: var(--obe-block-pad-y)');
     expect(CSS).not.toContain('.obe-row:focus-within > .obe-gutter');
   });

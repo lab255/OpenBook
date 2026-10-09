@@ -238,7 +238,7 @@
     --obe-block-bleed: 4px;
     --obe-row-space-above: 0px;
     --obe-select-radius: var(--radius-sm);
-    --obe-select-wash: hsl(var(--accent) / 0.55);
+    --obe-select-wash: hsl(var(--ring) / 0.14);
     --obe-chrome-ink: hsl(var(--muted-foreground) / 0.8);
     --obe-columns-gap: 28px;
     --obe-title-size: calc(var(--obe-font-size) * 2.5);
@@ -403,6 +403,7 @@
   }
 
   .dark {
+    --obe-select-wash: hsl(var(--ring) / 0.2);
     --obe-fg-gray: hsl(0 0% 66%);
     --obe-fg-brown: hsl(25 40% 62%);
     --obe-fg-orange: hsl(28 85% 62%);
@@ -898,10 +899,10 @@
   --obe-lead-line: var(--obe-line);
   padding-block: var(--obe-block-pad-y);
 }
-.obe-row:is([data-block-type='paragraph'], [data-block-type='heading'], [data-block-type='list'], [data-block-type='todo'], [data-block-type='quote']) {
+.obe-row:is([data-block-type='paragraph'], [data-block-type='heading'], [data-block-type='list'], [data-block-type='todo'], [data-block-type='quote'], [data-block-type='notes']) {
   padding-block: var(--obe-row-space-above) 0;
 }
-.obe-row:is([data-block-type='paragraph'], [data-block-type='heading'], [data-block-type='list'], [data-block-type='todo'], [data-block-type='quote']) > .obe-blockbody .obe-text {
+.obe-row:is([data-block-type='paragraph'], [data-block-type='heading'], [data-block-type='list'], [data-block-type='todo'], [data-block-type='quote'], [data-block-type='notes']) > .obe-blockbody .obe-text {
   padding-block: var(--obe-block-pad-y);
 }
 .obe-row[data-block-type='heading'][data-block-level='1'] {
@@ -998,6 +999,8 @@
   pointer-events: none;
   transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
+/* Hover bridge across --obe-gutter-clear; inherits the gutter's pointer-events, so inert while hidden. */
+.obe-gutter::after { content: ''; position: absolute; inset-block: 0; left: 100%; width: var(--obe-gutter-clear); }
 /* Inside columns there's no page gutter — a compact, handle-only grip
    floats in the column gap. Keep the visible grip above the resize divider;
    hidden gutters remain inert, so the divider owns the gap at rest. */
