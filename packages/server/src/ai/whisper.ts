@@ -120,15 +120,14 @@ export class LocalWhisper implements TranscriptionEngine {
     ] as const) {
       runtime.tools[tool].available = Boolean(resolved);
       if (override) runtime.tools[tool].override = tool === 'whisper-cli' ? 'OPENBOOK_WHISPER_BIN' : 'OPENBOOK_FFMPEG_BIN';
-      else if (resolved && !await this.runtime.binary(tool)) runtime.tools[tool].override = 'PATH';
+      else if (resolved && runtime.tools[tool].status !== 'provisioned') runtime.tools[tool].override = 'PATH';
     }
     const modelUpdateAvailable = !modelPresent && await stat(path.join(this.modelsDir, WHISPER_MODEL)).then((file) => file.isFile(), () => false);
     const runtimeAvailable = Boolean(whisper && ffmpeg);
     return {
       model: WHISPER_MODEL, modelPresent, modelUpdateAvailable, runtimeAvailable, ready: modelPresent && runtimeAvailable && !this.disposed,
       downloadUrl: WHISPER_MODEL_URL, runtime,
-      detail: !runtimeAvailable ? 'Enable local transcription in Settings → AI.'
-        : !modelPresent ? 'Enable local transcription in Settings → AI.' : undefined,
+      detail: !(modelPresent && runtimeAvailable) ? 'Enable local transcription in Settings → AI.' : undefined,
     };
   }
 

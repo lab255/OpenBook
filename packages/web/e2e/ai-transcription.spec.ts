@@ -62,3 +62,14 @@ for (const state of ['unsupported', 'model-update', 'runtime-update', 'failed', 
     else await expect(audio.getByText('whisper-cli: Using OPENBOOK_WHISPER_BIN.')).toBeVisible();
   });
 }
+
+test('real status pipeline renders tool lines', async ({page}) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', {name: 'Page actions'})).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+,');
+  await page.getByRole('button', {name: 'AI', exact: true}).press('Enter');
+  const audio = page.locator('section').filter({has: page.getByLabel('Transcription provider')});
+  await expect(audio.getByText(/^whisper-cli: /)).toBeVisible();
+  await expect(audio.getByText(/^ffmpeg: /)).toBeVisible();
+  await expect(audio.getByRole('button', {name: /local transcription/}).or(audio.getByText('Ready to transcribe.'))).toBeVisible();
+});

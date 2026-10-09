@@ -72,8 +72,11 @@ export class ManagedRuntime {
     for (const tool of tools) {
       signal?.throwIfAborted();
       const pin = this.pins[tool];
-      if (skip.has(tool) || pin.status === 'unsupported' || await this.binary(tool)) continue;
       this.stages[tool] = {status: 'provisioning'};
+      if (skip.has(tool) || pin.status === 'unsupported' || await this.binary(tool)) {
+        delete this.stages[tool];
+        continue;
+      }
       try {
         await this.installTool(tool, pin, signal);
         delete this.stages[tool];
@@ -82,7 +85,8 @@ export class ManagedRuntime {
           delete this.stages[tool];
           throw error;
         }
-        const detail = error instanceof Error ? error.message : String(error);
+        const root = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+        const detail = root instanceof Error ? root.message : String(root);
         this.stages[tool] = {status: 'failed', detail};
         throw new Error(`${tool}: ${detail}`, {cause: error});
       }
