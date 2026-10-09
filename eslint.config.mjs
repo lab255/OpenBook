@@ -7,6 +7,9 @@ import nextPlugin from '@next/eslint-plugin-next';
 import globals from 'globals';
 import e2eIsolation from './eslint-rules/e2e-workspace-isolation.mjs';
 import noArbitrarySpacing from './eslint-rules/no-arbitrary-spacing.mjs';
+import noArbitraryMotion from './eslint-rules/no-arbitrary-motion.mjs';
+import noPaletteColor from './eslint-rules/no-palette-color.mjs';
+import noRawZ from './eslint-rules/no-raw-z.mjs';
 import noHoverGeometry from './eslint-rules/no-hover-geometry.mjs';
 
 export default tseslint.config(
@@ -25,8 +28,6 @@ export default tseslint.config(
       '**/blob-report/**',
       // Rust host + generated Tauri capability schemas.
       'packages/app/src-tauri/**',
-      // shadcn/ui primitives, kept verbatim from upstream.
-      'packages/ui/src/components/ui/**',
       // Vendored UMD bundles (d3 / Observable Plot) inlined into the HTML export.
       'packages/ui/src/export/vendor/**',
       // Generated mirror of the ledger plugin's PURE report folds (LX-3) —
@@ -54,15 +55,25 @@ export default tseslint.config(
   },
   {
     // Hover may repaint an element, but it must not alter geometry and shift
-    // adjacent content. UI primitives remain covered by the upstream ignore.
+    // adjacent content.
     plugins: {'layout-shift': noHoverGeometry},
     rules: {'layout-shift/no-hover-geometry': 'error'},
   },
   {
     // Product spacing follows Tailwind's shared scale; bracket-arbitrary values
     // for padding, margin, and gaps would silently introduce one-off geometry.
-    plugins: {tailwind: noArbitrarySpacing},
+    plugins: {tailwind: {rules: {...noArbitrarySpacing.rules, ...noArbitraryMotion.rules, ...noPaletteColor.rules, ...noRawZ.rules}}},
     rules: {'tailwind/no-arbitrary-spacing': 'error'},
+  },
+  {
+    // DSX warn rollout: baseline 13 duration + 3 easing utilities, 208 palette
+    // utilities, 43 numeric z utilities; preserve existing debt without CI failure.
+    files: ['packages/{ui,web}/src/**/*.{ts,tsx}'],
+    rules: {
+      'tailwind/no-arbitrary-motion': 'warn',
+      'tailwind/no-palette-color': 'warn',
+      'tailwind/no-raw-z': 'warn',
+    },
   },
   {
     // Plain Node scripts (build helpers, etc.).
@@ -108,5 +119,21 @@ export default tseslint.config(
     files: ['packages/web/e2e/**/*.spec.ts'],
     plugins: {e2e: e2eIsolation},
     rules: {'e2e/workspace-isolation': 'error'},
+  },
+  {
+    // Upstream primitives retain their formatting/type lint exemption, but
+    // DSX guards cover them too (including future overlay motion regressions).
+    files: ['packages/ui/src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      ...Object.fromEntries(Object.keys({
+        ...js.configs.recommended.rules,
+        ...Object.assign({}, ...tseslint.configs.recommended.map(config => config.rules)),
+        ...react.configs.flat.recommended.rules,
+      }).map(name => [name, 'off'])),
+      'indent': 'off', 'linebreak-style': 'off', 'quotes': 'off', 'semi': 'off',
+      'no-eval': 'off', 'no-new-func': 'off',
+      'layout-shift/no-hover-geometry': 'off',
+      'tailwind/no-arbitrary-spacing': 'off',
+    },
   },
 );
