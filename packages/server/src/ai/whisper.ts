@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import type {AiStatus, AiTranscriptionResult} from '@book.dev/sdk';
 import type {TranscriptionEngine, TranscribeOptions} from './providers';
+import {WHISPER_MODEL_PIN} from './runtimeManifest';
 
 export const LOCAL_TRANSCRIPTION_MAX_JOBS = 2;
 
@@ -15,8 +16,8 @@ export class LocalTranscriptionBusyError extends Error {
   }
 }
 
-export const WHISPER_MODEL = 'ggml-base.bin';
-export const WHISPER_MODEL_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin';
+export const WHISPER_MODEL = WHISPER_MODEL_PIN.fileName;
+export const WHISPER_MODEL_URL = WHISPER_MODEL_PIN.url;
 
 async function executable(command: string): Promise<string | null> {
   const candidates = path.isAbsolute(command) || command.includes(path.sep)

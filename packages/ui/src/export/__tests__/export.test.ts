@@ -146,6 +146,28 @@ describe('toMarkdown', () => {
   });
 });
 
+describe('stored callout variants', () => {
+  it.each([
+    ['info', 'hsl(40 9% 96%)', '💡'],
+    ['warn', 'hsl(45 90% 52% / 0.15)', '⚠️'],
+    ['warning', 'hsl(45 90% 52% / 0.15)', '⚠️'],
+    ['success', 'hsl(140 55% 45% / 0.13)', '✅'],
+    ['danger', 'hsl(0 72% 55% / 0.12)', '🛑'],
+  ])('exports %s with its matching tint and icon', (variant, tint, icon) => {
+    const blocks: BlockJSON[] = [{id: 'callout', type: 'callout', text: [{t: 'Notice'}], props: {variant}}];
+    const html = toHtml(snapshot(projectBlocksForExport(blocks).blocks), 'T', '');
+    expect(html).toContain(`data-variant="${variant}"`);
+    const selector = variant === 'info' ? '.callout' : `.callout[data-variant=${variant}]`;
+    const tintSelector = variant === 'warn' || variant === 'warning'
+      ? '.callout[data-variant=warn], .callout[data-variant=warning]' : selector;
+    expect(html).toContain(`${tintSelector} { background: ${tint};`);
+    const iconSelector = variant === 'warn' || variant === 'warning'
+      ? '.callout[data-variant=warn]::before, .callout[data-variant=warning]::before' : `${selector}::before`;
+    expect(html).toContain(`${iconSelector} { content: "${icon}"; }`);
+    expect(html).toContain('.callout[data-variant=warn], .callout[data-variant=warning] {');
+  });
+});
+
 describe('new block types', () => {
   const blocks = [
     {type: 'header', data: {text: 'Alpha', level: 2}},
