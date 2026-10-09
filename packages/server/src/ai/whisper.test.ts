@@ -1,8 +1,18 @@
 import {mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {downloadPinned} from './pinnedDownload';
+import {WHISPER_MODEL_PIN} from './runtimeManifest';
 import {LocalWhisper, LocalTranscriptionBusyError, parseWhisperOutput, runWhisperProcess, WHISPER_MODEL} from './whisper';
+
+vi.mock('./runtimeManifest', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./runtimeManifest')>();
+  const {createHash} = await import('node:crypto');
+  return {...actual, WHISPER_MODEL_PIN: {...actual.WHISPER_MODEL_PIN,
+    sha256: createHash('sha256').update('test model').digest('hex'), size: 10,
+  }};
+});
 
 let dir: string;
 beforeEach(async () => { dir = await mkdtemp(path.join(tmpdir(), 'meet3-test-')); });
@@ -20,6 +30,9 @@ describe('optional local whisper runtime', () => {
     expect(await local.resolve()).toBeNull();
     expect(await local.status()).toMatchObject({modelPresent: false, runtimeAvailable: true, ready: false});
     await writeFile(path.join(dir, WHISPER_MODEL), 'test model');
+    expect((await local.status()).modelPresent).toBe(false);
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('test model'));
+    try { await downloadPinned(WHISPER_MODEL_PIN, path.join(dir, WHISPER_MODEL)); } finally { fetch.mockRestore(); }
     expect(await local.resolve()).toBe(local);
     const missing = new LocalWhisper(dir, path.join(dir, 'missing'), process.execPath);
     expect(await missing.resolve()).toBeNull();
