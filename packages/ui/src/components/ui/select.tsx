@@ -200,7 +200,8 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
           className={cn(
             "z-50 max-h-[var(--radix-popover-content-available-height)] min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)]",
             "overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover p-1 text-popover-foreground shadow-overlay outline-hidden",
-            OVERLAY_MOTION.menu,
+            // Entrance only — no exit animation (nested dismissable layer).
+            OVERLAY_MOTION.menuEnter,
           )}
         >
           {items.length === 0 && (

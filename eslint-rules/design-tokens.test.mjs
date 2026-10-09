@@ -6,7 +6,7 @@ const tester = new RuleTester({languageOptions: {ecmaVersion: 2022, sourceType: 
 const jsx = value => `<div className="${value}" />`;
 const invalid = values => values.map(value => ({code: jsx(value), errors: [{messageId: 'token'}]}));
 tester.run('no-arbitrary-motion', noArbitraryMotion, {
-  valid: [jsx('duration-(--motion-base) ease-out-soft transition-colors'),
+  valid: [jsx('duration-0 active:duration-0!'), jsx('duration-(--motion-base) ease-out-soft transition-colors'),
     {code: jsx('ease-spring'), filename: '/ui/switch.tsx'},
     {code: jsx('zoom-in-95'), filename: '/ui/overlay-motion.ts'},
     'const text = "duration-200";'],
@@ -20,7 +20,7 @@ tester.run('no-palette-color', noPaletteColor, {
     {code: '<div style={{borderColor: "rgb(0,0,0)"}} />', errors: [{messageId: 'token'}]}],
 });
 tester.run('no-raw-z', noRawZ, {
-  valid: [jsx('z-menu hover:z-sticky'), 'const label = "z-50";'],
+  valid: [jsx('z-0 hover:z-0!'), jsx('z-menu hover:z-sticky'), 'const label = "z-50";'],
   invalid: [...invalid(['z-50', '-z-10', 'hover:z-[1]', 'z-[var(--x)]']),
     {code: 'const menuStyles = "z-10";', errors: [{messageId: 'token'}]}],
 });

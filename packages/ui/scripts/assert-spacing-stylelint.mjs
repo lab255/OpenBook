@@ -19,7 +19,7 @@ async function assertAllowed(declaration) {
 
 async function assertRejected(declaration) {
   const warnings = await warningsFor(`.spc2-negative-control { ${declaration}; }`);
-  if (!warnings.some((warning) => [rule, 'design-tokens/role-values'].includes(warning.rule))) {
+  if (!warnings.some((warning) => warning.severity === 'error' && [rule, 'design-tokens/role-values'].includes(warning.rule))) {
     throw new Error(`SPC-2 stylelint negative control did not reject ${declaration}`);
   }
 }
@@ -49,11 +49,14 @@ for (const value of [
   'transition: color 120ms ease', 'transition-duration: 0ms', 'animation: enter .2s ease-out',
   'transition-timing-function: cubic-bezier(0, 0, 1, 1)',
   'color: #abcdef', 'border: 1px solid rgb(1 2 3)',
-  'border-radius: 4px', 'border-radius: var(--anything)',
-  'font-size: 14px', 'z-index: 4',
+  'font-size: 14px',
 ]) {
   const warnings = await warningsFor(`.obe-control { ${value}; }`);
   if (!warnings.length || warnings.some(w => w.severity !== 'warning')) throw new Error(`DSX warn guard missed ${value}`);
+}
+for (const value of ['border-radius: 4px', 'border-radius: var(--anything)', 'z-index: 4']) {
+  const warnings = await warningsFor(`.obe-control { ${value}; }`);
+  if (!warnings.length || warnings.some(w => w.severity !== 'error')) throw new Error(`DSX error guard missed ${value}`);
 }
 const {readFileSync} = await import('node:fs');
 const css = readFileSync(codeFilename, 'utf8');

@@ -20,7 +20,7 @@ export default {
     // font-size 124→119, z-index 2→0 (includes a calculated local tier).
     // Duration/easing combined findings 49→7: five attention timers and
     // two global reduced-motion overrides remain intentionally literal.
-    'design-tokens/role-values': [true, {severity: 'warning'}],
+    'design-tokens/role-values': true,
     'declaration-property-value-disallowed-list': [{
       '/^(transition|animation)(-duration|-delay)?$/': [
         '/(?<![\\w.-])(?!0s\\b)\\d*\\.?\\d+m?s\\b/',
@@ -38,7 +38,6 @@ export default {
       '/^(?:(?:padding|margin)(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|gap|row-gap|column-gap)$/i': [
         spacingValue,
       ],
-
     },
   },
   reportDescriptionlessDisables: true,

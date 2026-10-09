@@ -1254,6 +1254,7 @@ const SCHEME_DUAL = `
 :root { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
   body { background: #18181b; color: #e7e7ea; }
+  .callout { background: hsl(0 0% 18.5%); }
   /* Brighter text-colour tokens so palette colours stay legible on the dark page
      (the light-theme hex go muddy). Inline runs reference these via var(); when
      this query is inactive the var() falls back to the baked light hex. */

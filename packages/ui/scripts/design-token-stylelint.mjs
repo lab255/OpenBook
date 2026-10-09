@@ -12,6 +12,7 @@ export default stylelint.createPlugin(ruleName, enabled => (root, result) => {
       : prop === 'font-size' && /\.obe-[\w-]+/.test(decl.parent.selector ?? '') ? font : null;
     if (pattern && !pattern.test(decl.value)) stylelint.utils.report({
       ruleName, result, node: decl,
+      severity: prop === 'font-size' ? 'warning' : 'error',
       message: `Use a DSX role token for ${prop}: ${decl.value}`,
     });
   });

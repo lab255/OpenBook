@@ -1039,7 +1039,7 @@
 }
 .obe-text:empty::before {
   content: attr(data-placeholder);
-  color: hsl(var(--muted-foreground) / 0.45);
+  color: var(--obe-placeholder);
   pointer-events: none;
 }
 .obe-heading { flex: 1; min-width: 0; font-weight: var(--obe-heading-weight); }
@@ -3117,7 +3117,7 @@ a.obe-mention {
   border-radius: 9999px;
   background: hsl(var(--background));
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
-  transition: transform var(--motion-base) var(--ease-out-soft);
+  transition: transform var(--motion-base) var(--ease-spring);
 }
 .obe-kit-switch-on .obe-kit-knob { transform: translateX(1rem); }
 
