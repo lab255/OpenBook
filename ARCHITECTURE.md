@@ -449,9 +449,18 @@ Two ways for a model to *act on* the workspace, sharing one tool contract
 pnpm verify
 ```
 
-Runs, in order: **build:libs** (sdk → ui → server) → **typecheck** (all packages)
-→ **lint** (all) → **test** (vitest unit suites) → **test:e2e** (server e2e). This
-is the gate to run before committing and in CI (`.github/workflows/ci.yml`).
+Runs, in order: **test:eslint-rules** → **build:libs** (sdk → ui → mcp → server)
+→ **check:gen** → **typecheck** (all packages) → **lint** (all) → **test**
+(all unit suites, including server) → **test:e2e** (server + mcp e2e). Full
+verification runs nightly at 06:30 UTC and on demand via
+`.github/workflows/nightly-verify.yml`; failures open or update a pinned
+"Nightly verify failing" issue, which closes on recovery.
+
+PRs and pushes to main use the fast **Gate (typecheck · lint · unit)** in
+`.github/workflows/ci.yml`: restore/build libs, test ESLint rules, check generated
+files, typecheck, lint, and explicitly run sdk/ui/app/mcp unit tests. Full
+`verify` does not run on either event. The existing Playwright shards, PR P1
+gate, Beancount, durability, Postgres concurrency, and Chromatic jobs remain.
 
 Other commands:
 

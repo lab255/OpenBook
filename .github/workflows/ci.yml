@@ -8,10 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  # Build (libs) + typecheck + lint + unit tests + server e2e — the single gate
-  # developers run locally as `pnpm verify`.
-  verify:
-    name: Verify (build · lint · test)
+  # Fast PR + main gate; full verify runs nightly and on demand.
+  gate:
+    name: Gate (typecheck · lint · unit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +29,34 @@ jobs:
           cache: "pnpm" # caches the pnpm store
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Verify
-        run: pnpm run verify
+      - name: Cache built libs
+        id: libs-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/sdk/dist
+            packages/ui/dist
+            packages/mcp/dist
+            packages/server/dist
+            packages/server/assets
+          key: ${{ runner.os }}-libs-${{ hashFiles('packages/sdk/src/**', 'packages/sdk/package.json', 'packages/sdk/tsconfig.json', 'packages/ui/src/**', 'packages/ui/resources/**', 'packages/ui/package.json', 'packages/ui/tsconfig.json', 'packages/ui/vite.config.js', 'packages/ui/postcss.config.js', 'packages/mcp/src/**', 'packages/mcp/package.json', 'packages/mcp/tsconfig.json', 'packages/mcp/tsup.config.ts', 'packages/server/src/**', 'packages/server/package.json', 'packages/server/tsconfig.json', 'packages/server/tsup.config.ts', 'pnpm-lock.yaml') }}
+      - name: Build libs
+        if: steps.libs-cache.outputs.cache-hit != 'true'
+        run: pnpm run build:libs
+      # UI source tests import this gitignored bundle, which is outside the libs cache.
+      - name: Build viewer for UI tests
+        run: pnpm --filter @book.dev/ui run build:viewer
+      - name: Test ESLint rules
+        run: pnpm run test:eslint-rules
+      - name: Check generated files
+        run: pnpm run check:gen
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Lint
+        run: pnpm run lint
+      # Explicit allowlist: selecting the root would recursively test server too.
+      - name: Unit tests (sdk, ui, app, mcp)
+        run: pnpm --filter @book.dev/sdk --filter @book.dev/ui --filter @book.dev/app --filter @book.dev/mcp --if-present run test
 
   # Beancount reference gate (LGR-13): bean-check on the fixture exports plus
   # the Fava/OpenBook trial-balance parity comparison, against a PINNED Python

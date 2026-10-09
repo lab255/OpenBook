@@ -46,7 +46,8 @@ describe('optional local whisper runtime', () => {
     const controller = new AbortController();
     const promise = local.transcribe(new Uint8Array([1]), {signal: controller.signal});
     const rejected = expect(promise).rejects.toMatchObject({name: 'AbortError'});
-    await expect.poll(async () => readFile(marker, 'utf8').catch(() => '')).not.toBe('');
+    // Child startup can exceed the default 1s poll deadline under suite load.
+    await expect.poll(async () => readFile(marker, 'utf8').catch(() => ''), {timeout: 10_000}).not.toBe('');
     const started = JSON.parse(await readFile(marker, 'utf8')) as {pid: number; dir: string};
     if (action === 'abort') controller.abort();
     else await local.dispose();
@@ -64,7 +65,7 @@ describe('optional local whisper runtime', () => {
     const controller = new AbortController();
     const jobs = Promise.allSettled([0, 1].map(() => local.transcribe(new Uint8Array([1]), {signal: controller.signal})));
     try {
-      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length).toBe(2);
+      await expect.poll(async () => (await readdir(dir)).filter((f) => f.endsWith('.started')).length, {timeout: 10_000}).toBe(2);
       await expect(local.transcribe(new Uint8Array([1]))).rejects.toBeInstanceOf(LocalTranscriptionBusyError);
       if (outcome === 'abort') controller.abort();
       else await writeFile(mode, 'fail');

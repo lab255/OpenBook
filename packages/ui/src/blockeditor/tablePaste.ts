@@ -14,13 +14,17 @@ const htmlCellText = (cell: Element): string => {
   return (copy.textContent ?? '').trim();
 };
 
-const colorByCss = new Map(Object.entries(COLOR_EXPORT_HEX).map(([token, value]) => [value.hl.toLowerCase(), token]));
+// Pre-DSX-P opaque export tints, kept so older exported HTML still pastes with its tokens.
+const LEGACY_HL: Record<string, string> = {'#e5e7eb': 'gray', '#ece0d8': 'brown', '#ffedd5': 'orange', '#fef3c7': 'yellow', '#dcfce7': 'green', '#dbeafe': 'blue', '#f3e8ff': 'purple', '#fce7f3': 'pink', '#fee2e2': 'red'};
+const colorByCss = new Map<string, string>([...Object.entries(LEGACY_HL), ...Object.entries(COLOR_EXPORT_HEX).map(([token, value]) => [value.hl.toLowerCase(), token] as [string, string])]);
 const cellColor = (cell: Element): string | undefined => {
   const raw = (cell as HTMLElement).style.backgroundColor || (cell as HTMLElement).style.background;
   if (!raw) return undefined;
   if (colorByCss.has(raw.toLowerCase())) return colorByCss.get(raw.toLowerCase());
-  const match = raw.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
-  const hex = match ? `#${match.slice(1).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}` : '';
+  const match = raw.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  const rgb = match ? match.slice(1, 4).map((n) => Number(n).toString(16).padStart(2, '0')).join('') : '';
+  const alpha = match?.[4] === undefined ? '' : Math.round(Number(match[4]) * 255).toString(16).padStart(2, '0');
+  const hex = rgb ? `#${rgb}${alpha}` : '';
   return colorByCss.get(hex);
 };
 
