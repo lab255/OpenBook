@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenBook token sheet — DSX-0 (2026-10)</title>
+<!--
+  Visual sign-off artifact for docs/design/design-system-manifest-2026-10.md.
+  Self-contained: inline CSS, no scripts, no build step. Every value below is the
+  value decided in the manifest; section numbers (§) point back to it.
+-->
+<style>
+  /* ── Theme poles (copied from packages/ui/src/index.css :root / .dark) ── */
+  .lt {
+    --background: 0 0% 100%; --foreground: 34 9% 19%;
+    --muted: 40 9% 96%; --muted-foreground: 40 3% 43.2%;
+    --border: 40 8% 90%; --ring: 207 75% 49%; --primary: 207 75% 49%;
+    --primary-foreground: 0 0% 100%; --accent: 40 12% 93%;
+    --hover: hsl(var(--primary) / 0.1); --hover-strong: hsl(var(--primary) / 0.15);
+    --shadow-menu: 0 0 0 1px hsl(var(--foreground) / 0.03), 0 3px 10px -3px hsl(var(--foreground) / 0.1);
+    --shadow-overlay: 0 2px 4px hsl(20 14% 12% / 0.06), 0 8px 16px -4px hsl(20 14% 12% / 0.10), 0 24px 48px -12px hsl(20 14% 12% / 0.20);
+
+    /* editor palette (§5.1, verbatim) */
+    --obe-fg-gray: hsl(0 0% 45%); --obe-fg-brown: hsl(25 35% 38%); --obe-fg-orange: hsl(28 80% 42%);
+    --obe-fg-yellow: hsl(42 80% 36%); --obe-fg-green: hsl(140 50% 34%); --obe-fg-blue: hsl(210 72% 45%);
+    --obe-fg-purple: hsl(265 55% 52%); --obe-fg-pink: hsl(330 65% 48%); --obe-fg-red: hsl(0 68% 48%);
+    --obe-bg-gray: hsl(0 0% 50% / 0.1); --obe-bg-brown: hsl(25 45% 50% / 0.13); --obe-bg-orange: hsl(28 85% 52% / 0.13);
+    --obe-bg-yellow: hsl(45 90% 52% / 0.15); --obe-bg-green: hsl(140 55% 45% / 0.13); --obe-bg-blue: hsl(210 80% 55% / 0.13);
+    --obe-bg-purple: hsl(265 60% 58% / 0.14); --obe-bg-pink: hsl(330 70% 58% / 0.13); --obe-bg-red: hsl(0 72% 55% / 0.12);
+    --obe-hl-gray: hsl(0 0% 55% / 0.28); --obe-hl-brown: hsl(25 50% 50% / 0.3); --obe-hl-orange: hsl(30 90% 55% / 0.32);
+    --obe-hl-yellow: hsl(48 95% 55% / 0.4); --obe-hl-green: hsl(140 60% 48% / 0.3); --obe-hl-blue: hsl(210 85% 58% / 0.28);
+    --obe-hl-purple: hsl(265 65% 60% / 0.3); --obe-hl-pink: hsl(330 75% 60% / 0.3); --obe-hl-red: hsl(0 75% 58% / 0.28);
+
+    /* code syntax (§5.3) */
+    --obe-code-kw: hsl(265 55% 48%); --obe-code-str: hsl(140 50% 30%);
+    --obe-code-num: hsl(28 80% 38%); --obe-code-lit: hsl(210 72% 42%);
+    /* selection (§8.1) */
+    --obe-select-wash: hsl(var(--ring) / 0.14);
+  }
+  .dk {
+    --background: 0 0% 13%; --foreground: 0 0% 82%;
+    --muted: 0 0% 18.5%; --muted-foreground: 0 0% 59.1%;
+    --border: 0 0% 22%; --ring: 207 78% 62%; --primary: 207 78% 62%;
+    --primary-foreground: 207 50% 12%; --accent: 0 0% 22%;
+    --hover: hsl(var(--primary) / 0.2); --hover-strong: hsl(var(--primary) / 0.25);
+    --shadow-menu: 0 0 0 1px hsl(0 0% 0% / 0.14), 0 3px 10px -3px hsl(0 0% 0% / 0.22);
+    --shadow-overlay: 0 3px 6px hsl(0 0% 0% / 0.28), 0 12px 28px -6px hsl(0 0% 0% / 0.42), 0 32px 64px -16px hsl(0 0% 0% / 0.55);
+
+    --obe-fg-gray: hsl(0 0% 66%); --obe-fg-brown: hsl(25 40% 62%); --obe-fg-orange: hsl(28 85% 62%);
+    --obe-fg-yellow: hsl(45 80% 62%); --obe-fg-green: hsl(140 50% 60%); --obe-fg-blue: hsl(210 75% 67%);
+    --obe-fg-purple: hsl(265 65% 73%); --obe-fg-pink: hsl(330 70% 71%); --obe-fg-red: hsl(0 72% 69%);
+    --obe-bg-gray: hsl(0 0% 78% / 0.1); --obe-bg-brown: hsl(25 45% 55% / 0.18); --obe-bg-orange: hsl(28 80% 55% / 0.18);
+    --obe-bg-yellow: hsl(45 80% 55% / 0.18); --obe-bg-green: hsl(140 50% 50% / 0.18); --obe-bg-blue: hsl(210 70% 55% / 0.2);
+    --obe-bg-purple: hsl(265 55% 60% / 0.22); --obe-bg-pink: hsl(330 60% 58% / 0.2); --obe-bg-red: hsl(0 65% 55% / 0.2);
+    --obe-hl-gray: hsl(0 0% 62% / 0.3); --obe-hl-brown: hsl(25 45% 50% / 0.34); --obe-hl-orange: hsl(30 80% 50% / 0.36);
+    --obe-hl-yellow: hsl(48 80% 50% / 0.34); --obe-hl-green: hsl(140 50% 45% / 0.34); --obe-hl-blue: hsl(210 70% 52% / 0.36);
+    --obe-hl-purple: hsl(265 55% 55% / 0.38); --obe-hl-pink: hsl(330 60% 55% / 0.36); --obe-hl-red: hsl(0 65% 52% / 0.36);
+
+    --obe-code-kw: hsl(265 65% 73%); --obe-code-str: hsl(140 50% 60%);
+    --obe-code-num: hsl(28 85% 62%); --obe-code-lit: hsl(210 75% 67%);
+    --obe-select-wash: hsl(var(--ring) / 0.2);
+  }
+
+  /* ── Decided tokens (mode-independent) ── */
+  :root {
+    --obe-font-size: 16px; --obe-leading: 1.5;
+    --obe-line: calc(var(--obe-font-size) * var(--obe-leading));
+    --obe-title-size: calc(var(--obe-font-size) * 2.5);
+    --obe-h1-size: calc(var(--obe-font-size) * 1.875); --obe-h1-leading: 1.3; --obe-h1-space: 2rem;
+    --obe-h2-size: calc(var(--obe-font-size) * 1.5);   --obe-h2-leading: 1.3; --obe-h2-space: 1.5rem;
+    --obe-h3-size: calc(var(--obe-font-size) * 1.25);  --obe-h3-leading: 1.3; --obe-h3-space: 1rem;
+    --obe-code-size: calc(var(--obe-font-size) * 0.875); --obe-code-leading: 1.5;
+    --obe-small-size: calc(var(--obe-font-size) * 0.875); --obe-small-leading: 1.43;
+    --obe-caption-size: calc(var(--obe-font-size) * 0.75); --obe-caption-leading: 1.33;
+    --obe-heading-weight: 600;
+    --obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --motion-fast: 120ms; --motion-base: 180ms; --motion-slow: 240ms;
+    --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --radius: 0.5rem;
+    --radius-sm: calc(var(--radius) - 4px); --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px);
+
+    --obe-gutter-btn: 24px; --obe-gutter-gap: 4px; --obe-gutter-clear: 4px;
+    --obe-gutter-room: calc(2 * var(--obe-gutter-btn) + var(--obe-gutter-gap) + var(--obe-gutter-clear));
+    --obe-drag-dim: 0.4;
+    --obe-focus-offset: 2px;
+  }
+  .lt, .dk {
+    --obe-placeholder: hsl(var(--muted-foreground) / 0.6);
+    --obe-chrome-ink: hsl(var(--muted-foreground) / 0.8);
+    --obe-chrome-ink-hover: hsl(var(--foreground));
+    --obe-chrome-hover: var(--hover);
+    --obe-chrome-active: var(--hover-strong);
+    --obe-drop: hsl(var(--primary));
+    --obe-focus-ring: 2px solid hsl(var(--ring));
+    --obe-code-bg: hsl(var(--muted) / 0.6);
+    --obe-code-border: hsl(var(--border) / 0.7);
+    --obe-code-com: hsl(var(--muted-foreground));
+    --obe-callout-info: hsl(var(--muted));
+    --obe-callout-warn: var(--obe-bg-yellow);
+    --obe-callout-success: var(--obe-bg-green);
+    --obe-callout-danger: var(--obe-bg-red);
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  /* ── Sheet layout ── */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #ecebe8; color: #2f2c28;
+    font: 14px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, Inter, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.top { margin-bottom: 32px; }
+  header.top h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  header.top p { margin: 0; color: #6f6b65; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  nav.toc a { font-size: 12px; text-decoration: none; color: #2f2c28; background: #fff; border-radius: 9999px; padding: 4px 12px; box-shadow: 0 0 0 1px #dedbd5; }
+  section { background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px #e2dfda; padding: 24px; margin-bottom: 24px; }
+  section > h2 { font-size: 18px; margin: 0 0 4px; }
+  section > p.lede { margin: 0 0 20px; color: #6f6b65; }
+  .sec { color: #9a958d; font-weight: 500; font-size: 13px; margin-left: 6px; }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel { border-radius: 8px; padding: 20px; box-shadow: 0 0 0 1px rgba(0,0,0,0.08); }
+  .panel-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.55; margin-bottom: 12px; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.t th { text-align: left; font-weight: 600; color: #6f6b65; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid #e8e5e0; }
+  table.t td { padding: 8px; border-bottom: 1px solid #f1efeb; vertical-align: middle; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  .muted { color: #8a857d; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 9999px; background: #f1efeb; color: #6f6b65; }
+  .tag.new { background: #e0eefa; color: #1e5a96; }
+  .tag.fix { background: #fbe7e7; color: #8f2424; }
+
+  /* ── 1. Type ramp ── */
+  .ramp-row { display: grid; grid-template-columns: 170px 1fr 210px; gap: 16px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid #f1efeb; }
+  .ramp-row:last-child { border-bottom: 0; }
+  .ramp-meta { font-size: 12px; color: #8a857d; }
+  .ramp-meta b { color: #2f2c28; font-weight: 600; display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .s-title { font-size: var(--obe-title-size); line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
+  .s-h1 { font-size: var(--obe-h1-size); line-height: var(--obe-h1-leading); font-weight: var(--obe-heading-weight); }
+  .s-h2 { font-size: var(--obe-h2-size); line-height: var(--obe-h2-leading); font-weight: var(--obe-heading-weight); }
+  .s-h3 { font-size: var(--obe-h3-size); line-height: var(--obe-h3-leading); font-weight: var(--obe-heading-weight); }
+  .s-body { font-size: var(--obe-font-size); line-height: var(--obe-leading); }
+  .s-code { font-family: var(--obe-font-mono); font-size: var(--obe-code-size); line-height: var(--obe-code-leading); }
+  .s-small { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); }
+  .s-caption { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .inline-code { font-family: var(--obe-font-mono); font-size: 0.875em; background: hsl(40 9% 96% / 0.7); border-radius: var(--radius-sm); padding: 0 4px; }
+  .linebox { background: repeating-linear-gradient(to bottom, rgba(30,107,184,0.07) 0 var(--obe-line), transparent var(--obe-line) calc(2 * var(--obe-line))); }
+
+  /* ── 2. Motion ── */
+  .motion-grid { display: grid; grid-template-columns: 150px repeat(3, 1fr); gap: 8px 16px; align-items: center; }
+  .motion-grid .h { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6f6b65; }
+  .track { position: relative; height: 28px; border-radius: 9999px; background: #f4f2ee; overflow: hidden; }
+  .dot { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 9999px; background: hsl(207 75% 49%); }
+  /* 2s cycle: travel occupies duration/2000 of the cycle, then holds. */
+  @keyframes travel-fast { 0% { transform: translateX(0); } 6% { transform: translateX(var(--d)); } 50% { transform: translateX(var(--d)); } 56% { transform: translateX(0); } 100% { transform: translateX(0); } }
+  @keyframes travel-base { 0% { transform: translateX(0); } 9% { transform: translateX(var(--d)); } 50% { transform: translateX(var(--d)); } 59% { transform: translateX(0); } 100% { transform: translateX(0); } }
+  @keyframes travel-slow { 0% { transform: translateX(0); } 12% { transform: translateX(var(--d)); } 50% { transform: translateX(var(--d)); } 62% { transform: translateX(0); } 100% { transform: translateX(0); } }
+  .dot { --d: 200px; animation-duration: 2s; animation-iteration-count: infinite; }
+  .d-fast { animation-name: travel-fast; } .d-base { animation-name: travel-base; } .d-slow { animation-name: travel-slow; }
+  .e-out { animation-timing-function: var(--ease-out-soft); }
+  .e-io { animation-timing-function: var(--ease-in-out-soft); }
+  .e-spring { animation-timing-function: var(--ease-spring); }
+  .dur-label { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .dur-label small { display: block; color: #8a857d; font-family: inherit; }
+
+  .recipes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+  .recipe { border-radius: 8px; box-shadow: 0 0 0 1px #e8e5e0; padding: 16px; min-height: 180px; position: relative; overflow: hidden; }
+  .recipe h3 { margin: 0 0 2px; font-size: 13px; }
+  .recipe .spec { font-size: 11px; color: #8a857d; margin-bottom: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .hover-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-md); color: hsl(40 3% 43.2% / 0.8); cursor: pointer;
+    transition: background-color var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft); }
+  .hover-chip:hover { background: hsl(207 75% 49% / 0.1); color: hsl(34 9% 19%); }
+  .hover-chip:active { background: hsl(207 75% 49% / 0.15); transition-duration: 0s; }
+  /* Menu: enter base/out-soft (opacity + scale .98 + 2px), hold, exit fast/in-out-soft (opacity only). 2.4s cycle. */
+  @keyframes menu-cycle {
+    0%     { opacity: 0; transform: translateY(-2px) scale(0.98); animation-timing-function: var(--ease-out-soft); }
+    7.5%   { opacity: 1; transform: none; }
+    70%    { opacity: 1; transform: none; animation-timing-function: var(--ease-in-out-soft); }
+    75%    { opacity: 0; transform: none; }
+    100%   { opacity: 0; }
+  }
+  .menu { width: 170px; background: #fff; border: 1px solid hsl(40 8% 90%); border-radius: var(--radius-lg); padding: 4px; box-shadow: 0 0 0 1px hsl(34 9% 19% / 0.03), 0 3px 10px -3px hsl(34 9% 19% / 0.1);
+    transform-origin: top left; animation: menu-cycle 2.4s infinite; }
+  .menu div { padding: 6px 8px; border-radius: var(--radius-sm); font-size: 13px; }
+  .menu div.on { background: hsl(207 75% 49% / 0.1); }
+  /* Dialog: enter slow 240ms over a 3.2s cycle (7.5%), exit fast 120ms (3.75%). */
+  @keyframes dialog-cycle {
+    0%    { opacity: 0; transform: scale(0.98); animation-timing-function: var(--ease-out-soft); }
+    7.5%  { opacity: 1; transform: none; }
+    70%   { opacity: 1; transform: none; animation-timing-function: var(--ease-in-out-soft); }
+    73.75%{ opacity: 0; }
+    100%  { opacity: 0; }
+  }
+  @keyframes scrim-cycle { 0% { opacity: 0; animation-timing-function: var(--ease-out-soft); } 7.5% { opacity: 1; } 70% { opacity: 1; animation-timing-function: var(--ease-in-out-soft); } 73.75% { opacity: 0; } 100% { opacity: 0; } }
+  .scrim { position: absolute; inset: 0; background: hsl(20 14% 12% / 0.35); animation: scrim-cycle 3.2s infinite; }
+  .dialog { position: absolute; left: 50%; top: 58%; width: 180px; margin-left: -90px; margin-top: -36px; background: #fff; border-radius: var(--radius-xl); padding: 14px; font-size: 12px;
+    box-shadow: 0 2px 4px hsl(20 14% 12% / 0.06), 0 8px 16px -4px hsl(20 14% 12% / 0.10), 0 24px 48px -12px hsl(20 14% 12% / 0.20); animation: dialog-cycle 3.2s infinite; }
+  /* Toggle: chevron rotates base/out-soft; content appears instantly (steps). */
+  @keyframes chev-cycle { 0%, 45% { transform: rotate(0deg); animation-timing-function: var(--ease-out-soft); } 49.5%, 95% { transform: rotate(90deg); animation-timing-function: var(--ease-out-soft); } 99.5%, 100% { transform: rotate(0deg); } }
+  @keyframes content-cycle { 0%, 45% { visibility: hidden; } 45.01%, 95% { visibility: visible; } 95.01%, 100% { visibility: hidden; } }
+  .toggle-head { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+  .chev { display: inline-block; width: 16px; text-align: center; color: hsl(40 3% 43.2%); animation: chev-cycle 4s infinite; }
+  .toggle-body { padding: 4px 0 0 22px; font-size: 14px; animation: content-cycle 4s infinite; }
+  /* Switch: knob spring, track colour out-soft, both base. */
+  @keyframes knob-cycle { 0%, 45% { transform: translateX(0); animation-timing-function: var(--ease-spring); } 49.5%, 95% { transform: translateX(16px); animation-timing-function: var(--ease-spring); } 99.5%, 100% { transform: translateX(0); } }
+  @keyframes track-cycle { 0%, 45% { background: hsl(40 9% 96%); animation-timing-function: var(--ease-out-soft); } 49.5%, 95% { background: hsl(207 75% 49%); } 99.5%, 100% { background: hsl(40 9% 96%); } }
+  .switch { width: 38px; height: 22px; border-radius: 9999px; border: 1px solid hsl(40 8% 90%); position: relative; animation: track-cycle 4s infinite; }
+  .knob { position: absolute; top: 1px; left: 1px; width: 18px; height: 18px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); animation: knob-cycle 4s infinite; }
+  /* Block insert: no entrance — rows appear on the frame. */
+  @keyframes insert-cycle { 0%, 24.99% { visibility: hidden; } 25%, 100% { visibility: visible; } }
+  @keyframes insert-cycle-2 { 0%, 49.99% { visibility: hidden; } 50%, 100% { visibility: visible; } }
+  @keyframes insert-cycle-3 { 0%, 74.99% { visibility: hidden; } 75%, 100% { visibility: visible; } }
+  .ins { font-size: 14px; line-height: 24px; }
+  .ins.i2 { animation: insert-cycle 3s infinite step-end; } .ins.i3 { animation: insert-cycle-2 3s infinite step-end; } .ins.i4 { animation: insert-cycle-3 3s infinite step-end; }
+  /* Slide: slow, 16px rise. */
+  @keyframes slide-cycle { 0% { opacity: 0; transform: translateY(16px); animation-timing-function: var(--ease-out-soft); } 8% { opacity: 1; transform: none; } 100% { opacity: 1; transform: none; } }
+  .slide { border-radius: var(--radius-xl); background: #f6f5f4; padding: 16px; font-weight: 600; animation: slide-cycle 3s infinite; }
+
+  .rm-note { display: none; margin: 0 0 16px; padding: 8px 12px; border-radius: 8px; background: #fdf5dc; font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) {
+    .rm-note { display: block; }
+    *, ::before, ::after { animation-play-state: paused !important; }
+  }
+
+  /* ── 3. Radius ── */
+  .radius-row { display: flex; flex-wrap: wrap; gap: 20px; }
+  .rchip { width: 150px; }
+  .rchip .shape { height: 72px; background: hsl(207 86% 95%); box-shadow: inset 0 0 0 1.5px hsl(207 75% 49% / 0.55); margin-bottom: 8px; }
+  .rchip b { display: block; font-size: 13px; }
+  .rchip span { font-size: 12px; color: #8a857d; line-height: 1.4; display: block; }
+
+  /* ── 4/5. Colour rows ── */
+  .swatch { display: inline-block; width: 44px; height: 24px; border-radius: var(--radius-sm); vertical-align: middle; box-shadow: inset 0 0 0 1px rgba(127,127,127,0.25); }
+  .ctable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ctable th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6f6b65; padding: 6px 8px; border-bottom: 1px solid #e8e5e0; }
+  .ctable td { padding: 6px 8px; border-bottom: 1px solid #f1efeb; vertical-align: middle; }
+  .ctable td.cell-lt, .ctable td.cell-dk { width: 26%; }
+  .ctable td.cell-dk { background: hsl(0 0% 13%); color: hsl(0 0% 82%); }
+  .ctable td.cell-lt .v, .ctable td.cell-dk .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; margin-left: 8px; opacity: 0.8; }
+
+  .palette { display: grid; grid-template-columns: 70px repeat(9, 1fr); gap: 4px; align-items: center; font-size: 12px; }
+  .palette .lbl { font-size: 11px; opacity: 0.6; }
+  .palette .p { height: 26px; border-radius: var(--radius-sm); display: grid; place-items: center; font-size: 12px; font-weight: 500; }
+
+  /* ── Callout + code samples ── */
+  .callout { display: flex; gap: 8px; padding: 12px; border-radius: var(--radius-lg); margin: 0 0 8px; font-size: var(--obe-font-size); line-height: var(--obe-leading); }
+  .callout .ico { flex: none; }
+  .c-info { background: var(--obe-callout-info); } .c-warn { background: var(--obe-callout-warn); }
+  .c-success { background: var(--obe-callout-success); } .c-danger { background: var(--obe-callout-danger); }
+  .codeblock { background: var(--obe-code-bg); border: 1px solid var(--obe-code-border); border-radius: var(--radius-lg); padding: 12px 16px; margin-top: 12px;
+    font-family: var(--obe-font-mono); font-size: var(--obe-code-size); line-height: var(--obe-code-leading); white-space: pre; overflow-x: auto; }
+  .tk-com { color: var(--obe-code-com); font-style: italic; } .tk-kw { color: var(--obe-code-kw); } .tk-str { color: var(--obe-code-str); }
+  .tk-num { color: var(--obe-code-num); } .tk-lit { color: var(--obe-code-lit); }
+
+  /* ── 8. Block chrome mock ── */
+  .ed { position: relative; padding: 8px 8px 8px calc(var(--obe-gutter-room) + 12px); font-size: var(--obe-font-size); line-height: var(--obe-leading); }
+  .row { position: relative; border-radius: var(--radius-sm); }
+  .row .txt { min-height: var(--obe-line); }
+  .row.h1 { --obe-lead-offset: var(--obe-h1-space); --obe-lead-line: calc(var(--obe-h1-size) * var(--obe-h1-leading)); }
+  .row.h2 { --obe-lead-offset: var(--obe-h2-space); --obe-lead-line: calc(var(--obe-h2-size) * var(--obe-h2-leading)); }
+  .row.h3 { --obe-lead-offset: var(--obe-h3-space); --obe-lead-line: calc(var(--obe-h3-size) * var(--obe-h3-leading)); }
+  .row.co { --obe-lead-offset: 12px; }
+  .row.h1 .txt { font-size: var(--obe-h1-size); line-height: var(--obe-h1-leading); font-weight: var(--obe-heading-weight); padding-top: var(--obe-h1-space); }
+  .row.h2 .txt { font-size: var(--obe-h2-size); line-height: var(--obe-h2-leading); font-weight: var(--obe-heading-weight); padding-top: var(--obe-h2-space); }
+  .row.h3 .txt { font-size: var(--obe-h3-size); line-height: var(--obe-h3-leading); font-weight: var(--obe-heading-weight); padding-top: var(--obe-h3-space); }
+  .gutter { position: absolute; left: calc(-1 * var(--obe-gutter-room)); display: flex; gap: var(--obe-gutter-gap);
+    top: calc(var(--obe-lead-offset, 0px) + (var(--obe-lead-line, var(--obe-line)) - var(--obe-gutter-btn)) / 2); }
+  .gbtn { width: var(--obe-gutter-btn); height: var(--obe-gutter-btn); display: grid; place-items: center; border-radius: var(--radius-md); color: var(--obe-chrome-ink); font-size: 14px; line-height: 1; user-select: none;
+    transition: background-color var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft); }
+  .gbtn:hover { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+  .gbtn.active { background: var(--obe-chrome-active); color: var(--obe-chrome-ink-hover); }
+  .gbtn.focus { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
+  .gutter.guide::after { content: ''; position: absolute; left: calc(100% + var(--obe-gutter-clear)); width: 6px; top: 50%; border-top: 1px dashed hsl(var(--ring) / 0.6); }
+  .row.sel { background: var(--obe-select-wash); }
+  .row.drag { opacity: var(--obe-drag-dim); }
+  .row.drop::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; border-top: 2px solid var(--obe-drop); }
+  .ph::before { content: "Type '/' for commands"; color: var(--obe-placeholder); }
+  .ed .callout { margin: 4px 0; }
+  .chrome-legend { font-size: 12px; opacity: 0.6; margin-top: 12px; line-height: 1.5; }
+
+  /* ── 6. z ladder ── */
+  .zl { display: grid; grid-template-columns: 70px 190px 1fr; gap: 0; font-size: 13px; }
+  .zl div { padding: 5px 8px; border-bottom: 1px solid #f1efeb; }
+  .zl .n { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
+  .zl .local { background: #f8f7f5; }
+
+  @media (max-width: 820px) { .duo, .recipes { grid-template-columns: 1fr; } .ramp-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <h1>OpenBook token sheet</h1>
+    <p>DSX-0 · design-system manifest v1 · 2026-10 · visual sign-off for <code>docs/design/design-system-manifest-2026-10.md</code></p>
+    <nav class="toc">
+      <a href="#type">1 Type</a><a href="#motion">2 Motion</a><a href="#radius">3 Radius</a><a href="#placeholder">4 Placeholder</a>
+      <a href="#colour">5 Callout + code</a><a href="#z">6 z-index</a><a href="#palettes">7 Palettes</a><a href="#chrome">8 Block chrome</a>
+    </nav>
+  </header>
+
+  <!-- 1. TYPE -->
+  <section id="type">
+    <h2>Type ramp <span class="sec">§1</span></h2>
+    <p class="lede">All sizes are multiples of <code>--obe-font-size: 16px</code>. The tinted bands under the body sample are the 24px line box (<code>--obe-line</code>), which equals the gutter button height.</p>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-title-size</b>40 / 48 · 700</div><div class="s-title">Quarterly planning</div><div class="ramp-meta">page title (unchanged value)</div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-h1-size</b>30 / 39 · 600 · space 32</div><div class="s-h1">Heading one</div><div class="ramp-meta">was 27.2px · 650 · space 12 <span class="tag new">changed</span></div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-h2-size</b>24 / 31.2 · 600 · space 24</div><div class="s-h2">Heading two</div><div class="ramp-meta">was 21.6px · 650 · space 8 <span class="tag new">changed</span></div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-h3-size</b>20 / 26 · 600 · space 16</div><div class="s-h3">Heading three</div><div class="ramp-meta">was 17.9px · 650 · space 4 <span class="tag new">changed</span></div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-font-size</b>16 / 24 · 400</div><div class="s-body linebox">Body text sits on a 24px line box. Inline code like <span class="inline-code">seriesColor(i)</span> is <code>0.875em</code> of its parent, so it scales inside headings too. A second line shows the rhythm.</div><div class="ramp-meta">was 15px / 1.65 (24.75px) <span class="tag new">changed</span></div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-code-size</b>14 / 21 · mono</div><div class="s-code">const total = rows.reduce((a, r) =&gt; a + r.value, 0);</div><div class="ramp-meta">was 0.85rem / 1.55</div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-small-size</b>14 / 20</div><div class="s-small">Image captions, kit labels, table cells, chip text.</div><div class="ramp-meta">absorbs literals ≥ 0.82rem</div></div>
+    <div class="ramp-row"><div class="ramp-meta"><b>--obe-caption-size</b>12 / 16 · 600 · +0.04em</div><div class="s-caption">Speaker note · Contents</div><div class="ramp-meta">absorbs literals &lt; 0.82rem</div></div>
+  </section>
+
+  <!-- 2. MOTION -->
+  <section id="motion">
+    <h2>Motion <span class="sec">§2</span></h2>
+    <p class="lede">Three durations × three easings. Each dot travels for exactly its token's duration, then holds. Spring is shown for completeness. It is allowed on switch knobs only.</p>
+    <p class="rm-note">Your OS has <b>reduce motion</b> on, so animations are paused here, as the product does via its global kill switch (§2.3).</p>
+    <div class="motion-grid">
+      <div></div><div class="h">--ease-out-soft <span class="muted">(default)</span></div><div class="h">--ease-in-out-soft <span class="muted">(exits, loops)</span></div><div class="h">--ease-spring <span class="muted">(knobs only)</span></div>
+      <div class="dur-label">--motion-fast<small>120ms · hover, reveal, exits, tooltips</small></div>
+      <div class="track"><span class="dot d-fast e-out"></span></div><div class="track"><span class="dot d-fast e-io"></span></div><div class="track"><span class="dot d-fast e-spring"></span></div>
+      <div class="dur-label">--motion-base<small>180ms · menus in, toggles, values</small></div>
+      <div class="track"><span class="dot d-base e-out"></span></div><div class="track"><span class="dot d-base e-io"></span></div><div class="track"><span class="dot d-base e-spring"></span></div>
+      <div class="dur-label">--motion-slow<small>240ms · dialogs, drawers, slides</small></div>
+      <div class="track"><span class="dot d-slow e-out"></span></div><div class="track"><span class="dot d-slow e-io"></span></div><div class="track"><span class="dot d-slow e-spring"></span></div>
+    </div>
+
+    <div class="recipes">
+      <div class="recipe">
+        <h3>Hover chrome</h3>
+        <div class="spec">fast · out-soft · colour/bg · press = 0</div>
+        <span class="hover-chip">⋮⋮ Hover me</span> <span class="hover-chip">＋ and me</span>
+        <p class="muted" style="font-size:12px;margin-top:14px">Real hover. Press is instant.</p>
+      </div>
+      <div class="recipe">
+        <h3>Menu / popover</h3>
+        <div class="spec">in: base · out-soft · fade + scale .98 + 2px<br>out: fast · in-out-soft · fade only</div>
+        <div class="menu"><div class="on">Turn into</div><div>Colour</div><div>Duplicate</div><div>Delete</div></div>
+      </div>
+      <div class="recipe">
+        <h3>Dialog</h3>
+        <div class="spec">in: slow · out-soft · fade + scale .98<br>out: fast · in-out-soft · radius xl</div>
+        <div class="scrim"></div>
+        <div class="dialog"><b>Delete page?</b><br><span class="muted">This can be undone from Trash.</span></div>
+      </div>
+      <div class="recipe">
+        <h3>Toggle / collapse</h3>
+        <div class="spec">chevron: base · out-soft · content: instant</div>
+        <div class="toggle-head"><span class="chev">›</span> Meeting notes</div>
+        <div class="toggle-body">Content shows on the frame. Only the chevron moves.</div>
+      </div>
+      <div class="recipe">
+        <h3>Switch knob</h3>
+        <div class="spec">base · knob spring · track out-soft</div>
+        <div class="switch"><span class="knob"></span></div>
+        <p class="muted" style="font-size:12px;margin-top:14px">The only sanctioned use of <code>--ease-spring</code>.</p>
+      </div>
+      <div class="recipe">
+        <h3>Block insert</h3>
+        <div class="spec">none: caret-ready on the frame Enter lands</div>
+        <div class="ins">First paragraph</div>
+        <div class="ins i2">Second (Enter)</div>
+        <div class="ins i3">Third (Enter)</div>
+        <div class="ins i4">Pasted block</div>
+      </div>
+    </div>
+    <div class="recipes" style="grid-template-columns: 1fr 2fr;">
+      <div class="recipe" style="min-height:140px">
+        <h3>Presentation slide</h3>
+        <div class="spec">slow · out-soft · 16px rise</div>
+        <div class="slide">Slide 3: Results</div>
+      </div>
+      <div class="recipe" style="min-height:140px">
+        <h3>No motion</h3>
+        <div class="spec">drag + drop</div>
+        <p style="margin:0;font-size:13px">Drop indicators track the pointer with no transition; the drag source dims instantly to 0.4; nothing settles after drop. Attention signals (locate flash 1.2s, anchor flash 1.8s, flow pulse 0.7s, cursor-label dwell 2.8s, skeleton 1.6s) are timers, so the scale does not apply to them. They still use an <code>--ease-*</code> token.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. RADIUS -->
+  <section id="radius">
+    <h2>Radius <span class="sec">§3</span></h2>
+    <p class="lede">Assigned by surface role, not nearest number. Nesting is concentric: inner = outer − padding, never below sm.</p>
+    <div class="radius-row">
+      <div class="rchip"><div class="shape" style="border-radius:0"></div><b>none · 0</b><span>table cells, dividers, rail side of quotes</span></div>
+      <div class="rchip"><div class="shape" style="border-radius:var(--radius-sm)"></div><b>sm · 4px</b><span>inline marks, menu items, selection wash, marquee, grips</span></div>
+      <div class="rchip"><div class="shape" style="border-radius:var(--radius-md)"></div><b>md · 6px</b><span>standalone controls: gutter + toolbar buttons, inputs, tooltips</span></div>
+      <div class="rchip"><div class="shape" style="border-radius:var(--radius-lg)"></div><b>lg · 8px</b><span>block surfaces + floating menus (4 item + 4 pad)</span></div>
+      <div class="rchip"><div class="shape" style="border-radius:var(--radius-xl)"></div><b>xl · 12px <span class="tag new">new</span></b><span>dialogs, command palette, lightbox, slides</span></div>
+      <div class="rchip"><div class="shape" style="border-radius:9999px;height:36px;margin:18px 0 26px"></div><b>pill · 9999px</b><span>chips, switches, progress, lamps (50% for circles)</span></div>
+    </div>
+  </section>
+
+  <!-- 4. PLACEHOLDER -->
+  <section id="placeholder">
+    <h2>Placeholder <span class="sec">§4</span></h2>
+    <p class="lede">One alpha: <code>--obe-placeholder: hsl(var(--muted-foreground) / 0.6)</code>. Rejected alphas shown for comparison.</p>
+    <table class="ctable">
+      <tr><th>Alpha</th><th>Light</th><th>Dark</th><th>Ratio vs page (L / D)</th><th></th></tr>
+      <tr><td>0.45</td><td class="cell-lt lt"><span style="color:hsl(var(--muted-foreground)/0.45)">Type '/' for commands</span></td><td class="cell-dk dk"><span style="color:hsl(var(--muted-foreground)/0.45)">Type '/' for commands</span></td><td class="mono">1.85 / 2.19</td><td class="muted">.obe-text today</td></tr>
+      <tr><td><b>0.6</b></td><td class="cell-lt lt"><span class="ph"></span></td><td class="cell-dk dk"><span class="ph"></span></td><td class="mono"><b>2.35 / 2.87</b></td><td><span class="tag new">decided</span></td></tr>
+      <tr><td>0.7</td><td class="cell-lt lt"><span style="color:hsl(var(--muted-foreground)/0.7)">Type '/' for commands</span></td><td class="cell-dk dk"><span style="color:hsl(var(--muted-foreground)/0.7)">Type '/' for commands</span></td><td class="mono">2.80 / 3.41</td><td class="muted">[data-placeholder] today</td></tr>
+    </table>
+  </section>
+
+  <!-- 5. COLOUR -->
+  <section id="colour">
+    <h2>Callout tints + code syntax <span class="sec">§5</span></h2>
+    <p class="lede">Callout variants reuse the editor palette's block-background tints (info = theme neutral). They have no border, and every value has a dark pair. Syntax hues align with the editor palette, and every light value passes 4.5:1 on the code surface.</p>
+    <table class="ctable">
+      <tr><th>Token</th><th>Light</th><th>Dark</th><th>Ratio (L / D)</th></tr>
+      <tr><td><code>--obe-callout-info</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-callout-info)"></span><span class="v">--muted #f6f5f4</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-callout-info)"></span><span class="v">#2f2f2f</span></td><td class="mono">fg 11.86 / 8.75</td></tr>
+      <tr><td><code>--obe-callout-warn</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-callout-warn)"></span><span class="v">bg-yellow ≈ #fdf5dc</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-callout-warn)"></span><span class="v">≈ #453d24</span></td><td class="mono">fg 11.84 / 7.10</td></tr>
+      <tr><td><code>--obe-callout-success</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-callout-success)"></span><span class="v">bg-green ≈ #e5f5ea</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-callout-success)"></span><span class="v">≈ #273e2e</span></td><td class="mono">fg 11.41 / 7.62</td></tr>
+      <tr><td><code>--obe-callout-danger</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-callout-danger)"></span><span class="v">bg-red ≈ #fbe7e7</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-callout-danger)"></span><span class="v">≈ #452828</span></td><td class="mono">fg 10.90 / 8.68</td></tr>
+      <tr><td><code>--obe-code-kw</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-code-kw)"></span><span class="v">265 55% 48%</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-code-kw)"></span><span class="v">265 65% 73%</span></td><td class="mono">6.73 / 5.43</td></tr>
+      <tr><td><code>--obe-code-str</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-code-str)"></span><span class="v">140 50% 30%</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-code-str)"></span><span class="v">140 50% 60%</span></td><td class="mono">5.55 / 7.26</td></tr>
+      <tr><td><code>--obe-code-num</code> <span class="tag fix">was 3.91</span></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-code-num)"></span><span class="v">28 80% 38%</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-code-num)"></span><span class="v">28 85% 62%</span></td><td class="mono">4.60 / 6.43</td></tr>
+      <tr><td><code>--obe-code-lit</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-code-lit)"></span><span class="v">210 72% 42%</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-code-lit)"></span><span class="v">210 75% 67%</span></td><td class="mono">5.18 / 5.94</td></tr>
+      <tr><td><code>--obe-code-com</code></td><td class="cell-lt lt"><span class="swatch" style="background:var(--obe-code-com)"></span><span class="v">--muted-foreground</span></td><td class="cell-dk dk"><span class="swatch" style="background:var(--obe-code-com)"></span><span class="v">--muted-foreground</span></td><td class="mono">4.75 / 4.92</td></tr>
+    </table>
+
+    <div class="duo" style="margin-top:20px">
+      <div class="panel lt">
+        <div class="panel-label">Light</div>
+        <div class="callout c-info"><span class="ico">💡</span><div>Info uses the theme neutral and follows the accent's grey temperature.</div></div>
+        <div class="callout c-warn"><span class="ico">⚠️</span><div>Warn reads the editor palette's yellow block tint.</div></div>
+        <div class="callout c-success"><span class="ico">✅</span><div>Success reads the green block tint.</div></div>
+        <div class="callout c-danger"><span class="ico">🚫</span><div>Danger reads the red block tint.</div></div>
+<div class="codeblock"><span class="tk-com">// running total of the visible rows</span>
+<span class="tk-kw">const</span> limit = <span class="tk-num">42</span>;
+<span class="tk-kw">export function</span> total(rows, label = <span class="tk-str">'sum'</span>) {
+  <span class="tk-kw">if</span> (!rows) <span class="tk-kw">return</span> <span class="tk-lit">null</span>;
+  <span class="tk-kw">return</span> rows.length &gt; limit ? <span class="tk-lit">true</span> : <span class="tk-num">0.5</span>;
+}</div>
+      </div>
+      <div class="panel dk">
+        <div class="panel-label">Dark</div>
+        <div class="callout c-info"><span class="ico">💡</span><div>Info uses the theme neutral and follows the accent's grey temperature.</div></div>
+        <div class="callout c-warn"><span class="ico">⚠️</span><div>Warn reads the editor palette's yellow block tint.</div></div>
+        <div class="callout c-success"><span class="ico">✅</span><div>Success reads the green block tint.</div></div>
+        <div class="callout c-danger"><span class="ico">🚫</span><div>Danger reads the red block tint.</div></div>
+<div class="codeblock"><span class="tk-com">// running total of the visible rows</span>
+<span class="tk-kw">const</span> limit = <span class="tk-num">42</span>;
+<span class="tk-kw">export function</span> total(rows, label = <span class="tk-str">'sum'</span>) {
+  <span class="tk-kw">if</span> (!rows) <span class="tk-kw">return</span> <span class="tk-lit">null</span>;
+  <span class="tk-kw">return</span> rows.length &gt; limit ? <span class="tk-lit">true</span> : <span class="tk-num">0.5</span>;
+}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Z -->
+  <section id="z">
+    <h2>z-index ladder <span class="sec">§6</span></h2>
+    <p class="lede">The scale is unchanged. Shaded rows are local tiers, which only have meaning inside a block's own stacking context. Same-tier overlap resolves by portal order. Never add a tier to win an overlap.</p>
+    <div class="zl">
+      <div class="n">100</div><div><code>toast</code></div><div>notifications</div>
+      <div class="n">60</div><div><code>lightbox</code></div><div>image lightbox (reserved)</div>
+      <div class="n">55</div><div><code>nested-menu</code></div><div>submenus above their z-50 parent</div>
+      <div class="n">50</div><div><code>menu</code></div><div>menus, popovers, dialogs, tooltips, slash, inline toolbar</div>
+      <div class="n">45</div><div><code>drawer</code></div><div>narrow sidebar</div>
+      <div class="n">40</div><div><code>overlay</code></div><div>navigation scrims</div>
+      <div class="n">30</div><div><code>raised-chrome</code></div><div>timeline-local only</div>
+      <div class="n">20</div><div><code>inline-hint</code></div><div>.obe-kit-tip</div>
+      <div class="n">10</div><div><code>sticky</code></div><div>sticky chrome</div>
+      <div class="n local">6</div><div class="local"><code>presence</code></div><div class="local">remote cursors</div>
+      <div class="n local">5</div><div class="local"><code>local-overlay</code></div><div class="local">marquee, chart tooltip, nested gutter</div>
+      <div class="n local">4</div><div class="local"><code>pane-overlay</code></div><div class="local">column divider (was literal 4)</div>
+      <div class="n local">3</div><div class="local"><code>drop-indicator</code></div><div class="local">drop lines</div>
+      <div class="n local">2</div><div class="local"><code>control</code></div><div class="local">in-block controls</div>
+      <div class="n local">1</div><div class="local"><code>raised</code></div><div class="local">in-block raise</div>
+    </div>
+  </section>
+
+  <!-- 7. PALETTES -->
+  <section id="palettes">
+    <h2>Editor palette vs data palette <span class="sec">§7</span></h2>
+    <p class="lede"><b>Editor palette</b> = authored emphasis stored in the document (text, highlight, block bg, callouts, syntax hues). <b>Data palette</b> = encodes data (chips, series, status) and follows the viewer's scheme. Never cross. Meters and controls use <code>--primary</code>.</p>
+    <div class="duo">
+      <div class="panel lt">
+        <div class="panel-label">Editor palette · light</div>
+        <div class="palette">
+          <span class="lbl">fg</span>
+          <span class="p" style="color:var(--obe-fg-gray)">Aa</span><span class="p" style="color:var(--obe-fg-brown)">Aa</span><span class="p" style="color:var(--obe-fg-orange)">Aa</span><span class="p" style="color:var(--obe-fg-yellow)">Aa</span><span class="p" style="color:var(--obe-fg-green)">Aa</span><span class="p" style="color:var(--obe-fg-blue)">Aa</span><span class="p" style="color:var(--obe-fg-purple)">Aa</span><span class="p" style="color:var(--obe-fg-pink)">Aa</span><span class="p" style="color:var(--obe-fg-red)">Aa</span>
+          <span class="lbl">bg</span>
+          <span class="p" style="background:var(--obe-bg-gray)"></span><span class="p" style="background:var(--obe-bg-brown)"></span><span class="p" style="background:var(--obe-bg-orange)"></span><span class="p" style="background:var(--obe-bg-yellow)"></span><span class="p" style="background:var(--obe-bg-green)"></span><span class="p" style="background:var(--obe-bg-blue)"></span><span class="p" style="background:var(--obe-bg-purple)"></span><span class="p" style="background:var(--obe-bg-pink)"></span><span class="p" style="background:var(--obe-bg-red)"></span>
+          <span class="lbl">hl</span>
+          <span class="p" style="background:var(--obe-hl-gray)">ab</span><span class="p" style="background:var(--obe-hl-brown)">ab</span><span class="p" style="background:var(--obe-hl-orange)">ab</span><span class="p" style="background:var(--obe-hl-yellow)">ab</span><span class="p" style="background:var(--obe-hl-green)">ab</span><span class="p" style="background:var(--obe-hl-blue)">ab</span><span class="p" style="background:var(--obe-hl-purple)">ab</span><span class="p" style="background:var(--obe-hl-pink)">ab</span><span class="p" style="background:var(--obe-hl-red)">ab</span>
+        </div>
+        <p class="chrome-legend">gray · brown · orange · yellow · green · blue · purple · pink · red. Values are verbatim from index.css (hoisted to variables). Orange and yellow text fall below 4.5:1 (finding F3).</p>
+      </div>
+      <div class="panel dk">
+        <div class="panel-label">Editor palette · dark</div>
+        <div class="palette">
+          <span class="lbl">fg</span>
+          <span class="p" style="color:var(--obe-fg-gray)">Aa</span><span class="p" style="color:var(--obe-fg-brown)">Aa</span><span class="p" style="color:var(--obe-fg-orange)">Aa</span><span class="p" style="color:var(--obe-fg-yellow)">Aa</span><span class="p" style="color:var(--obe-fg-green)">Aa</span><span class="p" style="color:var(--obe-fg-blue)">Aa</span><span class="p" style="color:var(--obe-fg-purple)">Aa</span><span class="p" style="color:var(--obe-fg-pink)">Aa</span><span class="p" style="color:var(--obe-fg-red)">Aa</span>
+          <span class="lbl">bg</span>
+          <span class="p" style="background:var(--obe-bg-gray)"></span><span class="p" style="background:var(--obe-bg-brown)"></span><span class="p" style="background:var(--obe-bg-orange)"></span><span class="p" style="background:var(--obe-bg-yellow)"></span><span class="p" style="background:var(--obe-bg-green)"></span><span class="p" style="background:var(--obe-bg-blue)"></span><span class="p" style="background:var(--obe-bg-purple)"></span><span class="p" style="background:var(--obe-bg-pink)"></span><span class="p" style="background:var(--obe-bg-red)"></span>
+          <span class="lbl">hl</span>
+          <span class="p" style="background:var(--obe-hl-gray)">ab</span><span class="p" style="background:var(--obe-hl-brown)">ab</span><span class="p" style="background:var(--obe-hl-orange)">ab</span><span class="p" style="background:var(--obe-hl-yellow)">ab</span><span class="p" style="background:var(--obe-hl-green)">ab</span><span class="p" style="background:var(--obe-hl-blue)">ab</span><span class="p" style="background:var(--obe-hl-purple)">ab</span><span class="p" style="background:var(--obe-hl-pink)">ab</span><span class="p" style="background:var(--obe-hl-red)">ab</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel lt" style="margin-top:16px">
+      <div class="panel-label">Data palette · pastel fills (default scheme, mode-invariant): owned by sdk/src/dataColors.ts, not re-decided here</div>
+      <div class="palette" style="grid-template-columns:70px repeat(12,1fr)">
+        <span class="lbl">fill</span>
+        <span class="p" style="background:#93c5fd"></span><span class="p" style="background:#fdba74"></span><span class="p" style="background:#86efac"></span><span class="p" style="background:#fca5a5"></span><span class="p" style="background:#d8b4fe"></span><span class="p" style="background:#67e8f9"></span><span class="p" style="background:#fde047"></span><span class="p" style="background:#5eead4"></span><span class="p" style="background:#f9a8d4"></span><span class="p" style="background:#a5b4fc"></span><span class="p" style="background:#bdac9e"></span><span class="p" style="background:#d4d4d8"></span>
+      </div>
+      <p class="chrome-legend">Series order: blue · orange · green · red · purple · cyan · yellow · teal · pink · indigo · brown · gray.</p>
+    </div>
+  </section>
+
+  <!-- 8. CHROME -->
+  <section id="chrome">
+    <h2>Block chrome <span class="sec">§8</span></h2>
+    <p class="lede">The gutter is positioned by one formula, <code>top = lead-offset + (lead-line − 24px) / 2</code>, using variables each family declares from its own tokens. No per-type tuning. The dashed tick marks where each gutter is centred. Hover the gutter buttons for live states.</p>
+    <div class="duo">
+      <div class="panel lt">
+        <div class="panel-label">Light</div>
+        <div class="ed">
+          <div class="row h1"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn">⋮⋮</span></div><div class="txt">Heading one</div></div>
+          <div class="row"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn active">⋮⋮</span></div><div class="txt">Paragraph, with the handle menu open (active).</div></div>
+          <div class="row sel"><div class="txt">A selected block: wash only, radius sm, no ring.</div></div>
+          <div class="row sel"><div class="txt">Adjacent selection stays one continuous wash.</div></div>
+          <div class="row h2"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn focus">⋮⋮</span></div><div class="txt">Heading two</div></div>
+          <div class="row drag drop"><div class="txt">Drag source (0.4) above a 2px solid drop line</div></div>
+          <div class="row h3"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn">⋮⋮</span></div><div class="txt">Heading three</div></div>
+          <div class="row co"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn">⋮⋮</span></div><div class="callout c-info"><span class="ico">💡</span><div>Callout: lead-offset = its 12px padding.</div></div></div>
+          <div class="row"><div class="txt ph"></div></div>
+        </div>
+      </div>
+      <div class="panel dk">
+        <div class="panel-label">Dark</div>
+        <div class="ed">
+          <div class="row h1"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn">⋮⋮</span></div><div class="txt">Heading one</div></div>
+          <div class="row"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn active">⋮⋮</span></div><div class="txt">Paragraph, with the handle menu open (active).</div></div>
+          <div class="row sel"><div class="txt">A selected block: wash only, radius sm, no ring.</div></div>
+          <div class="row sel"><div class="txt">Adjacent selection stays one continuous wash.</div></div>
+          <div class="row h2"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn focus">⋮⋮</span></div><div class="txt">Heading two</div></div>
+          <div class="row drag drop"><div class="txt">Drag source (0.4) above a 2px solid drop line</div></div>
+          <div class="row h3"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn">⋮⋮</span></div><div class="txt">Heading three</div></div>
+          <div class="row co"><div class="gutter guide"><span class="gbtn">＋</span><span class="gbtn">⋮⋮</span></div><div class="callout c-info"><span class="ico">💡</span><div>Callout: lead-offset = its 12px padding.</div></div></div>
+          <div class="row"><div class="txt ph"></div></div>
+        </div>
+      </div>
+    </div>
+    <table class="t" style="margin-top:20px">
+      <tr><th>Token</th><th>Value</th><th>Use</th></tr>
+      <tr><td><code>--obe-gutter-btn / -gap / -clear</code></td><td class="mono">24px / 4px / 4px</td><td>gutter room = 2×24 + 4 + 4 = <b>56px</b>; handle-only (narrow, nested) left = −24px</td></tr>
+      <tr><td><code>--obe-chrome-ink</code></td><td class="mono">muted-foreground / 0.8</td><td>gutter icons at rest: 3.36 / 4.02 (was 0.7: 2.80, failed 3:1)</td></tr>
+      <tr><td><code>--obe-chrome-hover / -active</code></td><td class="mono">--hover / --hover-strong</td><td>button hover / menu-open</td></tr>
+      <tr><td><code>--obe-select-wash</code></td><td class="mono">ring / 0.14 · dark 0.2</td><td>block selection, marquee fill, table cell selection</td></tr>
+      <tr><td><code>--obe-drop</code></td><td class="mono">--primary, 2px solid</td><td>all drop indicators (blocks + tables)</td></tr>
+      <tr><td><code>--obe-focus-ring</code></td><td class="mono">2px solid ring · offset 2px</td><td>editor chrome :focus-visible; app chrome keeps --ring-control</td></tr>
+      <tr><td><code>--obe-drag-dim</code></td><td class="mono">0.4</td><td>drag source; never pointer-events: none</td></tr>
+    </table>
+  </section>
+</main>
+</body>
+</html>
