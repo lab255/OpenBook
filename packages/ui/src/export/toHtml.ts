@@ -54,7 +54,7 @@ import {
   renderLedgerReportBlock,
   type LedgerExportRecords,
 } from './exportLedgerReports';
-import {COLOR_EXPORT_HEX} from '../blockeditor/colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../blockeditor/colors';
 import {kitChartRuntime, kitChartSvg} from './kitChart';
 import {formatValue} from './format';
 import {inlineScriptHash, pageCsp} from './exportCsp';
@@ -208,7 +208,8 @@ interface RenderCtx {
  * on a dark background (brown/purple especially). So we re-emit text colour as a
  * `var(--obtc-<token>, <light hex>)`: light mode falls back to the hex, dark mode
  * picks up the brighter override defined in `STYLES`. (Highlights need no such
- * map — their tints are light pastels in both themes, with forced-dark text.)
+ * map — their tints are translucent in both themes, with inherited light text
+ * in dark mode.)
  */
 const FG_TOKEN = new Map(Object.entries(COLOR_EXPORT_HEX).map(([token, v]) => [v.fg, token]));
 
@@ -1258,10 +1259,10 @@ const SCHEME_DUAL = `
      (the light-theme hex go muddy). Inline runs reference these via var(); when
      this query is inactive the var() falls back to the baked light hex. */
   :root {
-    --obtc-gray: #9ca3af; --obtc-brown: #c8956b; --obtc-orange: #fb923c;
-    --obtc-yellow: #fcd34d; --obtc-green: #4ade80; --obtc-blue: #60a5fa;
-    --obtc-purple: #c084fc; --obtc-pink: #f472b6; --obtc-red: #f87171;
+    ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtc-${token}: ${value.fg};`).join('\n    ')}
   }
+  /* Palette highlight tints are translucent; let marked text inherit the light page ink. */
+  mark[style] { color: inherit; }
   /* The ledger alarm red (#b91c1c) goes muddy on the dark page — lighten it. */
   .ob-ledger-note.is-alarm { color: #f87171; }
 }
@@ -1282,8 +1283,8 @@ ul,ol { margin: .4em 0; padding-left: 1.4em; }
 blockquote { margin: 1em 0; padding: .2em 0 .2em 1em; border-left: 3px solid currentColor; opacity: .85; font-style: italic; }
 pre { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 8px; overflow-x: auto; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
-/* Highlight tints are always light pastels (in both themes), so the marked text
-   must stay dark. An inherited colour would be light-on-light (unreadable) in dark mode. */
+/* Unstyled highlights keep an opaque tint and dark text. Translucent palette
+   highlights inherit the light page ink in dark mode via SCHEME_DUAL. */
 mark { background: #fde68a; color: #1c1917; padding: 0 .1em; border-radius: 2px; }
 hr { border: none; border-top: 1px solid rgba(127,127,127,.3); width: 30%; margin: 2em auto; }
 a.mention { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; color: inherit; }
@@ -1399,11 +1400,11 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .82em; margin: 1px 2px 1px 0; }
 .callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: 1px solid; }
 .callout::before { content: "💡"; }
-.callout[data-variant=warning]::before { content: "⚠️"; }
+.callout[data-variant=warning]::before, .callout[data-variant=warn]::before { content: "⚠️"; }
 .callout[data-variant=success]::before { content: "✅"; }
 .callout[data-variant=danger]::before { content: "🛑"; }
 .callout { background: rgba(59,130,246,.10); border-color: rgba(59,130,246,.35); }
-.callout[data-variant=warning] { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.4); }
+.callout[data-variant=warning], .callout[data-variant=warn] { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.4); }
 .callout[data-variant=success] { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
 .callout[data-variant=danger] { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
 .callout__body { flex: 1; }

@@ -28,18 +28,31 @@ const IDS = new Set(COLOR_TOKENS.map((c) => c.id));
 export const isColorToken = (v: string | undefined | null): v is string => !!v && IDS.has(v);
 
 /**
- * Concrete light-theme hex for each token — used by the **exports** (HTML/PDF),
- * which are self-contained and can't reference the editor's theme-adaptive CSS
- * classes. `fg` colours text (`tc`); `hl` tints a highlight (`hl`).
+ * Export mirrors of index.css. Eight-digit hex retains tint alpha on any surface.
+ * colors.test.ts guards every role/theme against CSS; static exports use light.
  */
-export const COLOR_EXPORT_HEX: Record<string, {fg: string; hl: string}> = {
-  gray: {fg: '#6b7280', hl: '#e5e7eb'},
-  brown: {fg: '#92400e', hl: '#ece0d8'},
-  orange: {fg: '#c2410c', hl: '#ffedd5'},
-  yellow: {fg: '#a16207', hl: '#fef3c7'},
-  green: {fg: '#15803d', hl: '#dcfce7'},
-  blue: {fg: '#1d4ed8', hl: '#dbeafe'},
-  purple: {fg: '#7e22ce', hl: '#f3e8ff'},
-  pink: {fg: '#be185d', hl: '#fce7f3'},
-  red: {fg: '#b91c1c', hl: '#fee2e2'},
+type ExportColors = Record<string, {fg: string; bg: string; hl: string}>;
+
+export const COLOR_EXPORT_HEX: ExportColors = {
+  gray: {fg: '#737373', bg: '#8080801a', hl: '#8c8c8c47'},
+  brown: {fg: '#835b3f', bg: '#b9764621', hl: '#bf75404d'},
+  orange: {fg: '#b35e14', bg: '#ed7e1d21', hl: '#f48c2552'},
+  yellow: {fg: '#976f11', bg: '#f3bc1626', hl: '#f9ce1f66'},
+  green: {fg: '#2b8248', bg: '#34b25e21', hl: '#31c4624d'},
+  blue: {fg: '#2073c5', bg: '#308ce821', hl: '#3994ef47'},
+  purple: {fg: '#7941c8', bg: '#8954d424', hl: '#8e57db4d'},
+  pink: {fg: '#ca2b7a', bg: '#df499421', hl: '#e64c994d'},
+  red: {fg: '#ce2727', bg: '#df3a3a1f', hl: '#e4444447'},
+};
+
+export const COLOR_EXPORT_HEX_DARK: ExportColors = {
+  gray: {fg: '#a8a8a8', bg: '#c7c7c71a', hl: '#9e9e9e4d'},
+  brown: {fg: '#c59877', bg: '#c084592e', hl: '#b9764657'},
+  orange: {fg: '#f0994c', bg: '#e886302e', hl: '#e680195c'},
+  yellow: {fg: '#ecc551', bg: '#e8ba302e', hl: '#e6bd1957'},
+  green: {fg: '#66cc88', bg: '#40bf6a2e', hl: '#39ac6057'},
+  blue: {fg: '#6cabea', bg: '#3c8cdd33', hl: '#2f85da5c'},
+  purple: {fg: '#b38de7', bg: '#9061d138', hl: '#824dcb61'},
+  pink: {fg: '#e981b5', bg: '#d4549433', hl: '#d1478c5c'},
+  red: {fg: '#e97777', bg: '#d7424233', hl: '#d435355c'},
 };
