@@ -21,9 +21,9 @@ describe('block gutter visibility', () => {
     expect(ruleBody('.obe-gutter')).toMatch(/pointer-events:\s*none/);
   });
 
-  it('restores hit testing with row hover or focus', () => {
+  it('restores hit testing with innermost row hover or gutter focus', () => {
     const visibleGutter = ruleBody(
-      '.obe-row:hover > .obe-gutter,\n.obe-row:focus-within > .obe-gutter,\n.obe-gutter:focus-within',
+      '.obe-row:hover:not(:has(.obe-row:hover)) > .obe-gutter,\n.obe-gutter:focus-within',
     );
     expect(visibleGutter).toMatch(/opacity:\s*1/);
     expect(visibleGutter).toMatch(/pointer-events:\s*auto/);
@@ -41,8 +41,8 @@ describe('block gutter pane geometry', () => {
   });
 
   it('uses pane width to collapse the top-level gutter to its grip', () => {
-    expect(CSS).toContain('@container obe-editor-pane (max-width: 47.8rem)');
-    expect(ruleBody('.obe-root:not(.obe-full) .obe-gutter:not(.obe-gutter-nested)')).toMatch(/left:\s*-1\.5rem/);
+    expect(CSS).toContain('@container obe-editor-pane (max-width: 52.25rem)');
+    expect(ruleBody('.obe-root:not(.obe-full) .obe-gutter:not(.obe-gutter-nested)')).toContain('left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear)))');
     expect(
       ruleBody('.obe-root:not(.obe-full) .obe-gutter:not(.obe-gutter-nested) > button:first-child'),
     ).toMatch(/display:\s*none/);
@@ -50,9 +50,9 @@ describe('block gutter pane geometry', () => {
   });
 
   it('reserves the complete gutter on every shared full-width document column', () => {
-    expect(ruleBody('.obe-editor-pane')).toMatch(/--obe-gutter-room:\s*3\.4rem/);
+    expect(CSS).toContain('--obe-gutter-room: calc(var(--obe-gutter-btn) + var(--obe-gutter-gap) + var(--obe-handle-w) + var(--obe-gutter-clear))');
     expect(DOCUMENT).toContain(
-      'fullWidth ? \'max-w-none pl-[var(--obe-gutter-room)]\' : \'max-w-content\'',
+      'fullWidth ? \'max-w-none px-[var(--obe-gutter-room)]\' : \'max-w-content\'',
     );
     const fullWidth = ruleBody('.obe-root.obe-full');
     expect(fullWidth).toMatch(/max-width:\s*none/);
@@ -89,8 +89,8 @@ describe('table grip geometry', () => {
     const revealedGrip = ruleBody('.obe-table tr:hover .obe-table-row-grip');
     expect(revealedGrip).not.toMatch(/pointer-events/);
     expect(revealedGrip).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);
-    expect(ruleBody('.obe-row[data-block-type=\'table\']:has(.obe-has-grips) > .obe-gutter')).toMatch(
-      /top:\s*-0\.25rem/,
+    expect(ruleBody('.obe-row[data-block-type=\'table\']:has(.obe-has-grips)')).toMatch(
+      /--obe-lead-offset:\s*calc\(var\(--obe-block-pad-y\) - var\(--obe-gutter-clear\)\)/,
     );
   });
 
@@ -119,14 +119,41 @@ describe('column resize styles', () => {
     expect(divider).toMatch(/width:\s*1rem/);
     expect(divider).toMatch(/touch-action:\s*none/);
     expect(ruleBody('.obe-col-divider::after')).toMatch(/width:\s*2px/);
-    expect(ruleBody('.obe-col-divider-trailing')).toMatch(/right:\s*-1rem/);
+    expect(ruleBody('.obe-col-divider-trailing')).toContain('right: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2)');
   });
 
   it('lets a revealed nested gutter take pointer ownership above the column divider', () => {
     expect(ruleBody('.obe-gutter-nested')).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);
     expect(ruleBody('.obe-gutter')).toMatch(/pointer-events:\s*none/);
     expect(
-      ruleBody('.obe-row:hover > .obe-gutter,\n.obe-row:focus-within > .obe-gutter,\n.obe-gutter:focus-within'),
+      ruleBody('.obe-row:hover:not(:has(.obe-row:hover)) > .obe-gutter,\n.obe-gutter:focus-within'),
     ).toMatch(/pointer-events:\s*auto/);
+  });
+});
+
+
+describe('block chrome rhythm', () => {
+  it('paints selection in a non-interactive overlay without a row ring', () => {
+    const overlay = ruleBody('.obe-row-selected::before');
+    expect(overlay).toContain('inset: var(--obe-row-space-above, 0px) calc(-1 * var(--obe-block-bleed))');
+    expect(overlay).toMatch(/pointer-events:\s*none/);
+    expect(overlay).toContain('background: var(--obe-select-wash)');
+    expect(CSS).not.toMatch(/\.obe-row-selected\s*{[^}]*box-shadow/);
+    expect(ruleBody('.obe-row')).not.toMatch(/border-radius|background|box-shadow/);
+  });
+
+  it('sizes the handle independently and pads text inside the caret target', () => {
+    expect(ruleBody('.obe-handle')).toContain('width: var(--obe-handle-w)');
+    expect(ruleBody('.obe-gutter-btn')).toContain('height: var(--obe-gutter-btn)');
+    expect(ruleBody('.obe-row:is([data-block-type=\'paragraph\'], [data-block-type=\'heading\'], [data-block-type=\'list\'], [data-block-type=\'todo\'], [data-block-type=\'quote\']) > .obe-blockbody .obe-text'))
+      .toContain('padding-block: var(--obe-block-pad-y)');
+    expect(CSS).not.toContain('.obe-row:focus-within > .obe-gutter');
+  });
+
+  it('reserves only the add-row height and puts add-column outside the table', () => {
+    expect(ruleBody('.obe-table-wrap')).toContain('padding: 0 0 16px 0');
+    expect(ruleBody('.obe-table-add-col')).toContain('right: -16px');
+    expect(ruleBody('.obe-columns')).toContain('gap: var(--obe-columns-gap)');
+    expect(ruleBody('.obe-col-divider')).toContain('left: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2)');
   });
 });

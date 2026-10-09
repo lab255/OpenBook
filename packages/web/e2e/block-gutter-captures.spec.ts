@@ -2,9 +2,9 @@ import type {APIRequestContext, Locator, Page, TestInfo} from '@playwright/test'
 import {expect, test} from './fixtures';
 import {newPage, SERVER} from './seed';
 
-// BB-6 manager verification: Chromium is intentionally unavailable in the
-// worker sandbox. Run this tagged spec on a browser host and compare the paired
-// `*-before.png` / `*-after.png` attachments for all four pane geometries.
+// Compare the paired gutter captures for all four pane geometries.
+// The baseline removes the page reserve and forces the old reveal policy;
+// its narrow inset includes an extra clearance to reproduce the prior clip.
 test.use({freshWorkspace: true});
 
 const snapshot = (text: string) => ({
@@ -72,16 +72,16 @@ async function captureBeforeAfter(
 
   const priorGutter = options.priorNarrowFallback
     ? `
-      .obe-gutter:not(.obe-gutter-nested) { left: -1.6rem !important; }
+      .obe-gutter:not(.obe-gutter-nested) { left: calc(-1 * (var(--obe-handle-w) + 2 * var(--obe-gutter-clear))) !important; }
       .obe-gutter:not(.obe-gutter-nested) > button:first-child { display: none !important; }
     `
     : `
-      .obe-gutter:not(.obe-gutter-nested) { left: -3.4rem !important; }
+      .obe-gutter:not(.obe-gutter-nested) { left: calc(-1 * var(--obe-gutter-room)) !important; }
       .obe-gutter:not(.obe-gutter-nested) > button:first-child { display: grid !important; }
     `;
   const baseline = await page.addStyleTag({
     content: `
-      .obe-editor-pane .max-w-none { padding-left: 0 !important; }
+      .obe-editor-pane .max-w-none { padding-inline: 0 !important; }
       ${priorGutter}
     `,
   });
@@ -136,6 +136,13 @@ test(
     const pageId = await pageWithBlock(request, 'BB-6 full database', true);
     await page.goto(`/?page=${pageId}`);
     await expect(page.locator('main .obe-root')).toHaveClass(/obe-full/);
+    const margins = await page.locator('main .obe-root').evaluate((root) => {
+      const pane = root.closest('.obe-editor-pane')!.getBoundingClientRect();
+      const rect = root.getBoundingClientRect();
+      return {left: rect.left - pane.left, right: pane.right - rect.right};
+    });
+    expect(margins).toEqual({left: 90, right: 90});
+    await testInfo.attach('dsx7-full-width-margins.json', {body: JSON.stringify(margins), contentType: 'application/json'});
     await captureBeforeAfter(page, testInfo, page.locator('main'), 'bb6-full-database-1440', {
       expectPlus: true,
       expectPriorClip: true,
@@ -188,3 +195,66 @@ test(
     });
   },
 );
+
+test('DSX-7: block chrome resolves audit geometry without selection layout shifts', {tag: ['@editor']}, async ({page, request}, testInfo) => {
+  const pageId = await newPage(request, 'DSX-7 geometry', {
+    editorjs: {blocks: [
+      {type: 'paragraph', data: {text: 'First line'}},
+      {type: 'paragraph', data: {text: 'Second line'}},
+      ...[1, 2, 3].map((level) => ({type: 'header', data: {text: `Heading ${level}`, level}})),
+      {type: 'callout', data: {text: 'Callout'}},
+      {type: 'list', data: {items: ['List item']}},
+      {type: 'checklist', data: {items: [{text: 'Todo item', checked: false}]}},
+    ]},
+    values: [], names: [],
+  });
+  await page.goto(`/?page=${pageId}`);
+  const rows = page.locator('main .obe-root > .obe-row');
+  await expect(rows).toHaveCount(8);
+  const geometry = await rows.evaluateAll((elements) => elements.map((row) => {
+    const rect = row.getBoundingClientRect();
+    const gutter = row.querySelector('.obe-gutter')!;
+    const handle = row.querySelector('.obe-handle')!.getBoundingClientRect();
+    const text = row.querySelector('.obe-text')!.getBoundingClientRect();
+    row.classList.add('obe-row-selected');
+    const selected = row.getBoundingClientRect();
+    const overlay = getComputedStyle(row, '::before');
+    const result = {
+      type: row.getAttribute('data-block-type'),
+      top: parseFloat(getComputedStyle(gutter).top),
+      height: rect.height,
+      handleWidth: handle.width, handleHeight: handle.height,
+      textStart: text.left - rect.left,
+      shift: selected.height - rect.height,
+      overlayLeft: parseFloat(overlay.left),
+      overlayTop: parseFloat(overlay.top),
+      pointerEvents: overlay.pointerEvents,
+      shadow: getComputedStyle(row).boxShadow,
+    };
+    row.classList.remove('obe-row-selected');
+    return result;
+  }));
+  await testInfo.attach('dsx7-geometry.json', {body: JSON.stringify(geometry, null, 2), contentType: 'application/json'});
+  for (const [index, target] of [4, 4, 43.5, 31.6, 21, 16, 4, 4].entries()) {
+    expect(geometry[index].top).toBeCloseTo(target, 1);
+    expect(geometry[index].handleWidth).toBe(18);
+    expect(geometry[index].handleHeight).toBe(24);
+    expect(geometry[index].shift).toBe(0);
+    expect(geometry[index].overlayLeft).toBe(-4);
+    expect(geometry[index].pointerEvents).toBe('none');
+    expect(geometry[index].shadow).toBe('none');
+  }
+  expect(geometry[0].height).toBe(32);
+  expect(geometry[1].height).toBe(32);
+  expect(geometry.slice(2, 5).map((row) => row.overlayTop)).toEqual([32, 24, 16]);
+  expect(geometry[6].textStart).toBe(24);
+  expect(geometry[7].textStart).toBe(24);
+
+  // Editing focus alone must not reveal chrome; keyboard gutter focus must.
+  await rows.first().locator('.obe-text').focus();
+  await page.mouse.move(0, 0);
+  await expect(rows.first().locator('.obe-gutter')).toHaveCSS('opacity', '0');
+  await rows.first().locator('.obe-handle').focus();
+  await expect(rows.first().locator('.obe-gutter')).toHaveCSS('opacity', '1');
+  await expect(rows.first().locator('.obe-handle')).toHaveCSS('outline-offset', '2px');
+});

@@ -589,7 +589,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
   const columnClass = cn(
     'mx-auto w-full',
     // eslint-disable-next-line tailwind/no-arbitrary-spacing -- BB-6: the gutter reserve is a pane-scoped CSS variable zeroed for read-only and coarse-pointer surfaces.
-    fullWidth ? 'max-w-none pl-[var(--obe-gutter-room)]' : 'max-w-content',
+    fullWidth ? 'max-w-none px-[var(--obe-gutter-room)]' : 'max-w-content',
   );
 
   // Per-page overrides recolor (theme) and restyle (fonts) just this page.
