@@ -1,0 +1,79 @@
+--- a/packages/server/src/ai/runtimeManifest.ts
++++ b/packages/server/src/ai/runtimeManifest.ts
+@@ -10,6 +10,31 @@
+ ] as const;
+ export type ReleaseTarget = typeof RELEASE_TARGETS[number];
+ export type RuntimeTool = 'whisper-cli' | 'ffmpeg';
++
++// Prepared only: no production pin consumes this URL until release review.
++export const OWN_RUNTIME_RELEASE = 'https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1';
++export function ownRuntimeAssetUrl(asset: string): string {
++  return `${OWN_RUNTIME_RELEASE}/${encodeURIComponent(asset)}`;
++}
++
++/** TODO(WSP-6): after publishing the reviewed draft, replace exactly these pins
++ * with supported ZIP entries using independently verified SHA-256 + byte sizes.
++ * Do not fabricate digests or enable downloads before publication.
++ * Windows whisper becomes a static root executable: remove extractDir.
++ * See docs/runtime-binaries.md for the activation and test-update procedure. */
++export const PENDING_OWN_RUNTIME_ASSETS = [
++  {target: 'aarch64-apple-darwin', tool: 'whisper-cli', version: '1.8.2', asset: 'whisper-cli-1.8.2-aarch64-apple-darwin.zip', binaryPath: 'whisper-cli'},
++  {target: 'x86_64-apple-darwin', tool: 'whisper-cli', version: '1.8.2', asset: 'whisper-cli-1.8.2-x86_64-apple-darwin.zip', binaryPath: 'whisper-cli'},
++  {target: 'x86_64-unknown-linux-gnu', tool: 'whisper-cli', version: '1.8.2', asset: 'whisper-cli-1.8.2-x86_64-unknown-linux-gnu.zip', binaryPath: 'whisper-cli'},
++  {target: 'x86_64-pc-windows-msvc', tool: 'whisper-cli', version: '1.8.2', asset: 'whisper-cli-1.8.2-x86_64-pc-windows-msvc.zip', binaryPath: 'whisper-cli.exe'},
++  {target: 'aarch64-apple-darwin', tool: 'ffmpeg', version: '7.1.1', asset: 'ffmpeg-7.1.1-aarch64-apple-darwin.zip', binaryPath: 'ffmpeg'},
++] as const satisfies ReadonlyArray<{
++  target: ReleaseTarget;
++  tool: RuntimeTool;
++  version: string;
++  asset: string;
++  binaryPath: string;
++}>;
+ 
+ export interface ArtifactPin {
+   version: string;
+--- a/packages/server/src/ai/runtimeManifest.test.ts
++++ b/packages/server/src/ai/runtimeManifest.test.ts
+@@ -1,5 +1,5 @@
+ import {describe, expect, it} from 'vitest';
+-import {RELEASE_TARGETS, RUNTIME_MANIFEST, WHISPER_MODEL_PIN, type ArtifactPin} from './runtimeManifest';
++import {RELEASE_TARGETS, RUNTIME_MANIFEST, WHISPER_MODEL_PIN, PENDING_OWN_RUNTIME_ASSETS, ownRuntimeAssetUrl, type ArtifactPin} from './runtimeManifest';
+ 
+ function checkPin(pin: ArtifactPin) {
+   expect(new URL(pin.url).protocol).toBe('https:');
+@@ -45,3 +45,35 @@
+     expect(WHISPER_MODEL_PIN.version).toMatch(/^[a-f0-9]{40}$/);
+   });
+ });
++
++describe('prepared OpenBook runtime release', () => {
++  it('maps exactly the five built assets to immutable versioned ZIP URLs', () => {
++    expect(PENDING_OWN_RUNTIME_ASSETS).toHaveLength(5);
++    expect(new Set(PENDING_OWN_RUNTIME_ASSETS.map(p => `${p.target}/${p.tool}`)).size).toBe(5);
++    for (const pending of PENDING_OWN_RUNTIME_ASSETS) {
++      expect(ownRuntimeAssetUrl(pending.asset)).toBe(
++        `https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1/${pending.tool}-${pending.version}-${pending.target}.zip`,
++      );
++      expect(pending.binaryPath).toBe(pending.target === 'x86_64-pc-windows-msvc' ? 'whisper-cli.exe' : pending.tool);
++    }
++  });
++
++  it('leaves unsupported tools and existing Windows pins unchanged until publication', () => {
++    for (const pending of PENDING_OWN_RUNTIME_ASSETS) {
++      const active = RUNTIME_MANIFEST[pending.target][pending.tool];
++      if (pending.target === 'x86_64-pc-windows-msvc') {
++        expect(active.status).toBe('supported');
++        if (active.status !== 'supported') throw new Error('Windows upstream pin missing');
++        expect(active.url).toContain('github.com/ggml-org/whisper.cpp/');
++        expect(active.extractDir).toBe('Release');
++      } else {
++        expect(active.status).toBe('unsupported');
++      }
++    }
++    for (const tools of Object.values(RUNTIME_MANIFEST)) {
++      for (const pin of Object.values(tools)) {
++        if (pin.status === 'supported') expect(pin.url).not.toContain('/runtime-binaries-v');
++      }
++    }
++  });
++});
