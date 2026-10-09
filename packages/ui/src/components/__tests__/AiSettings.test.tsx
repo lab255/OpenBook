@@ -61,7 +61,7 @@ describe('AI transcription settings', () => {
       expect(aiSetConfig.mock.lastCall?.[0]).toEqual({...chat, transcription: expect.objectContaining({provider})});
       expect(Boolean(audio.queryByLabelText('API key'))).toBe(provider === 'openai-compat');
       expect(Boolean(audio.queryByRole('button', {name: 'Enable local transcription'}))).toBe(provider === 'local');
-      expect(Boolean(audio.queryByText(/Model not downloaded/))).toBe(provider === 'local');
+      expect(Boolean(audio.queryByText(/Whisper model: Not downloaded/))).toBe(provider === 'local');
       if (provider !== 'local') expect(audio.getByText('Local Whisper is not used with this provider.')).toBeTruthy();
       if (provider === 'openai-compat') {
         expect((audio.getByLabelText('Server URL') as HTMLInputElement).value).toBe('');
@@ -235,11 +235,12 @@ it('enables once, polls runtime then model progress, and finishes ready', async 
 
 it.each(['model', 'runtime'])('offers an update for stale %s receipts', async (stage) => {
   const transcription = structuredClone(fresh);
-  if (stage === 'model') transcription.modelUpdateAvailable = true;
+  if (stage === 'model') Object.assign(transcription, {modelPresent: true, modelUpdateAvailable: true});
   else transcription.runtime!.tools.ffmpeg = {status: 'missing', installedVersion: '1', version: '2'};
   setup(chat, {transcription});
   const {audio} = await section();
   expect(audio.getByRole('button', {name: 'Update local transcription'})).toBeTruthy();
+  expect(audio.getByText(`${stage === 'model' ? 'Whisper model' : 'FFmpeg'}: Update available`)).toBeTruthy();
 });
 
 it('keeps partial unsupported runtime informative and names active and broken overrides', async () => {
@@ -249,7 +250,8 @@ it('keeps partial unsupported runtime informative and names active and broken ov
   let {audio} = await section();
   expect(audio.getByText(/whisper-cli: Built-in runtime unavailable.*OPENBOOK_WHISPER_BIN/)).toBeTruthy();
   expect(audio.queryByRole('alert')).toBeNull();
-  expect(audio.getByText('ffmpeg: Installed')).toBeTruthy();
+  expect(audio.getByText('FFmpeg: Installed')).toBeTruthy();
+  expect(audio.getByRole('button', {name: 'Download available components'})).toBeTruthy();
   view.unmount();
   transcription.runtime!.tools = {
     'whisper-cli': {status: 'unsupported', override: 'OPENBOOK_WHISPER_BIN', available: true},
@@ -258,7 +260,7 @@ it('keeps partial unsupported runtime informative and names active and broken ov
   setup(chat, {transcription});
   ({audio} = await section());
   expect(audio.getByText('whisper-cli: Using OPENBOOK_WHISPER_BIN.')).toBeTruthy();
-  expect(audio.getByText(/ffmpeg: OPENBOOK_FFMPEG_BIN is set, but/)).toBeTruthy();
+  expect(audio.getByText(/FFmpeg: OPENBOOK_FFMPEG_BIN is set, but/)).toBeTruthy();
 });
 
 it.each(['runtime', 'model', 'request'])('names the failing %s stage and allows retry', async (stage) => {
@@ -275,6 +277,6 @@ it.each(['runtime', 'model', 'request'])('names the failing %s stage and allows 
     aiDownloadModel.mockRejectedValueOnce(new Error('Forbidden'));
     fireEvent.click(audio.getByRole('button', {name: 'Enable local transcription'}));
   }
-  expect((await audio.findByRole('alert')).textContent).toBe(stage === 'runtime' ? 'ffmpeg: Failed: offline' : stage === 'model' ? 'Whisper model: checksum mismatch' : 'Could not start local transcription setup: Forbidden');
+  expect((await audio.findByRole('alert')).textContent).toBe(stage === 'runtime' ? 'FFmpeg: Failed: offline' : stage === 'model' ? 'Whisper model: checksum mismatch' : 'Could not start local transcription setup: Forbidden');
   expect((audio.getByRole('button', {name: 'Enable local transcription'}) as HTMLButtonElement).disabled).toBe(false);
 });

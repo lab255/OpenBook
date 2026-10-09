@@ -528,6 +528,7 @@ export const zh: PartialMessages = {
   ai: {
     transcription: {
       enable: '启用本地转录',
+      downloadAvailable: '下载可用组件',
       update: '更新本地转录',
       enabling: '正在设置本地转录…',
       stageLine: '{stage}：{state}',
@@ -536,7 +537,7 @@ export const zh: PartialMessages = {
       updateAvailable: '有可用更新',
       provisioning: '正在准备运行时…',
       installed: '已安装',
-      pending: '未下载',
+      pending: '未安装',
       unsupported: '此平台不支持内置运行时。请在服务器上设置 {override} 以使用现有运行时。',
       failed: '失败：{detail}',
       override: '正在使用 {override}。',
@@ -550,7 +551,7 @@ export const zh: PartialMessages = {
       privacy: '云端转录会将会议音频发送到配置的端点。仅在信任该服务能够处理你的录音时启用。',
       description: '录音默认使用 Whisper 在本地转录，无需云端密钥。Whisper base 支持多种语言（约142 MiB）。',
       modelPresent: '模型已下载。',
-      modelAbsent: '模型尚未下载。',
+      modelAbsent: '未下载',
       ready: '已准备好转录。',
       downloading: '正在下载…',
       downloadingProgress: '正在下载 {progress}%',

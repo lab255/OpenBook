@@ -848,6 +848,7 @@ export const en = {
   ai: {
     transcription: {
       enable: 'Enable local transcription',
+      downloadAvailable: 'Download available components',
       update: 'Update local transcription',
       enabling: 'Setting up local transcription…',
       stageLine: '{stage}: {state}',
@@ -856,7 +857,7 @@ export const en = {
       updateAvailable: 'Update available',
       provisioning: 'Preparing runtime…',
       installed: 'Installed',
-      pending: 'Not downloaded',
+      pending: 'Not installed',
       unsupported: 'Built-in runtime unavailable on this platform. Set {override} on the server to use an existing runtime.',
       failed: 'Failed: {detail}',
       override: 'Using {override}.',
@@ -870,7 +871,7 @@ export const en = {
       privacy: 'Cloud transcription sends meeting audio to the configured endpoint. Only enable it if you trust that service with your recordings.',
       description: 'Recordings use Whisper locally by default, with no cloud key. Whisper base is multilingual (~142 MiB).',
       modelPresent: 'Model downloaded.',
-      modelAbsent: 'Model not downloaded.',
+      modelAbsent: 'Not downloaded',
       ready: 'Ready to transcribe.',
       downloading: 'Downloading…',
       downloadingProgress: 'Downloading {progress}%',

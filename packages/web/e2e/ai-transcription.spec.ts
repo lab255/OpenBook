@@ -49,7 +49,7 @@ for (const state of ['unsupported', 'model-update', 'runtime-update', 'failed', 
     const status = fresh();
     const audioStatus = status.transcription!;
     if (state === 'unsupported') audioStatus.runtime!.tools = {'whisper-cli': {status: 'unsupported'}, ffmpeg: {status: 'provisioned'}};
-    if (state === 'model-update') audioStatus.modelUpdateAvailable = true;
+    if (state === 'model-update') Object.assign(audioStatus, {modelPresent: true, modelUpdateAvailable: true});
     if (state === 'runtime-update') audioStatus.runtime!.tools.ffmpeg = {status: 'missing', installedVersion: '1', version: '2'};
     if (state === 'failed') audioStatus.runtime!.tools.ffmpeg = {status: 'failed', detail: 'Network unavailable'};
     if (state === 'override') audioStatus.runtime!.tools['whisper-cli'] = {status: 'unsupported', override: 'OPENBOOK_WHISPER_BIN', available: true};
@@ -57,8 +57,11 @@ for (const state of ['unsupported', 'model-update', 'runtime-update', 'failed', 
     if (state === 'unsupported') {
       await expect(audio.getByText(/Built-in runtime unavailable.*OPENBOOK_WHISPER_BIN/)).toBeVisible();
       await expect(audio.getByRole('alert')).toHaveCount(0);
-    } else if (state.endsWith('update')) await expect(audio.getByRole('button', {name: 'Update local transcription'})).toBeVisible();
-    else if (state === 'failed') await expect(audio.getByRole('alert')).toHaveText('ffmpeg: Failed: Network unavailable');
+      await expect(audio.getByRole('button', {name: 'Download available components'})).toBeVisible();
+    } else if (state.endsWith('update')) {
+      await expect(audio.getByRole('button', {name: 'Update local transcription'})).toBeVisible();
+      await expect(audio.getByText(`${state === 'model-update' ? 'Whisper model' : 'FFmpeg'}: Update available`)).toBeVisible();
+    } else if (state === 'failed') await expect(audio.getByRole('alert')).toHaveText('FFmpeg: Failed: Network unavailable');
     else await expect(audio.getByText('whisper-cli: Using OPENBOOK_WHISPER_BIN.')).toBeVisible();
   });
 }
@@ -70,6 +73,6 @@ test('real status pipeline renders tool lines', async ({page}) => {
   await page.getByRole('button', {name: 'AI', exact: true}).press('Enter');
   const audio = page.locator('section').filter({has: page.getByLabel('Transcription provider')});
   await expect(audio.getByText(/^whisper-cli: /)).toBeVisible();
-  await expect(audio.getByText(/^ffmpeg: /)).toBeVisible();
-  await expect(audio.getByRole('button', {name: /local transcription/}).or(audio.getByText('Ready to transcribe.'))).toBeVisible();
+  await expect(audio.getByText(/^FFmpeg: /)).toBeVisible();
+  await expect(audio.getByRole('button', {name: /local transcription|Download available components/}).or(audio.getByText('Ready to transcribe.'))).toBeVisible();
 });

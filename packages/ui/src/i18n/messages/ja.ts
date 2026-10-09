@@ -529,6 +529,7 @@ export const ja: PartialMessages = {
   ai: {
     transcription: {
       enable: 'ローカル文字起こしを有効にする',
+      downloadAvailable: '利用可能なコンポーネントをダウンロード',
       update: 'ローカル文字起こしを更新',
       enabling: 'ローカル文字起こしを設定中…',
       stageLine: '{stage}：{state}',
@@ -537,7 +538,7 @@ export const ja: PartialMessages = {
       updateAvailable: '更新があります',
       provisioning: 'ランタイムを準備中…',
       installed: 'インストール済み',
-      pending: '未ダウンロード',
+      pending: '未インストール',
       unsupported: 'このプラットフォームでは組み込みランタイムを利用できません。既存のランタイムを使用するには、サーバーで{override}を設定してください。',
       failed: '失敗: {detail}',
       override: '{override}を使用中。',
@@ -551,7 +552,7 @@ export const ja: PartialMessages = {
       privacy: 'クラウド文字起こしでは会議の音声を設定したエンドポイントに送信します。録音を預けられる信頼できるサービスの場合のみ有効にしてください。',
       description: '録音は標準でWhisperを使ってローカルで文字起こしされます。クラウドのAPIキーは不要です。Whisper baseは多言語対応です（約142 MiB）。',
       modelPresent: 'モデルをダウンロード済みです。',
-      modelAbsent: 'モデルが未ダウンロードです。',
+      modelAbsent: '未ダウンロード',
       ready: '文字起こしの準備ができています。',
       downloading: 'ダウンロード中…',
       downloadingProgress: 'ダウンロード中 {progress}%',

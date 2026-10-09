@@ -534,6 +534,7 @@ export const de: PartialMessages = {
   ai: {
     transcription: {
       enable: 'Lokale Transkription aktivieren',
+      downloadAvailable: 'Verfügbare Komponenten herunterladen',
       update: 'Lokale Transkription aktualisieren',
       enabling: 'Lokale Transkription wird eingerichtet…',
       stageLine: '{stage}: {state}',
@@ -542,7 +543,7 @@ export const de: PartialMessages = {
       updateAvailable: 'Update verfügbar',
       provisioning: 'Laufzeit wird vorbereitet…',
       installed: 'Installiert',
-      pending: 'Nicht heruntergeladen',
+      pending: 'Nicht installiert',
       unsupported: 'Die integrierte Laufzeit ist auf dieser Plattform nicht verfügbar. Setze {override} auf dem Server, um eine vorhandene Laufzeit zu verwenden.',
       failed: 'Fehlgeschlagen: {detail}',
       override: '{override} wird verwendet.',
@@ -556,7 +557,7 @@ export const de: PartialMessages = {
       privacy: 'Die Cloud-Transkription sendet Meeting-Audio an den konfigurierten Endpunkt. Aktiviere sie nur, wenn du diesem Dienst deine Aufnahmen anvertrauen möchtest.',
       description: 'Aufnahmen werden standardmäßig lokal mit Whisper transkribiert, ohne Cloud-Schlüssel. Whisper base ist mehrsprachig (~142 MiB).',
       modelPresent: 'Modell heruntergeladen.',
-      modelAbsent: 'Modell nicht heruntergeladen.',
+      modelAbsent: 'Nicht heruntergeladen',
       ready: 'Bereit zur Transkription.',
       downloading: 'Wird heruntergeladen…',
       downloadingProgress: 'Download: {progress}%',
