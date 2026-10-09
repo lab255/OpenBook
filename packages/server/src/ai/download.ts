@@ -21,10 +21,12 @@ export async function downloadFile(
   dest: string,
   onProgress?: (progress: DownloadProgress) => void,
   integrity?: DownloadIntegrity,
+  signal?: AbortSignal,
 ): Promise<void> {
   const partial = `${dest}.part`;
   try {
-    const res = await fetch(url, {redirect: 'follow'});
+    signal?.throwIfAborted();
+    const res = await fetch(url, {redirect: 'follow', signal});
     if (!res.ok || !res.body) {
       await res.body?.cancel();
       throw new Error(`HTTP ${res.status}`);
@@ -51,7 +53,7 @@ export async function downloadFile(
       }
     }
     // pipeline propagates disk/read errors and closes the file before cleanup or rename.
-    await pipeline(Readable.from(chunks()), createWriteStream(partial));
+    await pipeline(Readable.from(chunks()), createWriteStream(partial), {signal});
     if (integrity) {
       if (received !== integrity.size) throw new Error(`Download size mismatch: expected ${integrity.size} bytes, received ${received}`);
       if (hash!.digest('hex') !== integrity.sha256) throw new Error('Download SHA-256 mismatch');
@@ -59,6 +61,7 @@ export async function downloadFile(
     const fh = await open(partial, 'r+');
     await fh.sync();
     await fh.close();
+    signal?.throwIfAborted();
     await rename(partial, dest);
   } catch (error) {
     await unlink(partial).catch(() => undefined);
@@ -72,6 +75,7 @@ export async function downloadVerified(
   dest: string,
   integrity: DownloadIntegrity,
   onProgress?: (progress: DownloadProgress) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
-  await downloadFile(url, dest, onProgress, integrity);
+  await downloadFile(url, dest, onProgress, integrity, signal);
 }

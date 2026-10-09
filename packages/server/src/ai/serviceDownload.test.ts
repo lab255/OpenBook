@@ -60,7 +60,7 @@ it('reports corrupt Whisper bytes as an error and removes the partial', async ()
 
 it('maps the legacy mutable model URL to the current immutable pin', async () => {
   await finish('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin');
-  expect(fetchMock).toHaveBeenCalledWith(WHISPER_MODEL_PIN.url, {redirect: 'follow'});
+  expect(fetchMock).toHaveBeenCalledWith(WHISPER_MODEL_PIN.url, {redirect: 'follow', signal: expect.any(AbortSignal)});
 });
 
 it('keeps arbitrary llama downloads unverified, auto-selected, and skipped when present', async () => {
@@ -74,4 +74,54 @@ it('keeps arbitrary llama downloads unverified, auto-selected, and skipped when 
   expect(await finish(url)).toMatchObject({done: true});
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(await readdir(dir)).toEqual(['custom.gguf']);
+});
+
+it('enabling local provisions runtime and model; disposal aborts the active fetch', async () => {
+  let signal: AbortSignal | undefined;
+  fetchMock.mockImplementationOnce(async (_url?: unknown, options?: RequestInit) => {
+    signal = options?.signal as AbortSignal;
+    return new Promise<Response>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => reject(signal!.reason), {once: true});
+    });
+  });
+  const provision = vi.fn(async () => undefined);
+  const local = {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)};
+  const enabled = new AiService({query: vi.fn(async () => [])} as unknown as Db, dir, undefined, local);
+  await enabled.setConfig({provider: 'off', transcription: {provider: 'local'}});
+  await expect.poll(() => signal !== undefined).toBe(true);
+  await enabled.dispose();
+  expect(provision).toHaveBeenCalledOnce();
+  expect(signal?.aborted).toBe(true);
+  expect((await enabled.status()).download?.error).toContain('abort');
+});
+
+it('rechecks persisted local enablement on startup and refreshes an obsolete model receipt', async () => {
+  await finish(WHISPER_MODEL_PIN.url);
+  const receipt = path.join(dir, `${WHISPER_MODEL_PIN.fileName}.verified.json`);
+  const stored = JSON.parse(await readFile(receipt, 'utf8'));
+  await writeFile(receipt, JSON.stringify({...stored, version: 'old'}));
+  const provision = vi.fn(async () => undefined);
+  const restarted = new AiService({query: vi.fn(async () => [{value: {provider: 'off', transcription: {provider: 'local'}}}])} as unknown as Db,
+    dir, undefined, {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)});
+  try {
+    await restarted.getConfig();
+    await expect.poll(async () => (await restarted.status()).download?.done).toBe(true);
+    expect(provision).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(await readFile(receipt, 'utf8')).version).toBe(WHISPER_MODEL_PIN.version);
+  } finally { await restarted.dispose(); }
+});
+
+it('publishes the model receipt even when runtime provisioning rejects', async () => {
+  const provision = vi.fn(async () => { throw new Error('Runtime download failed'); });
+  const enabled = new AiService({query: vi.fn(async () => [])} as unknown as Db, dir, undefined,
+    {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)});
+  try {
+    const state = await enabled.startDownload(WHISPER_MODEL_PIN.url);
+    await expect.poll(() => state.done).toBe(true);
+    expect(state).toMatchObject({done: true, error: 'Runtime download failed', received: 11, total: 11});
+    expect(provision).toHaveBeenCalledOnce();
+    expect(await readFile(path.join(dir, WHISPER_MODEL_PIN.fileName), 'utf8')).toBe('model bytes');
+    expect(JSON.parse(await readFile(path.join(dir, `${WHISPER_MODEL_PIN.fileName}.verified.json`), 'utf8')).version).toBe(WHISPER_MODEL_PIN.version);
+  } finally { await enabled.dispose(); }
 });
