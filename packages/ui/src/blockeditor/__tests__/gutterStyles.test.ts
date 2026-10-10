@@ -238,8 +238,8 @@ describe('container surface equality', () => {
     for (const selector of ['.obe-group-head', '.obe-cnt-head', '.obe-acc-section']) {
       expect(ruleBody(selector)).toContain('border-bottom: 1px solid hsl(var(--border) / 0.7)');
     }
-    expect(ruleBody('.obe-group-locked').trim()).toBe('border-style: dashed;');
-    expect(ruleBody('.obe-cnt:has(> .obe-cnt-locked), .obe-cnt:has(> .obe-cnt-head > .obe-tabs-strip > .obe-tab-locked)').trim()).toBe('border-style: dashed;');
+    expect(ruleBody('.obe-group-locked').trim()).toBe('border-style: dashed;\n  border-color: hsl(var(--muted-foreground) / 0.45);');
+    expect(ruleBody('.obe-cnt:has(> .obe-cnt-locked)').trim()).toBe('border-style: dashed;\n  border-color: hsl(var(--muted-foreground) / 0.45);');
     expect(CSS).not.toMatch(/\.obe-cnt-panel\.obe-cnt-locked[^}]*opacity/);
   });
 
@@ -247,9 +247,16 @@ describe('container surface equality', () => {
     const host = document.createElement('div');
     host.innerHTML = '<section class="obe-cnt"><div class="obe-cnt-panel"><section class="obe-cnt"><div class="obe-acc-section obe-cnt-locked"></div></section></div></section>';
     const frames = host.querySelectorAll('.obe-cnt');
-    const selector = '.obe-cnt:has(> .obe-cnt-locked), .obe-cnt:has(> .obe-cnt-head > .obe-tabs-strip > .obe-tab-locked)';
+    const selector = '.obe-cnt:has(> .obe-cnt-locked)';
     expect(frames[0].matches(selector)).toBe(false);
     expect(frames[1].matches(selector)).toBe(true);
+
+    host.innerHTML = '<section class="obe-cnt"><div class="obe-cnt-head"><div class="obe-tabs-strip"><button class="obe-tab obe-tab-on"></button><button class="obe-tab obe-tab-locked"></button></div></div><div class="obe-cnt-panel"></div></section>';
+    const tabs = host.querySelector('.obe-cnt')!;
+    expect(tabs.matches(selector)).toBe(false);
+    const activeLocked = tabs.cloneNode(true) as HTMLElement;
+    activeLocked.querySelector('.obe-cnt-panel')!.classList.add('obe-cnt-locked');
+    expect(activeLocked.matches(selector)).toBe(true);
   });
 
   it('pairs the live green chip colours with providerless editor fallbacks', () => {
