@@ -32,6 +32,18 @@ test('board column footer: configurable calculation', {tag: ['@database']}, asyn
   // The Done column footer sums Cost (10 + 30 = 40) by default.
   const doneFooter = page.getByRole('button', {name: /Sum.*Cost.*40/});
   await expect(doneFooter).toBeVisible();
+  const header = page.locator('[data-col-key="s_done"]');
+  await expect(header).toHaveCSS('height', '20px');
+  await expect(header.getByText('Done', {exact: true})).toHaveCSS('border-radius', '4px');
+  const column = header.locator('..');
+  await expect(column).toHaveAttribute('style', /color-mix\(in srgb, var\(--data-green-chip-bg, #[0-9a-f]+\) 50%, transparent\)/);
+  const dt = await page.evaluateHandle(() => new DataTransfer());
+  await header.dispatchEvent('dragstart', {dataTransfer: dt});
+  await column.dispatchEvent('dragover', {dataTransfer: dt});
+  expect(await column.evaluate((element) => (element as HTMLElement).style.backgroundColor)).toBe('');
+  await expect(column).toHaveClass(/bg-accent\/50/);
+  await header.dispatchEvent('dragend', {dataTransfer: dt});
+  await expect(column).toHaveAttribute('style', /color-mix/);
   await page.screenshot({path: 'test-results/board-footer.png'});
 
   // Switch the calculation to Count → the Done footer now shows the row count (2).

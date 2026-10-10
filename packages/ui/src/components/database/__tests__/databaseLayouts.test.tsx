@@ -63,7 +63,7 @@ describe('card layout design system', () => {
     const header = container.querySelector('[data-col-key="todo"]')!;
     expect(header.querySelector('.rounded-full')?.textContent).toBe('Todo');
     const column = header.parentElement!;
-    // jsdom drops color-mix()/var() declarations; SSR preserves the authored style.
+    // The DOM emulator drops color-mix()/var() declarations; SSR preserves the authored style.
     expect(renderToStaticMarkup(<BoardView db={makeDb()} view={view} properties={properties} cardProperties={[]} />)).toContain('background-color:color-mix(');
     const none = container.querySelector('[data-col-key="__none__"]')!;
     expect(none.textContent).toContain('No value');

@@ -32,4 +32,22 @@ test('gallery grouping: cards split into sections by a property', {tag: ['@datab
   await expect(page.locator('[data-group]')).toHaveCount(2);
   await expect(page.locator('[data-group="s_done"] .grid button')).toHaveCount(2);
   await expect(page.locator('[data-group="s_todo"] .grid button')).toHaveCount(1);
+  const card = page.locator('[data-group="s_todo"] .grid button');
+  await expect(card.locator('.h-16, img')).toHaveCount(0);
+  await expect(card).toHaveCSS('border-radius', '8px');
+  await expect(card.locator(':scope > div')).toHaveCSS('padding-top', '12px');
+  // Reconstruct the old empty cover treatment to measure the exact density delta.
+  const reduction = await card.evaluate((element) => {
+    const before = element.getBoundingClientRect().height;
+    const body = element.firstElementChild as HTMLElement;
+    body.style.paddingTop = '0px';
+    const band = document.createElement('div');
+    band.style.cssText = 'height:64px;flex-shrink:0';
+    element.prepend(band);
+    const oldHeight = element.getBoundingClientRect().height;
+    band.remove();
+    body.style.paddingTop = '';
+    return oldHeight - before;
+  });
+  expect(reduction).toBe(60);
 });
