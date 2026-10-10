@@ -3834,3 +3834,11 @@ a.obe-mention {
 .obe-meeting time { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .obe-meeting-summary { user-select: text; white-space: pre-wrap; margin-block: 12px; }
 .obe-meeting-notes { border-top: 1px solid hsl(var(--border)); margin-top: 16px; padding-top: 12px; }
+
+/* Free-text language names must not expand the media toolbar. */
+.obe-code-lang {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

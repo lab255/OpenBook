@@ -15,6 +15,7 @@ describe('code media settings', () => {
     fireEvent.click(screen.getByLabelText('Run code'));
     expect(container.querySelector('.obe-kit-gear')).toBeNull();
     expect(screen.queryByLabelText('Choose code language')).toBeNull();
+    expect(container.querySelector('.obe-code-lang')).toBeNull();
     fireEvent.click(container.querySelector('.obe-code-collapsed')!);
     expect(docToJSON(doc)).toEqual(before);
   });

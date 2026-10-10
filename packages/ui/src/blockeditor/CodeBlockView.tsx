@@ -116,9 +116,7 @@ export const CodeBlockView: React.FC<{
   return (
     <div className={`obe-codeblock${live ? ' obe-codeblock-live' : ''}`} data-wrap={wrap}>
       <div className="obe-media-bar" data-surface="plain" contentEditable={false}>
-        {editor.readOnly ? (
-          <span className="obe-media-btn obe-code-lang" data-chrome="author">{codeLanguageName(language)}</span>
-        ) : (
+        {!editor.readOnly && (
           <Popover open={languageOpen} onOpenChange={setLanguageOpen}>
             <PopoverTrigger asChild>
               <button type="button" className="obe-media-btn obe-code-lang" data-chrome="author" aria-label="Choose code language" title="Choose code language">{codeLanguageName(language)}</button>
