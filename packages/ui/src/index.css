@@ -228,6 +228,19 @@
     --obe-font-size: 16px;
     --obe-leading: 1.5;
     --obe-line: calc(var(--obe-font-size) * var(--obe-leading));
+    --obe-gutter-btn: 24px;
+    --obe-handle-w: 18px;
+    /* FLOOR 4px — WCAG 2.5.8 spacing exception for the 18px handle depends on it. */
+    --obe-gutter-gap: 4px;
+    --obe-gutter-clear: 4px;
+    --obe-gutter-room: calc(var(--obe-gutter-btn) + var(--obe-gutter-gap) + var(--obe-handle-w) + var(--obe-gutter-clear));
+    --obe-block-pad-y: 4px;
+    --obe-block-bleed: 4px;
+    --obe-row-space-above: 0px;
+    --obe-select-radius: var(--radius-sm);
+    --obe-select-wash: hsl(var(--ring) / 0.14);
+    --obe-chrome-ink: hsl(var(--muted-foreground) / 0.8);
+    --obe-columns-gap: 28px;
     --obe-title-size: calc(var(--obe-font-size) * 2.5);
     --obe-title-leading: 1.2;
     --obe-heading-weight: 600;
@@ -390,6 +403,7 @@
   }
 
   .dark {
+    --obe-select-wash: hsl(var(--ring) / 0.2);
     --obe-fg-gray: hsl(0 0% 66%);
     --obe-fg-brown: hsl(25 40% 62%);
     --obe-fg-orange: hsl(28 85% 62%);
@@ -844,7 +858,6 @@
    or .obe-editor-wrap WOULD break every fixed popup
    (slash/mention/emoji/link/toolbar) — don't. */
 .obe-editor-pane {
-  --obe-gutter-room: 3.4rem;
   container-name: obe-editor-pane;
   container-type: inline-size;
 }
@@ -880,12 +893,65 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  border-radius: var(--radius-sm);
-  padding: 0;
+  --obe-row-space-above: 0px;
+  --obe-select-radius: var(--radius-sm);
+  --obe-lead-offset: calc(var(--obe-row-space-above) + var(--obe-block-pad-y));
+  --obe-lead-line: var(--obe-line);
+  padding-block: var(--obe-block-pad-y);
 }
-.obe-row-selected {
-  background: hsl(var(--accent) / 0.55);
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
+.obe-row:is([data-block-type='paragraph'], [data-block-type='heading'], [data-block-type='list'], [data-block-type='todo'], [data-block-type='quote'], [data-block-type='notes']) {
+  padding-block: var(--obe-row-space-above) 0;
+}
+.obe-row:is([data-block-type='paragraph'], [data-block-type='heading'], [data-block-type='list'], [data-block-type='todo'], [data-block-type='quote'], [data-block-type='notes']) > .obe-blockbody .obe-text {
+  padding-block: var(--obe-block-pad-y);
+}
+.obe-row[data-block-type='heading'][data-block-level='1'] {
+  --obe-row-space-above: var(--obe-h1-space);
+  --obe-lead-line: calc(var(--obe-h1-size) * var(--obe-h1-leading));
+}
+.obe-row[data-block-type='heading'][data-block-level='2'] {
+  --obe-row-space-above: var(--obe-h2-space);
+  --obe-lead-line: calc(var(--obe-h2-size) * var(--obe-h2-leading));
+}
+.obe-row[data-block-type='heading'][data-block-level='3'] {
+  --obe-row-space-above: var(--obe-h3-space);
+  --obe-lead-line: calc(var(--obe-h3-size) * var(--obe-h3-leading));
+}
+.obe-root > .obe-row:first-child { --obe-row-space-above: 0px; }
+.obe-row:is([data-block-type='callout'], [data-block-type='code'], [data-block-type='image'], [data-block-type='htmlArtifact'], [data-block-type='group']),
+.obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit) {
+  --obe-select-radius: var(--radius-xl);
+}
+.obe-row[data-block-type='group'] {
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + 0.25rem);
+  --obe-lead-line: calc(0.8rem * var(--obe-leading));
+}
+.obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit) {
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 0.25rem);
+  --obe-lead-line: calc(0.8rem * var(--obe-leading));
+}
+.obe-row[data-block-type='callout'] {
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 0.75rem);
+}
+.obe-row[data-block-type='table']:has(.obe-has-grips) {
+  /* End the block handle above the first row grip; both remain draggable. */
+  --obe-lead-offset: calc(var(--obe-block-pad-y) - var(--obe-gutter-clear));
+  --obe-lead-line: var(--obe-line);
+}
+.obe-row[data-block-type='code'] {
+  /* Border, inner pad, action row, divider, and its spacing. */
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + 0.75rem + 1.5rem + 0.25rem + 1px + 0.5rem);
+  --obe-lead-line: calc(var(--obe-code-size) * var(--obe-code-leading));
+}
+.obe-row-selected::before {
+  content: '';
+  position: absolute;
+  inset: var(--obe-row-space-above, 0px) calc(-1 * var(--obe-block-bleed)) 0;
+  background: var(--obe-select-wash);
+  /* stylelint-disable-next-line design-tokens/role-values -- DSX-7: family role resolves to foundation radius tokens. */
+  border-radius: var(--obe-select-radius, var(--radius-sm));
+  z-index: var(--z-index-drop-indicator);
+  pointer-events: none;
 }
 /* Rubber-band marquee: a translucent accent rectangle over the content column.
    Non-interactive (clicks fall through to the editor) and theme-aware via the
@@ -923,22 +989,23 @@
 
 .obe-gutter {
   position: absolute;
-  left: -3.4rem;
-  /* Paired with .obe-row's top padding to stay on the first text line. */
-  top: 0;
-  height: 1.5rem;
+  left: calc(-1 * var(--obe-gutter-room));
+  top: calc(var(--obe-lead-offset) + (var(--obe-lead-line) - var(--obe-gutter-btn)) / 2);
+  height: var(--obe-gutter-btn);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--obe-gutter-gap);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
+/* Hover bridge across --obe-gutter-clear; inherits the gutter's pointer-events, so inert while hidden. */
+.obe-gutter::after { content: ''; position: absolute; inset-block: 0; left: 100%; width: var(--obe-gutter-clear); }
 /* Inside columns there's no page gutter — a compact, handle-only grip
    floats in the column gap. Keep the visible grip above the resize divider;
    hidden gutters remain inert, so the divider owns the gap at rest. */
 .obe-gutter-nested {
-  left: -1.45rem;
+  left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear)));
   z-index: var(--z-index-local-overlay);
 }
 .obe-gutter-icon { width: 14px; height: 14px; }
@@ -949,42 +1016,23 @@
   .obe-editor-pane { --obe-gutter-room: 0; }
   .obe-gutter { display: none; }
 }
-/* A standard column needs 3.4rem to show both gutter buttons. Below 47.8rem,
-   the pane's 2.5rem desktop padding plus its centring slack provides less than
-   that; phone padding is smaller still. Keep only the 1.5rem grip, tucked
-   exactly inside the minimum 1.5rem page padding. Full-width roots reserve
-   their own gutter below and therefore keep both buttons at every pane width. */
-@container obe-editor-pane (max-width: 47.8rem) {
-  .obe-root:not(.obe-full) .obe-gutter:not(.obe-gutter-nested) { left: -1.5rem; }
+/* Collapse to the handle when the pane cannot fit the complete gutter. */
+@container obe-editor-pane (max-width: 52.25rem) {
+  .obe-root:not(.obe-full) .obe-gutter:not(.obe-gutter-nested) { left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear))); }
   .obe-root:not(.obe-full) .obe-gutter:not(.obe-gutter-nested) > button:first-child { display: none; }
 }
-/* Align the hover gutter (drag handle + add button) with each block type's
-   FIRST text line. The default `top` is tuned for a paragraph; headings push
-   their first line down (margin-top + a taller line), and callouts/code blocks
-   add top padding — so nudge the gutter to sit on that line instead of floating
-   above it. */
-.obe-row[data-block-type='heading'][data-block-level='1'] > .obe-gutter { top: 1.15rem; }
-.obe-row[data-block-type='heading'][data-block-level='2'] > .obe-gutter { top: 0.7rem; }
-.obe-row[data-block-type='heading'][data-block-level='3'] > .obe-gutter { top: 0.4rem; }
-.obe-row[data-block-type='callout'] > .obe-gutter { top: 0.85rem; }
-/* Meet the table row grip at the edge of the 1.5rem block gutter. */
-.obe-row[data-block-type='table']:has(.obe-has-grips) > .obe-gutter { top: -0.25rem; }
-/* Code top: border + .75rem block pad + the actions row and its grid-aligned
-   divider spacing. Centre the 1.5rem gutter on the .85rem × 1.55 code line. */
-.obe-row[data-block-type='code'] > .obe-gutter { top: 3rem; }
-.obe-row:hover > .obe-gutter,
-.obe-row:focus-within > .obe-gutter,
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-gutter,
 .obe-gutter:focus-within {
   opacity: 1;
   pointer-events: auto;
 }
 .obe-gutter-btn {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
   display: grid;
   place-items: center;
   border-radius: var(--radius-md);
-  color: hsl(var(--muted-foreground) / 0.7);
+  color: var(--obe-chrome-ink);
   font-size: 14px;
   cursor: pointer;
   user-select: none;
@@ -993,7 +1041,7 @@
   background: hsl(var(--accent));
   color: hsl(var(--foreground));
 }
-.obe-handle { cursor: grab; }
+.obe-handle { width: var(--obe-handle-w); cursor: grab; }
 .obe-handle:active { cursor: grabbing; }
 
 /* Drop indicators: a dashed line drawn on a ::after that's absolutely
@@ -1011,8 +1059,8 @@
 }
 .obe-drop-above::after,
 .obe-drop-below::after {
-  left: 0.1rem;
-  right: 0.1rem;
+  left: calc(-1 * var(--obe-block-bleed));
+  right: calc(-1 * var(--obe-block-bleed));
   border-top: 2px dashed hsl(var(--primary));
 }
 .obe-drop-above::after { top: -1px; }
@@ -1023,8 +1071,8 @@
   bottom: 0.15rem;
   border-left: 2px dashed hsl(var(--primary));
 }
-.obe-drop-left::after { left: -0.35rem; }
-.obe-drop-right::after { right: -0.35rem; }
+.obe-drop-left::after { left: calc(-1 * var(--obe-block-bleed)); }
+.obe-drop-right::after { right: calc(-1 * var(--obe-block-bleed)); }
 
 /* Text */
 .obe-text {
@@ -1043,9 +1091,9 @@
   pointer-events: none;
 }
 .obe-heading { flex: 1; min-width: 0; font-weight: var(--obe-heading-weight); }
-.obe-h1 .obe-text { font-size: var(--obe-h1-size); line-height: var(--obe-h1-leading); margin-top: var(--obe-h1-space); }
-.obe-h2 .obe-text { font-size: var(--obe-h2-size); line-height: var(--obe-h2-leading); margin-top: var(--obe-h2-space); }
-.obe-h3 .obe-text { font-size: var(--obe-h3-size); line-height: var(--obe-h3-leading); margin-top: var(--obe-h3-space); }
+.obe-h1 .obe-text { font-size: var(--obe-h1-size); line-height: var(--obe-h1-leading); }
+.obe-h2 .obe-text { font-size: var(--obe-h2-size); line-height: var(--obe-h2-leading); }
+.obe-h3 .obe-text { font-size: var(--obe-h3-size); line-height: var(--obe-h3-leading); }
 
 .obe-code, code.obe-code {
   font-family: var(--obe-font-mono);
@@ -1079,15 +1127,16 @@ a.obe-mention {
   text-align: center;
   user-select: none;
   color: hsl(var(--foreground) / 0.8);
-  padding-top: 0;
+  padding-top: var(--obe-block-pad-y);
   font-variant-numeric: tabular-nums;
 }
 .obe-todo { flex: 1; display: flex; min-width: 0; align-items: flex-start; }
 .obe-todo-box {
   flex: none;
-  margin: 0.5rem 0.5rem 0 0.25rem;
-  width: 0.95rem;
-  height: 0.95rem;
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- DSX-7: centre the checkbox on the padded text line. */
+  margin: calc(var(--obe-block-pad-y) + (var(--obe-line) - 1rem) / 2) 4px 0 4px;
+  width: 1rem;
+  height: 1rem;
   accent-color: hsl(var(--primary));
   cursor: pointer;
 }
@@ -1131,7 +1180,7 @@ a.obe-mention {
   flex: 1;
   border: 0;
   border-top: 1px solid hsl(var(--border));
-  margin: 0.75rem 0;
+  margin: calc(var(--obe-line) / 2) 0;
 }
 /* Speaker note: quietly marked on the page; hidden from the audience deck and
    every export, surfaced only in the presenter view. */
@@ -1167,7 +1216,7 @@ a.obe-mention {
 .obe-image {
   flex: 1;
   min-width: 0;
-  margin: 0.25rem 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1462,7 +1511,7 @@ a.obe-mention {
 .obe-artifact {
   flex: 1;
   min-width: 0;
-  margin: 0.25rem 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1785,7 +1834,7 @@ a.obe-mention {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 1.25rem;
+  gap: var(--obe-columns-gap);
 }
 .obe-column { min-width: 0; }
 
@@ -1796,7 +1845,7 @@ a.obe-mention {
   border: 1px solid hsl(var(--border) / 0.8);
   border-radius: var(--radius-lg);
   background: hsl(var(--muted) / 0.25);
-  margin: 0.25rem 0;
+  margin: 0;
 }
 .obe-group-locked {
   background: hsl(var(--muted) / 0.45);
@@ -1846,7 +1895,7 @@ a.obe-mention {
 .obe-x-plugin > p.obe-x-plugin-text { margin-top: 0.5rem; }
 
 /* Tables */
-.obe-table-wrap { flex: 1; min-width: 0; position: relative; padding: 0 24px 24px 0; }
+.obe-table-wrap { flex: 1; min-width: 0; position: relative; padding: 0 0 16px 0; }
 .obe-table {
   width: 100%;
   border-collapse: collapse;
@@ -1929,8 +1978,8 @@ a.obe-mention {
 }
 .obe-table-wrap:hover .obe-table-add { opacity: 1; }
 .obe-table-add:hover { background: var(--hover); color: hsl(var(--foreground)); }
-.obe-table-add-row { left: 0; right: 1.5rem; bottom: 0; height: 1rem; }
-.obe-table-add-col { top: 0; bottom: 1.5rem; right: 0; width: 1rem; }
+.obe-table-add-row { left: 0; right: 0; bottom: 0; height: 1rem; }
+.obe-table-add-col { top: 0; bottom: 16px; right: -16px; width: 1rem; }
 .obe-table-tools {
   position: absolute;
   top: -1.7rem;
@@ -2199,8 +2248,8 @@ a.obe-mention {
    while the text stays aligned with untinted blocks. */
 .obe-blockbody[class*='obe-bg-'] {
   border-radius: var(--radius-lg);
-  padding: 0.25rem 0.5rem;
-  margin-inline: -0.5rem;
+  padding-inline: var(--obe-block-bleed);
+  margin-inline: calc(var(--obe-block-bleed) * -1);
 }
 /* A tinted section shows the tint instead of a group's default panel fill. */
 .obe-blockbody[class*='obe-bg-'] > .obe-group { background: transparent; }
@@ -2310,8 +2359,6 @@ a.obe-mention {
 /* Touch: gutters are always visible (no hover on touch screens) */
 @media (hover: none) {
   .obe-gutter { opacity: 0.85; }
-  .obe-root { padding-left: 0.5rem; }
-  .obe-gutter { left: -2.1rem; }
   .obe-table-add { opacity: 0.7; }
 }
 
@@ -2331,7 +2378,7 @@ a.obe-mention {
 .obe-artifact-expand:focus-visible,
 .obe-image-placeholder:focus-visible {
   outline: 2px solid hsl(var(--ring));
-  outline-offset: 1px;
+  outline-offset: 2px;
   opacity: 1;
 }
 .obe-row:has(.obe-gutter-btn:focus-visible) > .obe-gutter {
@@ -2341,7 +2388,7 @@ a.obe-mention {
 /* Block editor: reactive custom blocks (slider + formula) */
 .obe-custom { flex: 1; min-width: 0; }
 /* Inline database embed ("Link to database"): a live DatabaseView as a block. */
-.obe-dbview { margin: 0.5rem 0; }
+.obe-dbview { margin: 0; }
 /* The slider's control surface (its config — name, min/max/step, layout — lives
    behind the shared ⚙, like every other kit input). */
 .obe-kit-range {
@@ -3139,7 +3186,7 @@ a.obe-mention {
 .obe-kit-select { cursor: pointer; }
 
 /* Chart */
-.obe-kit-chart { display: block; margin: 0.25rem 0; }
+.obe-kit-chart { display: block; margin: 0; }
 .obe-kit-chart-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 1.4rem; }
 .obe-kit-chart-title { font-size: 0.82rem; font-weight: 550; color: hsl(var(--muted-foreground)); }
 .obe-chart-svg {
@@ -3590,7 +3637,7 @@ a.obe-mention {
   display: block;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
-  margin: 0.25rem 0;
+  margin: 0;
   overflow: hidden;
 }
 .obe-cnt-head {
@@ -3762,7 +3809,7 @@ a.obe-mention {
 .obe-col-divider {
   position: absolute;
   z-index: var(--z-index-pane-overlay);
-  left: -1.125rem;
+  left: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2);
   top: 0;
   bottom: 0;
   width: 1rem;
@@ -3787,11 +3834,11 @@ a.obe-mention {
   background: hsl(var(--ring) / 0.65);
 }
 .obe-col-divider-trailing {
-  right: -1rem;
+  right: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2);
   left: auto;
 }
 @container obe-block-editor (max-width: 40rem) {
-  .obe-columns { display: flex; flex-direction: column; gap: 0.25rem; }
+  .obe-columns { display: flex; flex-direction: column; gap: 0; }
   .obe-col-divider { display: none; }
 }
 

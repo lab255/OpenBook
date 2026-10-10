@@ -566,9 +566,10 @@ export const BlockEditor: React.FC<{
   // ── Drag and drop ────────────────────────────────────────────────────────
   const computeRegion = (e: React.DragEvent | React.PointerEvent, el: HTMLElement, allowSides: boolean): DropRegion => {
     const rect = el.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    if (allowSides && x < 0.18) return 'left';
-    if (allowSides && x > 0.82) return 'right';
+    const x = e.clientX - rect.left;
+    const side = Math.min(48, rect.width * 0.18);
+    if (allowSides && x < side) return 'left';
+    if (allowSides && x > rect.width - side) return 'right';
     const y = (e.clientY - rect.top) / rect.height;
     return y < 0.5 ? 'above' : 'below';
   };
