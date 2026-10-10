@@ -1227,6 +1227,7 @@ a.obe-mention {
   gap: 0.25rem;
 }
 .obe-image-frame {
+  align-self: center;
   position: relative;
   display: inline-block;
   max-width: 100%;
@@ -1294,49 +1295,11 @@ a.obe-mention {
 .obe-media-bar .obe-kit-gear:hover { background: var(--obe-chrome-hover); }
 .obe-media-bar .obe-kit-gear[data-state='open'] { background: var(--obe-chrome-active); }
 
-/* Hover chrome: size presets + replace, top-right over the image. */
-.obe-image-tools {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border-radius: var(--radius-lg);
-  background: hsl(var(--background) / 0.86);
-  box-shadow: 0 1px 4px hsl(0 0% 0% / 0.16);
-  backdrop-filter: blur(6px);
-  opacity: 0;
-  transition: opacity var(--motion-fast) var(--ease-out-soft);
-}
-.obe-image-frame:hover .obe-image-tools,
-.obe-image-tools:focus-within { opacity: 1; }
-.obe-image-sizes { display: flex; gap: 4px; }
-.obe-image-size {
-  min-width: 1.4rem;
-  padding: 0 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
-  border-radius: var(--radius-sm);
-}
-.obe-image-size:hover { background: var(--hover); color: hsl(var(--foreground)); }
-.obe-image-size-on { background: hsl(var(--primary) / 0.14); color: hsl(var(--primary)); }
-.obe-image-tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border-radius: var(--radius-sm);
-  color: hsl(var(--muted-foreground));
-}
-.obe-image-tool:hover { background: var(--hover); color: hsl(var(--foreground)); }
 /* Drag handle on the right edge. */
 .obe-image-resize {
   position: absolute;
   top: 50%;
-  right: -3px;
+  right: 4px;
   width: 10px;
   height: 44px;
   max-height: 60%;
@@ -1351,13 +1314,15 @@ a.obe-mention {
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 4px;
+  width: 6px;
   height: 100%;
   border-radius: var(--radius-sm);
-  background: hsl(var(--foreground) / 0.35);
-  box-shadow: 0 0 0 2px hsl(var(--background) / 0.7);
+  background: hsl(var(--foreground) / 0.6);
+  box-shadow: 0 0 0 1px hsl(var(--background) / 0.9);
 }
-.obe-image-frame:hover .obe-image-resize { opacity: 1; }
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-image-resize,
+.obe-image-resize:focus-visible,
+.obe-row-selected .obe-image-resize { opacity: 1; }
 /* Alt + caption inputs (borderless, indented under the picture). */
 .obe-image-alt,
 .obe-image-caption-input {
@@ -1366,16 +1331,22 @@ a.obe-mention {
   background: transparent;
   padding: 0;
   color: hsl(var(--muted-foreground));
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
 }
-.obe-image-alt { font-size: 0.75rem; opacity: 0.85; }
+.obe-image-alt { font-size: var(--obe-caption-size); }
 .obe-image-alt::placeholder,
 .obe-image-caption-input::placeholder { color: var(--obe-placeholder); }
 .obe-image-caption {
   color: hsl(var(--muted-foreground));
-  font-size: 0.82rem;
-  text-align: center;
+  font-size: var(--obe-small-size);
+  align-self: center;
+  text-align: left;
 }
+.obe-image-resize[data-edge='left'] { left: 4px; right: auto; }
+.obe-image-caption-input:placeholder-shown { opacity: 0; }
+.obe-row:hover .obe-image-caption-input,
+.obe-row:focus-within .obe-image-caption-input,
+.obe-row-selected .obe-image-caption-input { opacity: 1; }
 /* Placeholder / broken state. */
 .obe-image-placeholder {
   display: flex;
@@ -1399,10 +1370,10 @@ a.obe-mention {
 }
 .obe-image-placeholder-static { cursor: default; flex-direction: row; padding: 1rem; }
 .obe-image-placeholder-icon { width: 1.4rem; height: 1.4rem; opacity: 0.7; }
-.obe-image-placeholder-title { font-size: 0.9rem; font-weight: 600; color: hsl(var(--foreground)); }
-.obe-image-placeholder-hint { font-size: 0.76rem; }
+.obe-image-placeholder-title { font-size: var(--obe-small-size); font-weight: 600; color: hsl(var(--foreground)); }
+.obe-image-placeholder-hint { font-size: var(--obe-caption-size); }
 .obe-image-error {
-  font-size: 0.78rem;
+  font-size: var(--obe-caption-size);
   color: hsl(var(--destructive, 0 75% 55%));
   padding: 0.25rem 0;
 }

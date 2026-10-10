@@ -184,7 +184,7 @@ describe('image block — size cap', () => {
 });
 
 describe('image block — render, resize, alt/caption', () => {
-  it('shows the image with editable alt, caption, size presets and a resize handle when writable', () => {
+  it('shows caption, two resize handles and menu-only alt and size editing', async () => {
     const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG, alt: 'A cat'}}]);
     const {container} = render(<BlockEditor doc={doc} />);
 
@@ -194,22 +194,33 @@ describe('image block — render, resize, alt/caption', () => {
     expect(img.getAttribute('alt')).toBe('A cat');
 
     // Editable alt + caption.
-    expect(screen.getByLabelText('Alt text')).toBeTruthy();
+    expect(screen.queryByLabelText('Alt text')).toBeNull();
     expect(screen.getByLabelText('Image caption')).toBeTruthy();
 
     // Resize handle + size presets.
     expect(screen.getByLabelText('Resize image')).toBeTruthy();
-    expect(screen.getByLabelText('Small')).toBeTruthy();
-    expect(screen.getByLabelText('Medium')).toBeTruthy();
-    expect(screen.getByLabelText('Full width')).toBeTruthy();
+    expect(screen.getByLabelText('Resize image from left')).toBeTruthy();
+    fireEvent.keyDown(screen.getByLabelText('Image actions'), {key: 'Enter'});
+    fireEvent.click(await screen.findByText('Set alt text…'));
+    expect(screen.getByLabelText('Alt text')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Alt text')));
+    fireEvent.blur(screen.getByLabelText('Alt text'));
+    expect(screen.queryByLabelText('Alt text')).toBeNull();
   });
 
-  it('a size preset persists width to props', () => {
-    const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG}}]);
-    render(<BlockEditor doc={doc} />);
-    fireEvent.click(screen.getByLabelText('Small'));
-    const block = docToJSON(doc).find((b) => b.id === 'img');
-    expect(block!.props?.width).toBe('30%');
+  it('all size presets in the menu persist width to props', async () => {
+    for (const [label, width] of [['Small', '30%'], ['Medium', '60%'], ['Full width', undefined]]) {
+      const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG}}]);
+      const {container} = render(<BlockEditor doc={doc} />);
+      fireEvent.contextMenu(container.querySelector('img.obe-image-img')!);
+      const trigger = screen.getByText('Image size').closest('[role="menuitem"]') as HTMLElement;
+      trigger.focus();
+      fireEvent.keyDown(trigger, {key: 'ArrowRight'});
+      fireEvent.click(await screen.findByRole('menuitemcheckbox', {name: label}));
+      expect(docToJSON(doc).find((b) => b.id === 'img')!.props?.width).toBe(width);
+      await waitFor(() => expect(screen.queryByRole('menuitemcheckbox', {name: label})).toBeNull());
+      cleanup();
+    }
   });
 
   it('localizes every size preset label', () => {

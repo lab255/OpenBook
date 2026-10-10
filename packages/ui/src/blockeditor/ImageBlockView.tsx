@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Copy, Download, ExternalLink, ImageOff, ImagePlus, Loader2, Maximize2, Pencil, Trash2, Upload} from 'lucide-react';
+import {Copy, Download, ExternalLink, ImageOff, ImagePlus, Loader2, Maximize2, MoreHorizontal, Pencil, Trash2, Upload} from 'lucide-react';
 import {t, type TKey} from '@/i18n';
 import {openLightbox} from '@/lib/imageLightbox';
 import {copyText} from '@/lib/pageActions';
@@ -27,6 +27,11 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuSub,
+  DropdownMenuSubTrigger, DropdownMenuSubContent,
+} from '@/components/ui/dropdown-menu';
 import {MENU_DESTRUCTIVE_CLASS, MENU_WIDTH_MD, MENU_WIDTH_SM} from '@/components/ui/menu-components';
 import type {BlockEditorController} from './useBlockEditor';
 import type {EditorUI} from './BlockEditor';
@@ -116,6 +121,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
   const caption = blockProp<string>(block, 'caption') ?? '';
   const width = blockProp<string>(block, 'width');
   const readOnly = editor.readOnly;
+  const [altEditing, setAltEditing] = useState(false);
   const [broken, setBroken] = useState(false);
   // The resolved object URL for an assetId, and whether we're still fetching it.
   // `resolving` seeds from whether we have an assetId so a block with one paints
@@ -250,9 +256,10 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
     if (!frame || !container) return;
     const containerWidth = container.getBoundingClientRect().width;
     if (containerWidth <= 0) return;
+    const bounds = frame.getBoundingClientRect();
+    const frameCenterX = bounds.left + bounds.width / 2;
     const move = (ev: PointerEvent): void => {
-      const left = frame.getBoundingClientRect().left;
-      const px = Math.max(40, ev.clientX - left);
+      const px = 2 * Math.abs(ev.clientX - frameCenterX);
       const pct = Math.max(15, Math.min(100, Math.round((px / containerWidth) * 100)));
       set('width', `${pct}%`);
     };
@@ -281,6 +288,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
   };
 
   const focusAlt = (): void => {
+    setAltEditing(true);
     // Let Radix restore focus to the trigger first, then move into the existing
     // inline alt editor. This is the prompt-free "Set alt text…" flow.
     requestAnimationFrame(() => {
@@ -305,7 +313,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
           <Loader2 className="obe-image-placeholder-icon animate-spin" aria-hidden />
           <span>Loading image…</span>
         </div>
-        {caption && <figcaption className="obe-image-caption">{caption}</figcaption>}
+        {caption && <figcaption className="obe-image-caption" style={{width: width ?? '100%'}}>{caption}</figcaption>}
       </figure>
     );
   }
@@ -320,7 +328,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
             <ImageOff className="obe-image-placeholder-icon" aria-hidden />
             <span>{broken ? 'Image unavailable' : 'Image'}</span>
           </div>
-          {caption && <figcaption className="obe-image-caption">{caption}</figcaption>}
+          {caption && <figcaption className="obe-image-caption" style={{width: width ?? '100%'}}>{caption}</figcaption>}
         </figure>
       );
     }
@@ -345,10 +353,69 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
           aria-label="Choose an image file"
           onChange={onFileInput}
         />
-        {caption && <figcaption className="obe-image-caption">{caption}</figcaption>}
+        {caption && <figcaption className="obe-image-caption" style={{width: width ?? '100%'}}>{caption}</figcaption>}
       </figure>
     );
   }
+
+  const menuItems = (dropdown: boolean): React.ReactNode => {
+    const MenuItem = dropdown ? DropdownMenuItem : ContextMenuItem;
+    const MenuCheckboxItem = dropdown ? DropdownMenuCheckboxItem : ContextMenuCheckboxItem;
+    const MenuSeparator = dropdown ? DropdownMenuSeparator : ContextMenuSeparator;
+    const MenuSub = dropdown ? DropdownMenuSub : ContextMenuSub;
+    const MenuSubTrigger = dropdown ? DropdownMenuSubTrigger : ContextMenuSubTrigger;
+    const MenuSubContent = dropdown ? DropdownMenuSubContent : ContextMenuSubContent;
+    return (<>
+      <MenuItem
+        onSelect={() => imageRef.current && void copyRenderedImage(imageRef.current, displaySrc!, rawSrc)}
+      >
+        <Copy className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.copy')}
+      </MenuItem>
+      <MenuItem onSelect={() => saveImage(displaySrc!, alt)}>
+        <Download className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.saveAs')}
+      </MenuItem>
+      <MenuItem onSelect={() => window.open(displaySrc!, '_blank', 'noopener,noreferrer')}>
+        <ExternalLink className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.openOriginal')}
+      </MenuItem>
+      {!readOnly && (
+        <>
+          <MenuItem onSelect={pickFile}>
+            <Upload className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.replace')}…
+          </MenuItem>
+          <MenuItem onSelect={focusAlt}>
+            <Pencil className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.setAltText')}
+          </MenuItem>
+          <MenuSub>
+            <MenuSubTrigger>{t('blocks.image.size')}</MenuSubTrigger>
+            <MenuSubContent className={MENU_WIDTH_SM}>
+              {SIZE_PRESETS.map((preset) => {
+                const active = (preset.width ?? undefined) === (width ?? undefined);
+                return (
+                  <MenuCheckboxItem
+                    key={preset.label}
+                    checked={active}
+                    onSelect={() => set('width', preset.width)}
+                  >
+                    {t(preset.title)}
+                  </MenuCheckboxItem>
+                );
+              })}
+            </MenuSubContent>
+          </MenuSub>
+          <MenuSeparator />
+          <MenuItem
+            className={MENU_DESTRUCTIVE_CLASS}
+            onSelect={() => {
+              removeBlock(editor.doc, id);
+              editor.clearSelection();
+            }}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.deleteBlock')}
+          </MenuItem>
+        </>
+      )}
+    </>);
+  };
 
   // ── Image state ────────────────────────────────────────────────────────────
   return (
@@ -386,102 +453,33 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
                 : {})}
             />
           </ContextMenuTrigger>
-          <ContextMenuContent className={MENU_WIDTH_MD}>
-            <ContextMenuItem
-              onSelect={() => imageRef.current && void copyRenderedImage(imageRef.current, displaySrc!, rawSrc)}
-            >
-              <Copy className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.copy')}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => saveImage(displaySrc!, alt)}>
-              <Download className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.saveAs')}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => window.open(displaySrc!, '_blank', 'noopener,noreferrer')}>
-              <ExternalLink className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.openOriginal')}
-            </ContextMenuItem>
-            {!readOnly && (
-              <>
-                <ContextMenuItem onSelect={pickFile}>
-                  <Upload className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.replace')}…
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={focusAlt}>
-                  <Pencil className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.setAltText')}
-                </ContextMenuItem>
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger>{t('blocks.image.size')}</ContextMenuSubTrigger>
-                  <ContextMenuSubContent className={MENU_WIDTH_SM}>
-                    {SIZE_PRESETS.map((preset) => {
-                      const active = (preset.width ?? undefined) === (width ?? undefined);
-                      return (
-                        <ContextMenuCheckboxItem
-                          key={preset.label}
-                          checked={active}
-                          onSelect={() => set('width', preset.width)}
-                        >
-                          {t(preset.title)}
-                        </ContextMenuCheckboxItem>
-                      );
-                    })}
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                  className={MENU_DESTRUCTIVE_CLASS}
-                  onSelect={() => {
-                    removeBlock(editor.doc, id);
-                    editor.clearSelection();
-                  }}
-                >
-                  <Trash2 className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.deleteBlock')}
-                </ContextMenuItem>
-              </>
-            )}
+          <ContextMenuContent className={MENU_WIDTH_MD} onCloseAutoFocus={(e) => { if (altEditing) e.preventDefault(); }}>
+            {menuItems(false)}
           </ContextMenuContent>
         </ContextMenu>
-        {!readOnly && (
-          <>
-            <div className="obe-image-tools" contentEditable={false}>
-              <div className="obe-image-sizes" role="group" aria-label="Image size">
-                {SIZE_PRESETS.map((p) => {
-                  const active = (p.width ?? undefined) === (width ?? undefined);
-                  return (
-                    <button
-                      key={p.label}
-                      type="button"
-                      className={`obe-image-size${active ? ' obe-image-size-on' : ''}`}
-                      aria-pressed={active}
-                      aria-label={t(p.title)}
-                      title={t(p.title)}
-                      onClick={() => set('width', p.width)}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                className="obe-image-tool"
-                aria-label={t('blocks.image.expand')}
-                title={t('blocks.image.expand')}
-                onClick={(e) => openView(e.currentTarget)}
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-              </button>
-              <button type="button" className="obe-image-tool" aria-label={t('blocks.image.replace')} title={t('blocks.image.replace')} onClick={pickFile}>
-                <Upload className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <button
-              type="button"
-              className="obe-image-resize"
-              aria-label="Resize image"
-              title="Drag to resize"
-              onPointerDown={onResizeDown}
-            />
-          </>
-        )}
+        <div className="obe-media-bar" data-surface="media" contentEditable={false}>
+          <button type="button" className="obe-media-btn" data-chrome="view" aria-label={t('blocks.image.expand')} title={t('blocks.image.expand')} onClick={(e) => openView(e.currentTarget)}>
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
+          {!readOnly && (<>
+            <button type="button" className="obe-media-btn" data-chrome="author" aria-label={t('blocks.image.replace')} title={t('blocks.image.replace')} onClick={pickFile}>
+              <Upload className="h-3.5 w-3.5" />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="obe-media-btn" data-chrome="author" aria-label="Image actions" title="Image actions"><MoreHorizontal className="h-3.5 w-3.5" /></button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className={MENU_WIDTH_MD} onCloseAutoFocus={(e) => { if (altEditing) e.preventDefault(); }}>{menuItems(true)}</DropdownMenuContent>
+            </DropdownMenu>
+          </>)}
+        </div>
+        {!readOnly && (['left', 'right'] as const).map((edge) => (
+          <button key={edge} type="button" className="obe-image-resize" data-edge={edge}
+            aria-label={edge === 'right' ? 'Resize image' : 'Resize image from left'}
+            title="Drag to resize" onPointerDown={onResizeDown} />
+        ))}
       </div>
-      {!readOnly && (
+      {!readOnly && altEditing && (
         <input
           ref={altRef}
           className="obe-image-alt"
@@ -489,14 +487,17 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
           placeholder="Alt text (describe the image for accessibility)"
           aria-label="Alt text"
           spellCheck
+          onBlur={() => setAltEditing(false)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
           onChange={(e) => set('alt', e.target.value || undefined)}
         />
       )}
       {readOnly ? (
-        caption && <figcaption className="obe-image-caption">{caption}</figcaption>
+        caption && <figcaption className="obe-image-caption" style={{width: width ?? '100%'}}>{caption}</figcaption>
       ) : (
         <input
           className="obe-image-caption obe-image-caption-input"
+          style={{width: width ?? '100%'}}
           value={caption}
           placeholder="Add a caption…"
           aria-label="Image caption"
