@@ -1,10 +1,10 @@
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {BlockEditor} from '../BlockEditor';
-import {readSelection, writeSelection} from '../richtext';
+import {readSelection, readSelectionDirected, writeSelection} from '../richtext';
 import {createDoc, docToJSON, encodeSnapshot, decodeSnapshot} from '../model';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('code media settings', () => {
   it('keeps viewing actions on locked code without exposing settings or changing the document', () => {
@@ -39,13 +39,24 @@ describe('code media settings', () => {
     const {container} = render(<BlockEditor doc={doc} />);
     const text = container.querySelector('.obe-text') as HTMLElement;
     text.scrollLeft = 600;
-    // Home/End are native browser navigation: unit-check the offset mapping
-    // and that the editor leaves those keys unconsumed; e2e exercises movement.
+    // Exercise actual key movement across highlighted spans and a scrolled line.
+    vi.spyOn(text, 'getBoundingClientRect').mockReturnValue({left: 0, right: 100} as DOMRect);
+    vi.spyOn(Range.prototype, 'getBoundingClientRect').mockImplementation(() => {
+      const left = (readSelectionDirected(text)?.head ?? 0) * 8 - text.scrollLeft;
+      return {left, right: left + 1} as DOMRect;
+    });
     for (const [key, offset] of [['End', 300], ['Home', 0]] as const) {
-      writeSelection(text, offset);
+      writeSelection(text, offset === 0 ? 300 : 0);
+      expect(fireEvent.keyDown(text, {key})).toBe(false);
       expect(readSelection(text)).toEqual({start: offset, end: offset});
-      expect(fireEvent.keyDown(text, {key})).toBe(true);
+      expect(text.scrollLeft).toBe(offset === 0 ? 0 : 2301);
     }
+    writeSelection(text, 300);
+    fireEvent.keyDown(text, {key: 'Home', shiftKey: true});
+    expect(readSelectionDirected(text)).toEqual({anchor: 300, head: 0});
+    expect(window.getSelection()!.toString()).toBe(line);
+    fireEvent.keyDown(text, {key: 'End', shiftKey: true});
+    expect(readSelectionDirected(text)).toEqual({anchor: 300, head: 300});
     writeSelection(text, 20, 280);
     expect(readSelection(text)).toEqual({start: 20, end: 280});
     expect(window.getSelection()!.toString()).toBe(line.slice(20, 280));
@@ -60,4 +71,22 @@ describe('code media settings', () => {
     fireEvent.click(screen.getByRole('checkbox', {name: 'Wrap code'}));
     expect(docToJSON(doc)[0].props?.wrap).toBe(false);
   });
+});
+
+it('navigates logical code lines, preserves Shift direction, and leaves wrapped code native', () => {
+  const doc = createDoc([{id: 'code', type: 'code', text: 'abc\ndefgh\nijk'}]);
+  const {container} = render(<BlockEditor doc={doc} />);
+  const text = container.querySelector('.obe-text') as HTMLElement;
+  writeSelection(text, 6);
+  fireEvent.keyDown(text, {key: 'Home'});
+  expect(readSelection(text)).toEqual({start: 4, end: 4});
+  fireEvent.keyDown(text, {key: 'End', shiftKey: true});
+  expect(readSelectionDirected(text)).toEqual({anchor: 4, head: 9});
+  fireEvent.keyDown(text, {key: 'Home', ctrlKey: true, shiftKey: true});
+  expect(readSelectionDirected(text)).toEqual({anchor: 4, head: 0});
+  fireEvent.keyDown(text, {key: 'End', ctrlKey: true});
+  expect(readSelection(text)).toEqual({start: 13, end: 13});
+  fireEvent.click(container.querySelector('.obe-kit-gear')!);
+  fireEvent.click(screen.getByRole('checkbox', {name: 'Wrap code'}));
+  expect(fireEvent.keyDown(text, {key: 'Home'})).toBe(true);
 });
