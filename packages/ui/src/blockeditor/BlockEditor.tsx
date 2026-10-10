@@ -2560,7 +2560,7 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
     return (
       <div className="obe-notes" data-block-kind="notes">
         <span className="obe-notes-tag" contentEditable={false}>
-          <EyeOff className="h-3.5 w-3.5" /> Speaker note
+          <EyeOff className="h-3 w-3" /> Speaker note
         </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
       </div>

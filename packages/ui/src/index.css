@@ -1224,6 +1224,7 @@ a.obe-mention {
 }
 /* Speaker note: quietly marked on the page; hidden from the audience deck and
    every export, surfaced only in the presenter view. */
+.obe-row[data-block-type='notes'] { --obe-lead-offset: 0.5rem; --obe-lead-line: calc(var(--obe-caption-size) * var(--obe-caption-leading)); }
 .obe-notes {
   flex: 1;
   min-width: 0;
@@ -1233,16 +1234,18 @@ a.obe-mention {
   padding: 0.5rem 0.75rem;
   margin: 0;
   color: hsl(var(--muted-foreground));
-  font-size: 0.9rem;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
 }
 .obe-notes-tag {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   margin-bottom: 0.25rem;
-  font-size: 0.68rem;
+  font-size: var(--obe-caption-size);
+  line-height: var(--obe-caption-leading);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: hsl(var(--primary) / 0.8);
   user-select: none;
