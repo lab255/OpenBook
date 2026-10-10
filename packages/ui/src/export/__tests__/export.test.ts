@@ -215,8 +215,8 @@ describe('new block types', () => {
     expect(html).toContain('<table class="block-table">');
     expect(html).toContain('<th>Name</th>');
     expect(html).toContain('<td>Ada</td>');
-    expect(html).toContain('padding: 4px 8px; text-align: left; vertical-align: top;');
-    expect(html).toContain('font-weight: 600; padding-block: 6px;');
+    expect(html).toContain('padding: 6px 8px; text-align: left; vertical-align: top;');
+    expect(html).toContain('background: var(--obe-x-head, hsl(40 9% 96% / 0.5)); font-weight: 600;');
     expect(html).toContain('data-variant="warning"');
     expect(html).toContain('<details class="accordion"');
     expect(html).toContain('<ul class="checklist">');

@@ -1092,8 +1092,13 @@ test('range-aware cell menu: right-click inside a selection tints/deletes the wh
     expect(Math.abs(outlineBox[key] - union[key])).toBeLessThanOrEqual(1.5);
   }
 
+  const toolbarBox = (await page.getByRole('toolbar', {name: 'Cell selection actions'}).boundingBox())!;
+  expect(Math.abs(toolbarBox.x - union.x)).toBeLessThanOrEqual(1.5);
+  expect(toolbarBox.width).toBe(128);
+
+  // Use the rightmost outside cell, clear of the range's left-aligned toolbar.
   // A right-click OUTSIDE the rectangle still opens the single-cell menu.
-  await td.nth(6).click({button: 'right'});
+  await td.nth(8).click({button: 'right'});
   await expect(page.getByRole('menuitem', {name: 'Duplicate row'})).toBeVisible();
   await expect(page.getByRole('menuitem', {name: 'Clear contents'})).toHaveCount(0);
   await page.keyboard.press('Escape');
