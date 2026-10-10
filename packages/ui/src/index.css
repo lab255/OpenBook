@@ -945,7 +945,7 @@
 }
 .obe-row[data-block-type='code'] {
   /* Border, inner pad, action row, divider, and its spacing. */
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + 0.75rem + 1.5rem + 0.25rem + 1px + 0.5rem);
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + var(--obe-gutter-btn) + 0.5rem);
   --obe-lead-line: calc(var(--obe-code-size) * var(--obe-code-leading));
 }
 .obe-row-selected::before {
@@ -1864,7 +1864,8 @@ a.obe-mention {
   background: var(--obe-code-bg);
   border: 1px solid var(--obe-code-border);
   border-radius: var(--radius-lg);
-  padding: 0.75rem 1rem;
+  position: relative;
+  padding: calc(var(--obe-gutter-btn) + 0.5rem) 1rem 0.75rem;
   margin: 0;
 }
 .obe-codeblock .obe-text {
@@ -1872,6 +1873,8 @@ a.obe-mention {
   font-size: var(--obe-code-size);
   line-height: var(--obe-code-leading);
 }
+
+.obe-codeblock[data-wrap='false'] .obe-text { white-space: pre; overflow-x: auto; overflow-wrap: normal; }
 
 /* Syntax-highlight tokens (blockeditor/highlight.ts). The tokenizer only wraps
    runs in these spans — never alters the character stream — so highlighting is
@@ -3781,58 +3784,11 @@ a.obe-mention {
 
 /* Live code: a toolbar (language badge · show-hide · run · copy · ⚙) above the
    editor, and the live output row below it. */
-.obe-code-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.25rem;
-  border-bottom: 1px solid hsl(var(--border) / 0.5);
-}
-.obe-code-lang-badge {
-  font-family: var(--obe-font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
-  color: hsl(var(--muted-foreground));
-  white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.obe-code-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  padding: 0.25rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
-}
-.obe-code-btn:hover:not(:disabled) { background: var(--hover); color: hsl(var(--foreground)); }
-.obe-code-btn:disabled { opacity: 0.45; cursor: default; }
-/* The shared kit gear floats top-right on other blocks; in the code toolbar it
-   flows inline as the last action and stays visible. */
-.obe-code-actions .obe-kit-gear {
-  position: static;
-  opacity: 1;
-  pointer-events: auto;
-  border-color: transparent;
-  background: transparent;
-}
-.obe-code-actions .obe-kit-gear:hover,
-.obe-code-actions .obe-kit-gear[data-state='open'] {
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-}
 .obe-code-collapsed {
   display: block;
   width: 100%;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
   background: transparent;
   border: none;
@@ -3842,10 +3798,11 @@ a.obe-mention {
 .obe-code-collapsed:hover { color: hsl(var(--foreground)); }
 .obe-code-out {
   display: block;
-  padding: 0.25rem 0.75rem;
+  padding: 0.25rem 0 0;
+  margin-top: 0.5rem;
   border-top: 1px solid hsl(var(--border) / 0.5);
   font-family: var(--obe-font-mono);
-  font-size: 0.85rem;
+  font-size: var(--obe-code-size);
   color: hsl(var(--primary));
   font-weight: 600;
   overflow-wrap: anywhere; /* huge outputs wrap instead of widening the page */
