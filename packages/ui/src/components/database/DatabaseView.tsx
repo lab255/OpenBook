@@ -515,7 +515,7 @@ const GroupSummaryRow: React.FC<{
         {summarizeColumn(rows, property, summaryOf(property.id), db.rollupProperties, db.rollupRows)}
       </td>
     ))}
-    <td />
+    <td className="border-l border-border/60" />
   </tr>
 );
 
