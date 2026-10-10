@@ -1855,12 +1855,13 @@ a.obe-mention {
 .obe-group-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
+  gap: 0;
+  padding: 0 var(--obe-cnt-inset);
   border-bottom: 1px solid hsl(var(--border) / 0.6);
 }
 .obe-group-icon {
-  width: 0.95rem;
+  margin-left: calc(-1 * var(--obe-cnt-inset));
+  width: var(--obe-cnt-inset);
   height: 0.95rem;
   color: hsl(var(--muted-foreground));
   flex-shrink: 0;
@@ -1883,7 +1884,7 @@ a.obe-mention {
 .obe-group-btn:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-group-btn-on { color: hsl(var(--primary)); }
 .obe-group-btn:disabled { opacity: 0.4; cursor: default; }
-.obe-group-body { padding: 0.25rem 0.5rem; }
+.obe-group-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 /* Exported groups (static HTML). */
 .obe-x-group { border: 1px solid #e5e7eb; border-radius: var(--radius-lg); padding: 0.5rem 1rem; margin: 0.75rem 0; }
 .obe-x-group-name { margin: 0 0 0.25rem; font-size: 0.9rem; }
@@ -3645,12 +3646,12 @@ a.obe-mention {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0 var(--obe-cnt-inset);
   background: hsl(var(--muted) / 0.4);
   border-bottom: 1px solid hsl(var(--border) / 0.7);
 }
 .obe-cnt-spacer { flex: 1; }
-.obe-cnt-panel { padding: 0.5rem; }
+.obe-cnt-panel { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 .obe-cnt-panel.obe-cnt-locked, .obe-acc-section.obe-cnt-locked { opacity: 0.7; }
 .obe-cnt-add {
   display: inline-flex;
@@ -3665,7 +3666,7 @@ a.obe-mention {
 }
 .obe-cnt-add:hover { color: hsl(var(--foreground)); background: var(--hover); }
 
-.obe-tabs-strip { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; flex: 1; }
+.obe-tabs-strip { margin-inline-start: calc(-1 * var(--obe-cnt-inset)); padding-inline-start: calc(var(--obe-cnt-inset) - 8px); display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; flex: 1; }
 .obe-tab {
   display: inline-flex;
   align-items: center;
@@ -3694,10 +3695,12 @@ a.obe-mention {
 .obe-acc-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
+  gap: 0;
+  padding: 0 8px 0 0;
 }
 .obe-acc-toggle {
+  width: var(--obe-cnt-inset);
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3708,7 +3711,7 @@ a.obe-mention {
 .obe-acc-toggle:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-acc-toggle:disabled { opacity: 0.5; cursor: default; }
 .obe-acc-label { font-size: 0.9rem; font-weight: 550; }
-.obe-acc-body { padding: 0 0.5rem 0.5rem 1.75rem; }
+.obe-acc-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 .obe-acc-foot { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; }
 
 /* Completion chip shared by tabs + accordion. */

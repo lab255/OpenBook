@@ -169,3 +169,22 @@ describe('container frame geometry', () => {
     expect(ruleBody('.obe-cnt-head')).toContain('border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0');
   });
 });
+
+
+describe('container inset equality', () => {
+  it.each(['.obe-group-body', '.obe-cnt-panel', '.obe-acc-body'])('%s uses the shared body inset', (selector) => {
+    expect(ruleBody(selector)).toContain('padding: var(--obe-block-pad-y) var(--obe-cnt-inset)');
+  });
+
+  it('aligns header labels with body text, accounting for icons and tab padding', () => {
+    for (const selector of ['.obe-group-head', '.obe-cnt-head']) {
+      expect(ruleBody(selector)).toContain('padding: 0 var(--obe-cnt-inset)');
+    }
+    expect(ruleBody('.obe-group-icon')).toContain('margin-left: calc(-1 * var(--obe-cnt-inset))');
+    expect(ruleBody('.obe-group-head')).toContain('gap: 0;');
+    expect(ruleBody('.obe-acc-head')).toContain('gap: 0;');
+    expect(ruleBody('.obe-acc-toggle')).toContain('width: var(--obe-cnt-inset)');
+    expect(ruleBody('.obe-tabs-strip')).toContain('padding-inline-start: calc(var(--obe-cnt-inset) - 8px)');
+    expect(ruleBody('.obe-tabs-strip')).toContain('margin-inline-start: calc(-1 * var(--obe-cnt-inset))');
+  });
+});
