@@ -528,7 +528,7 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
                   {group.color && <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(group.color)} />}
                   {glyph && <span className="text-base leading-none">{glyph}</span>}
                   <span className="truncate">{groupHeading(group, groupProp)}</span>
-                  <span className="text-muted-foreground/60">{group.rows.length}</span>
+                  <span className="text-muted-foreground">{group.rows.length}</span>
                 </button>
               </GroupContextMenu>
               {!isCollapsed && grid(group.rows)}
@@ -590,7 +590,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
       </PopoverTrigger>
       <PopoverContent align="start" className="w-48 space-y-2 p-2.5">
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Property</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">Property</span>
           <Select inputSize="sm" aria-label="Summary property" value={summary.propertyId} onChange={(e) => update({propertyId: e.target.value})} className={cn(fieldClass, 'mt-1')}>
             <option value={TITLE_PROPERTY_ID}>Rows (count)</option>
             {properties.map((p) => (
@@ -601,7 +601,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
           </Select>
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Calculate</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">Calculate</span>
           <Select inputSize="sm" aria-label="Summary calculation" value={summary.type} onChange={(e) => update({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1')}>
             {BOARD_CALCS.map((c) => (
               <option key={c.value} value={c.value}>
@@ -882,7 +882,7 @@ export const BoardView: React.FC<{
               {group.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(group.color)} />}
               {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
               {!isCollapsed && <span className="truncate">{heading}</span>}
-              <span className="text-muted-foreground/60">{group.rows.length}</span>
+              <span className="text-muted-foreground">{group.rows.length}</span>
               <IconButton
                 size="inline"
                 onClick={() => toggleCol(group.key)}
@@ -1010,7 +1010,7 @@ export const BoardView: React.FC<{
                       {lane.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(lane.color)} />}
                       {laneGlyph && <span className="shrink-0 text-sm leading-none">{laneGlyph}</span>}
                       <span className="truncate text-foreground/80">{laneHeading}</span>
-                      <span className="text-muted-foreground/60">{lane.rows.length}</span>
+                      <span className="text-muted-foreground">{lane.rows.length}</span>
                     </button>
                   </div>
                 </GroupContextMenu>
@@ -1087,7 +1087,7 @@ export const BoardView: React.FC<{
                       <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(group.color)} />
                     )}
                     {glyph && <span className="text-sm leading-none">{glyph}</span>}
-                    <span className="text-muted-foreground/60">{group.rows.length}</span>
+                    <span className="text-muted-foreground">{group.rows.length}</span>
                     <span className="truncate [writing-mode:vertical-rl]">{heading}</span>
                   </button>
                 </GroupContextMenu>
@@ -1125,7 +1125,7 @@ export const BoardView: React.FC<{
                       )}
                       {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
                       <span className="truncate">{heading}</span>
-                      <span className="text-muted-foreground/60">{group.rows.length}</span>
+                      <span className="text-muted-foreground">{group.rows.length}</span>
                       <IconButton
                         size="inline"
                         onClick={() => toggleCol(group.key)}

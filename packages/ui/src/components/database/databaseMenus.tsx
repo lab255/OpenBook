@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpAZ,
+  ArrowUpDown,
   BarChart3,
   Calendar,
   ChevronDown,
@@ -892,7 +893,7 @@ export const PropertyMenu = React.forwardRef<
           defaultValue={property.description ?? ''}
           onBlur={(e) => e.target.value !== (property.description ?? '') && db.updateProperty(property.id, {description: e.target.value})}
           placeholder="Description"
-          className={cn(fieldClass, 'w-full text-xs')}
+          className={cn(fieldClass, 'w-full')}
         />
 
         <div className="flex items-center gap-1 border-t border-border pt-2">
@@ -1069,11 +1070,11 @@ const GroupEditor: React.FC<{
         )}
       </div>
       <div className="mt-1.5 flex gap-1">
-        <button onClick={addCondition} className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center')}>
+        <button onClick={addCondition} className={cn(menuItemClass, 'text-muted-foreground w-auto')}>
           <Plus className="h-3.5 w-3.5" /> Condition
         </button>
         {depth === 0 && (
-          <button onClick={addGroup} className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center')}>
+          <button onClick={addGroup} className={cn(menuItemClass, 'text-muted-foreground w-auto')}>
             <Plus className="h-3.5 w-3.5" /> Group
           </button>
         )}
@@ -1102,7 +1103,7 @@ export const FilterMenu: React.FC<MenuProps> = ({database, view, onChange, open,
           <TooltipContent>Filter</TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <PopoverContent align="start" className="w-[24rem] p-3">
+      <PopoverContent align="end" className="w-[24rem] p-3">
         <GroupEditor
           database={database}
           group={root}
@@ -1133,7 +1134,7 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange, open, o
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
               <button className={cn(iconButtonVariants({size: 'sm'}), sorts.length > 0 && 'text-foreground', sorts.length > 0 && 'w-auto gap-1 px-1.5')} aria-label={`Sort${sorts.length > 0 ? ` (${sorts.length})` : ''}`}>
-                <ListFilter className="h-4 w-4" />
+                <ArrowUpDown className="h-4 w-4" />
                 {sorts.length > 0 && <span className="text-xs tabular-nums">{sorts.length}</span>}
               </button>
             </PopoverTrigger>
@@ -1141,7 +1142,7 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange, open, o
           <TooltipContent>Sort</TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <PopoverContent align="start" className="w-80 space-y-2 p-3">
+      <PopoverContent align="end" className="w-80 space-y-2 p-3">
         {sorts.length === 0 && (
           <EmptyState variant="overlay" className="py-1" title={t('database.empty.noSorts')} />
         )}
@@ -1166,7 +1167,7 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange, open, o
             </IconButton>
           </div>
         ))}
-        <button onClick={addSort} className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}>
+        <button onClick={addSort} className={cn(menuItemClass, 'text-muted-foreground w-full')}>
           <Plus className="h-3.5 w-3.5" /> Add sort
         </button>
       </PopoverContent>
@@ -1315,7 +1316,7 @@ export const ColorRulesEditor: React.FC<{db: UseDatabase; view: DatabaseView}> =
       {rules.map((rule) => (
         <ColorRuleRow key={rule.id} db={db} view={view} rule={rule} properties={properties} />
       ))}
-      <button onClick={add} className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}>
+      <button onClick={add} className={cn(menuItemClass, 'text-muted-foreground w-full')}>
         <Plus className="h-3.5 w-3.5" /> Add rule
       </button>
     </div>
@@ -1433,7 +1434,7 @@ export const MetricsBar: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db,
       ))}
       <button
         onClick={add}
-        className="flex min-w-[40px] items-center justify-center rounded-lg text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+        className="flex min-w-[40px] items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
         aria-label="Add metric"
         title="Add metric"
       >
@@ -1551,7 +1552,7 @@ export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit:
       ))}
       {groups > 0 && (
         <ChipContextMenu onEdit={onEdit} onRemove={removeGroups}>
-          <span className="rounded-full px-2 py-0.5 text-xs text-muted-foreground">+{groups} advanced</span>
+          <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">+{groups} advanced</span>
         </ChipContextMenu>
       )}
       {leaves.length + groups > 1 && (
@@ -1761,7 +1762,7 @@ export const GroupMenu: React.FC<{db: UseDatabase; view: DatabaseView; open?: bo
               </button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Group</TooltipContent>
+          <TooltipContent>{t('database.toolbar.group')}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <PopoverContent align="end" className="w-72 space-y-2.5 p-3">
@@ -1817,6 +1818,7 @@ export const PropertyVisibilityList: React.FC<{db: UseDatabase; view: DatabaseVi
  * trip into View options. Lit up once the view has an explicit property set.
  */
 export const FieldsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, view}) => {
+  const {t} = useTranslation();
   if (!FIELDABLE_VIEW_TYPES.has(view.type) || db.database!.schema.properties.length === 0) return null;
   const customized = Boolean(view.visiblePropertyIds && view.visiblePropertyIds.length > 0);
   return (
@@ -1830,7 +1832,7 @@ export const FieldsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db,
               </button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Fields</TooltipContent>
+          <TooltipContent>{t('database.toolbar.fields')}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <PopoverContent align="end" className="w-64 space-y-1.5 p-3">

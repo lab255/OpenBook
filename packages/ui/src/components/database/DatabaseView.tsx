@@ -380,7 +380,7 @@ const DataRow: React.FC<ViewProps & {row: DatabaseRow; drag: DragApi; tree?: Row
     >
       <td
         style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
-        className="sticky left-0 z-sticky border-r border-border bg-card px-2 py-0 align-middle"
+        className="sticky left-0 z-sticky border-r border-border bg-background px-2 py-0 align-middle"
       >
         {/* The title cell right-clicks into the same row menu as every other
             cell (no property section — there's no title quick-filter). */}
@@ -705,7 +705,7 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border text-left text-sm font-normal text-muted-foreground">
-              <th className="sticky left-0 z-sticky min-w-[220px] border-r border-border bg-card px-2 py-1.5 font-normal">
+              <th className="sticky left-0 z-sticky min-w-[220px] border-r border-border bg-background px-2 py-1.5 font-normal">
                 <span className="flex items-center gap-1.5">
                   <input
                     type="checkbox"
@@ -857,7 +857,7 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
 
           <tfoot>
             <tr className="border-t border-border text-xs">
-              <td className="sticky left-0 z-sticky border-r border-border bg-card align-middle">
+              <td className="sticky left-0 z-sticky border-r border-border bg-background align-middle">
                 <SummaryPicker
                   current={summaryOf(TITLE_PROPERTY_ID)}
                   display={summarizeColumn(db.visibleRows, TITLE_PROPERTY_ID, summaryOf(TITLE_PROPERTY_ID), db.rollupProperties, db.rollupRows)}
@@ -1317,7 +1317,7 @@ export const Toolbar: React.FC<{
         )}
         <ViewOptionsMenu db={db} view={view} />
         {rowAware && (
-          <span className="px-1 text-xs text-muted-foreground/70">
+          <span className="px-1 text-xs text-muted-foreground">
             {db.visibleRows.length === db.rows.length
               ? `${db.visibleRows.length} row${db.visibleRows.length === 1 ? '' : 's'}`
               : `${db.visibleRows.length} of ${db.rows.length}`}
