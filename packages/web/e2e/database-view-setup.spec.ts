@@ -31,13 +31,20 @@ async function addView(page: import('@playwright/test').Page, type: string): Pro
   await expect(page.getByRole('menu')).toHaveCount(0);
 }
 
+/** Popper wrappers that are real overlays (popovers/menus) — the DSX-5a toolbar
+ *  tooltips are also Radix poppers and legitimately open when focus returns to
+ *  a trigger after its popover closes, so they must not count as "still open". */
+function overlayPoppers(page: import('@playwright/test').Page) {
+  return page.locator('[data-radix-popper-content-wrapper]:not(:has([role="tooltip"]))');
+}
+
 /** Close the View-options popover by toggling its trigger, and wait for the
  *  teardown — Escape is unreliable right after a schema save re-renders the
  *  panel, and a lingering popover overlaps later clicks (its Layout grid has
  *  its own "Table" button that collides with the Table view tab). */
 async function closeViewOptions(page: import('@playwright/test').Page): Promise<void> {
   await page.getByRole('button', {name: 'View options'}).click();
-  await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(0);
+  await expect(overlayPoppers(page)).toHaveCount(0);
 }
 
 // Fresh DB → Add view → Timeline → the in-body setup card's ONE click creates a
@@ -124,7 +131,7 @@ test('view options sentinel: "+ New date property" creates and wires the start d
   await chooseLabel(page, page.getByLabel('Start date'), '+ New date property');
   // A successful sentinel create closes the popover by itself, revealing the
   // freshly-configured view — no toggle-to-close dance needed.
-  await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(0);
+  await expect(overlayPoppers(page)).toHaveCount(0);
 
   await expect(page.getByText(/click anywhere on the timeline to add one/i)).toBeVisible();
   await expect(page.locator('div[title="Today"]')).toBeVisible();
@@ -139,7 +146,7 @@ test('view options sentinel: "+ New dependency property" creates and wires depen
   await page.getByRole('button', {name: 'View options'}).click();
   await chooseLabel(page, page.getByLabel('Dependencies'), '+ New dependency property');
   // The sentinel create closes the popover on its own.
-  await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(0);
+  await expect(overlayPoppers(page)).toHaveCount(0);
 
   // The graph view mounts (no rows yet), and the column exists in the table.
   await expect(page.getByText('No rows yet.')).toBeVisible();
@@ -158,12 +165,12 @@ test('add view setup card: unconfigured layouts show the card, configured ones r
   // Gallery needs no property → its layout renders, no setup card, no popover.
   await addView(page, 'Gallery');
   await expect(page.getByRole('button', {name: 'New row'})).toBeVisible();
-  await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(0);
+  await expect(overlayPoppers(page)).toHaveCount(0);
 
   // A date-less Timeline → the in-body setup card offers its create action.
   await addView(page, 'Timeline');
   await expect(page.getByRole('button', {name: 'Create a Date property and use it'})).toBeVisible();
-  await expect(page.locator('[data-radix-popper-content-wrapper]')).toHaveCount(0);
+  await expect(overlayPoppers(page)).toHaveCount(0);
 
   // Give the database a date column, back on the table view.
   await page.getByRole('button', {name: 'Table', exact: true}).click();
