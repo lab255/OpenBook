@@ -1077,7 +1077,20 @@ test('range-aware cell menu: right-click inside a selection tints/deletes the wh
     return {background: computed.backgroundColor, expectedBackground, shadow: computed.boxShadow};
   });
   expect(selectedPaint.background).toBe(selectedPaint.expectedBackground);
-  expect(selectedPaint.shadow.match(/inset/g)).toHaveLength(2);
+  expect(selectedPaint.shadow.match(/inset/g)).toHaveLength(1);
+  const outline = page.locator('.obe-table-range');
+  await expect(outline).toHaveCount(1);
+  await expect(outline).toBeVisible();
+  const union = await page.locator('.obe-table td.obe-cell-selected').evaluateAll((cells) => {
+    const boxes = cells.map((cell) => cell.getBoundingClientRect());
+    const left = Math.min(...boxes.map((box) => box.left));
+    const top = Math.min(...boxes.map((box) => box.top));
+    return {x: left, y: top, width: Math.max(...boxes.map((box) => box.right)) - left, height: Math.max(...boxes.map((box) => box.bottom)) - top};
+  });
+  const outlineBox = (await outline.boundingBox())!;
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(outlineBox[key] - union[key])).toBeLessThanOrEqual(1.5);
+  }
 
   // A right-click OUTSIDE the rectangle still opens the single-cell menu.
   await td.nth(6).click({button: 'right'});

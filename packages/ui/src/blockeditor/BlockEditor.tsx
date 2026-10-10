@@ -82,7 +82,7 @@ import {
   type CellSelection,
 } from './model';
 import {TableColResizer} from './TableColResizer';
-import {TableRangeToolbar} from './TableRangeToolbar';
+import {TableRangeToolbar, selectedCellRangeRect} from './TableRangeToolbar';
 import {rangeHasAttr, readSelection, readSelectionDirected, writeSelection} from './richtext';
 import {marqueeRect, rowsInMarquee, shiftClickRange, type Rect} from './marquee';
 import {blocksToHtml, blocksToMarkdown} from './exportBlocks';
@@ -3245,6 +3245,30 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   const rangeKey = activeCellSel
     ? `${activeCellSel.anchor.row}:${activeCellSel.anchor.col}:${activeCellSel.focus.row}:${activeCellSel.focus.col}`
     : '';
+  const [rangeBounds, setRangeBounds] = useState<React.CSSProperties | null>(null);
+  const widthsKey = renderedWidths.join();
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    const wrap = table?.parentElement;
+    if (!table || !wrap || !rangeKey) {
+      setRangeBounds(null);
+      return;
+    }
+    const update = (): void => {
+      const bounds = selectedCellRangeRect(table);
+      const origin = wrap.getBoundingClientRect();
+      setRangeBounds(bounds ? {
+        left: bounds.left - origin.left,
+        top: bounds.top - origin.top,
+        width: bounds.width,
+        height: bounds.height,
+      } : null);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [rangeKey, widthsKey]);
   const [rangeToolbarDismissed, setRangeToolbarDismissed] = useState(false);
   useEffect(() => setRangeToolbarDismissed(false), [rangeKey]);
   // Shift-click a cell extends the range from its anchor (the live range's
@@ -3486,6 +3510,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
           })}
         </tbody>
       </table>
+      {cellRect && rangeBounds && <div className="obe-table-range" aria-hidden style={rangeBounds} />}
       {cellRect && isMultiCellRect(cellRect) && !editor.readOnly && !lockText && !rangeToolbarDismissed && (
         <TableRangeToolbar
           rect={cellRect}
