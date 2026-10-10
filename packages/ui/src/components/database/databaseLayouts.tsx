@@ -36,6 +36,7 @@ import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {IconButton} from '@/components/ui/icon-button';
 import {MENU_DESTRUCTIVE_CLASS, MENU_WIDTH_MD} from '@/components/ui/menu-components';
 import {cn} from '@/lib/utils';
+import {chipBgVar} from '@/lib/dataColorVars';
 import {hydratePageIcons, readPageIcon, subscribePageIcon} from '@/lib/pageIcon';
 import {PageIcon} from '@/components/PageIcon';
 import {pageLinks, subscribePageLinks} from '@/lib/pageLinks';
@@ -841,6 +842,7 @@ export const BoardView: React.FC<{
         const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
         const glyph = groupGlyph(group, groupProp, groupByParent);
         const heading = groupHeading(group, groupProp);
+          const opt = groupProp?.options?.find((o) => o.id === group.key);
         return (
           <GroupContextMenu
             key={group.key}
@@ -879,9 +881,9 @@ export const BoardView: React.FC<{
                 overKey === cellKey(group.key, null) && 'ring-1 ring-brand/40',
               )}
             >
-              {group.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(group.color)} />}
+              {isCollapsed && group.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(group.color)} />}
               {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
-              {!isCollapsed && <span className="truncate">{heading}</span>}
+              {!isCollapsed && (opt ? <SelectChip option={opt} pill={groupProp?.type === 'status'} /> : <span className="truncate">{heading}</span>)}
               <span className="text-muted-foreground">{group.rows.length}</span>
               <IconButton
                 size="inline"
@@ -902,6 +904,7 @@ export const BoardView: React.FC<{
   const Cell: React.FC<{group: RowGroup; rows: DatabaseRow[]; subKey: string | null}> = ({group, rows, subKey}) => {
     const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
     const key = cellKey(group.key, subKey);
+    const tint = group.color && groupProp?.options?.some((o) => o.id === group.key);
     if (isCollapsed) return <div className="w-11 shrink-0" />;
     return (
       <div
@@ -912,8 +915,10 @@ export const BoardView: React.FC<{
           }
         }}
         onDrop={() => !dragCol && drop({colKey: group.key, subKey})}
+        style={tint && overKey !== key ? {backgroundColor: `color-mix(in srgb, ${chipBgVar(group.color)} 50%, transparent)`} : undefined}
         className={cn(
-          'flex w-64 shrink-0 flex-col gap-2 rounded-lg bg-muted/30 p-2 transition-colors',
+          'flex w-64 shrink-0 flex-col gap-2 rounded-lg p-2 transition-colors',
+          !tint && 'bg-muted/30',
           overKey === key && 'bg-accent/50 ring-1 ring-brand/40',
         )}
       >
@@ -950,6 +955,7 @@ export const BoardView: React.FC<{
             const laneCollapsed = groupCollapsed(lane, collapsedLanes, collapseEmpty);
             const laneGlyph = groupGlyph(lane, subProp, subByParent);
             const laneHeading = groupHeading(lane, subProp);
+            const laneOpt = subProp?.options?.find((o) => o.id === lane.key);
             const byCol = new Map(groups.map((g) => [g.key, new Set(g.rows.map((r) => r.id))]));
             return (
               <div key={lane.key} className="space-y-2">
@@ -1002,14 +1008,13 @@ export const BoardView: React.FC<{
                       onClick={() => toggleLane(lane.key)}
                       aria-label={`${laneCollapsed ? 'Expand' : 'Collapse'} ${laneHeading} lane`}
                       className={cn(
-                        'flex flex-1 items-center gap-1.5 py-1.5 pr-2.5 text-left transition-colors hover:bg-hover',
+                        'flex flex-1 items-center gap-1.5 min-h-7 py-1 pr-2.5 text-left transition-colors hover:bg-hover',
                         isLaneOption(lane.key) ? 'rounded-r-md' : 'rounded-md pl-2.5',
                       )}
                     >
                       <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform', !laneCollapsed && 'rotate-90')} />
-                      {lane.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(lane.color)} />}
                       {laneGlyph && <span className="shrink-0 text-sm leading-none">{laneGlyph}</span>}
-                      <span className="truncate text-foreground/80">{laneHeading}</span>
+                      {laneOpt ? <SelectChip option={laneOpt} pill={subProp?.type === 'status'} /> : <span className="truncate text-foreground">{laneHeading}</span>}
                       <span className="text-muted-foreground">{lane.rows.length}</span>
                     </button>
                   </div>
@@ -1049,6 +1054,7 @@ export const BoardView: React.FC<{
           const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
           const glyph = groupGlyph(group, groupProp, groupByParent);
           const heading = groupHeading(group, groupProp);
+          const opt = groupProp?.options?.find((o) => o.id === group.key);
           return (
             <div
               key={group.key}
@@ -1059,8 +1065,10 @@ export const BoardView: React.FC<{
                 }
               }}
               onDrop={() => (dragCol ? reorderColumn(dragCol, group.key) : drop({colKey: group.key, subKey: null}))}
+              style={opt && group.color && overKey !== cellKey(group.key, null) ? {backgroundColor: `color-mix(in srgb, ${chipBgVar(group.color)} 50%, transparent)`} : undefined}
               className={cn(
-                'flex shrink-0 flex-col gap-2 rounded-lg bg-muted/30 p-2 transition-colors',
+                'flex shrink-0 flex-col gap-2 rounded-lg p-2 transition-colors',
+                !(opt && group.color) && 'bg-muted/30',
                 isCollapsed ? 'w-11 items-center' : 'w-64',
                 overKey === cellKey(group.key, null) && 'bg-accent/50 ring-1 ring-brand/40',
               )}
@@ -1120,11 +1128,8 @@ export const BoardView: React.FC<{
                         dragCol === group.key && 'opacity-40',
                       )}
                     >
-                      {group.color && (
-                        <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(group.color)} />
-                      )}
                       {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
-                      <span className="truncate">{heading}</span>
+                      {opt ? <SelectChip option={opt} pill={groupProp?.type === 'status'} /> : <span className="truncate">{heading}</span>}
                       <span className="text-muted-foreground">{group.rows.length}</span>
                       <IconButton
                         size="inline"
