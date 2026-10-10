@@ -420,7 +420,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
   // ── Image state ────────────────────────────────────────────────────────────
   return (
     <figure className="obe-image" contentEditable={false} data-block-image={id}>
-      <div ref={frameRef} className="obe-image-frame" style={width ? {width} : undefined}>
+      <div ref={frameRef} className="obe-image-frame" style={{width: width ?? '100%'}}>
         <ContextMenu>
           <ContextMenuTrigger asChild onContextMenu={(e) => e.stopPropagation()}>
             <img

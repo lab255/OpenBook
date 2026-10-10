@@ -192,6 +192,8 @@ describe('image block — render, resize, alt/caption', () => {
     expect(img).toBeTruthy();
     expect(img.getAttribute('src')).toBe(TINY_PNG);
     expect(img.getAttribute('alt')).toBe('A cat');
+    expect((container.querySelector('.obe-image-frame') as HTMLElement).style.width).toBe('100%');
+    expect((screen.getByLabelText('Image caption') as HTMLElement).style.width).toBe('100%');
 
     // Editable alt + caption.
     expect(screen.queryByLabelText('Alt text')).toBeNull();
@@ -218,6 +220,8 @@ describe('image block — render, resize, alt/caption', () => {
       fireEvent.keyDown(trigger, {key: 'ArrowRight'});
       fireEvent.click(await screen.findByRole('menuitemcheckbox', {name: label}));
       expect(docToJSON(doc).find((b) => b.id === 'img')!.props?.width).toBe(width);
+      expect((container.querySelector('.obe-image-frame') as HTMLElement).style.width).toBe(width ?? '100%');
+      expect((screen.getByLabelText('Image caption') as HTMLElement).style.width).toBe(width ?? '100%');
       await waitFor(() => expect(screen.queryByRole('menuitemcheckbox', {name: label})).toBeNull());
       cleanup();
     }
