@@ -1,7 +1,7 @@
 import {isSafeHref, type DatabaseFormReference, type FormField, type FormSchema} from '@book.dev/sdk';
 import {t} from '@/i18n';
 import type {BlockJSON, BlockType, CellRangeExportCell, InlineAttrs, TextRun} from './model';
-import {CONTAINER_BLOCKS, TABLE_COLBG_PREFIX, TABLE_COL_PREFIX, TABLE_COLW_PREFIX, TEXT_BLOCKS} from './model';
+import {CONTAINER_BLOCKS, normalizeColumnSpans, TABLE_COLBG_PREFIX, TABLE_COL_PREFIX, TABLE_COLW_PREFIX, TEXT_BLOCKS} from './model';
 import {describeUnknownBlock} from './unknownBlock';
 import {COLOR_EXPORT_HEX} from './colors';
 import {resolveOptionsFromProps, varNameFromLabel} from './kit/options';
@@ -379,10 +379,11 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
     }
     case 'columns': {
       const cols = b.children ?? [];
+      const spans = normalizeColumnSpans(cols.map((col) => col.props?.span as number | undefined));
       const colHtml = cols
-        .map((col) => `<div style="flex:1;min-width:0">${blocksToHtml(col.children ?? [], opts)}</div>`)
+        .map((col, index) => `<div style="flex:${spans[index]} 1 0;min-width:0">${blocksToHtml(col.children ?? [], opts)}</div>`)
         .join('');
-      parts.push(`<div style="display:flex;gap:1.25rem" class="obe-x-columns">${colHtml}</div>`);
+      parts.push(`<div style="display:flex;gap:28px" class="obe-x-columns">${colHtml}</div>`);
       i += 1;
       break;
     }
@@ -432,20 +433,24 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
       break;
     case 'group': {
       const name = String(b.props?.name ?? '').trim();
-      const heading = name ? `<p class="obe-x-group-name"><strong>${escapeHtml(name)}</strong></p>` : '';
-      parts.push(`<section class="obe-x-group">${heading}${blocksToHtml(b.children ?? [], opts)}</section>`);
+      const heading = name ? `<p class="obe-x-group-name" style="${CONTAINER_EYEBROW_STYLE}">${escapeHtml(name)}</p>` : '';
+      parts.push(`<section class="obe-x-group" style="${CONTAINER_FRAME_STYLE}">${heading}${blocksToHtml(b.children ?? [], opts)}</section>`);
       i += 1;
       break;
     }
     case 'tabs':
     case 'accordion': {
-      // Each tab/section becomes a titled block (the static export has no
-      // interactive tab/accordion widget).
+      // Tabs flatten in reading order; accordion items retain native disclosure.
       const sections = (b.children ?? [])
-        .map((s) => {
+        .map((s, index) => {
           const label = String(s.props?.label ?? '').trim();
-          const head = label ? `<h3>${escapeHtml(label)}</h3>` : '';
-          return `<section class="obe-x-section">${head}${blocksToHtml(s.children ?? [], opts)}</section>`;
+          const body = blocksToHtml(s.children ?? [], opts);
+          if (b.type === 'accordion') {
+            const summary = label || t('blockEditor.accordionItem', {number: index + 1});
+            return `<details class="obe-x-section"${containerExpanded(s.props) ? ' open' : ''}><summary>${escapeHtml(summary)}</summary>${body}</details>`;
+          }
+          const head = label ? `<p class="obe-x-group-name" style="${CONTAINER_EYEBROW_STYLE}">${escapeHtml(label)}</p>` : '';
+          return `<section class="obe-x-section">${head}${body}</section>`;
         })
         .join('');
       parts.push(`<section class="obe-x-${b.type}">${sections}</section>`);
@@ -655,6 +660,15 @@ interface ExportDoc {
   blocks: Array<{id?: string; type: string; data: Record<string, unknown>}>;
   values: Array<[string, unknown]>;
   names: Array<[string, string]>;
+}
+
+/** Static mirrors of editor tokens; containerParity.test.ts guards equality. */
+export const CONTAINER_EYEBROW_STYLE = 'font-size:12px;line-height:1.33;letter-spacing:0.04em;color:var(--obe-x-muted,hsl(40 3% 43.2%))';
+export const CONTAINER_FRAME_STYLE = 'border:1px solid var(--obe-x-border,hsl(40 8% 90%));border-radius:8px;padding:4px 24px';
+
+/** `collapsed` is canonical; honour an explicit expanded flag on imported data. */
+function containerExpanded(props: Record<string, unknown> | undefined): boolean {
+  return props?.collapsed !== undefined ? !props.collapsed : props?.expanded !== false;
 }
 
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -870,30 +884,34 @@ export function projectBlocksForExport(
           emit(col.children ?? [], sub);
           return sub;
         });
-        sink.push({id: b.id, type: 'columns', data: {columns}});
+        const spans = normalizeColumnSpans((b.children ?? []).map((col) => col.props?.span as number | undefined));
+        sink.push({id: b.id, type: 'columns', data: {columns, spans}});
         i += 1;
         break;
       }
       case 'tabs':
       case 'accordion':
-        // No tab/accordion widget in the standalone runtime — flatten each
-        // tab/section's blocks in reading order (a labelled heading per
-        // section keeps them legible). Inputs inside still publish/stay live.
-        for (const section of b.children ?? []) {
-          const heading = String(section.props?.label ?? '').trim();
-          if (heading) sink.push({type: 'header', data: {text: textHtml([{t: heading}]), level: 3}});
+        // Preserve the flat projection contract for reactive/linear consumers.
+        // Range metadata lets HTML wrap those same live children in a frame.
+        for (const [index, section] of (b.children ?? []).entries()) {
+          const heading = String(section.props?.label ?? '').trim() || (b.type === 'accordion' ? t('blockEditor.accordionItem', {number: index + 1}) : '');
+          const start = sink.length;
+          const data = {text: textHtml([{t: heading}]), level: 3, container: b.type === 'tabs' ? 'tab' : 'accordion', childCount: 0, open: containerExpanded(section.props)};
+          sink.push({id: section.id, type: 'header', data});
           emit(section.children ?? [], sink);
+          data.childCount = sink.length - start - 1;
         }
         i += 1;
         break;
-      case 'group':
-        // A group is a container (lock / cross-page sync in the editor); the
-        // standalone runtime has no frame widget, so flatten its children inline.
-        // Without this the group fell through to `default` and ALL its reactive
-        // content (inputs, code, charts) was silently dropped from the export.
+      case 'group': {
+        const start = sink.length;
+        const data = {text: textHtml([{t: String(b.props?.name ?? '').trim()}]), level: 3, container: 'group', childCount: 0};
+        sink.push({id: b.id, type: 'header', data});
         emit(b.children ?? [], sink);
+        data.childCount = sink.length - start - 1;
         i += 1;
         break;
+      }
       case 'slider': {
         const name = String(b.props?.name ?? 'x');
         const value = Number(b.props?.value ?? 50);

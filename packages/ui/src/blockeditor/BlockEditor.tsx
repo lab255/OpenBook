@@ -2321,7 +2321,7 @@ const AccordionView: React.FC<RowShared & {block: BlockMap}> = ({block, ...share
   const set = (key: string, value: unknown): void => doc.transact(() => setBlockProp(block, key, value), 'local');
   const addSection = (): void => {
     doc.transact(() => {
-      sections.insert(sections.length, [makeChild('accordionsection', {label: `Section ${sections.length + 1}`})]);
+      sections.insert(sections.length, [makeChild('accordionsection', {label: t('blockEditor.accordionItem', {number: sections.length + 1})})]);
     }, 'local');
   };
 
@@ -2349,14 +2349,14 @@ const AccordionView: React.FC<RowShared & {block: BlockMap}> = ({block, ...share
                 disabled={forceCollapsed}
                 onClick={() => doc.transact(() => setBlockProp(section, 'collapsed', !collapsed), 'local')}
               >
-                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <ChevronRight className="obe-acc-chevron h-4 w-4" />
               </button>
               <KitInlineText
                 className="obe-acc-label"
                 value={blockProp<string>(section, 'label') ?? ''}
-                placeholder={`Section ${i + 1}`}
+                placeholder={t('blockEditor.accordionItem', {number: i + 1})}
                 readOnly={editor.readOnly}
-                ariaLabel="Section label"
+                ariaLabel={t('blockEditor.accordionItemLabel')}
                 onCommit={(v) => doc.transact(() => setBlockProp(section, 'label', v), 'local')}
               />
               <span className="obe-cnt-spacer" />
@@ -2375,8 +2375,8 @@ const AccordionView: React.FC<RowShared & {block: BlockMap}> = ({block, ...share
       })}
       {!editor.readOnly && (
         <div className="obe-acc-foot" contentEditable={false}>
-          <button type="button" className="obe-cnt-add" aria-label="Add section" onClick={addSection}>
-            <Plus className="h-3.5 w-3.5" /> Section
+          <button type="button" className="obe-cnt-add" aria-label={t('blockEditor.accordionAdd')} onClick={addSection}>
+            <Plus className="h-3.5 w-3.5" /> {t('blockEditor.accordionAddLabel')}
           </button>
           <span className="obe-cnt-spacer" />
           <button

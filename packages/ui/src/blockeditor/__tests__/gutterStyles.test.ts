@@ -9,7 +9,8 @@ const DOCUMENT = readFileSync('src/screens/BlockPageDocument.tsx', 'utf8');
 const EDITOR_LAB = readFileSync('../web/src/components/EditorLab.tsx', 'utf8');
 
 function ruleBody(selector: string): string {
-  const start = CSS.indexOf(`${selector} {`);
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = CSS.search(new RegExp(`^[ \t]*${escaped} \\{`, 'm'));
   expect(start, `rule not found: ${selector}`).toBeGreaterThanOrEqual(0);
   const open = CSS.indexOf('{', start);
   const close = CSS.indexOf('}', open);
@@ -157,5 +158,110 @@ describe('block chrome rhythm', () => {
     expect(ruleBody('.obe-table-add-col')).toContain('right: -16px');
     expect(ruleBody('.obe-columns')).toContain('gap: var(--obe-columns-gap)');
     expect(ruleBody('.obe-col-divider')).toContain('left: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2)');
+  });
+});
+
+
+describe('container frame geometry', () => {
+  it('reserves the 24px inset and lets nested handles escape without clipping', () => {
+    expect(CSS).toContain('--obe-cnt-inset: var(--obe-gutter-btn)');
+    expect(CSS).toContain('--obe-gutter-btn: 24px');
+    expect(ruleBody('.obe-cnt')).not.toMatch(/overflow/);
+    expect(ruleBody('.obe-cnt-head')).toContain('border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0');
+  });
+});
+
+
+describe('container inset equality', () => {
+  it.each(['.obe-group-body', '.obe-cnt-panel', '.obe-acc-body'])('%s uses the shared body inset', (selector) => {
+    expect(ruleBody(selector)).toContain('padding: var(--obe-block-pad-y) var(--obe-cnt-inset)');
+  });
+
+  it('aligns header labels with body text, accounting for icons and tab padding', () => {
+    for (const selector of ['.obe-group-head', '.obe-cnt-head']) {
+      expect(ruleBody(selector)).toContain('padding: 0 var(--obe-cnt-inset)');
+    }
+    expect(ruleBody('.obe-group-icon')).toContain('margin-left: calc(-1 * var(--obe-cnt-inset))');
+    expect(ruleBody('.obe-group-head')).toContain('gap: 0;');
+    expect(ruleBody('.obe-acc-head')).toContain('gap: 0;');
+    expect(ruleBody('.obe-acc-toggle')).toContain('width: var(--obe-cnt-inset)');
+    expect(ruleBody('.obe-tabs-strip')).toContain('padding-inline-start: calc(var(--obe-cnt-inset) - 8px)');
+    expect(ruleBody('.obe-tabs-strip')).toContain('margin-inline-start: calc(-1 * var(--obe-cnt-inset))');
+  });
+});
+
+
+describe('container header rhythm', () => {
+  it.each(['.obe-group-head', '.obe-cnt-head', '.obe-acc-head'])('%s shares the 32px header height', (selector) => {
+    expect(ruleBody(selector)).toContain('min-height: var(--height-control-md)');
+  });
+
+  it('fixes tab height independently of the caption-sized completion badge', () => {
+    expect(ruleBody('.obe-tab')).toContain('height: var(--height-control-sm)');
+    expect(ruleBody('.obe-cnt-badge')).toContain('height: calc(var(--obe-caption-size) * var(--obe-caption-leading))');
+    expect(ruleBody('.obe-cnt-badge')).toContain('font-size: var(--obe-caption-size)');
+    for (const selector of ['.obe-group-name', '.obe-tab', '.obe-acc-label', '.obe-cnt-add']) {
+      expect(ruleBody(selector)).toContain('font-size: var(--obe-small-size)');
+    }
+    for (const selector of ['.obe-tab-on', '.obe-acc-label']) {
+      expect(ruleBody(selector)).toContain('font-weight: 600');
+    }
+  });
+});
+
+
+describe('container handles and keyboard targets', () => {
+  it('centres each frame handle on its 32px header with a 9px gutter top', () => {
+    const header = ruleBody('.obe-row:is([data-block-type=\'group\'], [data-block-type=\'tabs\'], [data-block-type=\'accordion\'])');
+    expect(header).toContain('--obe-lead-offset: calc(var(--obe-block-pad-y) + 1px)');
+    expect(header).toContain('--obe-lead-line: var(--height-control-md)');
+    expect(CSS).toContain('[data-block-type=\'group\'], [data-block-type=\'tabs\'], [data-block-type=\'accordion\']),');
+  });
+
+  it('includes all container controls in the shared visible-focus rule', () => {
+    const focus = ruleBody('.obe-image-placeholder:focus-visible');
+    expect(focus).toContain('outline: 2px solid hsl(var(--ring))');
+    expect(CSS).toContain('.obe-group-btn:focus-visible,\n.obe-cnt-add:focus-visible,\n.obe-tab:focus-visible,\n.obe-acc-toggle:focus-visible,');
+    expect(ruleBody('.obe-group-btn')).toContain('width: var(--height-control-xs)');
+    expect(ruleBody('.obe-group-btn')).toContain('height: var(--height-control-xs)');
+    expect(ruleBody('.obe-acc-toggle')).toContain('height: var(--height-control-xs)');
+    expect(ruleBody('.obe-cnt-add')).toContain('min-height: var(--height-control-xs)');
+  });
+});
+
+describe('container surface equality', () => {
+  it('uses full frame borders and the same divider alpha', () => {
+    expect(ruleBody('.obe-group')).toContain('background: transparent');
+    for (const selector of ['.obe-group', '.obe-cnt']) {
+      expect(ruleBody(selector)).toContain('border: 1px solid hsl(var(--border))');
+    }
+    for (const selector of ['.obe-group-head', '.obe-cnt-head', '.obe-acc-section']) {
+      expect(ruleBody(selector)).toContain('border-bottom: 1px solid hsl(var(--border) / 0.7)');
+    }
+    expect(ruleBody('.obe-group-locked').trim()).toBe('border-style: dashed;\n  border-color: hsl(var(--muted-foreground) / 0.45);');
+    expect(ruleBody('.obe-cnt:has(> .obe-cnt-locked)').trim()).toBe('border-style: dashed;\n  border-color: hsl(var(--muted-foreground) / 0.45);');
+    expect(CSS).not.toMatch(/\.obe-cnt-panel\.obe-cnt-locked[^}]*opacity/);
+  });
+
+  it('marks only the frame that owns a locked item, not its outer containers', () => {
+    const host = document.createElement('div');
+    host.innerHTML = '<section class="obe-cnt"><div class="obe-cnt-panel"><section class="obe-cnt"><div class="obe-acc-section obe-cnt-locked"></div></section></div></section>';
+    const frames = host.querySelectorAll('.obe-cnt');
+    const selector = '.obe-cnt:has(> .obe-cnt-locked)';
+    expect(frames[0].matches(selector)).toBe(false);
+    expect(frames[1].matches(selector)).toBe(true);
+
+    host.innerHTML = '<section class="obe-cnt"><div class="obe-cnt-head"><div class="obe-tabs-strip"><button class="obe-tab obe-tab-on"></button><button class="obe-tab obe-tab-locked"></button></div></div><div class="obe-cnt-panel"></div></section>';
+    const tabs = host.querySelector('.obe-cnt')!;
+    expect(tabs.matches(selector)).toBe(false);
+    const activeLocked = tabs.cloneNode(true) as HTMLElement;
+    activeLocked.querySelector('.obe-cnt-panel')!.classList.add('obe-cnt-locked');
+    expect(activeLocked.matches(selector)).toBe(true);
+  });
+
+  it('pairs the live green chip colours with providerless editor fallbacks', () => {
+    expect(ruleBody('.obe-cnt-done').trim()).toBe('background: var(--data-green-chip-bg, var(--obe-bg-green)); color: var(--data-green-chip-fg, var(--obe-fg-green));');
+    expect(ruleBody('.obe-acc-chevron')).toContain('transition: transform var(--motion-base) var(--ease-out-soft)');
+    expect(ruleBody('.obe-acc-toggle[aria-expanded="true"] .obe-acc-chevron')).toContain('transform: rotate(90deg)');
   });
 });
