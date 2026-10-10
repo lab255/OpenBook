@@ -155,7 +155,7 @@ export const RowChips: React.FC<{
       const value = cellValue(row, property, resolveProperties ?? properties, rows);
       if (property.type === 'select' || property.type === 'status') {
         const option = property.options?.find((o) => o.id === value);
-        return option ? <SelectChip key={property.id} option={option} /> : null;
+        return option ? <SelectChip key={property.id} option={option} pill={property.type === 'status'} /> : null;
       }
       if (property.type === 'multi_select') {
         const ids = Array.isArray(value) ? (value as string[]) : [];
@@ -175,7 +175,7 @@ export const RowChips: React.FC<{
           <span key={property.id} className="flex flex-wrap items-center gap-1">
             {ids.map((id) => (
               <RowHoverCard key={id} rowId={id}>
-                <span className="truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                <span title={property.name} className="truncate rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   {pageLinks.label(id)}
                 </span>
               </RowHoverCard>
@@ -186,8 +186,8 @@ export const RowChips: React.FC<{
       const text = formatCellValue(property, value);
       if (!text) return null;
       return (
-        <span key={property.id} className="truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          {labelled ? `${property.name}: ${text}` : text}
+        <span key={property.id} title={property.name} className="truncate rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          {labelled ? `${property.name}: ${text}` : property.type === 'checkbox' && value ? `✓ ${property.name}` : text}
         </span>
       );
     })}
