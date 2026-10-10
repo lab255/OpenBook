@@ -56,3 +56,10 @@ describe('DSX foundation export mirrors', () => {
     expect(token('obe-code-num')).toBe('hsl(28 80% 38%)');
   });
 });
+
+describe('DSX-2 callout block background mirrors', () => {
+  it.each(['gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red'])('mirrors %s light tint exactly', (hue) => {
+    expect(exporter).toContain(`.callout[data-bg=${hue}] { background: ${token(`obe-bg-${hue}`)}; }`);
+    expect(css).toContain(`.obe-bg-${hue} > .obe-callout { background: var(--obe-bg-${hue}); }`);
+  });
+});

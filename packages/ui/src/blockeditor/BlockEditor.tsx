@@ -23,6 +23,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import type * as Y from 'yjs';
+import {listNumber, listNumberLabel} from './listMarkers';
+import {IconPicker} from '@/components/IconPicker';
+import {PageIcon} from '@/components/PageIcon';
 import {
   blockChildren,
   COLUMN_GRID_UNITS,
@@ -2422,6 +2425,8 @@ class BlockErrorBoundary extends React.Component<{children: React.ReactNode}, {f
 }
 
 /** Type dispatch for a block's content. */
+const VARIANT_ICON: Record<string, string> = {info: '💡', warn: '⚠️', success: '✅', danger: '🚫'};
+
 const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) => {
   const {editor, ui} = shared;
   const type = blockType(block);
@@ -2481,14 +2486,17 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
     const checked = blockProp<boolean>(block, 'checked') ?? false;
     return (
       <div className={`obe-todo${checked ? ' obe-todo-done' : ''}`}>
-        <input
-          type="checkbox"
-          className="obe-todo-box"
-          checked={checked}
-          disabled={textEditor.readOnly}
-          aria-label={checked ? 'Mark as not done' : 'Mark as done'}
-          onChange={() => editor.doc.transact(() => setBlockProp(block, 'checked', !checked), 'local')}
-        />
+        <span className="obe-todo-check">
+          <input
+            type="checkbox"
+            className="obe-todo-box"
+            checked={checked}
+            disabled={textEditor.readOnly}
+            aria-label={checked ? 'Mark as not done' : 'Mark as done'}
+            onChange={() => editor.doc.transact(() => setBlockProp(block, 'checked', !checked), 'local')}
+          />
+          {checked && <Check className="obe-todo-tick" aria-hidden strokeWidth={3} />}
+        </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
       </div>
     );
@@ -2496,10 +2504,11 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   case 'list': {
     const kind = blockProp<string>(block, 'kind') ?? 'bullet';
-    const marker = kind === 'number' ? `${listNumber(editor.doc, block)}.` : '•';
+    const depth = blockProp<number>(block, 'indent') ?? 0;
+    const marker = kind === 'number' ? listNumberLabel(listNumber(editor.doc, block), depth) : null;
     return (
       <div className="obe-list">
-        <span className={`obe-list-marker obe-list-${kind}`} contentEditable={false} aria-hidden>
+        <span className={`obe-list-marker obe-list-${kind}`} data-depth={depth % 3} contentEditable={false} aria-hidden>
           {marker}
         </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
@@ -2516,23 +2525,14 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   case 'callout': {
     const variant = blockProp<string>(block, 'variant') ?? 'info';
-    const icons: Record<string, string> = {info: '💡', warn: '⚠️', success: '✅', danger: '🚫'};
+    const icon = blockProp<string>(block, 'icon') ?? VARIANT_ICON[variant] ?? '💡';
     return (
       <div className={`obe-callout obe-callout-${variant}`}>
-        <button
-          type="button"
-          className="obe-callout-icon"
-          contentEditable={false}
-          disabled={textEditor.readOnly}
-          aria-label="Change callout style"
-          onClick={() => {
-            const order = ['info', 'warn', 'success', 'danger'];
-            const next = order[(order.indexOf(variant) + 1) % order.length];
-            editor.doc.transact(() => setBlockProp(block, 'variant', next), 'local');
-          }}
-        >
-          {icons[variant] ?? '💡'}
-        </button>
+        <span contentEditable={false}>
+          {textEditor.readOnly
+            ? <span className="obe-callout-icon" aria-hidden><PageIcon value={icon} fallback="💡" /></span>
+            : <IconPicker value={icon} onPick={(v) => editor.doc.transact(() => setBlockProp(block, 'icon', v), 'local')} className="obe-callout-icon" ariaLabel="Change callout icon" fallback="💡" />}
+        </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
       </div>
     );
@@ -2560,7 +2560,7 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
     return (
       <div className="obe-notes" data-block-kind="notes">
         <span className="obe-notes-tag" contentEditable={false}>
-          <EyeOff className="h-3.5 w-3.5" /> Speaker note
+          <EyeOff className="h-3 w-3" /> Speaker note
         </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
       </div>
@@ -2611,19 +2611,6 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   void id;
 };
-
-/** 1-based position of a numbered list item within its contiguous run. */
-function listNumber(doc: Y.Doc, block: BlockMap): number {
-  const found = findBlock(doc, blockId(block));
-  if (!found) return 1;
-  let n = 1;
-  for (let i = found.index - 1; i >= 0; i -= 1) {
-    const prev = found.parent.get(i);
-    if (blockType(prev) === 'list' && blockProp<string>(prev, 'kind') === 'number') n += 1;
-    else break;
-  }
-  return n;
-}
 
 // ── Columns ──────────────────────────────────────────────────────────────────
 

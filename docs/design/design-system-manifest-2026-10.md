@@ -53,6 +53,8 @@ ramp follows. Leadings are unitless.
 | `--obe-small-size` | `calc(var(--obe-font-size) * 0.875)` | 14px | `--obe-small-leading: 1.43` | 20px | 400 / 500 | — |
 | `--obe-caption-size` | `calc(var(--obe-font-size) * 0.75)` | 12px | `--obe-caption-leading: 1.33` | 16px | 500 / 600 | — |
 
+DSX-2 icon role: `--obe-icon-size: calc(var(--obe-font-size) * 1.25)` (20px at body size), used by callout icons.
+
 Also: `--obe-line: calc(var(--obe-font-size) * var(--obe-leading))` (the body line box, 24px),
 `--obe-heading-weight: 600`, `--obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`
 (replaces the three literal mono stacks, e.g. :1148, :1853). Uppercase eyebrows (caption
@@ -144,6 +146,9 @@ Select exit: **none** — nested dismissable layer.
 ---
 
 ## 3. Radius scale
+
+DSX-2 exception: the compact 16px todo checkbox uses `--radius-sm` (4px).
+The checked todo tick uses `--primary-foreground` (not white) for correct contrast in dark mode.
 
 | Step | Token | Value | Surfaces (exhaustive by role) |
 |---|---|---:|---|

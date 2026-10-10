@@ -421,11 +421,15 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
       if (colHtml) html.push(`<div class="cols">${colHtml}</div>`);
       break;
     }
-    case 'callout':
+    case 'callout': {
+      const icon = str(d.icon);
+      const customIcon = icon && !icon.startsWith('lucide:')
+        ? `<span class="callout__icon">${escapeHtml(icon)}</span>` : '';
       html.push(
-        `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"><div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
+        `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"${d.bg ? ` data-bg="${escapeHtml(str(d.bg))}"` : ''}>${customIcon}<div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
       );
       break;
+    }
     case 'accordion':
       html.push(
         `<details class="accordion"${d.open === false ? '' : ' open'}><summary>${inlineToHtml(parseInline(str(d.title)), ctx)}</summary><div class="accordion__content">${inlineToHtml(parseInline(str(d.content)), ctx)}</div></details>`,
@@ -1413,6 +1417,17 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .callout[data-variant=warn], .callout[data-variant=warning] { background: hsl(45 90% 52% / 0.15); }
 .callout[data-variant=success] { background: hsl(140 55% 45% / 0.13); }
 .callout[data-variant=danger] { background: hsl(0 72% 55% / 0.12); }
+.callout:has(.callout__icon)::before { content: none; }
+.callout__icon { flex: none; }
+.callout[data-bg=gray] { background: hsl(0 0% 50% / 0.1); }
+.callout[data-bg=brown] { background: hsl(25 45% 50% / 0.13); }
+.callout[data-bg=orange] { background: hsl(28 85% 52% / 0.13); }
+.callout[data-bg=yellow] { background: hsl(45 90% 52% / 0.15); }
+.callout[data-bg=green] { background: hsl(140 55% 45% / 0.13); }
+.callout[data-bg=blue] { background: hsl(210 80% 55% / 0.13); }
+.callout[data-bg=purple] { background: hsl(265 60% 58% / 0.14); }
+.callout[data-bg=pink] { background: hsl(330 70% 58% / 0.13); }
+.callout[data-bg=red] { background: hsl(0 72% 55% / 0.12); }
 .callout__body { flex: 1; }
 .accordion { margin: 8px 0; border: 1px solid rgba(127,127,127,.25); border-radius: 8px; padding: 4px 12px; }
 .accordion summary { cursor: pointer; font-weight: 600; padding: 4px 0; }

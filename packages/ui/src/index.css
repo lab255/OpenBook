@@ -28,6 +28,7 @@
 }
 
 @theme {
+  --obe-icon-size: calc(var(--obe-font-size) * 1.25); /* 20px */
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -247,6 +248,7 @@
     --obe-code-size: calc(var(--obe-font-size) * 0.875);
     --obe-code-leading: 1.5;
     --obe-code-inline: 0.875em;
+    --obe-icon-size: calc(var(--obe-font-size) * 1.25);
     --obe-small-size: calc(var(--obe-font-size) * 0.875);
     --obe-small-leading: 1.43;
     --obe-caption-size: calc(var(--obe-font-size) * 0.75);
@@ -931,7 +933,7 @@
   --obe-lead-line: calc(0.8rem * var(--obe-leading));
 }
 .obe-row[data-block-type='callout'] {
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + 0.75rem);
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1rem);
 }
 .obe-row[data-block-type='table']:has(.obe-has-grips) {
   /* End the block handle above the first row grip; both remain draggable. */
@@ -1123,23 +1125,53 @@ a.obe-mention {
 .obe-list { flex: 1; display: flex; min-width: 0; }
 .obe-list-marker {
   flex: none;
-  width: 1.5rem;
+  min-width: var(--obe-indent-step);
   text-align: center;
   user-select: none;
-  color: hsl(var(--foreground) / 0.8);
   padding-top: var(--obe-block-pad-y);
   font-variant-numeric: tabular-nums;
 }
+.obe-list-number { text-align: end; padding-inline-end: 0.25rem; white-space: nowrap; }
+.obe-list-bullet::before {
+  content: '';
+  display: block;
+  width: calc(var(--obe-font-size) * 0.375);
+  height: calc(var(--obe-font-size) * 0.375);
+  margin: calc(var(--obe-line) / 2 - var(--obe-font-size) * 0.1875) auto 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+.obe-list-bullet[data-depth='1']::before { background: transparent; border: 1.5px solid currentColor; }
+.obe-list-bullet[data-depth='2']::before {
+  width: calc(var(--obe-font-size) * 0.3125); /* 5px */
+  height: calc(var(--obe-font-size) * 0.3125); /* 5px */
+  margin: calc(var(--obe-line) / 2 - var(--obe-font-size) * 0.15625) auto 0;
+  border-radius: 0;
+}
 .obe-todo { flex: 1; display: flex; min-width: 0; align-items: flex-start; }
-.obe-todo-box {
+.obe-todo-check {
   flex: none;
+  display: grid;
   /* stylelint-disable-next-line declaration-property-value-allowed-list -- DSX-7: centre the checkbox on the padded text line. */
   margin: calc(var(--obe-block-pad-y) + (var(--obe-line) - 1rem) / 2) 4px 0 4px;
+}
+.obe-todo-check > * { grid-area: 1 / 1; }
+.obe-todo-box {
+  appearance: none;
+  margin: 0;
   width: 1rem;
   height: 1rem;
-  accent-color: hsl(var(--primary));
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
   cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
+.obe-todo-box:hover:not(:disabled) { background: var(--hover); }
+.obe-todo-box:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.obe-todo-box:checked { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
+.obe-todo-box:disabled { cursor: default; opacity: 1; }
+.obe-todo-tick { place-self: center; width: 0.75rem; height: 0.75rem; color: hsl(var(--primary-foreground)); pointer-events: none; }
 .obe-todo-done .obe-text {
   color: hsl(var(--muted-foreground));
   text-decoration: line-through;
@@ -1151,7 +1183,7 @@ a.obe-mention {
   flex: 1;
   min-width: 0;
   margin: 0;
-  border-left: 3px solid hsl(var(--foreground) / 0.85);
+  border-left: 3px solid currentColor;
   padding-left: 0.75rem;
 }
 .obe-callout {
@@ -1161,7 +1193,7 @@ a.obe-mention {
   gap: 0.5rem;
   background: var(--obe-callout-info);
   border-radius: var(--radius-lg);
-  padding: 0.75rem;
+  padding: 1rem 1rem 1rem 0.75rem;
   margin: 0;
 }
 .obe-callout-warn { background: var(--obe-callout-warn); }
@@ -1169,13 +1201,28 @@ a.obe-mention {
 .obe-callout-danger { background: var(--obe-callout-danger); }
 .obe-callout-icon {
   flex: none;
-  font-size: 1.05rem;
-  line-height: 1.5;
-  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
+  font-size: var(--obe-icon-size);
+  line-height: 1;
+  transition: background-color var(--motion-fast) var(--ease-out-soft);
   border-radius: var(--radius-md);
   padding: 0;
 }
-.obe-callout-icon:hover { background: var(--hover); }
+button.obe-callout-icon { cursor: pointer; }
+button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
+.obe-blockbody[class*='obe-bg-']:has(> .obe-callout) { background: none; padding-inline: 0; margin-inline: 0; }
+.obe-bg-gray > .obe-callout { background: var(--obe-bg-gray); }
+.obe-bg-brown > .obe-callout { background: var(--obe-bg-brown); }
+.obe-bg-orange > .obe-callout { background: var(--obe-bg-orange); }
+.obe-bg-yellow > .obe-callout { background: var(--obe-bg-yellow); }
+.obe-bg-green > .obe-callout { background: var(--obe-bg-green); }
+.obe-bg-blue > .obe-callout { background: var(--obe-bg-blue); }
+.obe-bg-purple > .obe-callout { background: var(--obe-bg-purple); }
+.obe-bg-pink > .obe-callout { background: var(--obe-bg-pink); }
+.obe-bg-red > .obe-callout { background: var(--obe-bg-red); }
 .obe-divider {
   flex: 1;
   border: 0;
@@ -1184,6 +1231,7 @@ a.obe-mention {
 }
 /* Speaker note: quietly marked on the page; hidden from the audience deck and
    every export, surfaced only in the presenter view. */
+.obe-row[data-block-type='notes'] { --obe-lead-offset: 0.5rem; --obe-lead-line: calc(var(--obe-caption-size) * var(--obe-caption-leading)); }
 .obe-notes {
   flex: 1;
   min-width: 0;
@@ -1193,16 +1241,18 @@ a.obe-mention {
   padding: 0.5rem 0.75rem;
   margin: 0;
   color: hsl(var(--muted-foreground));
-  font-size: 0.9rem;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
 }
 .obe-notes-tag {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   margin-bottom: 0.25rem;
-  font-size: 0.68rem;
+  font-size: var(--obe-caption-size);
+  line-height: var(--obe-caption-leading);
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: hsl(var(--primary) / 0.8);
   user-select: none;
@@ -1661,6 +1711,7 @@ a.obe-mention {
   /* Recompute derived sizes at the scaling context (CSS variables resolve here). */
   --obe-title-size: calc(var(--obe-font-size) * 2.5);
   --obe-code-size: calc(var(--obe-font-size) * 0.875);
+  --obe-icon-size: calc(var(--obe-font-size) * 1.25);
   --obe-small-size: calc(var(--obe-font-size) * 0.875);
   --obe-caption-size: calc(var(--obe-font-size) * 0.75);
   --obe-h1-size: calc(var(--obe-font-size) * 1.875);

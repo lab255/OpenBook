@@ -365,3 +365,19 @@ describe('toSlideDeck', () => {
     expect(html).toContain('id="ob-data"'); // reactive runtime data seeded
   });
 });
+
+describe('authored callout appearance', () => {
+  it.each(['🌱', 'lucide:Star', '<img src=x onerror=alert(1)>'])('round-trips icon %s and bg through projection', (icon) => {
+    const blocks: BlockJSON[] = [{id: 'c', type: 'callout', props: {variant: 'warn', icon, bg: 'purple'}}];
+    const projected = projectBlocksForExport(blocks).blocks;
+    expect(projected[0].data).toMatchObject({icon, bg: 'purple', variant: 'warn'});
+    const html = toHtml(snapshot(projected), 'T', '');
+    expect(html).toContain('data-bg="purple"');
+    if (icon === '🌱') expect(html).toContain('<span class="callout__icon">🌱</span>');
+    if (icon.startsWith('lucide:')) expect(html).not.toContain('<span class="callout__icon">');
+    if (icon.startsWith('<')) {
+      expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+      expect(new DOMParser().parseFromString(html, 'text/html').querySelector('.callout img')).toBeNull();
+    }
+  });
+});

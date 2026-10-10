@@ -235,7 +235,8 @@ test('DSX-7: block chrome resolves audit geometry without selection layout shift
     return result;
   }));
   await testInfo.attach('dsx7-geometry.json', {body: JSON.stringify(geometry, null, 2), contentType: 'application/json'});
-  for (const [index, target] of [4, 4, 43.5, 31.6, 21, 16, 4, 4].entries()) {
+  // Callout gutter target moved 16 → 20 with the DSX-2 callout top padding (0.75rem → 1rem); still centred on the first line.
+  for (const [index, target] of [4, 4, 43.5, 31.6, 21, 20, 4, 4].entries()) {
     expect(geometry[index].top).toBeCloseTo(target, 1);
     expect(geometry[index].handleWidth).toBe(18);
     expect(geometry[index].handleHeight).toBe(24);

@@ -335,7 +335,7 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
       i += 1;
       break;
     case 'callout':
-      parts.push(`<aside class="obe-x-callout obe-x-${(b.props?.variant as string) ?? 'info'}">${textHtml(b.text)}</aside>`);
+      parts.push(`<aside class="obe-x-callout obe-x-${(b.props?.variant as string) ?? 'info'}"${b.props?.bg ? ` data-bg="${escapeHtml(String(b.props.bg))}"` : ''}>${textHtml(b.text)}</aside>`);
       i += 1;
       break;
     case 'code':
@@ -778,7 +778,7 @@ export function projectBlocksForExport(
         i += 1;
         break;
       case 'callout':
-        sink.push({id: b.id, type: 'callout', data: {variant: (b.props?.variant as string) ?? 'info', text: textHtml(b.text)}});
+        sink.push({id: b.id, type: 'callout', data: {variant: (b.props?.variant as string) ?? 'info', icon: b.props?.icon, bg: b.props?.bg, text: textHtml(b.text)}});
         i += 1;
         break;
       case 'code': {
