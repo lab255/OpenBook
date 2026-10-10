@@ -52,7 +52,6 @@ export class BackupScheduler implements BackupController {
   private timer: ReturnType<typeof setInterval> | null = null;
   private catchUpTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
-  private readonly ticks = new Set<Promise<void>>();
 
   constructor(
     private readonly store: PageStore,
@@ -89,8 +88,7 @@ export class BackupScheduler implements BackupController {
     this.catchUpTimer.unref?.();
   }
 
-  /** Cancel future checks and drain work that still owns the store/filesystem. */
-  async stop(): Promise<void> {
+  stop(): void {
     this.started = false;
     if (this.catchUpTimer) {
       clearTimeout(this.catchUpTimer);
@@ -100,17 +98,10 @@ export class BackupScheduler implements BackupController {
       clearInterval(this.timer);
       this.timer = null;
     }
-    await Promise.all(this.ticks);
   }
 
   /** Run any enabled cadence whose interval has elapsed since its last run. */
-  tick(): Promise<void> {
-    const task = this.runTick().finally(() => { this.ticks.delete(task); });
-    this.ticks.add(task);
-    return task;
-  }
-
-  private async runTick(): Promise<void> {
+  async tick(): Promise<void> {
     try {
       const config = await this.store.getBackupConfig();
       if (!config.enabled) return;
