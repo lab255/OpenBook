@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Copy, Download, ExternalLink, ImageOff, ImagePlus, Loader2, Maximize2, MoreHorizontal, Pencil, Trash2, Upload} from 'lucide-react';
+import {Copy, Download, ExternalLink, ImageOff, ImagePlus, Loader2, Maximize2, MoreHorizontal, Pencil, Scaling, Trash2, Upload} from 'lucide-react';
 import {t, type TKey} from '@/i18n';
 import {openLightbox} from '@/lib/imageLightbox';
 import {copyText} from '@/lib/pageActions';
@@ -386,7 +386,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
             <Pencil className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.setAltText')}
           </MenuItem>
           <MenuSub>
-            <MenuSubTrigger>{t('blocks.image.size')}</MenuSubTrigger>
+            <MenuSubTrigger><Scaling className="mr-2 h-3.5 w-3.5" /> {t('blocks.image.size')}</MenuSubTrigger>
             <MenuSubContent className={MENU_WIDTH_SM}>
               {SIZE_PRESETS.map((preset) => {
                 const active = (preset.width ?? undefined) === (width ?? undefined);

@@ -87,20 +87,6 @@ export const CodeBlockView: React.FC<{
           }}
         />
       </ConfigField>
-      <ConfigField label="Language">
-        <ConfigInput
-          value={language}
-          placeholder="js"
-          readOnly={editor.readOnly}
-          spellCheck={false}
-          aria-label="Code language"
-          onChange={(e) => set('language', e.target.value)}
-          onBlur={(e) => set('language', e.target.value.trim())}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-          }}
-        />
-      </ConfigField>
       <ConfigToggle label="Hide code" checked={collapsed} disabled={editor.readOnly} onChange={(next) => set('collapsed', next)} />
       <ConfigToggle label="Wrap code" checked={wrap} disabled={editor.readOnly} onChange={(next) => set('wrap', next)} />
       <ConfigToggle

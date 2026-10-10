@@ -27,6 +27,8 @@ describe('code media settings', () => {
     expect(screen.getByLabelText('Copy code').getAttribute('data-chrome')).toBe('view');
     expect(container.querySelector('.obe-codeblock')?.getAttribute('data-wrap')).toBe('false');
     fireEvent.click(container.querySelector('.obe-kit-gear')!);
+    expect(screen.queryByLabelText('Code language')).toBeNull();
+    expect(screen.getByLabelText('File name')).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', {name: 'Live'}));
     expect(screen.getByLabelText('Run code')).toBeTruthy();
     fireEvent.click(screen.getByRole('checkbox', {name: 'Hide code'}));

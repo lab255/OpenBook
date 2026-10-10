@@ -25,6 +25,32 @@ describe('media design contracts', () => {
     expect(focus).toContain('outline-offset: var(--obe-focus-offset)');
   });
 
+  it('places media controls above selection wash without intervening stacking contexts', () => {
+    const resolveZ = (selector: string): number => {
+      const token = rule(selector).match(/z-index: var\((--[^)]+)\)/)?.[1];
+      expect(token).toBeTruthy();
+      return Number(css.match(new RegExp(`${token}: (\\d+);`))?.[1]);
+    };
+    expect(resolveZ('.obe-row-selected::before')).toBe(3);
+    for (const selector of ['.obe-media-bar', '.obe-image-resize', '.obe-artifact-resize']) {
+      expect(resolveZ(selector)).toBe(4);
+      expect(resolveZ(selector)).toBeGreaterThan(resolveZ('.obe-row-selected::before'));
+    }
+    // Audited DOM chains: blockbody → figure/frame, artifact/frame, or codeblock.
+    for (const selector of ['.obe-blockbody', '.obe-image', '.obe-image-frame', '.obe-artifact', '.obe-artifact-frame', '.obe-codeblock']) {
+      expect(rule(selector)).not.toMatch(/(?:z-index|transform|filter|opacity|isolation|contain|will-change):/);
+    }
+    expect(rule('.obe-media-bar[data-surface=\'plain\']')).toContain('top: 4px; right: 4px');
+  });
+
+  it('uses popover surfaces and menu shadows for lightbox chrome', () => {
+    for (const selector of ['.obe-lightbox-zoombar', '.obe-lightbox-close']) {
+      expect(rule(selector)).toContain('background: hsl(var(--popover))');
+      expect(rule(selector)).toContain('box-shadow: var(--shadow-menu)');
+      expect(rule(selector)).toContain('border: 0');
+    }
+  });
+
   it('reveals on deepest hover, keyboard focus, open menus and selection including touch', () => {
     expect(rule('.obe-media-bar')).toContain('pointer-events: none');
     expect(css).toContain(`.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-media-bar,
@@ -53,7 +79,7 @@ describe('media design contracts', () => {
 
   it('confines scrolling to text and reserves the same toolbar geometry for either wrap mode', () => {
     expect(rule('.obe-codeblock[data-wrap=\'false\'] .obe-text')).toContain('white-space: pre; overflow-x: auto');
-    expect(rule('.obe-codeblock')).toContain('padding: calc(var(--obe-gutter-btn) + 0.5rem) 1rem 0.75rem');
+    expect(rule('.obe-codeblock')).toContain('padding: calc(var(--obe-gutter-btn) + 0.5rem) 1rem 1rem');
     expect(rule('.obe-codeblock')).not.toContain('overflow');
     expect(rule('.obe-row[data-block-type=\'code\']')).toContain('calc(var(--obe-block-pad-y) + 1px + var(--obe-gutter-btn) + 0.5rem)');
     // First line centre = block pad + border + top inset + half line height.
