@@ -712,6 +712,32 @@ test('multi-cell selection: no-cell-focused paste still makes a new table, delet
   expect(await origTexts()).toEqual(['A1', 'B1', 'A2', 'B2']);
 });
 
+for (const trigger of ['More cell actions', 'Cell colour']) {
+  test(`table range toolbar opens ${trigger} on mouse click`, {tag: ['@editor', '@p1']}, async ({page}) => {
+    await freshLab(page);
+    await caretAtEnd(page, 2);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+
+    const cells = page.locator('.obe-table td');
+    const first = (await cells.nth(0).boundingBox())!;
+    const last = (await cells.nth(4).boundingBox())!;
+    await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, {steps: 10});
+    await page.mouse.up();
+    await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(4);
+
+    const toolbar = page.getByRole('toolbar', {name: 'Cell selection actions'});
+    await toolbar.getByRole('button', {name: trigger}).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    if (trigger === 'More cell actions') {
+      await expect(page.getByRole('menu').getByRole('menuitem', {name: 'Insert 2 rows above'})).toBeVisible();
+    }
+  });
+}
+
 test('table range toolbar clears a dragged 2x2 selection', {tag: ['@editor', '@p1']}, async ({page}) => {
   await freshLab(page);
   await caretAtEnd(page, 2);

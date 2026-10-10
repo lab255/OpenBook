@@ -131,7 +131,6 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
                 tabIndex={activeIndex === index ? 0 : -1}
                 aria-label={item.label}
                 title={item.label}
-                onPointerDown={(event) => event.preventDefault()}
                 onKeyDown={buttonKeyDown(index)}
               >
                 <Palette aria-hidden />
@@ -176,7 +175,6 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
             tabIndex={activeIndex === items.length ? 0 : -1}
             aria-label={t('menu.table.rangeToolbarMore')}
             title={t('menu.table.rangeToolbarMore')}
-            onPointerDown={(event) => event.preventDefault()}
             onKeyDown={buttonKeyDown(items.length)}
           >
             <Ellipsis aria-hidden />
