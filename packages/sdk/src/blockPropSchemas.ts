@@ -71,7 +71,7 @@ const optionsBase = {...frame, value: text, opts, options: text};
 const fields = {
   paragraph: {}, heading: {level: number('Heading level.', 1, 3)}, list: {kind: enumeration(['bullet', 'number'])},
   todo: {checked: boolean()}, quote: {}, callout: {variant: enumeration(['info', 'warn', 'success'])},
-  code: {language: text, live: boolean(), name: text, collapsed: boolean()}, notes: {}, divider: {},
+  code: {language: text, live: boolean(), name: text, collapsed: boolean(), wrap: boolean()}, notes: {}, divider: {},
   image: {assetId: id, src: text, alt: text, caption: text, width: cssLength('Rendered width as a CSS length such as "60%" or "320px".')},
   htmlArtifact: {assetId: id, title: text, height: number('Sandbox height in CSS pixels.', 120, 1200)},
   columns: {}, column: {span: number('Grid columns.', 1, 12)}, table: {}, row: {header: boolean()}, cell: {},

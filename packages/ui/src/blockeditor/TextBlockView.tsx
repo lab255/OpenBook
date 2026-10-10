@@ -20,7 +20,7 @@ import {
   type NewBlock,
   type TextRun,
 } from './model';
-import {attrsAt, diffText, domToOffset, readSelection, runsToHtml, writeSelection} from './richtext';
+import {attrsAt, diffText, domToOffset, offsetToDom, readSelectionDirected, readSelection, runsToHtml, writeSelection} from './richtext';
 import {searchEmojis} from '@/lib/emoji';
 import {pageIconToText} from '@/lib/iconValue';
 import {copyText, pageLinkUrl} from '@/lib/pageActions';
@@ -588,6 +588,33 @@ export const TextBlockView: React.FC<{
     }
 
     const mod = e.metaKey || e.ctrlKey;
+    // Native Home/End differs by platform and does not reliably reveal a caret
+    // inside an overflowing contenteditable. Own logical-line navigation only
+    // for no-wrap code; wrapped text keeps native visual-line navigation.
+    if (isCode && !blockProp(block, 'wrap') && !e.altKey && (e.key === 'Home' || e.key === 'End')) {
+      const directed = readSelectionDirected(el);
+      const selection = window.getSelection();
+      if (!directed || !selection) return;
+      e.preventDefault();
+      const value = text.toString();
+      const nextBreak = value.indexOf('\n', directed.head);
+      const target = e.key === 'Home'
+        ? (mod ? 0 : value.slice(0, directed.head).lastIndexOf('\n') + 1)
+        : (mod || nextBreak < 0 ? value.length : nextBreak);
+      const anchor = offsetToDom(el, e.shiftKey ? directed.anchor : target);
+      const head = offsetToDom(el, target);
+      selection.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
+      // Measure the focus endpoint, not the whole selected range (Shift+Home
+      // produces a backwards selection), and scroll only the code text area.
+      const caret = document.createRange();
+      caret.setStart(head.node, head.offset);
+      caret.collapse(true);
+      const rect = caret.getBoundingClientRect();
+      const viewport = el.getBoundingClientRect();
+      if (rect.left < viewport.left) el.scrollLeft += rect.left - viewport.left;
+      else if (rect.right > viewport.right) el.scrollLeft += rect.right - viewport.right;
+      return;
+    }
     if (mod && !isCode) {
       const fmt: Record<string, 'b' | 'i' | 'u' | 's' | 'c'> = {b: 'b', i: 'i', u: 'u', e: 'c'};
       const key = e.key.toLowerCase();

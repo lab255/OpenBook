@@ -220,7 +220,10 @@ describe('container handles and keyboard targets', () => {
 
   it('includes all container controls in the shared visible-focus rule', () => {
     const focus = ruleBody('.obe-image-placeholder:focus-visible');
-    expect(focus).toContain('outline: 2px solid hsl(var(--ring))');
+    // DSX-4 moved the shared rule onto the §8.1 token; assert the token is used
+    // AND that its declared value is still the 2px ring.
+    expect(focus).toContain('outline: var(--obe-focus-ring)');
+    expect(CSS).toContain('--obe-focus-ring: 2px solid hsl(var(--ring))');
     expect(CSS).toContain('.obe-group-btn:focus-visible,\n.obe-cnt-add:focus-visible,\n.obe-tab:focus-visible,\n.obe-acc-toggle:focus-visible,');
     expect(ruleBody('.obe-group-btn')).toContain('width: var(--height-control-xs)');
     expect(ruleBody('.obe-group-btn')).toContain('height: var(--height-control-xs)');
