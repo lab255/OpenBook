@@ -24,6 +24,8 @@
 //! callbacks); replacing it would duplicate upstream behavior. See README.md.
 
 mod ipc;
+#[cfg(target_os = "macos")]
+mod sidecar_env;
 mod sidecar_supervision;
 
 use std::collections::VecDeque;
@@ -256,6 +258,8 @@ fn spawn_sidecar(
     #[cfg(not(unix))]
     let _ = socket_path;
 
+    // The server uses this same directory for provisioning and resolving managed
+    // transcription tools (<data-dir>/bin); no binary env overrides are needed.
     let mut args: Vec<String> = vec![
         "--data-dir".into(),
         data_dir.into(),
@@ -298,6 +302,16 @@ fn spawn_sidecar(
         // The loopback-owner hatch: the sidecar trusts requests stamped with this
         // per-run secret (see `AppState::local_secret`) as the machine owner.
         .env("OPENBOOK_LOCAL_OWNER_SECRET", local_secret);
+
+    // Finder supplies a minimal PATH. Preserve inherited precedence and let
+    // Homebrew tools serve as fallback after the server's overrides/managed tools.
+    #[cfg(target_os = "macos")]
+    {
+        command = command.env(
+            "PATH",
+            sidecar_env::macos_path(std::env::var_os("PATH").as_deref()),
+        );
+    }
 
     // STAB-7 (LAN-hosted web UI): when PUBLISHED on the LAN, also hand the sidecar
     // the bundled static web bundle (a Next static export staged as the `web-ui`
