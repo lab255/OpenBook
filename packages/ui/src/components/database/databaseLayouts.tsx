@@ -455,7 +455,7 @@ const CardCover: React.FC<{src: string | null; heightClass: string; icon: string
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="flex h-16 items-center justify-center bg-muted/40 text-3xl">
+      <div className="flex h-16 items-center justify-center bg-muted text-3xl">
         <PageIcon value={icon} />
       </div>
     );
@@ -492,10 +492,10 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
         <button
           onClick={() => db.openRow(row.id)}
           style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
-          className="group flex flex-col gap-2 overflow-hidden rounded-lg border border-border bg-card text-left transition-[background-color,border-color,box-shadow] hover:border-foreground/20 hover:shadow-lift"
+          className="group flex flex-col gap-2 overflow-hidden rounded-lg border border-border bg-card text-left transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
         >
-          <CardCover src={cover} heightClass={GALLERY_COVER[size]} icon={readPageIcon(row.id)} />
-          <div className="flex flex-col gap-2 px-3 pb-3">
+          {view.coverPropertyId && <CardCover src={cover} heightClass={GALLERY_COVER[size]} icon={readPageIcon(row.id)} />}
+          <div className={cn('flex flex-col gap-2', view.coverPropertyId ? 'px-3 pb-3' : 'p-3')}>
             <div className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</div>
             <RowChips row={row} properties={cardProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />
           </div>
@@ -665,7 +665,7 @@ const BoardColumnCards: React.FC<{
               onClick={() => db.openRow(row.id)}
               style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
               className={cn(
-                'group cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-lift',
+                'group cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20',
                 dnd.dragRow === row.id && 'opacity-50',
               )}
             >
