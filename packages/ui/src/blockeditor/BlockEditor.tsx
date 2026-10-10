@@ -3492,7 +3492,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
           onDismiss={() => setRangeToolbarDismissed(true)}
         />
       )}
-      {!editor.readOnly && (
+      {showHandles && (
         <>
           <button
             type="button"
@@ -3510,22 +3510,6 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
           >
             +
           </button>
-          <div className="obe-table-tools" contentEditable={false}>
-            <button type="button" aria-label="Delete last row" onClick={() => tableDeleteRow(editor.doc, id, rows.length - 1)}>
-              − row
-            </button>
-            <button type="button" aria-label="Delete last column" onClick={() => tableDeleteColumn(editor.doc, id, cols - 1)}>
-              − col
-            </button>
-            <button
-              type="button"
-              aria-pressed={header}
-              aria-label="Toggle header row"
-              onClick={() => editor.doc.transact(() => setBlockProp(block, 'header', !header), 'local')}
-            >
-              header
-            </button>
-          </div>
         </>
       )}
     </div>

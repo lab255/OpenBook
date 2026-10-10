@@ -2037,29 +2037,6 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-table-add:hover { background: var(--hover); color: hsl(var(--foreground)); }
 .obe-table-add-row { left: 0; right: 0; bottom: 0; height: 1rem; }
 .obe-table-add-col { top: 0; bottom: 16px; right: -16px; width: 1rem; }
-.obe-table-tools {
-  position: absolute;
-  top: -1.7rem;
-  right: 0;
-  display: flex;
-  gap: 4px;
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) var(--ease-out-soft);
-}
-.obe-table-wrap:hover .obe-table-tools,
-.obe-table-tools:focus-within { opacity: 1; pointer-events: auto; }
-.obe-table-tools button {
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  border-radius: var(--radius-md);
-  padding: 4px 8px;
-  cursor: pointer;
-}
-.obe-table-tools button:hover { background: var(--hover); }
-.obe-table-tools button[aria-pressed='true'] { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
 
 /* TBL-2 drag-reorder: row grips overhang fully into the block gutter or column
    gap, while the table edge stays flush with paragraph text (TABLE-1). Top
@@ -2428,7 +2405,6 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-tb-btn:focus-visible,
 .obe-range-toolbar-button:focus-visible,
 .obe-table-add:focus-visible,
-.obe-table-tools button:focus-visible,
 .obe-callout-icon:focus-visible,
 .obe-todo-box:focus-visible,
 .obe-media-btn:focus-visible,
