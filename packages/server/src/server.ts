@@ -701,6 +701,9 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       // Stop accepting requests on every listener first, so no new writes arrive
       // mid-shutdown.
       for (const closeListener of closers) await closeListener();
+      // Timer cancellation does not stop an in-flight backup. Drain it while
+      // its database is still open, before shutdown returns to directory cleanup.
+      await backups.flush();
       // Collab T9: checkpoint every dirty canonical doc before the store closes, so a
       // shutdown never strands an edit the server was the persistence authority for
       // (no-lost-edit-on-shutdown). Runs BEFORE the mirror unsubscribe/close below so
