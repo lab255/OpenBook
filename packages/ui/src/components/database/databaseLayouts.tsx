@@ -1366,7 +1366,7 @@ export const CalendarView: React.FC<{
               }}
               onDrop={() => key && reschedule(dragRow!, key)}
               className={cn(
-                'group/day min-h-[88px] border-b border-r border-border/60 p-1 last:border-r-0 [&:nth-child(7n)]:border-r-0',
+                'group/day min-h-22 border-b border-r border-border/60 p-1 last:border-r-0 [&:nth-child(7n)]:border-r-0',
                 !day && 'bg-muted/10',
                 overKey === key && key && 'bg-accent/50 ring-1 ring-inset ring-brand/40',
               )}
@@ -1398,9 +1398,9 @@ export const CalendarView: React.FC<{
                         onDragStart={() => setDragRow(row.id)}
                         onDragEnd={() => setDragRow(null)}
                         onClick={() => db.openRow(row.id)}
-                        style={accent ? {backgroundColor: `color-mix(in srgb, ${accent} 14%, transparent)`, borderLeft: `3px solid ${accent}`} : undefined}
+                        style={accent ? {borderLeft: `3px solid ${accent}`} : undefined}
                         className={cn(
-                          'flex flex-col gap-0.5 rounded bg-brand/10 px-1 py-0.5 text-left text-[11px] text-foreground/80 transition-colors hover:bg-brand/20',
+                          'flex flex-col gap-0.5 rounded-sm bg-card px-1 py-0.5 text-left text-xs text-foreground shadow-sm ring-1 ring-border transition-colors hover:bg-hover',
                           editable && 'cursor-grab active:cursor-grabbing',
                           dragRow === row.id && 'opacity-40',
                         )}
