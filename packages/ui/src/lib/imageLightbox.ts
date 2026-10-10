@@ -16,8 +16,10 @@ export interface LightboxState {
   /** The resolved `<img src>` — an object URL (assetId), a legacy data URL, or a
    *  direct URL. Whatever the block itself is displaying. */
   src: string;
-  /** Alt text: the dialog's accessible label and, when set, a caption line. */
+  /** Alt text: the dialog's accessible label. */
   alt: string;
+  /** Visible block caption; omitted for uncaptioned images. */
+  caption?: string;
   /** The element that opened the overlay; focus returns here on close. */
   trigger: HTMLElement | null;
 }

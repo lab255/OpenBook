@@ -284,7 +284,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
   // close. Guarded on a resolved src so a still-loading / broken block is inert.
   const openView = (trigger: HTMLElement | null): void => {
     if (!displaySrc) return;
-    openLightbox({src: displaySrc, alt, trigger});
+    openLightbox({src: displaySrc, alt, caption, trigger});
   };
 
   const focusAlt = (): void => {

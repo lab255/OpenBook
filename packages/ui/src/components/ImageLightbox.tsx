@@ -1,3 +1,4 @@
+import {OVERLAY_MOTION} from '@/components/ui/overlay-motion';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {Minus, Plus, RotateCcw, X} from 'lucide-react';
@@ -207,10 +208,10 @@ export default function ImageLightbox() {
       <DialogPortal>
         {/* Dark scrim — a lightbox reads better on near-black than the themed
             80%-background used by ordinary dialogs. Still honours the blur var. */}
-        <DialogPrimitive.Overlay className="obe-lightbox-scrim fixed inset-0 z-lightbox data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className={`obe-lightbox-scrim fixed inset-0 z-lightbox ${OVERLAY_MOTION.scrim}`} />
         <DialogPrimitive.Content
           aria-label={state?.alt ? state.alt : t('blocks.image.lightboxLabel')}
-          className="obe-lightbox fixed inset-0 z-lightbox flex flex-col outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+          className={`obe-lightbox fixed inset-0 z-lightbox flex flex-col outline-hidden ${OVERLAY_MOTION.dialog}`}
         >
           <DialogPrimitive.Title className="sr-only">
             {state?.alt ? state.alt : t('blocks.image.lightboxLabel')}
@@ -248,7 +249,7 @@ export default function ImageLightbox() {
                 />
               </div>
 
-              {state.alt && <figcaption className="obe-lightbox-caption">{state.alt}</figcaption>}
+              {state.caption && <figcaption className="obe-lightbox-caption">{state.caption}</figcaption>}
             </>
           )}
 

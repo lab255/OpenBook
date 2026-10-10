@@ -1455,16 +1455,15 @@ a.obe-mention {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   color: hsl(0 0% 100% / 0.82);
-  font-size: 0.85rem;
-  line-height: 1.4;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
   text-align: center;
 }
 /* ── Zoom bar chrome ─────────────────────────────────────────────────────── */
 .obe-lightbox-zoombar {
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  flex: none;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -1478,8 +1477,8 @@ a.obe-mention {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: var(--height-control-md);
+  height: var(--height-control-md);
   border-radius: var(--radius-md);
   color: hsl(0 0% 100% / 0.85);
   background: transparent;
@@ -1514,8 +1513,8 @@ a.obe-mention {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--height-control-lg);
+  height: var(--height-control-lg);
   border-radius: var(--radius-md);
   color: hsl(0 0% 100% / 0.85);
   background: hsl(0 0% 0% / 0.35);

@@ -103,12 +103,12 @@ describe('ImageLightbox overlay', () => {
   it('shows nothing when closed, then the image + caption + a11y label when open', () => {
     renderOverlay();
     expect(screen.queryByRole('dialog')).toBeNull();
-    act(() => openLightbox({src: TINY_PNG, alt: 'A cat', trigger: null}));
+    act(() => openLightbox({src: TINY_PNG, alt: 'A cat', caption: 'Meow caption', trigger: null}));
     const dialog = screen.getByRole('dialog');
     expect(dialog.getAttribute('aria-label')).toBe('A cat'); // alt becomes the label
     const img = dialog.querySelector('img.obe-lightbox-img') as HTMLImageElement;
     expect(img.getAttribute('src')).toBe(TINY_PNG);
-    expect(dialog.querySelector('figcaption.obe-lightbox-caption')?.textContent).toBe('A cat');
+    expect(dialog.querySelector('figcaption.obe-lightbox-caption')?.textContent).toBe('Meow caption');
     expect(screen.getByLabelText('Close')).toBeTruthy();
   });
 
@@ -118,6 +118,13 @@ describe('ImageLightbox overlay', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog.getAttribute('aria-label')).toBe('Image viewer');
     expect(dialog.querySelector('figcaption.obe-lightbox-caption')).toBeNull();
+  });
+
+  it('does not turn alt into a visible caption', () => {
+    renderOverlay();
+    act(() => openLightbox({src: TINY_PNG, alt: 'Alt only', trigger: null}));
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Alt only');
+    expect(document.querySelector('.obe-lightbox-caption')).toBeNull();
   });
 
   it('the close button dismisses the overlay', async () => {
