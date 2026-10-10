@@ -9,7 +9,8 @@ const DOCUMENT = readFileSync('src/screens/BlockPageDocument.tsx', 'utf8');
 const EDITOR_LAB = readFileSync('../web/src/components/EditorLab.tsx', 'utf8');
 
 function ruleBody(selector: string): string {
-  const start = CSS.indexOf(`${selector} {`);
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = CSS.search(new RegExp(`^[ \t]*${escaped} \\{`, 'm'));
   expect(start, `rule not found: ${selector}`).toBeGreaterThanOrEqual(0);
   const open = CSS.indexOf('{', start);
   const close = CSS.indexOf('}', open);
@@ -205,5 +206,25 @@ describe('container header rhythm', () => {
     for (const selector of ['.obe-tab-on', '.obe-acc-label']) {
       expect(ruleBody(selector)).toContain('font-weight: 600');
     }
+  });
+});
+
+
+describe('container handles and keyboard targets', () => {
+  it('centres each frame handle on its 32px header with a 9px gutter top', () => {
+    const header = ruleBody('.obe-row:is([data-block-type=\'group\'], [data-block-type=\'tabs\'], [data-block-type=\'accordion\'])');
+    expect(header).toContain('--obe-lead-offset: calc(var(--obe-block-pad-y) + 1px)');
+    expect(header).toContain('--obe-lead-line: var(--height-control-md)');
+    expect(CSS).toContain('[data-block-type=\'group\'], [data-block-type=\'tabs\'], [data-block-type=\'accordion\']),');
+  });
+
+  it('includes all container controls in the shared visible-focus rule', () => {
+    const focus = ruleBody('.obe-image-placeholder:focus-visible');
+    expect(focus).toContain('outline: 2px solid hsl(var(--ring))');
+    expect(CSS).toContain('.obe-group-btn:focus-visible,\n.obe-cnt-add:focus-visible,\n.obe-tab:focus-visible,\n.obe-acc-toggle:focus-visible,');
+    expect(ruleBody('.obe-group-btn')).toContain('width: var(--height-control-xs)');
+    expect(ruleBody('.obe-group-btn')).toContain('height: var(--height-control-xs)');
+    expect(ruleBody('.obe-acc-toggle')).toContain('height: var(--height-control-xs)');
+    expect(ruleBody('.obe-cnt-add')).toContain('min-height: var(--height-control-xs)');
   });
 });
