@@ -17,10 +17,11 @@ until processing completes. Failed uploads retain an in-session audio copy with
 save/retry controls; transcription failures preserve uploaded audio and offer
 **Retry transcription**. Leaving the page can lose audio that has not uploaded.
 
-Local Whisper transcription ships by default, independently of the chat model.
-In **Settings → AI**, select **Download Whisper base** to download the model.
-See [local transcription](local-transcription.md) for the required Whisper and
-FFmpeg installation, model setup, and runtime checks. If local transcription
+Local Whisper transcription is the default, independently of the chat model.
+In **Settings → AI**, select **Enable local transcription** to provision the
+supported runtime and verified model, then follow the staged progress to ready.
+See [local transcription](local-transcription.md) for updates, platform availability,
+and advanced overrides. If local transcription
 is unavailable, recording and manual notes still work; OpenBook does not silently
 fall back to a cloud service. Cloud transcription requires explicit opt-in in
 **Settings → AI**. Selecting a cloud chat model alone does not opt audio into
@@ -49,6 +50,8 @@ assets and follows library/page access rules; it is not uploaded to a third-part
 transcription service unless you explicitly configure one. With a remote library,
 capture uploads to that library's server, so “local transcription” refers to
 processing on the server rather than necessarily on the microphone's device.
+Enable provisions that server's runtime and model; audio stays on that server
+during local transcription.
 
 Use **Page actions → Export → Markdown (.md)** for transcript timestamps,
 summary, manual notes, and audio references. Markdown is not an audio backup;

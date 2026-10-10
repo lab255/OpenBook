@@ -113,8 +113,10 @@ stop suppression, and repair reset are deterministic unit tests in
 3. With a supported transcription backend configured, confirm transcript lines
    appear as chunks complete. If no backend is available, confirm audio and notes
    remain usable and transcription offers retry. See
-   [local transcription setup](../../docs/local-transcription.md) for runtime
-   installation and the model download in **Settings → AI**.
+   **Settings → AI → Enable local transcription** provisions the supported
+   runtime and verified model with staged progress. See
+   [local transcription setup](../../docs/local-transcription.md) for platform
+   availability, updates, and advanced overrides.
 4. Generate a summary, cancel a regeneration, and confirm the previous summary
    survives. Type a manual note. Export audio and Markdown; check the ZIP's
    individual recordings and the Markdown transcript, summary, and note.

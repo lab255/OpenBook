@@ -76,9 +76,10 @@ a draft automatically.
 
 ## Activate pins only after publication
 
-WSP-1's `runtimeManifest.ts` has not landed on this worker's base. The companion
-`runtime-binaries-manifest.patch` is prepared against
-`feat/wsp-1-verified-downloads`; apply it after WSP-1 merges. It adds an unused
+WSP-1's `runtimeManifest.ts` is merged. Activation of our own release pins
+remains pending (WSP-7). The companion `runtime-binaries-manifest.patch` was
+prepared against `feat/wsp-1-verified-downloads`; check it against the current
+manifest before applying. It adds an unused
 URL helper and explicit pending asset mapping/tests, **no hashes and no supported
 status flips**. Do not cherry-pick a replacement of the whole WSP-1 manifest.
 

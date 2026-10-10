@@ -330,9 +330,13 @@ Transcription resolves separately from chat: explicit off rejects; an explicit
 OpenAI-compatible transcription provider opts into that endpoint; otherwise the
 local resolver runs, followed by the deterministic mock fallback only when chat
 provider is mock. An unavailable local engine returns a configuration error,
-never implicit cloud fallback. Local Whisper transcription ships by default; **Settings → AI** provides the
-model download. See [local transcription setup](docs/local-transcription.md) for
-Whisper and FFmpeg installation and runtime requirements.
+never implicit cloud fallback. **Settings → AI → Enable local transcription**
+provisions supported pinned runtimes into `<dataDir>/bin` and the verified model,
+with staged progress and generation receipts. Pin changes trigger re-provisioning
+when enabled configuration loads; Settings also offers Update. Resolution is
+explicit `OPENBOOK_*_BIN` override → current managed runtime → PATH. See
+[local transcription](docs/local-transcription.md) for platform availability and
+advanced custom-build overrides.
 
 Audio export downloads a single original file or an ordered timestamped ZIP of
 chunks, without remuxing or deleting library assets. Markdown and HTML exports
