@@ -545,7 +545,7 @@ const OptionsEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = (
               setDragId(null);
               setOverId(null);
             }}
-            className="shrink-0 cursor-grab text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing"
+            className="shrink-0 cursor-grab text-muted-foreground/80 transition-colors hover:text-muted-foreground active:cursor-grabbing"
             aria-label="Reorder option"
           >
             <GripVertical className="h-3.5 w-3.5" />
@@ -1211,7 +1211,7 @@ export const SummaryPicker: React.FC<{current: SummaryType; display: string; onC
           </span>
         ) : (
           <span className="flex items-center gap-1 tabular-nums">
-            <span className="text-muted-foreground/60">{SUMMARY_TYPES.find((s) => s.value === current)?.label}</span>
+            <span className="text-muted-foreground/80">{SUMMARY_TYPES.find((s) => s.value === current)?.label}</span>
             <span className="font-medium text-foreground/80">{display}</span>
             <ChevronDown className="h-3 w-3 opacity-0 transition-opacity group-hover/sum:opacity-100" />
           </span>

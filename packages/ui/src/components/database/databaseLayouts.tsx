@@ -269,7 +269,7 @@ const GroupRenameField: React.FC<{initial: string; onCommit: (value: string) => 
         onClick={(e) => e.stopPropagation()}
         placeholder="Group name…"
         aria-label="Rename group"
-        className="w-full rounded bg-accent/40 px-1.5 py-1 text-sm outline-hidden placeholder:text-muted-foreground-strong"
+        className="w-full rounded-sm bg-accent/40 px-1.5 py-1 text-sm outline-hidden placeholder:text-muted-foreground-strong"
       />
     </div>
   );
@@ -525,7 +525,7 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
                 onExpandAll={() => setCollapsed(setAllGroupsCollapsed(groups, false, collapseEmpty))}
               >
                 <button onClick={() => toggle(group.key)} className="mb-2 flex w-full items-center gap-1.5 text-sm font-medium">
-                  <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform', !isCollapsed && 'rotate-90')} />
+                  <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/80 transition-transform', !isCollapsed && 'rotate-90')} />
                   {group.color && <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(group.color)} />}
                   {glyph && <span className="text-base leading-none">{glyph}</span>}
                   <span className="truncate">{groupHeading(group, groupProp)}</span>
@@ -545,7 +545,7 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
     <div>
       {grid(db.visibleRows)}
       {db.visibleRows.length === 0 && (
-        <div className="rounded-md border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground">
         No rows{db.rows.length > 0 ? ' match the current filters' : ' yet'}.
         </div>
       )}
@@ -584,7 +584,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="flex w-full items-center justify-between gap-1 border-t border-border/50 px-1 pt-1 text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground">
+        <button className="flex w-full items-center justify-between gap-1 border-t border-border/50 px-1 pt-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <span className="truncate">{label}</span>
           <span className="font-medium tabular-nums text-foreground/70">{value || '—'}</span>
         </button>
@@ -678,7 +678,7 @@ const BoardColumnCards: React.FC<{
               <div className="mb-1 flex items-center gap-1.5">
                 <PageIcon value={readPageIcon(row.id)} className="shrink-0 text-sm leading-none" />
                 <span className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</span>
-                <PanelRightOpen className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/0 transition group-hover:text-muted-foreground/60" />
+                <PanelRightOpen className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/0 transition group-hover:text-muted-foreground/80" />
               </div>
               <RowChips row={row} properties={cardProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />
             </div>
@@ -889,7 +889,7 @@ export const BoardView: React.FC<{
                 size="inline"
                 onClick={() => toggleCol(group.key)}
                 aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${heading} column`}
-                className={cn('text-muted-foreground/50', !isCollapsed && 'ml-auto')}
+                className={cn('text-muted-foreground/80', !isCollapsed && 'ml-auto')}
               >
                 {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
               </IconButton>
@@ -982,7 +982,7 @@ export const BoardView: React.FC<{
                     }}
                     onDrop={() => dragLane && reorderLane(dragLane, lane.key)}
                     className={cn(
-                      'flex w-full items-center rounded-md border-b border-border/70 bg-muted/40 text-xs font-medium transition-colors',
+                      'group/lane flex w-full items-center rounded-md border-b border-border/70 bg-muted/40 text-xs font-medium transition-colors',
                       dragLane === lane.key && 'opacity-40',
                       overLane === lane.key && 'ring-1 ring-brand/40',
                     )}
@@ -999,7 +999,7 @@ export const BoardView: React.FC<{
                           setOverLane(null);
                         }}
                         aria-label={`Reorder ${laneHeading} lane`}
-                        className="flex cursor-grab items-center self-stretch rounded-l-md px-1 text-muted-foreground/30 transition-colors hover:bg-hover hover:text-muted-foreground active:cursor-grabbing"
+                        className="flex cursor-grab items-center self-stretch rounded-l-md px-1 text-muted-foreground/80 opacity-0 transition-opacity group-hover/lane:opacity-100 focus-visible:opacity-100 hover:bg-hover hover:text-muted-foreground active:cursor-grabbing"
                       >
                         <GripVertical className="h-3.5 w-3.5" />
                       </span>
@@ -1012,7 +1012,7 @@ export const BoardView: React.FC<{
                         isLaneOption(lane.key) ? 'rounded-r-md' : 'rounded-md pl-2.5',
                       )}
                     >
-                      <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform', !laneCollapsed && 'rotate-90')} />
+                      <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/80 transition-transform', !laneCollapsed && 'rotate-90')} />
                       {laneGlyph && <span className="shrink-0 text-sm leading-none">{laneGlyph}</span>}
                       {laneOpt ? <SelectChip option={laneOpt} pill={subProp?.type === 'status'} /> : <span className="truncate text-foreground">{laneHeading}</span>}
                       <span className="text-muted-foreground">{lane.rows.length}</span>
@@ -1042,7 +1042,7 @@ export const BoardView: React.FC<{
         <div className="mb-2 flex justify-end">
           <button
             onClick={() => setCollapsedCols(setAllGroupsCollapsed(groups, !allCollapsed, collapseEmpty))}
-            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
           >
             <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', !allCollapsed && 'rotate-90')} />
             {allCollapsed ? 'Expand all' : 'Collapse all'}
@@ -1135,7 +1135,7 @@ export const BoardView: React.FC<{
                         size="inline"
                         onClick={() => toggleCol(group.key)}
                         aria-label={`Collapse ${heading} column`}
-                        className="ml-auto text-muted-foreground/50"
+                        className="ml-auto text-muted-foreground/80"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                       </IconButton>
@@ -1201,7 +1201,7 @@ const NewGroupColumn: React.FC<{onAdd: (label: string) => void}> = ({onAdd}) => 
     return (
       <button
         onClick={() => setAdding(true)}
-        className="flex h-9 w-44 shrink-0 items-center gap-1 rounded-lg border border-dashed border-border/70 px-3 text-sm text-muted-foreground/70 transition-colors hover:border-border hover:bg-muted/30 hover:text-foreground"
+        className="flex h-9 w-44 shrink-0 items-center gap-1 rounded-lg border border-dashed border-border/70 px-3 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted/30 hover:text-foreground"
       >
         <Plus className="h-4 w-4" /> New group
       </button>
@@ -1326,13 +1326,13 @@ export const CalendarView: React.FC<{
   const todayKey = ymd(today.getFullYear(), today.getMonth(), today.getDate());
 
   return (
-    <div className="rounded-md border border-border">
+    <div className="rounded-lg border border-border">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="text-sm font-medium">
           {MONTHS[cursor.month]} {cursor.year}
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setCursor({year: today.getFullYear(), month: today.getMonth()})} className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
+          <button onClick={() => setCursor({year: today.getFullYear(), month: today.getMonth()})} className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
             Today
           </button>
           <IconButton size="sm" onClick={() => shift(-1)} aria-label="Previous month">
@@ -1343,7 +1343,7 @@ export const CalendarView: React.FC<{
           </IconButton>
         </div>
       </div>
-      <div className="grid grid-cols-7 border-b border-border bg-muted/20 text-center text-[11px] font-medium text-muted-foreground">
+      <div className="grid grid-cols-7 border-b border-border bg-muted/20 text-center text-xs font-medium text-muted-foreground">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">
             {w}
@@ -1378,14 +1378,14 @@ export const CalendarView: React.FC<{
                       size="inline"
                       onClick={() => createOn(key!)}
                       aria-label={`Add on ${key}`}
-                      className="text-muted-foreground/60 opacity-0 transition-[opacity,background-color,color] group-hover/day:opacity-100"
+                      className="text-muted-foreground/80 opacity-0 transition-[opacity,background-color,color] group-hover/day:opacity-100"
                     >
                       <Plus className="h-3 w-3" />
                     </IconButton>
                   ) : (
                     <span />
                   )}
-                  <span className={cn('text-xs', key === todayKey ? 'font-semibold text-brand' : 'text-muted-foreground/70')}>{day}</span>
+                  <span className={cn('text-xs', key === todayKey ? 'font-semibold text-brand' : 'text-muted-foreground')}>{day}</span>
                 </div>
               )}
               <div className="flex flex-col gap-0.5">
