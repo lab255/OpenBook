@@ -1,0 +1,32 @@
+[
+  {
+    "name": "ffmpeg-7.1.1-aarch64-apple-darwin.zip",
+    "size": 1040200,
+    "sha256": "541e623ed21d80e6ae6976faee8511924fe0e98445c7d7888f07d5bafe0bda65"
+  },
+  {
+    "name": "runtime-binaries-sources.zip",
+    "size": 23476917,
+    "sha256": "ac0040780ea76334cf7bba3009e3190e86400f82d5a91d2eaffb579370480c07"
+  },
+  {
+    "name": "whisper-cli-1.8.2-aarch64-apple-darwin.zip",
+    "size": 1047307,
+    "sha256": "9f62b22d4ffdc7340b42eef80a35293635cf06e499dba445677aa44bf49a8148"
+  },
+  {
+    "name": "whisper-cli-1.8.2-x86_64-apple-darwin.zip",
+    "size": 1204029,
+    "sha256": "f9518153a34a2619ae9446e0266cfad4af585e906b11feb3120329db3e3e91f3"
+  },
+  {
+    "name": "whisper-cli-1.8.2-x86_64-pc-windows-msvc.zip",
+    "size": 940580,
+    "sha256": "34cd1bbc8113299b72783a5c7b082e3226dcb40b66ba945de8f4cd10d0d4a3db"
+  },
+  {
+    "name": "whisper-cli-1.8.2-x86_64-unknown-linux-gnu.zip",
+    "size": 1545240,
+    "sha256": "d51266bfd47aebbcfe61de981534ec86a6915427f2160e886b9a0df294678e3a"
+  }
+]
