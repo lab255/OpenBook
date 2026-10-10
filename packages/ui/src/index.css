@@ -247,6 +247,8 @@
     --obe-chrome-active: var(--hover-strong);
     --obe-focus-ring: 2px solid hsl(var(--ring));
     --obe-focus-offset: 2px;
+    --obe-drop: hsl(var(--primary));
+    --obe-drag-dim: 0.4;
     --obe-columns-gap: 28px;
     --obe-title-size: calc(var(--obe-font-size) * 2.5);
     --obe-title-leading: 1.2;
@@ -2093,12 +2095,12 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-table-row-grip[aria-expanded='true'] { opacity: 1; background: var(--obe-chrome-active); }
 .obe-table-col-grip[aria-expanded='true'] { opacity: 1; background: linear-gradient(var(--obe-chrome-active), var(--obe-chrome-active)), hsl(var(--background)); }
 /* Insertion indicators — a primary-coloured bar at the target boundary. */
-.obe-table tr.obe-drop-row-above > td { box-shadow: inset 0 2px 0 0 hsl(var(--primary)); }
-.obe-table tr.obe-drop-row-below > td { box-shadow: inset 0 -2px 0 0 hsl(var(--primary)); }
-.obe-table td.obe-drop-col-before { box-shadow: inset 2px 0 0 0 hsl(var(--primary)); }
-.obe-table td.obe-drop-col-after { box-shadow: inset -2px 0 0 0 hsl(var(--primary)); }
+.obe-table tr.obe-drop-row-above > td { box-shadow: inset 0 2px 0 0 var(--obe-drop); }
+.obe-table tr.obe-drop-row-below > td { box-shadow: inset 0 -2px 0 0 var(--obe-drop); }
+.obe-table td.obe-drop-col-before { box-shadow: inset 2px 0 0 0 var(--obe-drop); }
+.obe-table td.obe-drop-col-after { box-shadow: inset -2px 0 0 0 var(--obe-drop); }
 .obe-table tr.obe-row-dragging > td,
-.obe-table td.obe-col-dragging { opacity: 0.45; }
+.obe-table td.obe-col-dragging { opacity: var(--obe-drag-dim); }
 
 /* Slash menu */
 @keyframes obe-menu-enter {

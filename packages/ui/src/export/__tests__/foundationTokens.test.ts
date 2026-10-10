@@ -18,6 +18,11 @@ function token(name: string): string {
 }
 
 describe('DSX foundation export mirrors', () => {
+  it('declares theme-derived drop ink and the shared drag opacity', () => {
+    expect(token('obe-drop')).toBe('hsl(var(--primary))');
+    expect(token('obe-drag-dim')).toBe('0.4');
+  });
+
   it('keeps the static type ramp equal to the plain CSS tokens', () => {
     const body = parseFloat(token('obe-font-size'));
     expect(exporter).toContain(`font: ${body}px/${token('obe-leading')} `);
