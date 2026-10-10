@@ -18,6 +18,7 @@ import {
   Lock,
   LockOpen,
   Plus,
+  Palette,
   RefreshCw,
   TableCellsSplit,
   Trash2,
@@ -2768,7 +2769,7 @@ const TableColorSubmenu: React.FC<{
   const {Item, Sub, SubContent, SubTrigger} = menu;
   return (
     <Sub>
-      <SubTrigger>{label}</SubTrigger>
+      <SubTrigger><Palette className="mr-2 h-3.5 w-3.5" />{label}</SubTrigger>
       <SubContent className={MENU_WIDTH_SM}>
         {COLOR_MENU.map((c) => (
           <Item key={c.id ?? 'default'} onSelect={() => onPick(c.id)}>
@@ -3529,7 +3530,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
             aria-label="Add row"
             onClick={() => tableInsertRow(editor.doc, id, rows.length)}
           >
-            +
+            <Plus className="h-3.5 w-3.5" aria-hidden />
           </button>
           <button
             type="button"
@@ -3537,7 +3538,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
             aria-label="Add column"
             onClick={() => tableInsertColumn(editor.doc, id, cols)}
           >
-            +
+            <Plus className="h-3.5 w-3.5" aria-hidden />
           </button>
         </>
       )}

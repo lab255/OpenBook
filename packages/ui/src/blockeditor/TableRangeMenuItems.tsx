@@ -7,6 +7,7 @@ import {
   ClipboardPaste,
   Copy,
   Eraser,
+  Palette,
   Scissors,
   TableCellsMerge,
   TableCellsSplit,
@@ -189,7 +190,7 @@ export const TableRangeMenuItems: React.FC<TableRangeMenuContext & {menu?: MenuC
     if (item.kind === 'separator') return <Separator key={item.id} />;
     if (item.kind === 'colour') return (
       <Sub key={item.id}>
-        <SubTrigger>{item.label}</SubTrigger>
+        <SubTrigger><Palette className="mr-2 h-3.5 w-3.5" />{item.label}</SubTrigger>
         <SubContent className={MENU_WIDTH_SM}>
           {RANGE_COLOUR_MENU.map((colour) => (
             <Item key={colour.id ?? 'default'} onSelect={() => item.onPick(colour.id)}>

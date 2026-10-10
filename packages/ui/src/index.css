@@ -2021,15 +2021,14 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   position: absolute;
   display: grid;
   place-items: center;
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: var(--obe-chrome-ink);
   border-radius: var(--radius-md);
-  font-size: 13px;
   opacity: 0;
   transition: opacity var(--motion-fast) var(--ease-out-soft);
   cursor: pointer;
 }
 .obe-table-wrap:hover .obe-table-add { opacity: 1; }
-.obe-table-add:hover { background: var(--hover); color: hsl(var(--foreground)); }
+.obe-table-add:hover { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
 .obe-table-add-row { left: 0; right: 0; bottom: 0; height: 1rem; }
 .obe-table-add-col { top: 0; bottom: 16px; right: -16px; width: 1rem; }
 
@@ -2386,7 +2385,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Touch: gutters are always visible (no hover on touch screens) */
 @media (hover: none) {
   .obe-gutter { opacity: 0.85; }
-  .obe-table-add { opacity: 0.7; }
+  .obe-table-add { opacity: 1; }
 }
 
 /* Block editor: keyboard focus visibility (a11y) */
