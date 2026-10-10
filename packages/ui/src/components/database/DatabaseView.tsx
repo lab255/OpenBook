@@ -1289,7 +1289,7 @@ export const Toolbar: React.FC<{
         })}
         <AddViewMenu onAdd={onAddView} />
       </div>
-      <div className="flex shrink-0 items-center gap-1 sm:shrink sm:flex-wrap">
+      <div className="flex shrink-0 items-center gap-1 sm:ml-auto sm:shrink sm:flex-wrap">
         {rowAware && (
           <>
             <NewRowMenu db={db} />
@@ -1667,7 +1667,7 @@ export const DatabaseView: React.FC<{pageId: string; databaseIdHint?: string | n
       >
         <div
           ref={anchorRootRef}
-          className={cn(inline ? 'rounded-lg border border-border p-3' : 'mt-6 border-t border-border pt-5')}
+          className={cn(inline ? undefined : 'mt-6 border-t border-border pt-5')}
         >
           {inline && (
             <input
