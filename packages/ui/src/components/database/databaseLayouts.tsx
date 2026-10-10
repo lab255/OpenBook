@@ -905,7 +905,8 @@ export const BoardView: React.FC<{
     const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
     const key = cellKey(group.key, subKey);
     const tint = group.color && groupProp?.options?.some((o) => o.id === group.key);
-    if (isCollapsed) return <div className="w-11 shrink-0" />;
+    const tintStyle = tint && overKey !== key ? {backgroundColor: `color-mix(in srgb, ${chipBgVar(group.color)} 50%, transparent)`} : undefined;
+    if (isCollapsed) return <div className="w-11 shrink-0 rounded-lg" style={tintStyle} />;
     return (
       <div
         onDragOver={(e) => {
@@ -915,7 +916,7 @@ export const BoardView: React.FC<{
           }
         }}
         onDrop={() => !dragCol && drop({colKey: group.key, subKey})}
-        style={tint && overKey !== key ? {backgroundColor: `color-mix(in srgb, ${chipBgVar(group.color)} 50%, transparent)`} : undefined}
+        style={tintStyle}
         className={cn(
           'flex w-64 shrink-0 flex-col gap-2 rounded-lg p-2 transition-colors',
           !tint && 'bg-muted/30',
