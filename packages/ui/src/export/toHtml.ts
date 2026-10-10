@@ -401,7 +401,7 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
       const cell = (c: unknown) => inlineToHtml(parseInline(str(c)), ctx);
       const tint = (ri: number, ci: number): string => {
         const tok = colors[ri]?.[ci];
-        return typeof tok === 'string' && COLOR_EXPORT_HEX[tok] ? ` style="background:${COLOR_EXPORT_HEX[tok].bg}"` : '';
+        return typeof tok === 'string' && COLOR_EXPORT_HEX[tok] ? ` style="background:var(--obtb-${tok}, ${COLOR_EXPORT_HEX[tok].bg})"` : '';
       };
       const spanAttrs = (ri: number, ci: number): string => {
         const raw = spans[ri]?.[ci];
@@ -1285,6 +1285,7 @@ const SCHEME_DUAL = `
      this query is inactive the var() falls back to the baked light hex. */
   :root {
     ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtc-${token}: ${value.fg};`).join('\n    ')}
+    ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtb-${token}: ${value.bg};`).join('\n    ')}
   }
   /* Palette highlight tints are translucent; let marked text inherit the light page ink. */
   mark[style] { color: inherit; }

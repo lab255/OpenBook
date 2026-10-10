@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import type {PageSnapshot} from '@book.dev/sdk';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../../blockeditor/colors';
 import {blocksToMarkdown, projectBlocksForExport} from '../../blockeditor/exportBlocks';
 import type {BlockJSON} from '../../blockeditor/model';
 import {buildDocumentModel, parseInline, runsToText} from '../documentModel';
@@ -226,6 +227,18 @@ describe('new block types', () => {
     expect(html).toContain('<nav class="toc">');
     expect(html).toContain('href="#h-0"'); // ToC links to the first heading anchor
     expect(html).toContain('id="h-0"');
+  });
+
+  it('renders table tints with light fallbacks and dark scheme values', () => {
+    const tokens = Object.keys(COLOR_EXPORT_HEX);
+    const html = toHtml(snapshot([{
+      type: 'table',
+      data: {content: [tokens], cellColors: [tokens]},
+    }]), 'T', '');
+    for (const token of tokens) {
+      expect(html).toContain(`style="background:var(--obtb-${token}, ${COLOR_EXPORT_HEX[token].bg})"`);
+      expect(html).toContain(`--obtb-${token}: ${COLOR_EXPORT_HEX_DARK[token].bg};`);
+    }
   });
 
   it('renders projected table cell spans in interactive HTML', () => {
