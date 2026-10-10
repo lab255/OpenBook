@@ -52,6 +52,7 @@ export class BackupScheduler implements BackupController {
   private timer: ReturnType<typeof setInterval> | null = null;
   private catchUpTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
+  private readonly pendingTicks = new Set<Promise<void>>();
 
   constructor(
     private readonly store: PageStore,
@@ -101,7 +102,18 @@ export class BackupScheduler implements BackupController {
   }
 
   /** Run any enabled cadence whose interval has elapsed since its last run. */
-  async tick(): Promise<void> {
+  tick(): Promise<void> {
+    const pending = this.runTick().finally(() => { this.pendingTicks.delete(pending); });
+    this.pendingTicks.add(pending);
+    return pending;
+  }
+
+  /** Drain checks already running after stop(), before closing their store. */
+  async flush(): Promise<void> {
+    await Promise.all(this.pendingTicks);
+  }
+
+  private async runTick(): Promise<void> {
     try {
       const config = await this.store.getBackupConfig();
       if (!config.enabled) return;

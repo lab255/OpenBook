@@ -76,4 +76,33 @@ describe('scheduled backup boot ordering (BOOT-1)', () => {
 
     expect(await (await fetch(`${server.url}/health`)).text()).toBe('ok');
   });
+  it('waits for an in-flight catch-up backup before closing its store', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const original = PageStore.prototype.exportAllTo;
+    const exported = vi.spyOn(PageStore.prototype, 'exportAllTo').mockImplementation(async function (this: PageStore, ...args) {
+      await gate;
+      return original.apply(this, args);
+    });
+    const closedStore = vi.spyOn(PageStore.prototype, 'close');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    server = await boot(0);
+    await waitFor(() => expect(exported).toHaveBeenCalled());
+    const closing = server.close();
+    try {
+      const result = await Promise.race([
+        closing.then(() => 'closed'),
+        new Promise<string>((resolve) => setTimeout(() => resolve('waiting'), 50)),
+      ]);
+      expect(result).toBe('waiting');
+      expect(closedStore).not.toHaveBeenCalled();
+    } finally {
+      release();
+      await closing;
+      server = undefined;
+    }
+    expect(closedStore).toHaveBeenCalledOnce();
+    expect(errors).not.toHaveBeenCalled();
+  });
+
 });

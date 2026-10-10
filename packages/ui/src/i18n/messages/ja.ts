@@ -1,7 +1,7 @@
 import type {PartialMessages} from './en';
 
 export const ja: PartialMessages = {
-  blockEditor: {resizeColumn: '列 {column} の幅を変更'},
+  blockEditor: {resizeColumn: '列 {column} の幅を変更', accordionItem: '項目 {number}', accordionAddLabel: '項目', accordionAdd: '項目を追加', accordionItemLabel: '項目のラベル'},
   navigation: {
     loadError: {
       title: 'このライブラリに接続できません',

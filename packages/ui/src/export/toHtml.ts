@@ -1,3 +1,4 @@
+import {normalizeColumnSpans} from '../blockeditor/model';
 /**
  * Render a page — or a whole reachable mini-site — to a **self-contained,
  * interactive** HTML document, structured in three layers:
@@ -342,7 +343,7 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
   // Pre-pass: stable, document-unique anchor per heading (for table-of-contents).
   const headerList: {anchor: string; level: number; text: string}[] = [];
   for (const block of blocks) {
-    if (block.type !== 'header') continue;
+    if (block.type !== 'header' || block.data?.container) continue;
     const runs = parseInline(str(block.data?.text));
     headerList.push({
       anchor: `${ctx.anchorPrefix}h-${headerList.length}`,
@@ -353,11 +354,25 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
 
   const html: string[] = [];
   let headerSeq = 0;
-  for (const block of blocks) {
+  const closeAt = new Map<number, string[]>();
+  for (const [index, block] of blocks.entries()) {
     const d = block.data ?? {};
     const id = block.id ?? '';
     switch (block.type) {
     case 'header': {
+      if (d.container === 'group' || d.container === 'tab' || d.container === 'accordion') {
+        const label = inlineToHtml(parseInline(str(d.text)), ctx);
+        const accordion = d.container === 'accordion';
+        const count = typeof d.childCount === 'number' && Number.isFinite(d.childCount) ? Math.max(0, Math.floor(d.childCount)) : 0;
+        const end = Math.min(blocks.length - 1, index + count);
+        const closes = closeAt.get(end) ?? [];
+        closes.unshift(accordion ? '</details>' : '</section>');
+        closeAt.set(end, closes);
+        html.push(accordion
+          ? `<details class="obe-x-section"${d.open === false ? '' : ' open'}><summary>${label}</summary>`
+          : `<section class="${d.container === 'group' ? 'obe-x-group' : 'obe-x-section'}">${label ? `<p class="obe-x-group-name">${label}</p>` : ''}`);
+        break;
+      }
       const level = typeof d.level === 'number' ? Math.min(6, Math.max(1, d.level)) : 2;
       const anchor = headerList[headerSeq++]?.anchor ?? '';
       html.push(`<h${level} id="${anchor}">${inlineToHtml(parseInline(str(d.text)), ctx)}</h${level}>`);
@@ -417,15 +432,20 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
       // flatten). Each column's blocks render through the shared context so any
       // reactive widgets inside stay live.
       const cols = Array.isArray(d.columns) ? (d.columns as ExportBlock[][]) : [];
-      const colHtml = cols.map((col) => `<div class="col">${renderBlocks(col, ctx)}</div>`).join('');
+      const spans = normalizeColumnSpans(cols.map((_, index) => Array.isArray(d.spans) ? d.spans[index] as number | undefined : undefined));
+      const colHtml = cols.map((col, index) => `<div class="col" style="flex:${spans[index]} 1 0">${renderBlocks(col, ctx)}</div>`).join('');
       if (colHtml) html.push(`<div class="cols">${colHtml}</div>`);
       break;
     }
-    case 'callout':
+    case 'callout': {
+      const icon = str(d.icon);
+      const customIcon = icon && !icon.startsWith('lucide:')
+        ? `<span class="callout__icon">${escapeHtml(icon)}</span>` : '';
       html.push(
-        `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"><div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
+        `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"${d.bg ? ` data-bg="${escapeHtml(str(d.bg))}"` : ''}>${customIcon}<div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
       );
       break;
+    }
     case 'accordion':
       html.push(
         `<details class="accordion"${d.open === false ? '' : ' open'}><summary>${inlineToHtml(parseInline(str(d.title)), ctx)}</summary><div class="accordion__content">${inlineToHtml(parseInline(str(d.content)), ctx)}</div></details>`,
@@ -717,6 +737,7 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
       break;
     }
     }
+    html.push(...(closeAt.get(index) ?? []));
   }
   return html.join('\n');
 }
@@ -1116,8 +1137,10 @@ export function toSlideDeck(
   // Group blocks into slides at each divider (notes are already stripped by the
   // block→export projection); drop empty groups from doubled/edge dividers.
   const groups: ExportBlock[][] = [[]];
-  for (const b of blocks) {
-    if (b.type === 'divider') groups.push([]);
+  let containerEnd = -1;
+  for (const [index, b] of blocks.entries()) {
+    if (b.data?.container && typeof b.data.childCount === 'number') containerEnd = Math.max(containerEnd, index + b.data.childCount);
+    if (b.type === 'divider' && index > containerEnd) groups.push([]);
     else groups[groups.length - 1].push(b);
   }
   const slides = groups.filter((g) => g.length > 0);
@@ -1256,6 +1279,7 @@ const SCHEME_DUAL = `
 @media (prefers-color-scheme: dark) {
   body { background: #18181b; color: #e7e7ea; }
   .callout { background: hsl(0 0% 18.5%); }
+  :root { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
   /* Brighter text-colour tokens so palette colours stay legible on the dark page
      (the light-theme hex go muddy). Inline runs reference these via var(); when
      this query is inactive the var() falls back to the baked light hex. */
@@ -1299,10 +1323,14 @@ a.subpage, span.subpage { display: flex; align-items: center; gap: 8px; margin: 
 a.subpage:hover { background: rgba(127,127,127,.08); }
 .subpage.is-missing { opacity: .55; cursor: default; }
 .subpage__icon { font-size: 1.1em; line-height: 1; }
-.cols { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; margin: 1em 0; }
-.cols > .col { flex: 1 1 12rem; min-width: 0; }
+.cols { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; margin: 1em 0; }
+.cols > .col { min-width: 0; }
 .cols > .col > :first-child { margin-top: 0; }
-@media (max-width: 640px) { .cols { flex-direction: column; gap: .25rem; } }
+@media (max-width: 640px) { .cols { flex-direction: column; gap: 28px; } .cols > .col { width: 100%; } }
+/* Container mirrors guarded against editor tokens by containerParity.test.ts. */
+.obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: 8px; padding: 4px 24px; margin: 12px 0; }
+.obe-x-group-name { font-size: 12px; line-height: 1.33; letter-spacing: 0.04em; color: var(--obe-x-muted, hsl(40 3% 43.2%)); margin: 0 0 4px; }
+.obe-x-section > summary { cursor: pointer; min-height: 32px; font-size: 14px; font-weight: 600; }
 .reactive { background: rgba(127,127,127,.06); border: 1px solid rgba(127,127,127,.16); border-radius: 8px; padding: 10px 12px; margin: 1em 0; }
 .kitinput { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .kit-label { font-weight: 600; font-size: .92rem; }
@@ -1413,6 +1441,17 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .callout[data-variant=warn], .callout[data-variant=warning] { background: hsl(45 90% 52% / 0.15); }
 .callout[data-variant=success] { background: hsl(140 55% 45% / 0.13); }
 .callout[data-variant=danger] { background: hsl(0 72% 55% / 0.12); }
+.callout:has(.callout__icon)::before { content: none; }
+.callout__icon { flex: none; }
+.callout[data-bg=gray] { background: hsl(0 0% 50% / 0.1); }
+.callout[data-bg=brown] { background: hsl(25 45% 50% / 0.13); }
+.callout[data-bg=orange] { background: hsl(28 85% 52% / 0.13); }
+.callout[data-bg=yellow] { background: hsl(45 90% 52% / 0.15); }
+.callout[data-bg=green] { background: hsl(140 55% 45% / 0.13); }
+.callout[data-bg=blue] { background: hsl(210 80% 55% / 0.13); }
+.callout[data-bg=purple] { background: hsl(265 60% 58% / 0.14); }
+.callout[data-bg=pink] { background: hsl(330 70% 58% / 0.13); }
+.callout[data-bg=red] { background: hsl(0 72% 55% / 0.12); }
 .callout__body { flex: 1; }
 .accordion { margin: 8px 0; border: 1px solid rgba(127,127,127,.25); border-radius: 8px; padding: 4px 12px; }
 .accordion summary { cursor: pointer; font-weight: 600; padding: 4px 0; }

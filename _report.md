@@ -1,69 +1,60 @@
-# DSX-4 report
+# DSX-3 — container family alignment
 
-All five sections implemented and committed separately; test ledger implemented. Full `pnpm verify` completed green in-turn (exit 0, 2026-10-10 13:58 SGT), with approved filesystem-watcher access. No push; no binaries committed. Browser execution is deliberately deferred under the brief’s “No Playwright” instruction.
+Implemented all six sections in six incremental conventional commits plus one scoped section-5 review fix on `feat/dsx-3-containers`. **`pnpm verify` passed (exit 0) in this turn on the final committed code, completed 2026-10-10 at 12:58 SGT.** No push.
 
-| Criterion | Implementation commit | Validation |
-|---|---|---|
-| §1 Unified media chrome, theme/focus tokens, author/view split | `cd0a5777` | `mediaStyles`, kit config/panel, readonly code tests |
-| §2 Language picker, live-only Run, gear Hide/Wrap, no-wrap text scroller, gutter/output tokens | `c592703d` | `codeMedia`, CSS/gutter formula tests; new browser wrap harness |
-| §3 Expand/Replace/⋯, shared menus, symmetric handles, edit-time alt, aligned captions | `63af4c97` | Image suite: 28 tests, including submenu sizes, focus, both edges/clamps, readonly captions |
-| §4 Caption distinct from alt, nonoverlapping zoom flex row, overlay motion/control sizes | `c59a7039` | Lightbox suite: 16 tests; CSS/order contract; updated browser caption assertion |
-| §5 Artifact bar, preserved aliases, lg frame, pill handle, lightbox stacking/motion | `7abd2bed` | Artifact suite: 16 tests; existing resize/read-only assertions retained |
-| Verification prerequisite outside media scope: drain scheduled backups before store close | `9d1a2c58` | Backup suites 31 passed; new regression fails on original code and passes with fix |
-| Final default image width matches caption after centering | `221cd260` | Image 28 passed; final UI build/typecheck/lint and 2,510 tests passed |
-| Final Copy→Run viewing-action order | `86b4efd3` | Post-commit code/media suite: 7 tests pass |
-| Cross-section ledger, SDK wrap catalogue, locked-code mutation guard, opt-in media gear styling | `b171d9c3` | Code 3 + media contracts 4; existing chart/input/config suites; browser tests typechecked |
-
-Detailed criterion-by-criterion dispositions and manager reruns: [_test-ledger.md](_test-ledger.md).
-
-Verification: `pnpm --filter open-book run verify` exited **0**. Builds, generated-source checks, all workspace typechecks/lint and available tests passed: **SDK 580, UI 2,510, app 9, server 1,441** (8 pre-existing server skips), plus MCP script tests. Protocol e2e passed **256 server checks + 70 MCP checks**. The script uses explicit sdk/ui/mcp/server build targets and server/MCP e2e targets; it does not run web Playwright or a native desktop build. CSS warnings shrink **162→148**, zero errors. `assert-spacing-stylelint.mjs` is untouched. No existing test was weakened beyond the brief’s intentional behavior changes.
-
-Environment/prerequisite evidence: macOS filesystem watchers raised EMFILE inside the sandbox; the identical mirror suite passed 3/3 with approved access outside it. No test suppression or watcher-related code change was needed. Full verification also exposed an independent ENOTEMPTY/PGlite-closed backup teardown race. `9d1a2c58` drains active scheduled backups before store close; its regression fails on the original implementation and passes with the fix, and both backup suites pass 31 tests.
-
-Final-source validation: the Copy→Run correction passed the code/media suite (7 tests). The final frame/caption width correction `221cd260` landed during workspace verification’s server phase, so the final UI source received an additional **full UI build, typecheck, lint and all 2,510 tests (253 files)**, all green. Frame and caption widths are asserted equal for default and every preset. No implementation changes followed those checks.
-
-Visual captures: code hover bar/language picker/settings and long horizontal line; image bar/dropdown/two handles, centred partial-width frame and matching left-aligned caption, empty-caption hover/focus reveal; lightbox distinct caption above zoom controls at short/tall viewports; artifact bar, lg corners, bottom pill and overlay stack. Capture light/dark, hovered/selected/focused/open menu, read-only/present/viewer, nested rows and touch selection.
-
-Manifest gaps: **G-b resolved locally without fallback**: built `packages/ui/dist/style.css` emits `--height-control-md:32px` and `--height-control-lg:36px`; lightbox uses these aliases. **G-c remains open**: stage scrim/white-alpha inks unchanged as instructed; manifest owner must supply stage tokens or an exemption. Chrome/focus declarations follow §8.1 exactly, using existing dark-aware semantic aliases. No invented stage tokens. Warn-only baseline comments record reduction; there is no enumerated baseline file to prune.
-
-Wrap risk: **browser gate remains required**. Units prove highlighted offset mapping, native-key pass-through, selection preservation, unchanged editor node and snapshot persistence; happy-dom cannot prove native caret auto-scroll, glyph geometry, pointer-drag selection, IME, bidi/grapheme navigation, browser scrollbar behavior or actual pixel stability. The added harness covers real Home/End, Shift+Home, scrolled caret visibility, and stable block/toolbar positions. Wrapping naturally changes content height; toggling back must restore it. Manager should run Chromium/WebKit, narrow columns, nested/locked groups, 300+ character lines, keyboard and drag selections, and OS-specific Home/End equivalents. Gutter math at 16px base: line centre = 4 + 1 + (24 + 8) + 21/2 = 47.5px; button centre = 35.5 + 12 = 47.5px. Existing glyph-centre e2e remains logically valid and unmodified.
-
-Scope flag: `9d1a2c58` is a small server lifecycle fix beyond the media brief, required by verification. Shutdown now waits for in-flight scheduled backups; code review should include that change and its regression. No existing assertion was relaxed.
-
-Proposed gates: **design + code**. Design owns the listed visual captures and G-c disposition; code owns manager browser reruns and wrap navigation/selection checks before merge. No push performed. Input `_brief.md` remains untracked and untouched. Git commit hooks completed; Git printed a nonfatal sandbox warning about `packed-refs.lock`, but every listed commit exists.
-
-## Review round — B1/B2/Q1/Q2/Q3
-
-All five review items implemented in four conventional commits, without push. This appendix supersedes the earlier native-key pass-through claim and server lifecycle scope flag. Browser confirmation remains manager-owned; no Chromium/Playwright was launched.
-
-| Item | Commit | Change and evidence |
+| Criterion | Commit | Evidence |
 | --- | --- | --- |
-| B1: no-wrap caret navigation/scroll | `bd9f4985` | Explicit no-wrap code Home/End logical-line movement; Ctrl/Meta reaches document endpoints; Shift preserves anchor and direction across highlight spans. Scroll the code area to the focus endpoint using its caret rectangle. Wrapped code retains native visual-line behavior. `codeMedia.test.tsx`: 4 passing tests; strengthened navigation and multiline regressions failed before the fix (2 failed/2 passed). Existing mapping, selection, persistence and node-identity assertions retained; key-consumption expectation intentionally changes to false. |
-| B2: initial fit equals Reset | `1962003b` | Reserve the zoom row from first open with visibility hidden until measurement is ready; caption and zoom rows occupy the same space during initial fit and Reset. Layout-sensitive regression reproduced 53% before insertion versus 49% after; now initial/reset both 49%, with double-click reaching 100%. `imageLightbox.test.tsx`: 17 passing tests; new regression failed against old code. |
-| Q1: revert duplicate backup drain | `bde84a66` | Reverts `9d1a2c58` using `git revert --no-commit`, with a conventional commit title. `server.ts:691` is plain `backups.stop();` with no await. The associated new drain regression was removed as part of the expressly requested full revert; PR #391 owns the safer replacement. |
-| Q2: no dead locked language chip | `a2127b8e` | Read-only branch renders no language chip; existing locked-action assertions preserved and DOM-absence assertion added. |
-| Q3: bounded language label | `a2127b8e` | Exact requested `.obe-code-lang` max-width 12rem, overflow hidden, ellipsis, nowrap declarations. |
+| 1. Shared 24px inset; unclipped container frame; rounded header background | `b3876cc4` | `gutterStyles.test.ts`: token equals the 24px gutter button; frame has no overflow clip; header follows frame radius minus border. Inspection found no scroll-shadow dependency on the clip. |
+| 2. Body/header inset equality | `9d8118e0` | All three bodies use the inset token. Header tests cover hanging group icon, accordion toggle width, zero extra icon gap, and tab-strip compensation for the header inset. |
+| 3. Header heights/type scale | `02813cf5` | Three 32px minimum headers, fixed 28px tabs, caption-sized badges, shared small labels and 600 weights; CSS regression assertions. |
+| 4. Handle/selection/focus/button alignment | `eebf8ea5` | Shared group/tabs/accordion header offsets and selection radius; all four focus selectors; 24px controls. CSS test helper now matches complete selectors rather than accidentally reading a descendant rule. |
+| 5. Surfaces, badge, chevron, naming | `1b2b99e4` + `5eba7b86` | Border-only group, dashed locked frames, unified divider alpha and one 0.5 disabled-control rule. `containerViews.test.tsx` covers item creation in en/de/ja/zh, retained authored labels, and the same SVG surviving collapse/reopen. Surface/badge CSS equality tests. Slash-menu defaults also use Item N. Final review scopes dashed borders to directly owned locked children/tabs; a nested-container DOM regression test passes with the 29-test gutter suite. |
+| 6. HTML export parity | `92594ba6` | `containerParity.test.ts`: 13 cases cover normalized weighted spans and 28px gap, frame/token equality, light/dark borders and muted colours, caption eyebrows, native details/open-state precedence, nested/empty frames, sibling boundaries, reactive input preservation, Markdown and slide-deck continuity. Existing export regression suites retained. |
 
-Focused verification: 21/21 tests across the two affected suites. Full foreground verification finished successfully; final counts are recorded below.
+## Validation
 
-Manifest flags unchanged: G-b aliases available (32px/36px), no literal fallback; G-c stage/scrim/white-alpha token decision remains open. Wrap-risk flag remains **browser gate pending**: units now exercise actual handler movement and mocked caret geometry, not merely native pass-through; real browser glyph/scroll geometry, pointer selection, IME, bidi, and visual-line behavior still require manager review. Rerun unchanged `kit.spec.ts` wrap case and `image-lightbox.spec.ts` initial-fit/reset case; no browser assertion was removed or relaxed. Shared `TextBlockView` change is explicitly limited to no-wrap code under B1 authorization.
+- Targeted unit run: **100 files / 1,099 tests passed**. Explicit UI filter; block-editor tests, kit tests, export tests, block-export tests and template tests.
+- Section-5 container/i18n run: **3 files / 44 tests passed**.
+- UI typecheck, changed-file ESLint, CSS error gate and `git diff --check` passed before the full gate. Commit hooks also ran ESLint/typecheck and commitlint.
+- **Full foreground `pnpm verify`: PASS, exit 0.** Includes ESLint-rule tests, library builds, generated-file equality, all workspace typechecks/lint/unit scripts, server e2e and MCP e2e. Final counts: SDK **580**, UI **2,533**, desktop **9**, server **1,440** passing tests; server **8 existing conditional skips** (Beancount/native runtime/native Whisper/real Postgres), none introduced here. Server e2e **256/256** checks; MCP e2e **70/70** checks; MCP catalogue coverage **45 types + 9 plugin blocks**. Server suite took 892.63 seconds. [Full log](/tmp/dsx3-verify.log); [targeted log](/tmp/dsx3-targeted.log).
+- Environment diagnosis: the first sandboxed full run hit `EMFILE` from macOS filesystem watchers in `mirror.integration.test.ts`; an isolated sandboxed rerun reproduced it. The unchanged suite passed **3/3** outside the sandbox. Stopped the failed sandboxed run and restarted outside the sandbox without watcher workarounds or skipped checks. Restarted that full run once more after committing the nested-lock CSS refinement, so the final gate covers the final source. Diagnostic logs: `/tmp/dsx3-verify-sandbox.log`, `/tmp/dsx3-mirror-recheck.log`, `/tmp/dsx3-mirror-unrestricted.log`.
+- Playwright was not run, per brief. The named `kit-blocks.spec.ts`, `block-editor.spec.ts`, and `templates.spec.ts` are browser specs, not Vitest suites; the unit coverage above exercises their relevant model/render/export paths. Manager-side browser regression should include those three, plus `block-gutter-captures.spec.ts`, `column-resize-captures.spec.ts`, `export-html.spec.ts`, `export.spec.ts`, `pdf-export.spec.ts`, and export-viewer captures.
 
-### Design-gate additions — D1–D6
+## Design choices and compatibility
 
-All six additions are in `d54549e7` (`fix(ui): address media design gate stacking and chrome findings`).
+- Badge uses `--data-green-chip-bg` / `--data-green-chip-fg`, installed at `:root` by `ThemeProvider` and the export viewer through `applyDataColors`. Nested `--obe-bg-green` / `--obe-fg-green` fallbacks cover providerless editors.
+- Existing `exportKit2.test.ts` requires a flat accordion projection with a header and live child inputs. Preserved that test and contract: headers carry container range metadata; HTML renders native details/eyebrows around the same flat children. Linear Markdown/PDF consumers retain their heading convention. Container labels do not become HTML h3s or table-of-contents entries. A divider inside a container stays inside its slide instead of breaking its range.
+- Updated only the existing equal-column HTML literal assertion for the new `flex:6 1 0` attributes. Existing gutter column/divider assertions already use correct tokens/geometry; none needed changing, and none were removed or weakened.
+- No lint-guard baseline edits. Three documented, declaration-scoped stylelint exceptions permit the brief's calculated inner radius and negative token-based icon/tab offsets; guard rules and their negative controls remain intact.
+- The group still uses “Section”; existing authored accordion labels are preserved. New defaults and add/label controls use localized “Item”. Tabs accessibility structure and gutter/menu chrome were left in their assigned scope.
 
-| Item | Result / evidence |
-| --- | --- |
-| D1 | Media bar and both image/artifact resize controls use `--z-index-pane-overlay` = 4 above selection wash `--z-index-drop-indicator` = 3. Audited actual TSX ancestor chains: `.obe-blockbody` → image figure/frame, artifact figure/frame, or codeblock; none introduces z-index, opacity, transforms, filter, isolation or containment between wash and controls. Contract tests resolve token numbers and check these ancestor rules. Manager must rerun adjacent drag/drop-indicator e2e and selected-media captures. |
-| D2 | Code bottom padding is 1rem; reserved top band unchanged. Existing geometry contract updated only to the new pinned padding literal. |
-| D3 | Plain media bar uses top/right 4px, asserted by contract. |
-| D4 | Removed free-text Language gear field; chip/dropdown owns language selection. File/output name, Hide code, Wrap code and Live remain. Added absence/presence assertions without removing existing assertions. |
-| D5 | Zoom bar and close tile use popover background, menu shadow, and border 0. Their text/icons use paired popover foreground and semantic hover fill so the new surfaces work in light mode too. Stage scrim, caption and focus-ring literals remain unchanged under G-c; no new stage token invented. |
-| D6 | Shared image menu renderer adds lucide Scaling before Image size, covering both dropdown and context menu. Existing item-list/preset tests remain intact. |
+## Capture matrix and proposed gates
 
-Focused design verification: 55/55 tests across mediaStyles, codeMedia, imageBlock and imageLightbox. The prior verification was intentionally stopped when the design additions arrived; it is not counted as a green run. A fresh full foreground run covers the final implementation. Visual recaptures should include selected image/artifact controls above the wash, code spacing and gear contents, light/dark lightbox tiles, and both Image size menu entries.
+**Design gate:** capture all four container families in light/dark, editable/read-only, selected/focused and locked/gated states. Group, tabs and accordion change in the editor; columns change in clipboard/static HTML (the editor already used 28px gaps and normalized spans). Include unequal columns, nested handles near borders, active/inactive tabs with completion badges, expanded/collapsed accordion items, and group frames in exports. Verify header text at the 24px inset and consistent tab height in a real browser; unit DOM/CSS tests cannot establish pixel geometry.
 
+**Code gate:** review the section commits and scoped lock-border refinement and foreground verification evidence, especially flat export-range metadata, nested closure ordering, generated-file cleanliness and sibling DSX-2 integration. No text-block renderer, text-block CSS or shared icon-size token was changed.
 
-Final review verification: `pnpm --filter open-book run verify` exited **0** in this turn on `d54549e7`, covering all B/Q/D implementation commits. **4,543 workspace unit tests passed**: SDK 580 (32 files), UI 2,514 (253 files), app 9 (3 files), server 1,440 (106 passing files; 1 file/8 tests skipped as before). ESLint-rule tests 7/7; MCP script tests all pass; server protocol e2e **256 checks**, MCP protocol e2e **70 checks**. All builds, generated checks, typechecks and lint passed; UI ESLint has 205 warnings/0 errors and CSS has 138 warnings/0 errors (148→138 this review, 162→138 overall). Full log: `/tmp/dsx-review-final-verify.log`. No implementation changes followed this run. The reverted backup race did not recur during this successful run; its permanent replacement remains PR #391's responsibility.
+## Follow-up card proposals
 
-Final disposition: **11/11 review items addressed**, five implementation commits plus this report/ledger commit, no push. Browser/design gate remains pending manager reruns for B1/B2/D1 and visual captures; unit success is not claimed as a browser pass. Input `_brief.md` remains untouched and untracked. `git diff --check` is clean.
+1. **Tabs accessibility:** replace input-inside-tab-button structure; implement arrow-key navigation, roving tabindex, stable panel IDs and aria-controls; add keyboard/browser tests.
+2. **DSX-7 columns handle collision (audit P2 #10):** test nested handles against column divider targets at narrow widths and unequal spans; resolve in the chrome owner branch.
+3. **Gate/add placement unification (audit P2 #13):** agree and implement consistent placement across tabs and accordion after design review.
+
+Git commits completed successfully despite a non-fatal sandbox warning about `packed-refs.lock` creation; all implementation hashes were checked. No push, binaries or generated build artifacts are included. `_brief.md` remains the pre-existing untracked task input.
+
+## DSX-3 pre-endorsed review fixes — 2026-10-10
+
+All eight fixes applied in `6d30de5c`; full foreground `pnpm --filter open-book verify` passed (exit 0) in-turn. No push.
+
+- **#1 → `6d30de5c`:** DSX-3 prefixes on all three stylelint exceptions.
+- **#2 → `6d30de5c`:** dashed container frames depend on directly owned locked content; inactive locked tabs no longer dash the frame. Retained nested-lock assertions and added inactive/active locked-tab coverage.
+- **#3 → `6d30de5c`:** accordion focus offset uses the requested negative focus token/fallback.
+- **#4 → `6d30de5c`:** group/container header trailing inset is 8px; starting inset remains 24px.
+- **#5 → `6d30de5c`:** 32px accordion footer, requested footer/button padding and zero button gap; plus SVG occupies the 24px inset without shrinking (SVG viewBox content centres by default).
+- **#6 → `6d30de5c`:** locked group/container border colour uses muted foreground at 0.45; pinned expectations updated, no assertions removed.
+- **#7 → `6d30de5c`:** tabs header minimum height includes the requested 1px adjustment.
+- **#8 → `6d30de5c`:** accordion body top padding is zero; bottom padding retained.
+
+Validation: targeted container suite **1 file / 29 tests passed**; CSS error gate and diff check passed. Full verify: ESLint-rule tests **7/7**; SDK **32 files / 580 tests**; UI **253 files / 2,533 tests**; desktop **3 files / 9 tests**; server **106 files / 1,440 tests passed**, **1 file / 8 existing conditional skips** (server duration 1,003.81s). MCP unit checks **13 assets + 67 API checks**, catalogue **45 types + 9 plugin blocks**. Server e2e **256/256**, MCP e2e **70/70**. Library builds, generated-file checks, workspace typechecks/lint and commit hooks passed. Verification ran outside the sandbox due to the previously documented watcher limitation. [Full verification log](/tmp/dsx3-review-verify.log).
+
+Only container CSS and its existing regression test changed. Visual review targets: group trailing alignment/locked contrast, active versus inactive locked tabs, accordion focus/footer/body spacing. Pre-existing `_brief.md` and `_fixbrief.md` remain untracked.
