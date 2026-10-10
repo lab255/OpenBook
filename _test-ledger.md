@@ -33,3 +33,13 @@ Environment diagnosis: sandboxed mirror integration hit filesystem-watch EMFILE;
 Verification prerequisite `9d1a2c58`: full run subsequently found backupBoot ENOTEMPTY/PGlite-closed teardown race. BackupScheduler.stop now drains active ticks, and server close awaits it. New drain regression fails on original implementation and passes with fix; backupBoot + backups: 31 passed. No original server test weakened or suppressed.
 
 Final width alignment `221cd260`: frame and caption explicitly share 100% default and 30/60/100% preset widths. Existing image suite extended with width equality assertions (28 passed). Follow-up full UI build/typecheck/lint/test passed (253 files, 2,510 tests), validating the final UI source after the workspace run’s earlier UI phase.
+
+## Review round addendum
+
+- B1 → `bd9f4985`: codeMedia suite 4/4. Long-line Home/End starts at the opposite endpoint and must move selection, reveal its focus endpoint, support backwards Shift+Home, and preserve selection/persistence across wrap toggles. Multiline logical endpoints and Ctrl+Shift anchor direction covered. Pre-fix: 2 failures; post-fix: 4 passes. Browser `kit.spec.ts` assertions unchanged, manager rerun pending.
+- B2 → `1962003b`: imageLightbox suite 17/17. Geometry stub reduces rendered width when the zoom row exists, reproducing the reported 53%/49% discrepancy before the fix. Initial fit, double-click 100%, and Reset equality covered. Browser `image-lightbox.spec.ts` assertions unchanged, manager rerun pending.
+- Q1 → `bde84a66`: authorized full revert of `9d1a2c58`, including its newly added drain test. `backups.stop()` restored without await; PR #391 supersedes this worktree's backup fix.
+- Q2/Q3 → `a2127b8e`: no read-only language-chip DOM, exact requested bounded-label CSS. Existing locked viewing-action assertions retained.
+- D1–D6 → `d54549e7`: mediaStyles token-resolved z-index 4 > wash 3 plus no intervening stacking-context declarations; bottom/right padding pins; popover surface/shadow/no-border checks; code gear language-input absence and retained file field. Shared Image size renderer gives both menus Scaling. Focused four-suite run: 55/55. Manager retains selection-wash/drag/drop browser gate; no browser assertion changed.
+
+Final complete-batch verification: `pnpm --filter open-book run verify` exited 0 on `d54549e7` in-turn. SDK 580 + UI 2,514 + app 9 + server 1,440 = **4,543 passed**, 8 existing server skips; ESLint-rule tests 7/7; MCP scripts pass; protocol e2e 256 server + 70 MCP checks. Builds/gen/typecheck/lint pass; CSS 138 warnings, 0 errors. Log `/tmp/dsx-review-final-verify.log`. Browser gates pending manager; no Playwright run and no push.
