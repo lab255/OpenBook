@@ -1843,13 +1843,12 @@ a.obe-mention {
 .obe-group {
   flex: 1;
   min-width: 0;
-  border: 1px solid hsl(var(--border) / 0.8);
+  border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
-  background: hsl(var(--muted) / 0.25);
+  background: transparent;
   margin: 0;
 }
 .obe-group-locked {
-  background: hsl(var(--muted) / 0.45);
   border-style: dashed;
 }
 .obe-group-head {
@@ -1858,9 +1857,10 @@ a.obe-mention {
   align-items: center;
   gap: 0;
   padding: 0 var(--obe-cnt-inset);
-  border-bottom: 1px solid hsl(var(--border) / 0.6);
+  border-bottom: 1px solid hsl(var(--border) / 0.7);
 }
 .obe-group-icon {
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- The group icon hangs inside the shared inset. */
   margin-left: calc(-1 * var(--obe-cnt-inset));
   width: var(--obe-cnt-inset);
   height: 0.95rem;
@@ -1885,7 +1885,6 @@ a.obe-mention {
 }
 .obe-group-btn:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-group-btn-on { color: hsl(var(--primary)); }
-.obe-group-btn:disabled { opacity: 0.4; cursor: default; }
 .obe-group-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 /* Exported groups (static HTML). */
 .obe-x-group { border: 1px solid #e5e7eb; border-radius: var(--radius-lg); padding: 0.5rem 1rem; margin: 0.75rem 0; }
@@ -3649,6 +3648,7 @@ a.obe-mention {
 }
 .obe-cnt-head {
   min-height: var(--height-control-md);
+  /* stylelint-disable-next-line design-tokens/role-values -- Header radius follows the frame token minus its 1px border, without clipping children. */
   border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   display: flex;
   align-items: center;
@@ -3659,7 +3659,7 @@ a.obe-mention {
 }
 .obe-cnt-spacer { flex: 1; }
 .obe-cnt-panel { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
-.obe-cnt-panel.obe-cnt-locked, .obe-acc-section.obe-cnt-locked { opacity: 0.7; }
+.obe-cnt:has(.obe-cnt-locked, .obe-tab-locked) { border-style: dashed; }
 .obe-cnt-add {
   min-height: var(--height-control-xs);
   display: inline-flex;
@@ -3674,6 +3674,7 @@ a.obe-mention {
 }
 .obe-cnt-add:hover { color: hsl(var(--foreground)); background: var(--hover); }
 
+/* stylelint-disable-next-line declaration-property-value-allowed-list -- Cancel header inset before applying the tab text inset. */
 .obe-tabs-strip { margin-inline-start: calc(-1 * var(--obe-cnt-inset)); padding-inline-start: calc(var(--obe-cnt-inset) - 8px); display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; flex: 1; }
 .obe-tab {
   height: var(--height-control-sm);
@@ -3696,10 +3697,9 @@ a.obe-mention {
   color: hsl(var(--foreground));
   font-weight: 600;
 }
-.obe-tab-locked { opacity: 0.55; cursor: default; }
 .obe-tab-label { font: inherit; }
 
-.obe-acc-section { border-bottom: 1px solid hsl(var(--border) / 0.6); }
+.obe-acc-section { border-bottom: 1px solid hsl(var(--border) / 0.7); }
 .obe-acc-section:last-child { border-bottom: none; }
 .obe-acc-head {
   min-height: var(--height-control-md);
@@ -3719,8 +3719,10 @@ a.obe-mention {
   border-radius: var(--radius-md);
   cursor: pointer;
 }
+.obe-acc-chevron { transition: transform var(--motion-base) var(--ease-out-soft); }
+.obe-acc-toggle[aria-expanded="true"] .obe-acc-chevron { transform: rotate(90deg); }
 .obe-acc-toggle:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
-.obe-acc-toggle:disabled { opacity: 0.5; cursor: default; }
+.obe-group-btn:disabled, .obe-tab:disabled, .obe-acc-toggle:disabled { opacity: 0.5; cursor: default; }
 .obe-acc-label { font-size: var(--obe-small-size); font-weight: 600; }
 .obe-acc-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 .obe-acc-foot { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; }
@@ -3739,7 +3741,7 @@ a.obe-mention {
   font-size: var(--obe-caption-size);
   font-variant-numeric: tabular-nums;
 }
-.obe-cnt-done { background: #10b981; color: #fff; }
+.obe-cnt-done { background: var(--data-green-chip-bg, var(--obe-bg-green)); color: var(--data-green-chip-fg, var(--obe-fg-green)); }
 
 /* Live code: a toolbar (language badge · show-hide · run · copy · ⚙) above the
    editor, and the live output row below it. */

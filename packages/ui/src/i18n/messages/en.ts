@@ -5,7 +5,7 @@
  * placeholders are interpolated by `t(key, {var})`.
  */
 export const en = {
-  blockEditor: {resizeColumn: 'Resize column {column}'},
+  blockEditor: {resizeColumn: 'Resize column {column}', accordionItem: 'Item {number}', accordionAddLabel: 'Item', accordionAdd: 'Add item', accordionItemLabel: 'Item label'},
   common: {
     cancel: 'Cancel',
     close: 'Close',

@@ -228,3 +228,24 @@ describe('container handles and keyboard targets', () => {
     expect(ruleBody('.obe-cnt-add')).toContain('min-height: var(--height-control-xs)');
   });
 });
+
+describe('container surface equality', () => {
+  it('uses full frame borders and the same divider alpha', () => {
+    expect(ruleBody('.obe-group')).toContain('background: transparent');
+    for (const selector of ['.obe-group', '.obe-cnt']) {
+      expect(ruleBody(selector)).toContain('border: 1px solid hsl(var(--border))');
+    }
+    for (const selector of ['.obe-group-head', '.obe-cnt-head', '.obe-acc-section']) {
+      expect(ruleBody(selector)).toContain('border-bottom: 1px solid hsl(var(--border) / 0.7)');
+    }
+    expect(ruleBody('.obe-group-locked').trim()).toBe('border-style: dashed;');
+    expect(ruleBody('.obe-cnt:has(.obe-cnt-locked, .obe-tab-locked)').trim()).toBe('border-style: dashed;');
+    expect(CSS).not.toMatch(/\.obe-cnt-panel\.obe-cnt-locked[^}]*opacity/);
+  });
+
+  it('pairs the live green chip colours with providerless editor fallbacks', () => {
+    expect(ruleBody('.obe-cnt-done').trim()).toBe('background: var(--data-green-chip-bg, var(--obe-bg-green)); color: var(--data-green-chip-fg, var(--obe-fg-green));');
+    expect(ruleBody('.obe-acc-chevron')).toContain('transition: transform var(--motion-base) var(--ease-out-soft)');
+    expect(ruleBody('.obe-acc-toggle[aria-expanded="true"] .obe-acc-chevron')).toContain('transform: rotate(90deg)');
+  });
+});

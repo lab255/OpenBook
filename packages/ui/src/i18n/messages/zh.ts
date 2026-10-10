@@ -1,7 +1,7 @@
 import type {PartialMessages} from './en';
 
 export const zh: PartialMessages = {
-  blockEditor: {resizeColumn: '调整列 {column} 的宽度'},
+  blockEditor: {resizeColumn: '调整列 {column} 的宽度', accordionItem: '项目 {number}', accordionAddLabel: '项目', accordionAdd: '添加项目', accordionItemLabel: '项目标签'},
   navigation: {
     loadError: {
       title: '无法连接到此资料库',
