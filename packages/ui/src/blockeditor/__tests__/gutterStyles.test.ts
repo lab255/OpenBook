@@ -239,8 +239,17 @@ describe('container surface equality', () => {
       expect(ruleBody(selector)).toContain('border-bottom: 1px solid hsl(var(--border) / 0.7)');
     }
     expect(ruleBody('.obe-group-locked').trim()).toBe('border-style: dashed;');
-    expect(ruleBody('.obe-cnt:has(.obe-cnt-locked, .obe-tab-locked)').trim()).toBe('border-style: dashed;');
+    expect(ruleBody('.obe-cnt:has(> .obe-cnt-locked), .obe-cnt:has(> .obe-cnt-head > .obe-tabs-strip > .obe-tab-locked)').trim()).toBe('border-style: dashed;');
     expect(CSS).not.toMatch(/\.obe-cnt-panel\.obe-cnt-locked[^}]*opacity/);
+  });
+
+  it('marks only the frame that owns a locked item, not its outer containers', () => {
+    const host = document.createElement('div');
+    host.innerHTML = '<section class="obe-cnt"><div class="obe-cnt-panel"><section class="obe-cnt"><div class="obe-acc-section obe-cnt-locked"></div></section></div></section>';
+    const frames = host.querySelectorAll('.obe-cnt');
+    const selector = '.obe-cnt:has(> .obe-cnt-locked), .obe-cnt:has(> .obe-cnt-head > .obe-tabs-strip > .obe-tab-locked)';
+    expect(frames[0].matches(selector)).toBe(false);
+    expect(frames[1].matches(selector)).toBe(true);
   });
 
   it('pairs the live green chip colours with providerless editor fallbacks', () => {

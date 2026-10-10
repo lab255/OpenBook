@@ -3660,7 +3660,7 @@ a.obe-mention {
 }
 .obe-cnt-spacer { flex: 1; }
 .obe-cnt-panel { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
-.obe-cnt:has(.obe-cnt-locked, .obe-tab-locked) { border-style: dashed; }
+.obe-cnt:has(> .obe-cnt-locked), .obe-cnt:has(> .obe-cnt-head > .obe-tabs-strip > .obe-tab-locked) { border-style: dashed; }
 .obe-cnt-add {
   min-height: var(--height-control-xs);
   display: inline-flex;
