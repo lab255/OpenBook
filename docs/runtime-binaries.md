@@ -76,45 +76,38 @@ a draft automatically.
 
 ## Activate pins only after publication
 
-WSP-1's `runtimeManifest.ts` has not landed on this worker's base. The companion
-`runtime-binaries-manifest.patch` is prepared against
-`feat/wsp-1-verified-downloads`; apply it after WSP-1 merges. It adds an unused
-URL helper and explicit pending asset mapping/tests, **no hashes and no supported
-status flips**. Do not cherry-pick a replacement of the whole WSP-1 manifest.
+Activated **2026-10-10** from the published, immutable prerelease
+[`runtime-binaries-v1`](https://github.com/lab255/OpenBook/releases/tag/runtime-binaries-v1).
+The release owner's pre-publication checksum/signing review is recorded in the
+activation brief. Downloaded `assets.json` and `checksums.txt` agree for all six
+archives; the inventory is checked in as a server test fixture.
 
-1. Merge this workflow, configure signing, dispatch `runtime-binaries-v1`.
-2. Download all six ZIPs plus `assets.json` and `checksums.txt` from the draft.
-   Compute `shasum -a 256` of the downloaded ZIPs yourself and match the digests
-   and byte sizes against the **workflow run's job summary**, not the draft's
-   `checksums.txt`. Any mismatch: discard the draft and rebuild under a new tag.
-   Inspect licenses, signing status and source correspondence. Test extraction
-   and execution on each supported OS. Publish the reviewed draft manually:
-   keep 'pre-release' checked; never set as latest.
-3. Apply the prepared patch with `git apply --check` then `git apply`. For each
-   `PENDING_OWN_RUNTIME_ASSETS` entry, replace only the matching tool pin with:
+All four Whisper pins and arm64 macOS FFmpeg now use literal release URLs,
+SHA-256 digests and ZIP byte sizes. macOS and Linux x64 Whisper are supported;
+Windows uses the root `whisper-cli.exe` without `extractDir` or companion DLLs.
+Linux arm64 and Windows arm64 remain unsupported. The other three FFmpeg pins
+retain their existing providers (see the mirroring procedure below).
 
-   ```ts
-   {
-     status: 'supported',
-     version: pending.version,
-     url: ownRuntimeAssetUrl(pending.asset),
-     sha256: /* literal digest you computed, matched against the run summary */,
-     size: /* literal ZIP size in bytes from assets.json */,
-     archive: 'zip',
-     binaryPath: pending.binaryPath,
-   }
-   ```
+Activated pin versions include `+runtime-binaries-v1` build metadata. WSP-2's
+`pinIdentity` includes version, URL, SHA-256 and size: changed identities mark old
+runtime receipts missing and provision a new installation on enable. The model
+pin, model receipt, and `modelPresent` semantics are unchanged. There is no
+separate global generation counter to increment.
 
-   Commit literal values, not runtime loading of release metadata. The three
-   unsupported whisper entries and arm64 ffmpeg flip; Windows whisper switches
-   from the upstream DLL archive to our static executable (`whisper-cli.exe`),
-   removing `extractDir: 'Release'`. Update its companion-directory test to assert
-   the new root path and absence of `extractDir`. Retire the pending-only tests
-   that intentionally assert the current unsupported states, and remove the TODO.
-4. Run focused manifest tests, server typecheck/lint and provisioning smoke tests.
-   Publish the manifest change only after those artifacts are publicly fetchable.
-   For later rebuilds choose a **new** numbered tag and update the helper's base;
-   never replace bytes already pinned by a shipped client.
+For subsequent activations:
+
+1. Build a new numbered draft release; never replace published pinned bytes.
+2. Download all ZIPs plus `assets.json` and `checksums.txt`. Independently hash
+   the ZIPs and compare digest and size with the workflow job summary. Inspect
+   licenses, source correspondence and each `SIGNING.txt` (Linux signer exempt).
+   Test extraction/execution on supported operating systems before publication.
+3. Publish the reviewed draft as a prerelease, not latest. Only then update
+   matching manifest pins with literal values and advance their release build
+   metadata. The source ZIP's old `runtime-binaries-manifest.patch` is a reference,
+   not a patch to apply over the current manifest.
+4. Refresh the inventory fixture, run manifest and mocked provisioning tests,
+   server typecheck/lint and full `pnpm verify`. Real-download native smoke
+   remains opt-in with `OPENBOOK_TEST_RUNTIME=1`.
 
 ## Mirror existing FFmpeg pins
 
