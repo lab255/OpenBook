@@ -842,7 +842,7 @@ export const BoardView: React.FC<{
         const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
         const glyph = groupGlyph(group, groupProp, groupByParent);
         const heading = groupHeading(group, groupProp);
-          const opt = groupProp?.options?.find((o) => o.id === group.key);
+        const opt = groupProp?.options?.find((o) => o.id === group.key);
         return (
           <GroupContextMenu
             key={group.key}
