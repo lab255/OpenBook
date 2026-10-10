@@ -1123,13 +1123,23 @@ a.obe-mention {
 .obe-list { flex: 1; display: flex; min-width: 0; }
 .obe-list-marker {
   flex: none;
-  width: 1.5rem;
+  min-width: var(--obe-indent-step);
   text-align: center;
   user-select: none;
-  color: hsl(var(--foreground) / 0.8);
   padding-top: var(--obe-block-pad-y);
   font-variant-numeric: tabular-nums;
 }
+.obe-list-bullet::before {
+  content: '';
+  display: block;
+  width: calc(var(--obe-font-size) * 0.375);
+  height: calc(var(--obe-font-size) * 0.375);
+  margin: calc(var(--obe-line) / 2 - var(--obe-font-size) * 0.1875) auto 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+.obe-list-bullet[data-depth='1']::before { background: transparent; border: 1.5px solid currentColor; }
+.obe-list-bullet[data-depth='2']::before { border-radius: 0; }
 .obe-todo { flex: 1; display: flex; min-width: 0; align-items: flex-start; }
 .obe-todo-check {
   flex: none;

@@ -23,6 +23,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import type * as Y from 'yjs';
+import {listNumber, listNumberLabel} from './listMarkers';
 import {
   blockChildren,
   COLUMN_GRID_UNITS,
@@ -2499,10 +2500,11 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   case 'list': {
     const kind = blockProp<string>(block, 'kind') ?? 'bullet';
-    const marker = kind === 'number' ? `${listNumber(editor.doc, block)}.` : '•';
+    const depth = blockProp<number>(block, 'indent') ?? 0;
+    const marker = kind === 'number' ? listNumberLabel(listNumber(editor.doc, block), depth) : null;
     return (
       <div className="obe-list">
-        <span className={`obe-list-marker obe-list-${kind}`} contentEditable={false} aria-hidden>
+        <span className={`obe-list-marker obe-list-${kind}`} data-depth={depth % 3} contentEditable={false} aria-hidden>
           {marker}
         </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
@@ -2614,19 +2616,6 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   void id;
 };
-
-/** 1-based position of a numbered list item within its contiguous run. */
-function listNumber(doc: Y.Doc, block: BlockMap): number {
-  const found = findBlock(doc, blockId(block));
-  if (!found) return 1;
-  let n = 1;
-  for (let i = found.index - 1; i >= 0; i -= 1) {
-    const prev = found.parent.get(i);
-    if (blockType(prev) === 'list' && blockProp<string>(prev, 'kind') === 'number') n += 1;
-    else break;
-  }
-  return n;
-}
 
 // ── Columns ──────────────────────────────────────────────────────────────────
 
