@@ -1952,11 +1952,18 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-x-plugin > p.obe-x-plugin-text { margin-top: 0.5rem; }
 
 /* Tables */
-.obe-table-wrap { flex: 1; min-width: 0; position: relative; padding: 0 0 16px 0; }
+.obe-row[data-block-type='table'] {
+  --obe-table-pad-y: 6px;
+  --obe-table-pad-x: 8px;
+  --obe-table-line: calc(var(--obe-small-size) * var(--obe-small-leading));
+  --obe-table-grip-top: calc(var(--obe-table-pad-y) + (var(--obe-table-line) - var(--obe-gutter-btn)) / 2);
+}
+.obe-table-wrap { flex: 1; min-width: 0; position: relative; padding: 0; }
 .obe-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-table-line);
 }
 /* TBL-12 — fixed only after a width is stored; auto columns share the fluid remainder. */
 .obe-table-fixed { table-layout: fixed; width: 100%; }
@@ -1984,11 +1991,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   vertical-align: top;
   min-width: 4rem;
 }
-.obe-table td .obe-text { padding: 4px 8px; }
+.obe-table td .obe-text { padding: var(--obe-table-pad-y) var(--obe-table-pad-x); }
 .obe-table-header td {
   font-weight: 600;
 }
-.obe-table-header td .obe-text { padding-block: 6px; }
 /* Header fill only where the cell has no row/column tint (TBL-4) — a tinted
    header cell shows its `obe-bg-*` colour instead, staying bold. */
 .obe-table-header td:not([class*='obe-bg-']) {
@@ -2043,7 +2049,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
    space is reserved for column grips only when handles are shown (editable,
    unlocked) — readOnly/present stay tight. Cells position column grips; every
    row gets a zero-width header-cell host so rowspan cannot swallow its grip. */
-.obe-table-wrap.obe-has-grips { padding-top: 1.25rem; }
+.obe-table-wrap.obe-has-grips { padding-top: 1.25rem; padding-bottom: 16px; }
 .obe-has-grips .obe-table-add-col { top: 1.25rem; }
 .obe-table td { position: relative; }
 .obe-table .obe-table-row-grip-host {

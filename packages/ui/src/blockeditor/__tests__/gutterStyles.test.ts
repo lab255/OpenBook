@@ -154,7 +154,11 @@ describe('block chrome rhythm', () => {
   });
 
   it('reserves only the add-row height and puts add-column outside the table', () => {
-    expect(ruleBody('.obe-table-wrap')).toContain('padding: 0 0 16px 0');
+    expect(ruleBody('.obe-table-wrap')).toContain('padding: 0;');
+    expect(ruleBody('.obe-table-wrap.obe-has-grips')).toContain('padding-bottom: 16px');
+    expect(ruleBody('.obe-table')).toContain('font-size: var(--obe-small-size)');
+    expect(ruleBody('.obe-table')).toContain('line-height: var(--obe-table-line)');
+    expect(ruleBody('.obe-table td .obe-text')).toContain('padding: var(--obe-table-pad-y) var(--obe-table-pad-x)');
     expect(ruleBody('.obe-table-add-col')).toContain('right: -16px');
     expect(ruleBody('.obe-columns')).toContain('gap: var(--obe-columns-gap)');
     expect(ruleBody('.obe-col-divider')).toContain('left: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2)');
