@@ -27,6 +27,7 @@ import {
 import {MENU_COMPONENTS, MENU_DESTRUCTIVE_CLASS, type MenuComponentSet} from '@/components/ui/menu-components';
 import {useCopyPageLink} from '@/lib/useCopyPageLink';
 import {useTranslation} from '@/providers';
+import {menuItemClass} from '@/components/ui/dropdown-menu';
 import {cn} from '@/lib/utils';
 import type {UseDatabase} from './useDatabase';
 
@@ -140,9 +141,6 @@ export const RowMenuItems: React.FC<{
  *  has no subs/checkboxes, so a plain button stack can host it too). */
 export type ColumnMenuComponents = Pick<MenuComponentSet, 'Item' | 'Separator'>;
 
-const popoverButtonClass =
-  'flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground';
-
 /**
  * A {@link ColumnMenuComponents} set rendering the items as a compact button
  * stack for the property editor popover (which is a Popover form, not a Radix
@@ -156,12 +154,12 @@ export function popoverColumnComponents(onAfter: () => void): ColumnMenuComponen
         onSelect?.();
         onAfter();
       }}
-      className={cn(popoverButtonClass, className)}
+      className={cn(menuItemClass, className)}
     >
       {children}
     </button>
   );
-  const Separator: React.FC = () => <div className="my-1 border-t border-border" />;
+  const Separator: React.FC = () => <div className="-mx-1 my-1 h-px bg-muted" />;
   return {Item, Separator};
 }
 

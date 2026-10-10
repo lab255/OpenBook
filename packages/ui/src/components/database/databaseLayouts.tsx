@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import {inputVariants} from '@/components/ui/input';
 import {Select} from '@/components/ui/select';
 import {ChevronLeft, ChevronRight, ChevronsDownUp, ChevronsUpDown, GripVertical, Palette, PanelRightOpen, Pencil, Plus, Trash2} from 'lucide-react';
 import {
@@ -552,7 +553,7 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
   );
 };
 
-const fieldClass = 'w-full rounded border border-border bg-background px-1.5 py-1 text-xs outline-hidden';
+const fieldClass = cn(inputVariants({inputSize: 'sm'}), 'text-xs');
 const BOARD_CALCS: {value: SummaryType; label: string}[] = [
   {value: 'count_all', label: 'Count'},
   {value: 'count_values', label: 'Count values'},
@@ -590,7 +591,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
       <PopoverContent align="start" className="w-48 space-y-2 p-2.5">
         <label className="block">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Property</span>
-          <Select unstyled aria-label="Summary property" value={summary.propertyId} onChange={(e) => update({propertyId: e.target.value})} className={cn(fieldClass, 'mt-1')}>
+          <Select inputSize="sm" aria-label="Summary property" value={summary.propertyId} onChange={(e) => update({propertyId: e.target.value})} className={cn(fieldClass, 'mt-1')}>
             <option value={TITLE_PROPERTY_ID}>Rows (count)</option>
             {properties.map((p) => (
               <option key={p.id} value={p.id}>
@@ -601,7 +602,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
         </label>
         <label className="block">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Calculate</span>
-          <Select unstyled aria-label="Summary calculation" value={summary.type} onChange={(e) => update({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1')}>
+          <Select inputSize="sm" aria-label="Summary calculation" value={summary.type} onChange={(e) => update({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1')}>
             {BOARD_CALCS.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
