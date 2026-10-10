@@ -235,3 +235,29 @@ it('abort clears the stage without marking failed', async () => {
   expect(status.status).toBe('missing');
   expect(status.detail).toBeUndefined();
 });
+
+// Desktop passes --data-dir independently of OPENBOOK_MODELS_DIR. Reopening
+// its managed bin directory must work even with Finder's restricted PATH.
+it('reopens managed tools under dataDir with an empty PATH and relocated models', async () => {
+  const {pin, bytes} = await fixture('zip');
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bytes))));
+  const binDir = path.join(dir, 'desktop-app-data', 'bin');
+  const pins = {'whisper-cli': pin, ffmpeg: pin};
+  await new ManagedRuntime(binDir, 'fixture', pins).provision();
+  vi.stubEnv('PATH', '');
+  vi.stubEnv('OPENBOOK_WHISPER_BIN', '');
+  vi.stubEnv('OPENBOOK_FFMPEG_BIN', '');
+  const models = path.join(dir, 'relocated-models');
+  const reopened = new ManagedRuntime(binDir, 'fixture', pins);
+  const local = new LocalWhisper(models, undefined, undefined, reopened);
+  const wrongDir = new LocalWhisper(models);
+  const override = new LocalWhisper(models, path.join(dir, 'missing-override'), undefined, reopened);
+  try {
+    expect(await local.status()).toMatchObject({runtimeAvailable: true, runtime: {tools: {
+      'whisper-cli': {status: 'provisioned', available: true},
+      ffmpeg: {status: 'provisioned', available: true},
+    }}});
+    expect((await wrongDir.status()).runtimeAvailable).toBe(false);
+    expect((await override.status()).runtimeAvailable).toBe(false);
+  } finally { await Promise.all([local.dispose(), wrongDir.dispose(), override.dispose()]); }
+});
