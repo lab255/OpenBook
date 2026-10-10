@@ -41,3 +41,20 @@ Implemented all six sections in six incremental conventional commits plus one sc
 3. **Gate/add placement unification (audit P2 #13):** agree and implement consistent placement across tabs and accordion after design review.
 
 Git commits completed successfully despite a non-fatal sandbox warning about `packed-refs.lock` creation; all implementation hashes were checked. No push, binaries or generated build artifacts are included. `_brief.md` remains the pre-existing untracked task input.
+
+## DSX-3 pre-endorsed review fixes — 2026-10-10
+
+All eight fixes applied in `6d30de5c`; full foreground `pnpm --filter open-book verify` passed (exit 0) in-turn. No push.
+
+- **#1 → `6d30de5c`:** DSX-3 prefixes on all three stylelint exceptions.
+- **#2 → `6d30de5c`:** dashed container frames depend on directly owned locked content; inactive locked tabs no longer dash the frame. Retained nested-lock assertions and added inactive/active locked-tab coverage.
+- **#3 → `6d30de5c`:** accordion focus offset uses the requested negative focus token/fallback.
+- **#4 → `6d30de5c`:** group/container header trailing inset is 8px; starting inset remains 24px.
+- **#5 → `6d30de5c`:** 32px accordion footer, requested footer/button padding and zero button gap; plus SVG occupies the 24px inset without shrinking (SVG viewBox content centres by default).
+- **#6 → `6d30de5c`:** locked group/container border colour uses muted foreground at 0.45; pinned expectations updated, no assertions removed.
+- **#7 → `6d30de5c`:** tabs header minimum height includes the requested 1px adjustment.
+- **#8 → `6d30de5c`:** accordion body top padding is zero; bottom padding retained.
+
+Validation: targeted container suite **1 file / 29 tests passed**; CSS error gate and diff check passed. Full verify: ESLint-rule tests **7/7**; SDK **32 files / 580 tests**; UI **253 files / 2,533 tests**; desktop **3 files / 9 tests**; server **106 files / 1,440 tests passed**, **1 file / 8 existing conditional skips** (server duration 1,003.81s). MCP unit checks **13 assets + 67 API checks**, catalogue **45 types + 9 plugin blocks**. Server e2e **256/256**, MCP e2e **70/70**. Library builds, generated-file checks, workspace typechecks/lint and commit hooks passed. Verification ran outside the sandbox due to the previously documented watcher limitation. [Full verification log](/tmp/dsx3-review-verify.log).
+
+Only container CSS and its existing regression test changed. Visual review targets: group trailing alignment/locked contrast, active versus inactive locked tabs, accordion focus/footer/body spacing. Pre-existing `_brief.md` and `_fixbrief.md` remain untracked.
