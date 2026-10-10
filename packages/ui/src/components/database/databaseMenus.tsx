@@ -7,6 +7,7 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpAZ,
+  ArrowUpDown,
   BarChart3,
   Calendar,
   ChevronDown,
@@ -69,6 +70,7 @@ import {useNavigation, useTranslation} from '@/providers';
 import type {TKey} from '@/i18n';
 import {Popover, PopoverAnchor, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {
+  menuItemClass,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -83,7 +85,9 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import {IconButton} from '@/components/ui/icon-button';
+import {inputVariants} from '@/components/ui/input';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip';
+import {IconButton, iconButtonVariants} from '@/components/ui/icon-button';
 import {MENU_WIDTH_SM} from '@/components/ui/menu-components';
 import {EmptyState} from '@/components/ui/empty-state';
 import {cn} from '@/lib/utils';
@@ -262,10 +266,8 @@ export function importCsvFile(importCsv: (text: string) => Promise<number>): voi
   input.click();
 }
 
-const fieldClass = 'rounded border border-border bg-background px-1.5 py-1 text-sm outline-hidden';
-const toolButtonClass =
-  'flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground';
-const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70';
+const fieldClass = inputVariants({inputSize: 'sm'});
+const sectionLabel = 'text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground';
 
 /** The `+` column header: add a new property to the database. */
 /** Relation cardinality choices (forward-side perspective). */
@@ -287,7 +289,7 @@ const RelationConfigFields: React.FC<{
   const databases = pages.filter((p) => p.hostedDatabaseId);
   return (
     <>
-      <Select unstyled aria-label="Related database" value={databaseId ?? ''} disabled={lockDatabase} onChange={(e) => onDatabase(e.target.value)} className={cn(fieldClass, 'w-full')}>
+      <Select inputSize="sm" aria-label="Related database" value={databaseId ?? ''} disabled={lockDatabase} onChange={(e) => onDatabase(e.target.value)} className="w-full">
         <option value="">Pick a database…</option>
         {databases.map((p) => (
           <option key={p.hostedDatabaseId!} value={p.hostedDatabaseId!}>
@@ -295,7 +297,7 @@ const RelationConfigFields: React.FC<{
           </option>
         ))}
       </Select>
-      <Select unstyled aria-label="Relation cardinality" value={cardinality} onChange={(e) => onCardinality(e.target.value as RelationCardinality)} className={cn(fieldClass, 'w-full')}>
+      <Select inputSize="sm" aria-label="Relation cardinality" value={cardinality} onChange={(e) => onCardinality(e.target.value as RelationCardinality)} className="w-full">
         {CARDINALITIES.map((c) => (
           <option key={c.value} value={c.value}>
             {c.label}
@@ -369,7 +371,7 @@ export const AddPropertyMenu: React.FC<{onAdd: (input: NewPropertyInput) => void
           placeholder="Property name"
           className={cn(fieldClass, 'w-full')}
         />
-        <Select unstyled aria-label="Property type" value={type} onChange={(e) => setType(e.target.value as DatabasePropertyType)} className={cn(fieldClass, 'w-full')}>
+        <Select inputSize="sm" aria-label="Property type" value={type} onChange={(e) => setType(e.target.value as DatabasePropertyType)} className="w-full">
           {PROPERTY_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
@@ -408,7 +410,7 @@ export const AddPropertyMenu: React.FC<{onAdd: (input: NewPropertyInput) => void
           </>
         )}
         {numeric && (
-          <Select unstyled aria-label="Number format" value={numberFormat} onChange={(e) => setNumberFormat(e.target.value as NumberFormat)} className={cn(fieldClass, 'w-full')}>
+          <Select inputSize="sm" aria-label="Number format" value={numberFormat} onChange={(e) => setNumberFormat(e.target.value as NumberFormat)} className="w-full">
             {NUMBER_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
@@ -440,7 +442,7 @@ export const AddPropertyMenu: React.FC<{onAdd: (input: NewPropertyInput) => void
 };
 
 const FormulaHint: React.FC = () => (
-  <div className="rounded bg-muted/50 px-2 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
+  <div className="rounded bg-muted/50 px-2 py-1.5 text-xs leading-relaxed text-muted-foreground">
     Reference other columns by name: <code>prop(&quot;Name&quot;)</code> or a bare word. Use <code>+ - * /</code>,{' '}
     <code>if(c, a, b)</code>, <code>round</code>, <code>concat</code>, <code>min</code>, <code>max</code>.
   </div>
@@ -555,10 +557,10 @@ const OptionsEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = (
             className={cn(fieldClass, 'min-w-0 flex-1')}
           />
           {isStatus && (
-            <Select unstyled
+            <Select inputSize="sm"
               value={option.group ?? 'todo'}
               onChange={(e) => setOption(option.id, {group: e.target.value as StatusGroup})}
-              className={cn(fieldClass, 'w-24')}
+              className="w-24"
               aria-label="Status group"
             >
               {STATUS_GROUPS.map((g) => (
@@ -602,7 +604,7 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
       <div className={sectionLabel}>Rollup</div>
       <label className="block">
         <span className="text-xs text-muted-foreground">Relation</span>
-        <Select unstyled value={cfg.relationPropertyId} onChange={(e) => set({relationPropertyId: e.target.value})} className={cn(fieldClass, 'mt-0.5 w-full')}>
+        <Select inputSize="sm" value={cfg.relationPropertyId} onChange={(e) => set({relationPropertyId: e.target.value})} className="mt-0.5 w-full">
           <option value="">—</option>
           {relations.map((p) => (
             <option key={p.id} value={p.id}>
@@ -613,7 +615,7 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
       </label>
       <label className="block">
         <span className="text-xs text-muted-foreground">Property</span>
-        <Select unstyled value={cfg.targetPropertyId} onChange={(e) => set({targetPropertyId: e.target.value})} className={cn(fieldClass, 'mt-0.5 w-full')}>
+        <Select inputSize="sm" value={cfg.targetPropertyId} onChange={(e) => set({targetPropertyId: e.target.value})} className="mt-0.5 w-full">
           <option value={TITLE_PROPERTY_ID}>Title</option>
           {targets.map((p) => (
             <option key={p.id} value={p.id}>
@@ -624,7 +626,7 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
       </label>
       <label className="block">
         <span className="text-xs text-muted-foreground">Calculate</span>
-        <Select unstyled value={cfg.function} onChange={(e) => set({function: e.target.value as RollupFunction})} className={cn(fieldClass, 'mt-0.5 w-full')}>
+        <Select inputSize="sm" value={cfg.function} onChange={(e) => set({function: e.target.value as RollupFunction})} className="mt-0.5 w-full">
           {ROLLUP_FUNCTIONS.map((f) => (
             <option key={f.value} value={f.value}>
               {f.label}
@@ -683,7 +685,7 @@ export const PropertyMenu = React.forwardRef<
       <PopoverTrigger asChild>
         <IconButton
           size="inline"
-          className="text-muted-foreground/60 opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 data-[state=open]:opacity-100"
+          className="text-muted-foreground/80 opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 data-[state=open]:opacity-100"
           aria-label="Property options"
         >
           <MoreHorizontal className="h-3.5 w-3.5" />
@@ -701,10 +703,10 @@ export const PropertyMenu = React.forwardRef<
           className={cn(fieldClass, 'w-full font-medium')}
           aria-label="Property name"
         />
-        <Select unstyled
+        <Select inputSize="sm"
           value={property.type}
           onChange={(e) => void db.updateProperty(property.id, {type: e.target.value as DatabasePropertyType})}
-          className={cn(fieldClass, 'w-full')}
+          className="w-full"
         >
           {PROPERTY_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -731,7 +733,7 @@ export const PropertyMenu = React.forwardRef<
               }
             />
             {property.reversePropertyId ? (
-              <p className="text-[11px] text-muted-foreground">Two-way link — edits sync to the related database.</p>
+              <p className="text-xs text-muted-foreground">Two-way link — edits sync to the related database.</p>
             ) : (
               <button
                 type="button"
@@ -789,10 +791,10 @@ export const PropertyMenu = React.forwardRef<
             </label>
             <label className="block">
               <span className={sectionLabel}>Display</span>
-              <Select unstyled
+              <Select inputSize="sm"
                 value={property.dateDisplay ?? 'absolute'}
                 onChange={(e) => void db.updateProperty(property.id, {dateDisplay: e.target.value as 'absolute' | 'relative'})}
-                className={cn(fieldClass, 'mt-1 w-full')}
+                className="mt-1 w-full"
                 aria-label="Date display"
               >
                 <option value="absolute">Absolute (Jun 12, 2026)</option>
@@ -813,11 +815,11 @@ export const PropertyMenu = React.forwardRef<
         )}
 
         {numeric && (
-          <Select unstyled
+          <Select inputSize="sm"
             aria-label="Number format"
             value={property.numberFormat ?? 'plain'}
             onChange={(e) => void db.updateProperty(property.id, {numberFormat: e.target.value as NumberFormat})}
-            className={cn(fieldClass, 'w-full')}
+            className="w-full"
           >
             {NUMBER_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -829,10 +831,10 @@ export const PropertyMenu = React.forwardRef<
 
         {property.type === 'number' && (
           <div className="flex items-center gap-1.5">
-            <Select unstyled
+            <Select inputSize="sm"
               value={property.numberDisplay ?? 'number'}
               onChange={(e) => void db.updateProperty(property.id, {numberDisplay: e.target.value as NumberDisplay})}
-              className={cn(fieldClass, 'flex-1')}
+              className="flex-1"
               aria-label="Show number as"
             >
               {NUMBER_DISPLAYS.map((d) => (
@@ -881,7 +883,7 @@ export const PropertyMenu = React.forwardRef<
           ) : (
             <button
               onClick={() => void db.makeDependencyTwoWay(property.id)}
-              className={cn(toolButtonClass, 'w-full justify-center')}
+              className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}
             >
               <Link2 className="h-3.5 w-3.5" /> Make two-way
             </button>
@@ -891,21 +893,21 @@ export const PropertyMenu = React.forwardRef<
           defaultValue={property.description ?? ''}
           onBlur={(e) => e.target.value !== (property.description ?? '') && db.updateProperty(property.id, {description: e.target.value})}
           placeholder="Description"
-          className={cn(fieldClass, 'w-full text-xs')}
+          className={cn(fieldClass, 'w-full')}
         />
 
         <div className="flex items-center gap-1 border-t border-border pt-2">
           <button
             disabled={index <= 0}
             onClick={() => void db.moveProperty(property.id, -1)}
-            className={cn(toolButtonClass, 'flex-1 justify-center disabled:opacity-30')}
+            className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center disabled:opacity-30')}
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Left
           </button>
           <button
             disabled={index >= count - 1}
             onClick={() => void db.moveProperty(property.id, 1)}
-            className={cn(toolButtonClass, 'flex-1 justify-center disabled:opacity-30')}
+            className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center disabled:opacity-30')}
           >
             Right <ArrowRight className="h-3.5 w-3.5" />
           </button>
@@ -966,14 +968,14 @@ const ConditionRow: React.FC<{
 
   return (
     <div className="flex items-center gap-1">
-      <Select unstyled
+      <Select inputSize="sm"
         value={filter.propertyId}
         onChange={(e) => {
           const nextProp = database.schema.properties.find((p) => p.id === e.target.value);
           const nextOps = operatorsFor(e.target.value === TITLE_PROPERTY_ID ? undefined : nextProp?.type);
           onChange({propertyId: e.target.value, operator: nextOps[0], value: ''});
         }}
-        className={cn(fieldClass, 'min-w-0 flex-1')}
+        className="min-w-0 flex-1"
       >
         {choices.map((c) => (
           <option key={c.id} value={c.id}>
@@ -981,7 +983,7 @@ const ConditionRow: React.FC<{
           </option>
         ))}
       </Select>
-      <Select unstyled value={operator} onChange={(e) => onChange({operator: e.target.value as FilterOperator})} className={cn(fieldClass, 'min-w-0 flex-1')}>
+      <Select inputSize="sm" value={operator} onChange={(e) => onChange({operator: e.target.value as FilterOperator})} className="min-w-0 flex-1">
         {ops.map((op) => (
           <option key={op} value={op}>
             {OPERATOR_LABEL[op]}
@@ -990,10 +992,10 @@ const ConditionRow: React.FC<{
       </Select>
       {!VALUELESS.has(operator) &&
         (isChoice ? (
-          <Select unstyled
+          <Select inputSize="sm"
             value={typeof filter.value === 'string' ? filter.value : ''}
             onChange={(e) => onChange({value: e.target.value})}
-            className={cn(fieldClass, 'w-24')}
+            className="w-24"
           >
             <option value="">—</option>
             {options.map((o) => (
@@ -1068,11 +1070,11 @@ const GroupEditor: React.FC<{
         )}
       </div>
       <div className="mt-1.5 flex gap-1">
-        <button onClick={addCondition} className={cn(toolButtonClass, 'flex-1 justify-center border border-dashed border-border')}>
+        <button onClick={addCondition} className={cn(menuItemClass, 'text-muted-foreground w-auto')}>
           <Plus className="h-3.5 w-3.5" /> Condition
         </button>
         {depth === 0 && (
-          <button onClick={addGroup} className={cn(toolButtonClass, 'flex-1 justify-center border border-dashed border-border')}>
+          <button onClick={addGroup} className={cn(menuItemClass, 'text-muted-foreground w-auto')}>
             <Plus className="h-3.5 w-3.5" /> Group
           </button>
         )}
@@ -1088,13 +1090,20 @@ export const FilterMenu: React.FC<MenuProps> = ({database, view, onChange, open,
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <button className={cn(toolButtonClass, count > 0 && 'text-foreground')}>
-          <Filter className="h-3.5 w-3.5" />
-          Filter{count > 0 ? ` (${count})` : ''}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[24rem] p-3">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), count > 0 && 'text-foreground', count > 0 && 'w-auto gap-1 px-1.5')} aria-label={`Filter${count > 0 ? ` (${count})` : ''}`}>
+                <Filter className="h-4 w-4" />
+                {count > 0 && <span className="text-xs tabular-nums">{count}</span>}
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Filter</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent align="end" className="w-[24rem] p-3">
         <GroupEditor
           database={database}
           group={root}
@@ -1120,19 +1129,26 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange, open, o
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <button className={cn(toolButtonClass, sorts.length > 0 && 'text-foreground')}>
-          <ListFilter className="h-3.5 w-3.5" />
-          Sort{sorts.length > 0 ? ` (${sorts.length})` : ''}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-2 p-3">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), sorts.length > 0 && 'text-foreground', sorts.length > 0 && 'w-auto gap-1 px-1.5')} aria-label={`Sort${sorts.length > 0 ? ` (${sorts.length})` : ''}`}>
+                <ArrowUpDown className="h-4 w-4" />
+                {sorts.length > 0 && <span className="text-xs tabular-nums">{sorts.length}</span>}
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Sort</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent align="end" className="w-80 space-y-2 p-3">
         {sorts.length === 0 && (
           <EmptyState variant="overlay" className="py-1" title={t('database.empty.noSorts')} />
         )}
         {sorts.map((sort, index) => (
           <div key={index} className="flex items-center gap-1">
-            <Select unstyled value={sort.propertyId} onChange={(e) => setSort(index, {propertyId: e.target.value})} className={cn(fieldClass, 'min-w-0 flex-1')}>
+            <Select inputSize="sm" value={sort.propertyId} onChange={(e) => setSort(index, {propertyId: e.target.value})} className="min-w-0 flex-1">
               {choices.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -1151,7 +1167,7 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange, open, o
             </IconButton>
           </div>
         ))}
-        <button onClick={addSort} className={cn(toolButtonClass, 'w-full justify-center border border-dashed border-border')}>
+        <button onClick={addSort} className={cn(menuItemClass, 'text-muted-foreground w-full')}>
           <Plus className="h-3.5 w-3.5" /> Add sort
         </button>
       </PopoverContent>
@@ -1228,13 +1244,13 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
   return (
     <div className="flex items-center gap-1">
       <span className="h-4 w-1.5 shrink-0 rounded-full" style={{backgroundColor: swatchColor(rule.color) ?? DEFAULT_SWATCH}} />
-      <Select unstyled
+      <Select inputSize="sm"
         value={rule.propertyId}
         onChange={(e) => {
           const next = properties.find((p) => p.id === e.target.value);
           update({propertyId: e.target.value, operator: operatorsFor(next?.type)[0], value: undefined});
         }}
-        className={cn(fieldClass, 'min-w-0 flex-1')}
+        className="min-w-0 flex-1"
         aria-label="Rule property"
       >
         {properties.map((p) => (
@@ -1243,7 +1259,7 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
           </option>
         ))}
       </Select>
-      <Select unstyled value={rule.operator} onChange={(e) => update({operator: e.target.value as FilterOperator})} className={cn(fieldClass, 'min-w-0')} aria-label="Rule operator">
+      <Select inputSize="sm" value={rule.operator} onChange={(e) => update({operator: e.target.value as FilterOperator})} className="min-w-0" aria-label="Rule operator">
         {ops.map((o) => (
           <option key={o} value={o}>
             {OPERATOR_LABEL[o]}
@@ -1252,7 +1268,7 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
       </Select>
       {!VALUELESS.has(rule.operator) &&
         (isSelect ? (
-          <Select unstyled value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => update({value: e.target.value})} className={cn(fieldClass, 'min-w-0 flex-1')} aria-label="Rule value">
+          <Select inputSize="sm" value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => update({value: e.target.value})} className="min-w-0 flex-1" aria-label="Rule value">
             <option value="">—</option>
             {(prop?.options ?? []).map((o) => (
               <option key={o.id} value={o.id}>
@@ -1269,14 +1285,14 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
             aria-label="Rule value"
           />
         ))}
-      <Select unstyled value={rule.color} onChange={(e) => update({color: e.target.value})} className={cn(fieldClass, 'w-16')} aria-label="Rule colour">
+      <Select inputSize="sm" value={rule.color} onChange={(e) => update({color: e.target.value})} className="w-16" aria-label="Rule colour">
         {SELECT_COLORS.map((c) => (
           <option key={c} value={c}>
             {c}
           </option>
         ))}
       </Select>
-      <IconButton size="inline" onClick={remove} aria-label="Remove rule" className="text-muted-foreground/70">
+      <IconButton size="inline" onClick={remove} aria-label="Remove rule" className="text-muted-foreground">
         <X className="h-3.5 w-3.5" />
       </IconButton>
     </div>
@@ -1300,7 +1316,7 @@ export const ColorRulesEditor: React.FC<{db: UseDatabase; view: DatabaseView}> =
       {rules.map((rule) => (
         <ColorRuleRow key={rule.id} db={db} view={view} rule={rule} properties={properties} />
       ))}
-      <button onClick={add} className={cn(toolButtonClass, 'w-full justify-center')}>
+      <button onClick={add} className={cn(menuItemClass, 'text-muted-foreground w-full')}>
         <Plus className="h-3.5 w-3.5" /> Add rule
       </button>
     </div>
@@ -1351,10 +1367,10 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
       <PopoverContent align="start" className="w-56 space-y-2 p-2.5">
         <label className="block">
           <span className={sectionLabel}>Property</span>
-          <Select unstyled
+          <Select inputSize="sm"
             value={metric.propertyId}
             onChange={(e) => patch({propertyId: e.target.value})}
-            className={cn(fieldClass, 'mt-1 w-full')}
+            className="mt-1 w-full"
           >
             <option value={TITLE_PROPERTY_ID}>Rows (count)</option>
             {properties.map((p) => (
@@ -1366,7 +1382,7 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
         </label>
         <label className="block">
           <span className={sectionLabel}>Calculate</span>
-          <Select unstyled value={metric.type} onChange={(e) => patch({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1 w-full')}>
+          <Select inputSize="sm" value={metric.type} onChange={(e) => patch({type: e.target.value as SummaryType})} className="mt-1 w-full">
             {METRIC_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -1392,7 +1408,7 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
           className={cn(fieldClass, 'w-full')}
           aria-label="Metric target"
         />
-        <button onClick={remove} className={cn(toolButtonClass, 'w-full justify-center text-destructive hover:text-destructive')}>
+        <button onClick={remove} className={cn(menuItemClass, 'text-muted-foreground w-full justify-center text-destructive hover:text-destructive')}>
           <Trash2 className="h-3.5 w-3.5" /> Remove metric
         </button>
       </PopoverContent>
@@ -1520,14 +1536,14 @@ export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit:
     <div className="mb-2 flex flex-wrap items-center gap-1.5">
       {leaves.map((f, i) => (
         <React.Fragment key={f.id}>
-          {i > 0 && <span className="text-[11px] uppercase text-muted-foreground/60">{root.conjunction}</span>}
+          {i > 0 && <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{root.conjunction}</span>}
           <ChipContextMenu onEdit={onEdit} onRemove={() => removeLeaf(f.id)}>
             <span className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-2 pr-1 text-xs">
               <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
               <span className="max-w-[16rem] truncate text-muted-foreground" title={filterChipText(f, properties)}>
                 {filterChipText(f, properties)}
               </span>
-              <button onClick={() => removeLeaf(f.id)} aria-label="Remove filter" className="rounded-full p-0.5 text-muted-foreground/70 transition-colors hover:bg-hover hover:text-foreground">
+              <button onClick={() => removeLeaf(f.id)} aria-label="Remove filter" className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -1592,7 +1608,7 @@ export const SortChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit: (
               <span className="max-w-[12rem] truncate">{name(sort.propertyId)}</span>
               {sort.direction === 'asc' ? <ArrowDownAZ className="h-3 w-3 shrink-0" /> : <ArrowUpAZ className="h-3 w-3 shrink-0" />}
             </button>
-            <button onClick={() => remove(i)} aria-label="Remove sort" className="rounded-full p-0.5 text-muted-foreground/70 transition-colors hover:bg-hover hover:text-foreground">
+            <button onClick={() => remove(i)} aria-label="Remove sort" className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
               <X className="h-3 w-3" />
             </button>
           </span>
@@ -1656,7 +1672,7 @@ export const AddViewMenu: React.FC<{onAdd: (type: DatabaseViewType) => void}> = 
                   useful part ("Needs a … property"). */}
               <span className="text-xs text-muted-foreground">
                 {t(VIEW_TYPE_HINT_KEY[value])}
-                {VIEW_TYPE_NEEDS_KEY[value] && <span className="text-muted-foreground/70"> · {t(VIEW_TYPE_NEEDS_KEY[value])}</span>}
+                {VIEW_TYPE_NEEDS_KEY[value] && <span className="text-muted-foreground"> · {t(VIEW_TYPE_NEEDS_KEY[value])}</span>}
               </span>
             </span>
           </DropdownMenuItem>
@@ -1682,13 +1698,13 @@ const GroupByPicker: React.FC<{
   <label className="block">
     <span className={sectionLabel}>{label}</span>
     <Select
-      unstyled
+      inputSize="sm"
       value={value ?? ''}
       onChange={(e) => {
         if (onCreate && e.target.value === NEW_PROPERTY_VALUE) onCreate.run();
         else onChange(e.target.value || undefined);
       }}
-      className={cn(fieldClass, 'mt-1 w-full')}
+      className="mt-1 w-full"
     >
       <option value="">—</option>
       <option value={PARENT_GROUP_ID}>Sub-items (parent)</option>
@@ -1737,12 +1753,18 @@ export const GroupMenu: React.FC<{db: UseDatabase; view: DatabaseView; open?: bo
   };
   return (
     <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-      <PopoverTrigger asChild>
-        <button className={cn(toolButtonClass, view.groupByPropertyId && 'text-foreground')}>
-          <Layers className="h-3.5 w-3.5" />
-          {t('database.toolbar.group')}
-        </button>
-      </PopoverTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), view.groupByPropertyId && 'text-foreground')} aria-label="Group">
+                <Layers className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{t('database.toolbar.group')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <PopoverContent align="end" className="w-72 space-y-2.5 p-3">
         <GroupByPicker
           label="Group by"
@@ -1801,12 +1823,18 @@ export const FieldsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db,
   const customized = Boolean(view.visiblePropertyIds && view.visiblePropertyIds.length > 0);
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button className={cn(toolButtonClass, customized && 'text-foreground')}>
-          <Eye className="h-3.5 w-3.5" />
-          {t('database.toolbar.fields')}
-        </button>
-      </PopoverTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), customized && 'text-foreground')} aria-label="Fields">
+                <Eye className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{t('database.toolbar.fields')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <PopoverContent align="end" className="w-64 space-y-1.5 p-3">
         <div className={sectionLabel}>Properties</div>
         <PropertyVisibilityList db={db} view={view} />
@@ -1844,7 +1872,7 @@ export const GroupChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit: 
           <button
             onClick={() => void db.updateView(view.id, {groupByPropertyId: undefined, subGroupByPropertyId: undefined})}
             aria-label={t('database.toolbar.removeGrouping')}
-            className="rounded-full p-0.5 text-muted-foreground/70 transition-colors hover:bg-hover hover:text-foreground"
+            className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
           >
             <X className="h-3 w-3" />
           </button>
@@ -1905,12 +1933,18 @@ export const ViewOptionsMenu: React.FC<{
 
   return (
     <Popover open={isOpen} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className={toolButtonClass} aria-label="View options">
-          <Settings2 className="h-3.5 w-3.5" />
-          View
-        </button>
-      </PopoverTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}))} aria-label="View options">
+                <Settings2 className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>View options</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       {/* The panel can outgrow short windows (layout grid + grouping + colour
           rules + metrics) — scroll inside rather than cutting off the tail.
           Cap to the collision-measured available height (like the base
@@ -1986,13 +2020,13 @@ export const ViewOptionsMenu: React.FC<{
         {showMap && (
           <label className="block">
             <span className={sectionLabel}>Location property</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.geoPropertyId ?? ''}
               onChange={(e) => {
                 if (e.target.value === NEW_PROPERTY_VALUE) createFor('location', 'geoPropertyId');
                 else db.updateView(view.id, {geoPropertyId: e.target.value || undefined});
               }}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">—</option>
               {locationProps.map((p) => (
@@ -2008,10 +2042,10 @@ export const ViewOptionsMenu: React.FC<{
         {showMap && (
           <label className="block">
             <span className={sectionLabel}>Geocode address (optional)</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.addressPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {addressPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {addressProps.map((p) => (
@@ -2020,7 +2054,7 @@ export const ViewOptionsMenu: React.FC<{
                 </option>
               ))}
             </Select>
-            <span className="mt-1 block text-[11px] text-muted-foreground/70">
+            <span className="mt-1 block text-xs text-muted-foreground">
               Lets you look up coordinates from an address column on demand (a network call).
             </span>
           </label>
@@ -2042,10 +2076,10 @@ export const ViewOptionsMenu: React.FC<{
           <div className="flex gap-1">
             <label className="flex-1">
               <span className={sectionLabel}>Measure</span>
-              <Select unstyled
+              <Select inputSize="sm"
                 value={aggregate.type}
                 onChange={(e) => db.updateView(view.id, {aggregate: {...aggregate, type: e.target.value as ChartAggregate['type']}})}
-                className={cn(fieldClass, 'mt-1 w-full')}
+                className="mt-1 w-full"
               >
                 {(['count', 'sum', 'avg', 'min', 'max'] as const).map((t) => (
                   <option key={t} value={t}>
@@ -2057,10 +2091,10 @@ export const ViewOptionsMenu: React.FC<{
             {aggregate.type !== 'count' && (
               <label className="flex-1">
                 <span className={sectionLabel}>Of</span>
-                <Select unstyled
+                <Select inputSize="sm"
                   value={aggregate.propertyId ?? ''}
                   onChange={(e) => db.updateView(view.id, {aggregate: {...aggregate, propertyId: e.target.value || undefined}})}
-                  className={cn(fieldClass, 'mt-1 w-full')}
+                  className="mt-1 w-full"
                 >
                   <option value="">—</option>
                   {numericProps.map((p) => (
@@ -2077,10 +2111,10 @@ export const ViewOptionsMenu: React.FC<{
         {showChart && (
           <label className="block">
             <span className={sectionLabel}>Break down by</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.breakdownPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {breakdownPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {view.groupByPropertyId !== PARENT_GROUP_ID && <option value={PARENT_GROUP_ID}>Sub-items (parent)</option>}
@@ -2110,7 +2144,7 @@ export const ViewOptionsMenu: React.FC<{
         {showDate && (
           <label className="block">
             <span className={sectionLabel}>{showTimeline ? 'Start date' : 'Date property'}</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.datePropertyId ?? ''}
               onChange={(e) => {
                 // A timeline's created date is a start→end range (bars get width
@@ -2118,7 +2152,7 @@ export const ViewOptionsMenu: React.FC<{
                 if (e.target.value === NEW_PROPERTY_VALUE) createFor('date', 'datePropertyId', {range: showTimeline});
                 else db.updateView(view.id, {datePropertyId: e.target.value || undefined});
               }}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">—</option>
               {dateProps.map((p) => (
@@ -2134,13 +2168,13 @@ export const ViewOptionsMenu: React.FC<{
         {showTimeline && (
           <label className="block">
             <span className={sectionLabel}>End date</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.endDatePropertyId ?? ''}
               onChange={(e) => {
                 if (e.target.value === NEW_PROPERTY_VALUE) createFor('endDate', 'endDatePropertyId');
                 else db.updateView(view.id, {endDatePropertyId: e.target.value || undefined});
               }}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">Same as start (or range end)</option>
               {dateProps
@@ -2158,13 +2192,13 @@ export const ViewOptionsMenu: React.FC<{
         {showDependency && (
           <label className="block">
             <span className={sectionLabel}>Dependencies</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.dependencyPropertyId ?? ''}
               onChange={(e) => {
                 if (e.target.value === NEW_PROPERTY_VALUE) createFor('dependency', 'dependencyPropertyId');
                 else db.updateView(view.id, {dependencyPropertyId: e.target.value || undefined});
               }}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">—</option>
               {dependencyProps.map((p) => (
@@ -2180,10 +2214,10 @@ export const ViewOptionsMenu: React.FC<{
         {showCover && (
           <label className="block">
             <span className={sectionLabel}>Card cover</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.coverPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {coverPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {coverProps.map((p) => (
@@ -2198,10 +2232,10 @@ export const ViewOptionsMenu: React.FC<{
         {showCover && (
           <label className="block">
             <span className={sectionLabel}>Card size</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.cardSize ?? 'medium'}
               onChange={(e) => db.updateView(view.id, {cardSize: e.target.value as 'small' | 'medium' | 'large'})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
               aria-label="Card size"
             >
               <option value="small">Small</option>
@@ -2214,10 +2248,10 @@ export const ViewOptionsMenu: React.FC<{
         {showCardColor && colorProps.length > 0 && (
           <label className="block">
             <span className={sectionLabel}>Color by</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.cardColorPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {cardColorPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {colorProps.map((p) => (
@@ -2240,13 +2274,13 @@ export const ViewOptionsMenu: React.FC<{
 
         {view.type !== 'form' && (
           <div className="space-y-1.5 border-t border-border pt-2">
-            <button onClick={() => addFirstMetric(db, view)} className={cn(toolButtonClass, 'w-full justify-center')}>
+            <button onClick={() => addFirstMetric(db, view)} className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}>
               <Sigma className="h-3.5 w-3.5" /> Add metric card
             </button>
             {((view.sorts?.length ?? 0) > 0 || (view.filters?.length ?? 0) > 0 || (view.filterRoot?.filters.length ?? 0) > 0) && (
               <button
                 onClick={() => void db.updateView(view.id, {filterRoot: undefined, filters: [], sorts: []})}
-                className={cn(toolButtonClass, 'w-full justify-center')}
+                className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}
               >
                 <ListFilter className="h-3.5 w-3.5" /> Clear filters & sorts
               </button>
@@ -2255,13 +2289,13 @@ export const ViewOptionsMenu: React.FC<{
         )}
 
         <div className="flex items-center gap-1 border-t border-border pt-2">
-          <button onClick={() => void db.duplicateView(view.id)} className={cn(toolButtonClass, 'flex-1 justify-center')}>
+          <button onClick={() => void db.duplicateView(view.id)} className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center')}>
             Duplicate
           </button>
           <button
             onClick={() => void db.deleteView(view.id)}
             disabled={!canDeleteDatabaseView(db.database!.schema.views, view.id)}
-            className={cn(toolButtonClass, 'flex-1 justify-center text-destructive hover:text-destructive disabled:opacity-30')}
+            className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center text-destructive hover:text-destructive disabled:opacity-30')}
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>

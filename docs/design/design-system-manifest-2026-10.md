@@ -147,17 +147,19 @@ Select exit: **none** — nested dismissable layer.
 
 ## 3. Radius scale
 
+Owner decision (2026-10-10): select/multi-select chips use `--radius-sm`; status chips remain pill.
+
 DSX-2 exception: the compact 16px todo checkbox uses `--radius-sm` (4px).
 The checked todo tick uses `--primary-foreground` (not white) for correct contrast in dark mode.
 
 | Step | Token | Value | Surfaces (exhaustive by role) |
 |---|---|---:|---|
 | none | `0` | 0 | Table cells, dividers, full-bleed media, the rail side of quote/notes shapes |
-| sm | `--radius-sm` | 4px | **Inline marks** (inline code, mention, highlight runs, `@cell` token); **items inside a menu/list**; row hover/selection wash; marquee; table grips; small tool chips inside an overlay (image size chips) |
+| sm | `--radius-sm` | 4px | **Inline marks** (inline code, mention, highlight runs, `@cell` token); **items inside a menu/list**; row hover/selection wash; marquee; table grips; small tool chips inside an overlay (image size chips); select/multi-select chips |
 | md | `--radius-md` | 6px | **Standalone controls**: gutter buttons, toolbar buttons, icon buttons, inputs/selects/buttons inside blocks and forms, callout icon button, tooltips, drag ghost |
 | lg | `--radius-lg` | 8px | **Block surfaces** (callout, code block, image frame + img, image placeholder, group, kit cards, embeds, artifact frames) and **floating menus** (popover, dropdown, select, context, slash, inline toolbar) |
 | xl | `--radius-xl` **(new)** = `calc(var(--radius) + 4px)` | 12px | Dialogs, command palette, lightbox frame, presentation slide frame |
-| pill | `9999px` (TSX `rounded-full`) | — | Tags/chips, switches, progress track + fill, status lamps; `50%` for true circles (avatars, presence dots) |
+| pill | `9999px` (TSX `rounded-full`) | — | Status chips, switches, progress track + fill, status lamps; `50%` for true circles (avatars, presence dots) |
 | page | `--ob-page-radius` | ≥10px | Notebook sheets only (window-concentric, :282) |
 
 Rules:
