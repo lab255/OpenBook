@@ -214,12 +214,14 @@ export interface AiUsageResponse {
 export interface AiStatus {
   /** Local audio capability is independent of the chat provider. */
   transcription?: {
-    model: string; modelPresent: boolean; runtimeAvailable: boolean; ready: boolean; downloadUrl: string; detail?: string;
+    model: string; modelPresent: boolean; modelUpdateAvailable?: boolean; runtimeAvailable: boolean; ready: boolean; downloadUrl: string; detail?: string;
     /** Managed pins only; env/PATH overrides can independently make the runtime available. */
     runtime?: {
       target: string;
       tools: Record<'whisper-cli' | 'ffmpeg', {
-        status: 'provisioned' | 'unsupported' | 'missing';
+        status: 'provisioned' | 'unsupported' | 'missing' | 'provisioning' | 'failed';
+        override?: 'OPENBOOK_WHISPER_BIN' | 'OPENBOOK_FFMPEG_BIN' | 'PATH';
+        available?: boolean;
         /** Desired pin and last intact managed installation, respectively. */
         version?: string; installedVersion?: string; reason?: string; detail?: string;
       }>;
