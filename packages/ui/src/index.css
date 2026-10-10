@@ -1853,6 +1853,7 @@ a.obe-mention {
   border-style: dashed;
 }
 .obe-group-head {
+  min-height: var(--height-control-md);
   display: flex;
   align-items: center;
   gap: 0;
@@ -1867,7 +1868,7 @@ a.obe-mention {
   flex-shrink: 0;
 }
 .obe-group-name {
-  font-size: 0.8rem;
+  font-size: var(--obe-small-size);
   font-weight: 600;
   color: hsl(var(--foreground));
 }
@@ -3642,6 +3643,7 @@ a.obe-mention {
   margin: 0;
 }
 .obe-cnt-head {
+  min-height: var(--height-control-md);
   border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   display: flex;
   align-items: center;
@@ -3659,7 +3661,7 @@ a.obe-mention {
   gap: 0.25rem;
   border-radius: var(--radius-md);
   padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
@@ -3668,6 +3670,7 @@ a.obe-mention {
 
 .obe-tabs-strip { margin-inline-start: calc(-1 * var(--obe-cnt-inset)); padding-inline-start: calc(var(--obe-cnt-inset) - 8px); display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; flex: 1; }
 .obe-tab {
+  height: var(--height-control-sm);
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -3675,7 +3678,7 @@ a.obe-mention {
   border-radius: var(--radius-md);
   background: transparent;
   padding: 0.25rem 0.5rem;
-  font-size: 0.84rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
@@ -3685,7 +3688,7 @@ a.obe-mention {
   background: hsl(var(--card));
   border-color: hsl(var(--border));
   color: hsl(var(--foreground));
-  font-weight: 550;
+  font-weight: 600;
 }
 .obe-tab-locked { opacity: 0.55; cursor: default; }
 .obe-tab-label { font: inherit; }
@@ -3693,6 +3696,7 @@ a.obe-mention {
 .obe-acc-section { border-bottom: 1px solid hsl(var(--border) / 0.6); }
 .obe-acc-section:last-child { border-bottom: none; }
 .obe-acc-head {
+  min-height: var(--height-control-md);
   display: flex;
   align-items: center;
   gap: 0;
@@ -3710,7 +3714,7 @@ a.obe-mention {
 }
 .obe-acc-toggle:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-acc-toggle:disabled { opacity: 0.5; cursor: default; }
-.obe-acc-label { font-size: 0.9rem; font-weight: 550; }
+.obe-acc-label { font-size: var(--obe-small-size); font-weight: 600; }
 .obe-acc-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 .obe-acc-foot { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; }
 
@@ -3719,13 +3723,13 @@ a.obe-mention {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.1rem;
-  height: 1.1rem;
+  min-width: calc(var(--obe-caption-size) * var(--obe-caption-leading));
+  height: calc(var(--obe-caption-size) * var(--obe-caption-leading));
   padding: 0 0.25rem;
   border-radius: 9999px;
   background: hsl(var(--muted) / 0.8);
   color: hsl(var(--muted-foreground));
-  font-size: 0.68rem;
+  font-size: var(--obe-caption-size);
   font-variant-numeric: tabular-nums;
 }
 .obe-cnt-done { background: #10b981; color: #fff; }

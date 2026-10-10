@@ -188,3 +188,22 @@ describe('container inset equality', () => {
     expect(ruleBody('.obe-tabs-strip')).toContain('margin-inline-start: calc(-1 * var(--obe-cnt-inset))');
   });
 });
+
+
+describe('container header rhythm', () => {
+  it.each(['.obe-group-head', '.obe-cnt-head', '.obe-acc-head'])('%s shares the 32px header height', (selector) => {
+    expect(ruleBody(selector)).toContain('min-height: var(--height-control-md)');
+  });
+
+  it('fixes tab height independently of the caption-sized completion badge', () => {
+    expect(ruleBody('.obe-tab')).toContain('height: var(--height-control-sm)');
+    expect(ruleBody('.obe-cnt-badge')).toContain('height: calc(var(--obe-caption-size) * var(--obe-caption-leading))');
+    expect(ruleBody('.obe-cnt-badge')).toContain('font-size: var(--obe-caption-size)');
+    for (const selector of ['.obe-group-name', '.obe-tab', '.obe-acc-label', '.obe-cnt-add']) {
+      expect(ruleBody(selector)).toContain('font-size: var(--obe-small-size)');
+    }
+    for (const selector of ['.obe-tab-on', '.obe-acc-label']) {
+      expect(ruleBody(selector)).toContain('font-weight: 600');
+    }
+  });
+});
