@@ -240,6 +240,11 @@
     --obe-select-radius: var(--radius-sm);
     --obe-select-wash: hsl(var(--ring) / 0.14);
     --obe-chrome-ink: hsl(var(--muted-foreground) / 0.8);
+    --obe-chrome-ink-hover: hsl(var(--foreground));
+    --obe-chrome-hover: var(--hover);
+    --obe-chrome-active: var(--hover-strong);
+    --obe-focus-ring: 2px solid hsl(var(--ring));
+    --obe-focus-offset: 2px;
     --obe-columns-gap: 28px;
     --obe-title-size: calc(var(--obe-font-size) * 2.5);
     --obe-title-leading: 1.2;
@@ -1236,6 +1241,59 @@ a.obe-mention {
   -webkit-user-select: none;
   user-select: none;
 }
+.obe-media-bar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: var(--z-index-control);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out-soft);
+}
+.obe-media-bar[data-surface='media'] {
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--popover));
+  box-shadow: var(--shadow-menu);
+}
+.obe-media-bar[data-surface='plain'] { top: 4px; right: 8px; }
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-media-bar,
+.obe-media-bar:focus-within,
+.obe-media-bar:has([data-state='open']),
+.obe-row-selected .obe-media-bar { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .obe-row-selected .obe-media-bar { opacity: 1; pointer-events: auto; } }
+.obe-media-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  color: var(--obe-chrome-ink);
+  font-size: var(--obe-caption-size);
+  font-weight: 500;
+  transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
+}
+.obe-media-btn:hover:not(:disabled) { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+.obe-media-btn[data-state='open'], .obe-media-btn:active { background: var(--obe-chrome-active); }
+.obe-media-btn[aria-pressed='true'] { background: var(--obe-chrome-active); color: hsl(var(--primary)); }
+.obe-media-btn:disabled { opacity: 0.45; cursor: default; }
+.obe-media-bar .obe-kit-gear {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  border-color: transparent;
+  background: transparent;
+  width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
+  border-radius: var(--radius-sm);
+}
+.obe-media-bar .obe-kit-gear:hover { background: var(--obe-chrome-hover); }
+.obe-media-bar .obe-kit-gear[data-state='open'] { background: var(--obe-chrome-active); }
+
 /* Hover chrome: size presets + replace, top-right over the image. */
 .obe-image-tools {
   position: absolute;
@@ -1687,10 +1745,8 @@ a.obe-mention {
 :is(.ob-present, .ob-viewer) .obe-table-add,
 :is(.ob-present, .ob-viewer) .obe-table-row-grip,
 :is(.ob-present, .ob-viewer) .obe-table-col-grip,
-:is(.ob-present, .ob-viewer) .obe-code-actions,
-:is(.ob-present, .ob-viewer) .obe-artifact-tool,
+:is(.ob-present, .ob-viewer) .obe-media-btn[data-chrome='author'],
 :is(.ob-present, .ob-viewer) .obe-artifact-resize,
-:is(.ob-present, .ob-viewer) input.obe-artifact-title,
 :is(.ob-present, .ob-viewer) .obe-handle-anchor { display: none !important; }
 /* Empty editable fields (chart title/description, kit labels) would otherwise
    show their "Add a description…" edit placeholder on the read-only stage. */
@@ -1705,10 +1761,8 @@ a.obe-mention {
    (CSS-gated like present mode), so hide them here too. Interactive widgets stay
    live — only their edit chrome (the ⚙ / code actions) goes. */
 .obe-root.obe-readonly .obe-kit-gear,
-.obe-root.obe-readonly .obe-artifact-tool,
 .obe-root.obe-readonly .obe-artifact-resize,
-.obe-root.obe-readonly input.obe-artifact-title,
-.obe-root.obe-readonly .obe-code-actions { display: none !important; }
+.obe-root.obe-readonly .obe-media-btn[data-chrome='author'] { display: none !important; }
 .obe-root.obe-readonly .obe-kit-inline:placeholder-shown { display: none; }
 /* The group sync / lock / gate buttons are author chrome — disabled for a
    viewer, so don't show them disabled-but-present. */
@@ -2370,15 +2424,14 @@ a.obe-mention {
 .obe-table-tools button:focus-visible,
 .obe-callout-icon:focus-visible,
 .obe-todo-box:focus-visible,
-.obe-image-size:focus-visible,
-.obe-image-tool:focus-visible,
+.obe-media-btn:focus-visible,
 .obe-image-resize:focus-visible,
 .obe-artifact-tool:focus-visible,
 .obe-artifact-resize:focus-visible,
 .obe-artifact-expand:focus-visible,
 .obe-image-placeholder:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+  outline: var(--obe-focus-ring);
+  outline-offset: var(--obe-focus-offset);
   opacity: 1;
 }
 .obe-row:has(.obe-gutter-btn:focus-visible) > .obe-gutter {

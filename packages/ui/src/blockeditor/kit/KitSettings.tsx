@@ -54,8 +54,8 @@ export const KitSettings: React.FC<{
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className="obe-kit-gear" aria-label={t('pane.config')} title={t('pane.config')}>
-            <Settings2 className="h-4 w-4" />
+          <button type="button" className="obe-kit-gear obe-media-btn" data-chrome="author" aria-label={t('pane.config')} title={t('pane.config')}>
+            <Settings2 className="h-3.5 w-3.5" />
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">
