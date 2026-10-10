@@ -3727,6 +3727,7 @@ a.obe-mention {
   cursor: pointer;
 }
 .obe-acc-toggle:focus-visible { outline-offset: calc(-1 * var(--obe-focus-offset, 2px)); }
+.obe-tab:focus-visible { outline-offset: 0; }
 .obe-acc-chevron { transition: transform var(--motion-base) var(--ease-out-soft); }
 .obe-acc-toggle[aria-expanded="true"] .obe-acc-chevron { transform: rotate(90deg); }
 .obe-acc-toggle:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
