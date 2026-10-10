@@ -70,6 +70,7 @@ export default tseslint.config(
     // utilities, 43 numeric z utilities; preserve existing debt without CI failure.
     // Measured with these guards at 1d6ef346: motion 33→16, palette 152→152,
     // z 40→40 (includes primitives; excludes generated/vendor sources).
+    // DSX-4 removes ArtifactOverlay’s raw z-50 finding (uses z-lightbox).
     files: ['packages/{ui,web}/src/**/*.{ts,tsx}'],
     rules: {
       'tailwind/no-arbitrary-motion': 'warn',

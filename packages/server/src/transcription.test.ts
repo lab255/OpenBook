@@ -1,3 +1,6 @@
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {ManagedRuntime} from './ai/runtime';
 import {WHISPER_MODEL_PIN} from './ai/runtimeManifest';
 import {mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -15,7 +18,7 @@ import {AiUsageLog} from './ai/usage';
 import {LocalDataClient} from './localClient';
 import {LocalWhisper, WHISPER_MODEL, WHISPER_MODEL_URL} from './ai/whisper';
 import {LOCAL_TRANSCRIPTION_RATE_LIMIT} from './ai/routes';
-import {readFile, readdir, writeFile} from 'node:fs/promises';
+import {mkdir, readFile, readdir, writeFile} from 'node:fs/promises';
 
 // Keep the existing model-download fixture small while exercising real verification.
 vi.mock('./ai/runtimeManifest', async (importOriginal) => {
@@ -49,6 +52,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   await store.close();
   rmSync(dir, {recursive: true, force: true});
 });
@@ -202,6 +206,52 @@ describe('transcription contract', () => {
     }
   });
 
+  it('POST transcribes with reopened provisioned receipts and no PATH or binary overrides', async () => {
+    const source = join(dir, 'source');
+    await mkdir(source);
+    await writeFile(join(source, 'ffmpeg'), `#!${process.execPath}\nprocess.exit(0);`, {mode: 0o755});
+    await writeFile(join(source, 'whisper-cli'), `#!${process.execPath}\nconst fs = require('node:fs'); const args = process.argv.slice(2); fs.writeFileSync(args[args.indexOf('-of') + 1] + '.json', JSON.stringify({transcription: [{offsets: {from: 0, to: 1250}, text: 'Managed runtime'}]}));`, {mode: 0o755});
+    const archive = join(dir, 'runtime.zip');
+    execFileSync('zip', ['-q', archive, 'whisper-cli', 'ffmpeg'], {cwd: source});
+    const bytes = await readFile(archive);
+    const pin = {status: 'supported' as const, version: 'fixture-1', url: 'https://fixture.test/runtime.zip',
+      archive: 'zip' as const, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex')};
+    const pins = {'whisper-cli': {...pin, binaryPath: 'whisper-cli'}, ffmpeg: {...pin, binaryPath: 'ffmpeg'}};
+    const bin = join(dir, 'bin');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bytes))));
+    await new ManagedRuntime(bin, 'fixture', pins).provision();
+    // Separate model directory proves runtime lookup uses dataDir, not modelsDir.
+    const models = join(dir, 'relocated', 'models');
+    await mkdir(models, {recursive: true});
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('model bytes')));
+    await downloadPinned(WHISPER_MODEL_PIN, join(models, WHISPER_MODEL));
+    vi.stubEnv('PATH', '');
+    vi.stubEnv('OPENBOOK_WHISPER_BIN', '');
+    vi.stubEnv('OPENBOOK_FFMPEG_BIN', '');
+    const runtime = new ManagedRuntime(bin, 'fixture', pins);
+    const local = new LocalWhisper(models, undefined, undefined, runtime);
+    const service = new AiService(db, models, () => local.resolve(), local);
+    try {
+      const app = appWith(service);
+      const status = await app.request(API.aiStatus, {headers: {...headers, [LOCAL_OWNER_HEADER]: secret}});
+      expect((await status.json()).transcription).toMatchObject({ready: true, runtime: {tools: {
+        'whisper-cli': {status: 'provisioned', available: true}, ffmpeg: {status: 'provisioned', available: true},
+      }}});
+      for (const tool of ['whisper-cli', 'ffmpeg'] as const) {
+        expect(await runtime.binary(tool)).toContain(join(bin, tool, 'install-'));
+        expect((await local.status()).runtime?.tools[tool].override).toBeUndefined();
+      }
+      const response = await post(app);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({text: 'Managed runtime', durationMs: 1250,
+        segments: [{start: 0, end: 1.25, text: 'Managed runtime'}]});
+      // Without a receipt, the same executable files must not count as managed.
+      await writeFile(join(bin, 'whisper-cli', 'current.json'), '{}');
+      expect((await local.status()).ready).toBe(false);
+      expect((await post(app)).status).toBe(400);
+    } finally { await service.dispose(); }
+  });
+
   it('rate-limits local requests per socket IP, ignores spoofed forwarding headers, and leaves mock/cloud untouched', async () => {
     const engine = new MockEngine();
     const transcribe = vi.spyOn(engine, 'transcribe');
@@ -244,28 +294,6 @@ describe('transcription contract', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect((await ai.status()).download).toBeUndefined();
   });
-
-  // Opt-in: OPENBOOK_TEST_WHISPER=1, OPENBOOK_MODELS_DIR containing ggml-base.bin,
-  // whisper-cli + ffmpeg on PATH (or OPENBOOK_WHISPER_BIN / OPENBOOK_FFMPEG_BIN).
-  it.skipIf(process.env.OPENBOOK_TEST_WHISPER !== '1')('native whisper: POST transcribes synthesized WAV with no cloud keys', async () => {
-    const local = new LocalWhisper(process.env.OPENBOOK_MODELS_DIR || join(dir, 'models'));
-    expect((await local.status()).ready).toBe(true);
-    const wav = Buffer.alloc(44 + 16000 * 2);
-    wav.write('RIFF'); wav.writeUInt32LE(wav.length - 8, 4); wav.write('WAVEfmt ', 8);
-    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
-    wav.writeUInt32LE(16000, 24); wav.writeUInt32LE(32000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
-    wav.write('data', 36); wav.writeUInt32LE(wav.length - 44, 40);
-    assetId = (await store.putAsset(wav, 'audio/wav')).id;
-    await store.refAsset(assetId, pageId);
-    const service = new AiService(db, dir, () => local.resolve(), local);
-    try {
-      const response = await post(appWith(service));
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({text: expect.any(String), segments: expect.any(Array), durationMs: expect.any(Number)});
-    } finally {
-      await service.dispose();
-    }
-  }, 120_000);
 
   it('returns identical 404s for missing, unreadable, unreferenced, and unrelated assets/pages', async () => {
     await ai.setConfig({provider: 'mock'});

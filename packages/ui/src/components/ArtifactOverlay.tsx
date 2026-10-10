@@ -1,3 +1,4 @@
+import {OVERLAY_MOTION} from '@/components/ui/overlay-motion';
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {AppWindow, X} from 'lucide-react';
@@ -47,7 +48,7 @@ export function ArtifactOverlay({html, title, onClose}: ArtifactOverlayProps): R
       <DialogPortal>
         <DialogPrimitive.Content
           data-testid="artifact-overlay"
-          className="fixed inset-0 z-50 flex flex-col bg-background outline-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          className={`fixed inset-0 z-lightbox flex flex-col bg-background outline-hidden ${OVERLAY_MOTION.dialog}`}
         >
           <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">{t('blocks.artifact.overlayDescription')}</DialogPrimitive.Description>

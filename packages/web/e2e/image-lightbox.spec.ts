@@ -23,7 +23,7 @@ const seedImagePage = async (
   const blockdoc = {
     blocks: [
       {id: 'h1', type: 'heading', props: {level: 1}, text: [{t: 'Photo Page'}]},
-      {id: 'img', type: 'image', props: {src, alt: 'A test cat'}},
+      {id: 'img', type: 'image', props: {src, alt: 'A test cat', caption: 'A test caption'}},
     ],
   };
   const res = await request.post(`${SERVER}/api/pages`, {
@@ -55,8 +55,8 @@ test('edit mode: the Expand toolbar button opens the lightbox; Esc closes it', {
   const dialog = page.getByRole('dialog', {name: 'A test cat'});
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('img.obe-lightbox-img')).toBeVisible();
-  // Alt renders as the caption line.
-  await expect(dialog.locator('figcaption.obe-lightbox-caption')).toHaveText('A test cat');
+  // The block caption renders separately from the accessible alt label.
+  await expect(dialog.locator('figcaption.obe-lightbox-caption')).toHaveText('A test caption');
 
   // Esc closes it.
   await page.keyboard.press('Escape');

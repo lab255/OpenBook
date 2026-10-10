@@ -26,9 +26,11 @@ export const KitSettings: React.FC<{
   blockId: string;
   /** Heading for the popover / side panel. */
   title: string;
+  /** Media toolbars opt into shared button styling; other kit gears retain their layout. */
+  media?: boolean;
   /** The configuration fields. */
   children: React.ReactNode;
-}> = ({blockId, title, children}) => {
+}> = ({blockId, title, media = false, children}) => {
   const [open, setOpen] = useState(false);
   const [host, setHost] = useState<HTMLElement | null>(getKitPanelHost());
   const [expanded, setExpanded] = useState(() => getKitPanel()?.blockId === blockId);
@@ -54,8 +56,8 @@ export const KitSettings: React.FC<{
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" className="obe-kit-gear" aria-label={t('pane.config')} title={t('pane.config')}>
-            <Settings2 className="h-4 w-4" />
+          <button type="button" className={`obe-kit-gear${media ? ' obe-media-btn' : ''}`} data-chrome="author" aria-label={t('pane.config')} title={t('pane.config')}>
+            <Settings2 className="h-3.5 w-3.5" />
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72">

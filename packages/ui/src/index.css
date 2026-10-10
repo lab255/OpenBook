@@ -242,6 +242,11 @@
     --obe-select-radius: var(--radius-sm);
     --obe-select-wash: hsl(var(--ring) / 0.14);
     --obe-chrome-ink: hsl(var(--muted-foreground) / 0.8);
+    --obe-chrome-ink-hover: hsl(var(--foreground));
+    --obe-chrome-hover: var(--hover);
+    --obe-chrome-active: var(--hover-strong);
+    --obe-focus-ring: 2px solid hsl(var(--ring));
+    --obe-focus-offset: 2px;
     --obe-columns-gap: 28px;
     --obe-title-size: calc(var(--obe-font-size) * 2.5);
     --obe-title-leading: 1.2;
@@ -943,7 +948,7 @@
 }
 .obe-row[data-block-type='code'] {
   /* Border, inner pad, action row, divider, and its spacing. */
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + 0.75rem + 1.5rem + 0.25rem + 1px + 0.5rem);
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + var(--obe-gutter-btn) + 0.5rem);
   --obe-lead-line: calc(var(--obe-code-size) * var(--obe-code-leading));
 }
 .obe-row-selected::before {
@@ -1273,6 +1278,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   gap: 0.25rem;
 }
 .obe-image-frame {
+  align-self: center;
   position: relative;
   display: inline-block;
   max-width: 100%;
@@ -1287,49 +1293,65 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   -webkit-user-select: none;
   user-select: none;
 }
-/* Hover chrome: size presets + replace, top-right over the image. */
-.obe-image-tools {
+.obe-media-bar {
   position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
+  z-index: var(--z-index-pane-overlay);
+  top: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border-radius: var(--radius-lg);
-  background: hsl(var(--background) / 0.86);
-  box-shadow: 0 1px 4px hsl(0 0% 0% / 0.16);
-  backdrop-filter: blur(6px);
+  gap: 4px;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--motion-fast) var(--ease-out-soft);
 }
-.obe-image-frame:hover .obe-image-tools,
-.obe-image-tools:focus-within { opacity: 1; }
-.obe-image-sizes { display: flex; gap: 4px; }
-.obe-image-size {
-  min-width: 1.4rem;
-  padding: 0 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
+.obe-media-bar[data-surface='media'] {
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: hsl(var(--popover));
+  box-shadow: var(--shadow-menu);
+}
+.obe-media-bar[data-surface='plain'] { top: 4px; right: 4px; }
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-media-bar,
+.obe-media-bar:focus-within,
+.obe-media-bar:has([data-state='open']),
+.obe-row-selected .obe-media-bar { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .obe-row-selected .obe-media-bar { opacity: 1; pointer-events: auto; } }
+.obe-media-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  color: var(--obe-chrome-ink);
+  font-size: var(--obe-caption-size);
+  font-weight: 500;
+  transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
+}
+.obe-media-btn:hover:not(:disabled) { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+.obe-media-btn[data-state='open'], .obe-media-btn:active { background: var(--obe-chrome-active); }
+.obe-media-btn[aria-pressed='true'] { background: var(--obe-chrome-active); color: hsl(var(--primary)); }
+.obe-media-btn:disabled { opacity: 0.45; cursor: default; }
+.obe-media-bar .obe-kit-gear {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  border-color: transparent;
+  background: transparent;
+  width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
   border-radius: var(--radius-sm);
 }
-.obe-image-size:hover { background: var(--hover); color: hsl(var(--foreground)); }
-.obe-image-size-on { background: hsl(var(--primary) / 0.14); color: hsl(var(--primary)); }
-.obe-image-tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border-radius: var(--radius-sm);
-  color: hsl(var(--muted-foreground));
-}
-.obe-image-tool:hover { background: var(--hover); color: hsl(var(--foreground)); }
+.obe-media-bar .obe-kit-gear:hover { background: var(--obe-chrome-hover); }
+.obe-media-bar .obe-kit-gear[data-state='open'] { background: var(--obe-chrome-active); }
+
 /* Drag handle on the right edge. */
 .obe-image-resize {
   position: absolute;
+  z-index: var(--z-index-pane-overlay);
   top: 50%;
-  right: -3px;
+  right: 4px;
   width: 10px;
   height: 44px;
   max-height: 60%;
@@ -1344,13 +1366,15 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 4px;
+  width: 6px;
   height: 100%;
   border-radius: var(--radius-sm);
-  background: hsl(var(--foreground) / 0.35);
-  box-shadow: 0 0 0 2px hsl(var(--background) / 0.7);
+  background: hsl(var(--foreground) / 0.6);
+  box-shadow: 0 0 0 1px hsl(var(--background) / 0.9);
 }
-.obe-image-frame:hover .obe-image-resize { opacity: 1; }
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-image-resize,
+.obe-image-resize:focus-visible,
+.obe-row-selected .obe-image-resize { opacity: 1; }
 /* Alt + caption inputs (borderless, indented under the picture). */
 .obe-image-alt,
 .obe-image-caption-input {
@@ -1359,16 +1383,22 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   background: transparent;
   padding: 0;
   color: hsl(var(--muted-foreground));
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
 }
-.obe-image-alt { font-size: 0.75rem; opacity: 0.85; }
+.obe-image-alt { font-size: var(--obe-caption-size); }
 .obe-image-alt::placeholder,
 .obe-image-caption-input::placeholder { color: var(--obe-placeholder); }
 .obe-image-caption {
   color: hsl(var(--muted-foreground));
-  font-size: 0.82rem;
-  text-align: center;
+  font-size: var(--obe-small-size);
+  align-self: center;
+  text-align: left;
 }
+.obe-image-resize[data-edge='left'] { left: 4px; right: auto; }
+.obe-image-caption-input:placeholder-shown { opacity: 0; }
+.obe-row:hover .obe-image-caption-input,
+.obe-row:focus-within .obe-image-caption-input,
+.obe-row-selected .obe-image-caption-input { opacity: 1; }
 /* Placeholder / broken state. */
 .obe-image-placeholder {
   display: flex;
@@ -1392,10 +1422,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 }
 .obe-image-placeholder-static { cursor: default; flex-direction: row; padding: 1rem; }
 .obe-image-placeholder-icon { width: 1.4rem; height: 1.4rem; opacity: 0.7; }
-.obe-image-placeholder-title { font-size: 0.9rem; font-weight: 600; color: hsl(var(--foreground)); }
-.obe-image-placeholder-hint { font-size: 0.76rem; }
+.obe-image-placeholder-title { font-size: var(--obe-small-size); font-weight: 600; color: hsl(var(--foreground)); }
+.obe-image-placeholder-hint { font-size: var(--obe-caption-size); }
 .obe-image-error {
-  font-size: 0.78rem;
+  font-size: var(--obe-caption-size);
   color: hsl(var(--destructive, 0 75% 55%));
   padding: 0.25rem 0;
 }
@@ -1477,40 +1507,40 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   color: hsl(0 0% 100% / 0.82);
-  font-size: 0.85rem;
-  line-height: 1.4;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
   text-align: center;
 }
 /* ── Zoom bar chrome ─────────────────────────────────────────────────────── */
 .obe-lightbox-zoombar {
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
+  flex: none;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem;
   border-radius: var(--radius-lg);
-  background: hsl(0 0% 0% / 0.45);
+  background: hsl(var(--popover));
+  box-shadow: var(--shadow-menu);
+  border: 0;
   backdrop-filter: blur(6px);
-  box-shadow: 0 4px 16px hsl(0 0% 0% / 0.4);
 }
 .obe-lightbox-zoombtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: var(--height-control-md);
+  height: var(--height-control-md);
   border-radius: var(--radius-md);
-  color: hsl(0 0% 100% / 0.85);
+  color: hsl(var(--popover-foreground));
   background: transparent;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), opacity var(--motion-fast) var(--ease-out-soft);
 }
 .obe-lightbox-zoombtn:hover:not(:disabled) {
-  background: hsl(0 0% 100% / 0.16);
-  color: hsl(0 0% 100%);
+  background: var(--obe-chrome-hover);
+  color: hsl(var(--popover-foreground));
 }
 .obe-lightbox-zoombtn:disabled {
   opacity: 0.4;
@@ -1523,7 +1553,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-lightbox-zoomvalue {
   min-width: 3.5rem;
   padding: 0 0.25rem;
-  color: hsl(0 0% 100% / 0.9);
+  color: hsl(var(--popover-foreground));
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -1536,17 +1566,19 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--height-control-lg);
+  height: var(--height-control-lg);
   border-radius: var(--radius-md);
-  color: hsl(0 0% 100% / 0.85);
-  background: hsl(0 0% 0% / 0.35);
+  color: hsl(var(--popover-foreground));
+  background: hsl(var(--popover));
+  box-shadow: var(--shadow-menu);
+  border: 0;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-lightbox-close:hover {
-  background: hsl(0 0% 100% / 0.16);
-  color: hsl(0 0% 100%);
+  background: var(--obe-chrome-hover);
+  color: hsl(var(--popover-foreground));
 }
 .obe-lightbox-close:focus-visible {
   outline: none;
@@ -1582,29 +1614,18 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   background: transparent;
   padding: 0;
   color: hsl(var(--foreground));
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   font-weight: 500;
 }
 .obe-artifact-title::placeholder { color: var(--obe-placeholder); }
 .obe-artifact-title-static {
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   font-weight: 500;
   color: hsl(var(--foreground));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.obe-artifact-tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  padding: 0.25rem;
-  border-radius: var(--radius-sm);
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-}
-.obe-artifact-tool:hover { background: var(--hover); color: hsl(var(--foreground)); }
 .obe-artifact-frame { position: relative; }
 /* The fixed-height loading placeholder — same footprint as the frame it
    becomes, so late-resolving artifacts never shift a long page. */
@@ -1612,6 +1633,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Drag handle on the bottom edge (vertical resize). */
 .obe-artifact-resize {
   position: absolute;
+  z-index: var(--z-index-pane-overlay);
   left: 50%;
   bottom: -3px;
   width: 44px;
@@ -1629,36 +1651,12 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   inset: 0;
   margin: auto;
   width: 100%;
-  height: 4px;
+  height: 6px;
   border-radius: var(--radius-sm);
-  background: hsl(var(--foreground) / 0.35);
-  box-shadow: 0 0 0 2px hsl(var(--background) / 0.7);
+  background: hsl(var(--foreground) / 0.6);
+  box-shadow: 0 0 0 1px hsl(var(--background) / 0.9);
 }
 .obe-artifact-frame:hover .obe-artifact-resize { opacity: 1; }
-/* Run full-window (top-right, hover-revealed like the resize handle). A
-   VIEWING affordance, not authoring chrome — deliberately NOT hidden by the
-   present-mode / read-only chrome rules below, so readers and presenters can
-   expand an artifact edge-to-edge. */
-.obe-artifact-expand {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border-radius: var(--radius-md);
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--background) / 0.85);
-  box-shadow: 0 0 0 1px hsl(var(--border));
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--motion-fast) var(--ease-out-soft);
-}
-.obe-artifact-expand:hover { background: var(--hover); color: hsl(var(--foreground)); }
-/* Keyboard reveal + themed ring live in the shared focus-visible rule below. */
-.obe-artifact-frame:hover .obe-artifact-expand { opacity: 1; }
-
 /* ── Present mode (slide deck) ───────────────────────────────────────────────
    A page rendered as slides (split at dividers): a centred sheet that fades and
    slides up on change, read-only but with live widgets, editing chrome hidden,
@@ -1739,10 +1737,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 :is(.ob-present, .ob-viewer) .obe-table-add,
 :is(.ob-present, .ob-viewer) .obe-table-row-grip,
 :is(.ob-present, .ob-viewer) .obe-table-col-grip,
-:is(.ob-present, .ob-viewer) .obe-code-actions,
-:is(.ob-present, .ob-viewer) .obe-artifact-tool,
+:is(.ob-present, .ob-viewer) .obe-media-btn[data-chrome='author'],
 :is(.ob-present, .ob-viewer) .obe-artifact-resize,
-:is(.ob-present, .ob-viewer) input.obe-artifact-title,
 :is(.ob-present, .ob-viewer) .obe-handle-anchor { display: none !important; }
 /* Empty editable fields (chart title/description, kit labels) would otherwise
    show their "Add a description…" edit placeholder on the read-only stage. */
@@ -1757,10 +1753,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
    (CSS-gated like present mode), so hide them here too. Interactive widgets stay
    live — only their edit chrome (the ⚙ / code actions) goes. */
 .obe-root.obe-readonly .obe-kit-gear,
-.obe-root.obe-readonly .obe-artifact-tool,
 .obe-root.obe-readonly .obe-artifact-resize,
-.obe-root.obe-readonly input.obe-artifact-title,
-.obe-root.obe-readonly .obe-code-actions { display: none !important; }
+.obe-root.obe-readonly .obe-media-btn[data-chrome='author'] { display: none !important; }
 .obe-root.obe-readonly .obe-kit-inline:placeholder-shown { display: none; }
 /* The group sync / lock / gate buttons are author chrome — disabled for a
    viewer, so don't show them disabled-but-present. */
@@ -1862,7 +1856,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   background: var(--obe-code-bg);
   border: 1px solid var(--obe-code-border);
   border-radius: var(--radius-lg);
-  padding: 0.75rem 1rem;
+  position: relative;
+  padding: calc(var(--obe-gutter-btn) + 0.5rem) 1rem 1rem;
   margin: 0;
 }
 .obe-codeblock .obe-text {
@@ -1870,6 +1865,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-size: var(--obe-code-size);
   line-height: var(--obe-code-leading);
 }
+
+.obe-codeblock[data-wrap='false'] .obe-text { white-space: pre; overflow-x: auto; overflow-wrap: normal; }
 
 /* Syntax-highlight tokens (blockeditor/highlight.ts). The tokenizer only wraps
    runs in these spans — never alters the character stream — so highlighting is
@@ -2430,15 +2427,14 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-table-tools button:focus-visible,
 .obe-callout-icon:focus-visible,
 .obe-todo-box:focus-visible,
-.obe-image-size:focus-visible,
-.obe-image-tool:focus-visible,
+.obe-media-btn:focus-visible,
 .obe-image-resize:focus-visible,
 .obe-artifact-tool:focus-visible,
 .obe-artifact-resize:focus-visible,
 .obe-artifact-expand:focus-visible,
 .obe-image-placeholder:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+  outline: var(--obe-focus-ring);
+  outline-offset: var(--obe-focus-offset);
   opacity: 1;
 }
 .obe-row:has(.obe-gutter-btn:focus-visible) > .obe-gutter {
@@ -3807,58 +3803,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Live code: a toolbar (language badge · show-hide · run · copy · ⚙) above the
    editor, and the live output row below it. */
-.obe-code-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-  padding-bottom: 0.25rem;
-  border-bottom: 1px solid hsl(var(--border) / 0.5);
-}
-.obe-code-lang-badge {
-  font-family: var(--obe-font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
-  color: hsl(var(--muted-foreground));
-  white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.obe-code-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  background: transparent;
-  color: hsl(var(--muted-foreground));
-  padding: 0.25rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
-}
-.obe-code-btn:hover:not(:disabled) { background: var(--hover); color: hsl(var(--foreground)); }
-.obe-code-btn:disabled { opacity: 0.45; cursor: default; }
-/* The shared kit gear floats top-right on other blocks; in the code toolbar it
-   flows inline as the last action and stays visible. */
-.obe-code-actions .obe-kit-gear {
-  position: static;
-  opacity: 1;
-  pointer-events: auto;
-  border-color: transparent;
-  background: transparent;
-}
-.obe-code-actions .obe-kit-gear:hover,
-.obe-code-actions .obe-kit-gear[data-state='open'] {
-  background: hsl(var(--accent));
-  color: hsl(var(--foreground));
-}
 .obe-code-collapsed {
   display: block;
   width: 100%;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
   background: transparent;
   border: none;
@@ -3868,10 +3817,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-code-collapsed:hover { color: hsl(var(--foreground)); }
 .obe-code-out {
   display: block;
-  padding: 0.25rem 0.75rem;
+  padding: 0.25rem 0 0;
+  margin-top: 0.5rem;
   border-top: 1px solid hsl(var(--border) / 0.5);
   font-family: var(--obe-font-mono);
-  font-size: 0.85rem;
+  font-size: var(--obe-code-size);
   color: hsl(var(--primary));
   font-weight: 600;
   overflow-wrap: anywhere; /* huge outputs wrap instead of widening the page */
@@ -3968,3 +3918,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-meeting time { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .obe-meeting-summary { user-select: text; white-space: pre-wrap; margin-block: 12px; }
 .obe-meeting-notes { border-top: 1px solid hsl(var(--border)); margin-top: 16px; padding-top: 12px; }
+
+/* Free-text language names must not expand the media toolbar. */
+.obe-code-lang {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

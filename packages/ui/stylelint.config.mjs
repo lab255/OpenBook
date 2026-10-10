@@ -18,6 +18,7 @@ export default {
     // literal colours 99, radius 84, editor font sizes ~120, z-index 1.
     // Measured at 1d6ef346 with these guards: colour 101→36, radius 84→0,
     // font-size 124→119, z-index 2→0 (includes a calculated local tier).
+    // DSX-4 media pass: total warnings 162→148 (font sizes and deleted image shadow); no added debt.
     // Duration/easing combined findings 49→7: five attention timers and
     // two global reduced-motion overrides remain intentionally literal.
     'design-tokens/role-values': true,

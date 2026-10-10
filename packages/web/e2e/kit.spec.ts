@@ -310,3 +310,49 @@ test('dropdown publishes its pick; full-width radio renders stacked rows', {tag:
   await radio.getByRole('radio', {name: 'Three'}).click();
   await expect(radio.getByRole('radio', {name: 'Three'})).toHaveAttribute('aria-checked', 'true');
 });
+
+test('code wrap preserves long-line caret, selection and toolbar geometry', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await insert(page, 'code', 'Code');
+  const code = page.locator('.obe-codeblock').last();
+  const text = code.locator('.obe-text');
+  const line = 'const value = ' + 'x'.repeat(286);
+  await text.click();
+  await page.keyboard.insertText(line);
+  await expect(code).toHaveAttribute('data-wrap', 'false');
+  const caret = () => text.evaluate((el) => {
+    const selection = window.getSelection()!;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.setEnd(selection.focusNode!, selection.focusOffset);
+    return range.toString().length;
+  });
+  // Native Home/End movement must also reveal the caret in the text scroller.
+  await page.keyboard.press('Home');
+  await expect.poll(caret).toBe(0);
+  await page.keyboard.press('End');
+  await expect.poll(caret).toBe(300);
+  await expect.poll(() => text.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await page.keyboard.press('Shift+Home');
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(line);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(caret).toBe(300);
+  const before = await code.boundingBox();
+  await code.hover();
+  const barBefore = await code.locator('.obe-media-bar').boundingBox();
+  await code.locator('.obe-kit-gear').click();
+  await page.getByRole('checkbox', {name: 'Wrap code', exact: true}).check();
+  await expect(code).toHaveAttribute('data-wrap', 'true');
+  await expect(text).toHaveText(line);
+  const wrapped = await code.boundingBox();
+  const barWrapped = await code.locator('.obe-media-bar').boundingBox();
+  expect(wrapped!.x).toBeCloseTo(before!.x, 1);
+  expect(wrapped!.y).toBeCloseTo(before!.y, 1);
+  expect(wrapped!.width).toBeCloseTo(before!.width, 1);
+  expect(barWrapped!.x).toBeCloseTo(barBefore!.x, 1);
+  expect(barWrapped!.y).toBeCloseTo(barBefore!.y, 1);
+  // Height may naturally grow with wrapping; toggling back restores its footprint.
+  await page.getByRole('checkbox', {name: 'Wrap code', exact: true}).uncheck();
+  await expect(code).toHaveAttribute('data-wrap', 'false');
+  expect((await code.boundingBox())!.height).toBeCloseTo(before!.height, 1);
+});

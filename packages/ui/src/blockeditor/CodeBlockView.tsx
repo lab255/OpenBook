@@ -1,6 +1,9 @@
 import React, {useReducer, useState} from 'react';
-import {Check, Copy, Eye, EyeOff, Play} from 'lucide-react';
+import {Check, Copy, Play} from 'lucide-react';
 import {blockId, blockProp, setBlockProp, type BlockMap} from './model';
+import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {Command, CommandInput, CommandList, CommandEmpty, CommandItem} from '@/components/ui/command';
+import {CODE_LANGUAGES, codeLanguageName} from './highlight';
 import {TextBlockView} from './TextBlockView';
 import {formatValue} from './kit/scope';
 import {useCachedCell} from './kit/useCachedEval';
@@ -12,7 +15,7 @@ import type {EditorUI} from './BlockEditor';
 
 /**
  * The code block, unified with live computation (the old formula block): a
- * toolbar with show/hide · run · copy, and a ⚙ that opens the same settings
+ * toolbar with language · live Run · Copy, and a ⚙ that opens the same settings
  * popover every kit block uses — variable name, language, and the *live* toggle.
  * Live = the code evaluates over the document's reactive scope (inputs + every
  * named live block above it) and publishes under a name later live blocks,
@@ -29,6 +32,8 @@ export const CodeBlockView: React.FC<{
   const live = Boolean(blockProp<boolean>(block, 'live'));
   const name = blockProp<string>(block, 'name') ?? '';
   const language = blockProp<string>(block, 'language') ?? '';
+  const wrap = Boolean(blockProp<boolean>(block, 'wrap'));
+  const [languageOpen, setLanguageOpen] = useState(false);
   const collapsed = Boolean(blockProp<boolean>(block, 'collapsed'));
   // "Run" forces a re-render so the scope recomputes against the current inputs;
   // the value itself is always derived from doc state (no stale cache to bust).
@@ -45,7 +50,9 @@ export const CodeBlockView: React.FC<{
     return full.length > 240 ? `${full.slice(0, 240)} …` : full;
   })();
 
-  const set = (key: string, value: unknown): void => editor.doc.transact(() => setBlockProp(block, key, value), 'local');
+  const set = (key: string, value: unknown): void => {
+    if (!editor.readOnly) editor.doc.transact(() => setBlockProp(block, key, value), 'local');
+  };
 
   const onCopy = (): void => {
     void copyText(String(block.get('text') ?? '')).then((ok) => {
@@ -56,8 +63,7 @@ export const CodeBlockView: React.FC<{
   };
 
   const onRun = (): void => {
-    if (!live) set('live', true);
-    else editor.evalCache.refresh(editor.version);
+    editor.evalCache.refresh(editor.version);
     forceRun();
   };
 
@@ -81,20 +87,8 @@ export const CodeBlockView: React.FC<{
           }}
         />
       </ConfigField>
-      <ConfigField label="Language">
-        <ConfigInput
-          value={language}
-          placeholder="js"
-          readOnly={editor.readOnly}
-          spellCheck={false}
-          aria-label="Code language"
-          onChange={(e) => set('language', e.target.value)}
-          onBlur={(e) => set('language', e.target.value.trim())}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur();
-          }}
-        />
-      </ConfigField>
+      <ConfigToggle label="Hide code" checked={collapsed} disabled={editor.readOnly} onChange={(next) => set('collapsed', next)} />
+      <ConfigToggle label="Wrap code" checked={wrap} disabled={editor.readOnly} onChange={(next) => set('wrap', next)} />
       <ConfigToggle
         label="Live"
         hint="Evaluate over the document's inputs and publish the result."
@@ -106,46 +100,57 @@ export const CodeBlockView: React.FC<{
   );
 
   return (
-    <div className={`obe-codeblock${live ? ' obe-codeblock-live' : ''}`}>
-      <div className="obe-code-actions" contentEditable={false}>
-        <span className="obe-code-lang-badge">{language || (live ? 'live' : 'code')}</span>
-        <span className="obe-kit-spacer" />
+    <div className={`obe-codeblock${live ? ' obe-codeblock-live' : ''}`} data-wrap={wrap}>
+      <div className="obe-media-bar" data-surface="plain" contentEditable={false}>
+        {!editor.readOnly && (
+          <Popover open={languageOpen} onOpenChange={setLanguageOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" className="obe-media-btn obe-code-lang" data-chrome="author" aria-label="Choose code language" title="Choose code language">{codeLanguageName(language)}</button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-0">
+              <Command>
+                <CommandInput placeholder="Search languages…" />
+                <CommandList>
+                  <CommandEmpty>No languages found.</CommandEmpty>
+                  {CODE_LANGUAGES.map(([value, label]) => (
+                    <CommandItem key={value} onSelect={() => { set('language', value); setLanguageOpen(false); }}>{label}</CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
         <button
           type="button"
-          className="obe-code-btn"
-          aria-label={collapsed ? 'Show code' : 'Hide code'}
-          title={collapsed ? 'Show code' : 'Hide code'}
-          onClick={() => set('collapsed', collapsed ? undefined : true)}
-        >
-          {collapsed ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-        </button>
-        <button
-          type="button"
-          className="obe-code-btn"
-          aria-label="Run code"
-          title="Run code"
-          disabled={editor.readOnly}
-          onClick={onRun}
-        >
-          <Play className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          className="obe-code-btn"
+          className="obe-media-btn"
+          data-chrome="view"
           aria-label="Copy code"
           title="Copy code"
           onClick={onCopy}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
-        <KitSettings blockId={id} title={name || 'Code'}>
+        {live && (
+          <button
+            type="button"
+            className="obe-media-btn"
+            data-chrome="view"
+            aria-label="Run code"
+            title="Run code"
+            onClick={onRun}
+          >
+            <Play className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {!editor.readOnly && <KitSettings media blockId={id} title={name || 'Code'}>
           {config}
-        </KitSettings>
+        </KitSettings>}
       </div>
       {collapsed ? (
         <button
           type="button"
           className="obe-code-collapsed"
+          disabled={editor.readOnly}
           contentEditable={false}
           onClick={() => set('collapsed', undefined)}
         >

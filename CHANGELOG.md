@@ -1,3 +1,27 @@
+## 3.21.0 (2026-10-10)
+
+### 🚀 Features
+
+- **server:** runtime provisioning — whisper-cli/ffmpeg auto-install with the model (WSP-2) ([#385](https://github.com/lab255/OpenBook/pull/385))
+- **ui:** one-click local transcription — Enable/Update with staged progress (WSP-3) ([#386](https://github.com/lab255/OpenBook/pull/386))
+- **ui:** design-system foundation — motion/type/radius/colour tokens + lint guards (DSX-1) ([#387](https://github.com/lab255/OpenBook/pull/387))
+- **ui:** text-block family on the design system — todo, lists, callout, quote, notes, hints (DSX-2) ([#393](https://github.com/lab255/OpenBook/pull/393))
+- **ui:** media family — unified hover chrome, code wrap control, lightbox + read-only fixes (DSX-4) ([#394](https://github.com/lab255/OpenBook/pull/394))
+
+### 🩹 Fixes
+
+- **ci:** add signing keychain to the user search list (runtime-binaries macOS legs) ([#389](https://github.com/lab255/OpenBook/pull/389))
+- **desktop:** macOS sidecar PATH fallback + managed-runtime precedence tests (WSP-4) ([#390](https://github.com/lab255/OpenBook/pull/390))
+- **server:** drain scheduled backups before closing the store ([#391](https://github.com/lab255/OpenBook/pull/391))
+- **ui:** block chrome — precise handle, overlay selection, 32px rhythm, even margins (DSX-7) ([#388](https://github.com/lab255/OpenBook/pull/388))
+- **ui:** unified container chrome — shared inset, unclipped frames, system headers, export parity (DSX-3) ([#392](https://github.com/lab255/OpenBook/pull/392))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 5.5 (1M context)
+- Eliot Lim @eliotlim
+
 ## 3.20.0 (2026-10-09)
 
 ### 🚀 Features

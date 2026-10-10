@@ -63,10 +63,14 @@ test('expand runs the artifact full-window; overlay is a fresh instance, inline 
   const overlay = page.getByTestId('artifact-overlay');
 
   // Edge-to-edge: the overlay frame fills the viewport (full width; full
-  // height minus the slim chrome bar).
+  // height minus the slim chrome bar). The overlay now enters on the system
+  // dialog motion (scale 0.98 → 1), so poll until the scale-in settles.
   const viewport = page.viewportSize()!;
-  const frameBox = (await overlay.locator('iframe').boundingBox())!;
-  expect(frameBox.width).toBeGreaterThanOrEqual(viewport.width - 2);
+  const overlayFrame = overlay.locator('iframe');
+  await expect
+    .poll(async () => (await overlayFrame.boundingBox())!.width)
+    .toBeGreaterThanOrEqual(viewport.width - 2);
+  const frameBox = (await overlayFrame.boundingBox())!;
   expect(frameBox.height).toBeGreaterThanOrEqual(viewport.height - 60);
 
   // Clean re-instantiation: the overlay runs a FRESH document (Count: 0) —
