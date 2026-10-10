@@ -29,6 +29,9 @@ test('board: Area sub-group renders as full-width lane bars above the cards', {t
   const coreLane = page.getByRole('button', {name: 'Collapse Core lane'});
   await expect(coreLane).toHaveCSS('height', '28px');
   await expect(page.locator('[data-col-key]').filter({hasText: 'Building'}).first()).toHaveCSS('height', '32px');
+  await page.getByLabel('Collapse Building column', {exact: true}).click();
+  await expect(page.locator('.w-11[style*="color-mix"]').first()).toBeVisible();
+  await page.getByLabel('Expand Building column', {exact: true}).click();
   await coreLane.click();
   await expect(page.getByRole('button', {name: 'Expand Core lane'})).toBeVisible();
 });
