@@ -59,3 +59,25 @@ No test assertions were removed, relaxed, or rewritten. No pin edits were necess
 - **Design:** light/dark table selection across opaque sticky title cells, horizontal scrolling, hover without row tint, stronger icon chrome, normal-weight 33px headers, quiet calculation footer, title text alignment ±1px; inline/full-page framing; grouped and ungrouped compact lists.
 - **Design:** toolbar at wide/wrapped/narrow widths, zero and multiple filter/sort counts, shared tooltips and keyboard focus; menu field rings, eyebrow contrast, separators/add actions, long overlay scrolling. Check the text-xs field exception noted above. Approve updated database-views Chromatic baseline.
 - **Code:** review all delta commits, scope boundary, named z tiers, additive export, exact accessible labels/counts, unchanged behavior pins, and full verification result. Manifest change is documentation only; chip-style migration is a later slice.
+
+
+## Pre-endorsed fix round — 2026-10-10
+
+**All 10 fixes implemented; full `pnpm --filter open-book verify` green in-turn, exit 0. Local commits only; no push.** Implementation: `c56c3a5d` (`fix(ui): apply database shell review corrections`).
+
+| Fix # | Commit | Result |
+|---|---|---|
+| 1 | `c56c3a5d` | Add metric tile restores `border border-dashed border-border`. |
+| 2 | `c56c3a5d` | Advanced-filter chip restores `border border-dashed border-border`. |
+| 3 | `c56c3a5d` | Group/Fields tooltips use existing locale keys; exact hardcoded aria-labels preserved. Filter/Sort/View options have no existing locale keys and remain unchanged. |
+| 4 | `c56c3a5d` | Filter and Sort popovers align end. |
+| 5 | `c56c3a5d` | Sort trigger uses 16px ArrowUpDown; Clear filters & sorts retains ListFilter. |
+| 6 | `c56c3a5d` | Condition/Group use w-auto and left alignment; Add sort/rule remain full-width and left-aligned; leading Plus preserved. |
+| 7 | `c56c3a5d` | Three sticky table cells (th, body td, tfoot td) use bg-background. |
+| 8 | `c56c3a5d` | Toolbar row count uses full text-muted-foreground. |
+| 9 | `c56c3a5d` | Five gallery/group/lane counts use full text-muted-foreground; both BoardColumnFooter eyebrows use the sectionLabel recipe. |
+| 10 | `c56c3a5d` | Property Description loses text-xs override; mono fields untouched. |
+
+Verification: foreground pipeline awaited to completion in this turn, using the explicit root-package allowlist. Ran outside the sandbox because the earlier report established reproducible sandbox watcher failures. ESLint-rule tests **7/7**; library builds, generated-file checks, workspace typechecks and lint all passed. Vitest: SDK **32 files / 580 tests**, UI **257 / 2,580**, app **3 / 9**, server **106 / 1,442**; aggregate **398 passed files / 4,611 passed tests**, plus **1 file / 8 tests skipped** by the existing suite. MCP unit/contract checks all passed (reported batches: 3, 17, 44, 17, 80, 54, 40, 10; catalogue coverage 45 types + 9 plugin blocks). Server e2e **256 checks**; MCP e2e **70 checks**. Log: `/tmp/dsx5a-fixes-verify.log`. Server unit duration: 824.49s. `git diff --check` passed; commit hooks passed lint/typecheck/commitlint. Git emitted the previously documented packed-refs.lock sandbox warning, but the commit succeeded and was confirmed in the log.
+
+Test pins: **unchanged; no value updates needed, no assertions removed or weakened**. No browser/Chromatic run in this round; the existing browser gates remain for the manager's capture pass. Capture changes: restored dashed outlines, translated Group/Fields tooltips, right-aligned popovers, sort glyph, left-aligned add actions, light/dark sticky seam and selection wash, stronger counts/eyebrows, Description field typography. These fixes supersede the earlier bg-card and Description text-xs notes above. Only the three requested production files changed; no generated files or binaries committed.
