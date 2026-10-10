@@ -127,7 +127,7 @@ describe('TableRangeToolbar', () => {
     expect(within(menu).getByRole('menuitem', {name: 'Insert 2 rows above'})).toBeTruthy();
     const entries = [...menu.querySelectorAll('[role="menuitem"], [role="separator"]')];
     expect(entries[0].getAttribute('role')).toBe('menuitem');
-    expect(entries.at(-1)!.getAttribute('role')).toBe('menuitem');
+    expect(entries[entries.length - 1].getAttribute('role')).toBe('menuitem');
     entries.forEach((entry, index) => {
       if (entry.getAttribute('role') === 'separator') expect(entries[index - 1].getAttribute('role')).toBe('menuitem');
     });

@@ -64,6 +64,32 @@ async function mergeTopLeft2x2(page: import('@playwright/test').Page): Promise<i
   return table;
 }
 
+test('table rows share the 33px pitch and compact chrome geometry', {tag: ['@editor', '@p1']}, async ({page}) => {
+  const table = await freshTable(page);
+  const metrics = await table.evaluate((element) => {
+    const wrap = element.parentElement!;
+    return {
+      rows: [...element.querySelectorAll('tr')].map((row) => row.getBoundingClientRect().height),
+      top: getComputedStyle(wrap).paddingTop,
+      bottom: getComputedStyle(wrap).paddingBottom,
+      fontSize: getComputedStyle(element).fontSize,
+      lineHeight: getComputedStyle(element).lineHeight,
+      blockHeight: element.closest('.obe-row')!.getBoundingClientRect().height,
+    };
+  });
+  expect(metrics.rows).toHaveLength(3);
+  for (const height of metrics.rows) expect(Math.abs(height - 33.02)).toBeLessThan(0.1);
+  expect(metrics.top).toBe('0px');
+  expect(metrics.bottom).toBe('16px');
+  expect(metrics.fontSize).toBe('14px');
+  expect(metrics.lineHeight).toBe('20.02px');
+  console.log('DSX-5b editable table metrics', JSON.stringify(metrics));
+  const rowGrip = (await table.locator('.obe-table-row-grip').first().boundingBox())!;
+  const colGrip = (await table.locator('.obe-table-col-grip').first().boundingBox())!;
+  expect([rowGrip.width, rowGrip.height]).toEqual([18, 24]);
+  expect([colGrip.width, colGrip.height]).toEqual([24, 18]);
+});
+
 test('column boundary resizes by pointer and stays clear of table chrome', {tag: ['@editor', '@p1']}, async ({page}) => {
   const table = await freshTable(page);
   const firstCell = table.locator('tbody > tr').first().locator('td').first();

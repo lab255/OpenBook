@@ -182,7 +182,7 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
             <Ellipsis aria-hidden />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className={MENU_WIDTH_MD, MENU_WIDTH_SM} onCloseAutoFocus={(event) => event.preventDefault()}>
+        <DropdownMenuContent className={MENU_WIDTH_MD} onCloseAutoFocus={(event) => event.preventDefault()}>
           <DropdownMenuLabel>{t('menu.table.sectionSelection')}</DropdownMenuLabel>
           <TableRangeMenuItems exclude="toolbar" menu={MENU_COMPONENTS.dropdown} {...ctx} />
         </DropdownMenuContent>
