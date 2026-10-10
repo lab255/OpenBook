@@ -136,6 +136,16 @@ export const CodeBlockView: React.FC<{
             </PopoverContent>
           </Popover>
         )}
+        <button
+          type="button"
+          className="obe-media-btn"
+          data-chrome="view"
+          aria-label="Copy code"
+          title="Copy code"
+          onClick={onCopy}
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
         {live && (
           <button
             type="button"
@@ -148,16 +158,6 @@ export const CodeBlockView: React.FC<{
             <Play className="h-3.5 w-3.5" />
           </button>
         )}
-        <button
-          type="button"
-          className="obe-media-btn"
-          data-chrome="view"
-          aria-label="Copy code"
-          title="Copy code"
-          onClick={onCopy}
-        >
-          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
         {!editor.readOnly && <KitSettings media blockId={id} title={name || 'Code'}>
           {config}
         </KitSettings>}
