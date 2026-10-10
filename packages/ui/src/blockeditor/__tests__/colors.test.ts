@@ -22,10 +22,11 @@ function rgba(value: string): number[] {
   return [channel(0), channel(8), channel(4), Number(match[4] ?? 1)];
 }
 
-function literal(selector: string, property: string): string {
-  const rule = css.split('\n').find((line) => line.startsWith(`${selector} {`));
-  const value = rule?.match(new RegExp(`${property}: hsl\\(([^)]+)\\)`))?.[1];
-  if (!value) throw new Error(`Missing ${selector} ${property}`);
+function literal(dark: boolean, role: typeof roles[number], id: string): string {
+  const theme = css.match(dark ? /\.dark\s*\{([^}]+)\}/ : /:root\s*\{([^}]+)\}/)?.[1];
+  const property = `--obe-${role}-${id}`;
+  const value = theme?.match(new RegExp(`${property}: hsl\\(([^)]+)\\)`))?.[1];
+  if (!value) throw new Error(`Missing ${dark ? '.dark' : ':root'} ${property}`);
   return value;
 }
 
@@ -64,12 +65,11 @@ for (const dark of [false, true]) {
       expect(COLOR_TOKENS).toHaveLength(9);
     });
     for (const {id} of COLOR_TOKENS) {
-      const selector = `${dark ? '.dark ' : ''}.obe-`;
       it(`${id} text meets 4.5:1`, () => {
-        expect(contrast(rgba(literal(`${selector}fg-${id}`, 'color')), rgba(background))).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(rgba(literal(dark, 'fg', id)), rgba(background))).toBeGreaterThanOrEqual(4.5);
       });
       it.each(roles)(`${id} %s matches export hex`, (role) => {
-        expect(palette[id][role]).toBe(hex(rgba(literal(`${selector}${role}-${id}`, role === 'fg' ? 'color' : 'background-color'))));
+        expect(palette[id][role]).toBe(hex(rgba(literal(dark, role, id))));
       });
     }
   });

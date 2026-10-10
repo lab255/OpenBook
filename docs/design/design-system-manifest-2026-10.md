@@ -123,6 +123,8 @@ remote insert is noise (the reference editor also inserts blocks with no entranc
 dwell 2.8s (:3606), skeleton shimmer 1.6s (:442). They keep their durations but must use
 an `--ease-*` token instead of `ease-out`/`ease`. Adding a new one requires a row here.
 
+Select exit: **none** — nested dismissable layer.
+
 ### 2.3 Reduced motion
 
 | Rule | Decision |
