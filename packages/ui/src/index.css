@@ -28,6 +28,7 @@
 }
 
 @theme {
+  --obe-icon-size: calc(var(--obe-font-size) * 1.25); /* 20px */
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -247,6 +248,7 @@
     --obe-code-size: calc(var(--obe-font-size) * 0.875);
     --obe-code-leading: 1.5;
     --obe-code-inline: 0.875em;
+    --obe-icon-size: calc(var(--obe-font-size) * 1.25);
     --obe-small-size: calc(var(--obe-font-size) * 0.875);
     --obe-small-leading: 1.43;
     --obe-caption-size: calc(var(--obe-font-size) * 0.75);
@@ -931,7 +933,7 @@
   --obe-lead-line: calc(0.8rem * var(--obe-leading));
 }
 .obe-row[data-block-type='callout'] {
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + 0.75rem);
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1rem);
 }
 .obe-row[data-block-type='table']:has(.obe-has-grips) {
   /* End the block handle above the first row grip; both remain draggable. */
@@ -1184,7 +1186,7 @@ a.obe-mention {
   gap: 0.5rem;
   background: var(--obe-callout-info);
   border-radius: var(--radius-lg);
-  padding: 0.75rem;
+  padding: 1rem 1rem 1rem 0.75rem;
   margin: 0;
 }
 .obe-callout-warn { background: var(--obe-callout-warn); }
@@ -1192,13 +1194,28 @@ a.obe-mention {
 .obe-callout-danger { background: var(--obe-callout-danger); }
 .obe-callout-icon {
   flex: none;
-  font-size: 1.05rem;
-  line-height: 1.5;
+  display: grid;
+  place-items: center;
+  width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
+  font-size: var(--obe-icon-size);
+  line-height: 1;
+  transition: background-color var(--motion-fast) var(--ease-out-soft);
   cursor: pointer;
   border-radius: var(--radius-md);
   padding: 0;
 }
 .obe-callout-icon:hover { background: var(--hover); }
+.obe-blockbody[class*='obe-bg-']:has(> .obe-callout) { background: none; padding-inline: 0; margin-inline: 0; }
+.obe-bg-gray > .obe-callout { background: var(--obe-bg-gray); }
+.obe-bg-brown > .obe-callout { background: var(--obe-bg-brown); }
+.obe-bg-orange > .obe-callout { background: var(--obe-bg-orange); }
+.obe-bg-yellow > .obe-callout { background: var(--obe-bg-yellow); }
+.obe-bg-green > .obe-callout { background: var(--obe-bg-green); }
+.obe-bg-blue > .obe-callout { background: var(--obe-bg-blue); }
+.obe-bg-purple > .obe-callout { background: var(--obe-bg-purple); }
+.obe-bg-pink > .obe-callout { background: var(--obe-bg-pink); }
+.obe-bg-red > .obe-callout { background: var(--obe-bg-red); }
 .obe-divider {
   flex: 1;
   border: 0;
@@ -1684,6 +1701,7 @@ a.obe-mention {
   /* Recompute derived sizes at the scaling context (CSS variables resolve here). */
   --obe-title-size: calc(var(--obe-font-size) * 2.5);
   --obe-code-size: calc(var(--obe-font-size) * 0.875);
+  --obe-icon-size: calc(var(--obe-font-size) * 1.25);
   --obe-small-size: calc(var(--obe-font-size) * 0.875);
   --obe-caption-size: calc(var(--obe-font-size) * 0.75);
   --obe-h1-size: calc(var(--obe-font-size) * 1.875);

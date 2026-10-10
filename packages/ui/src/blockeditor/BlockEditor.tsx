@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import type * as Y from 'yjs';
 import {listNumber, listNumberLabel} from './listMarkers';
+import {IconPicker} from '@/components/IconPicker';
+import {PageIcon} from '@/components/PageIcon';
 import {
   blockChildren,
   COLUMN_GRID_UNITS,
@@ -2423,6 +2425,8 @@ class BlockErrorBoundary extends React.Component<{children: React.ReactNode}, {f
 }
 
 /** Type dispatch for a block's content. */
+const VARIANT_ICON: Record<string, string> = {info: '💡', warn: '⚠️', success: '✅', danger: '🚫'};
+
 const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) => {
   const {editor, ui} = shared;
   const type = blockType(block);
@@ -2521,23 +2525,14 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   case 'callout': {
     const variant = blockProp<string>(block, 'variant') ?? 'info';
-    const icons: Record<string, string> = {info: '💡', warn: '⚠️', success: '✅', danger: '🚫'};
+    const icon = blockProp<string>(block, 'icon') ?? VARIANT_ICON[variant] ?? '💡';
     return (
       <div className={`obe-callout obe-callout-${variant}`}>
-        <button
-          type="button"
-          className="obe-callout-icon"
-          contentEditable={false}
-          disabled={textEditor.readOnly}
-          aria-label="Change callout style"
-          onClick={() => {
-            const order = ['info', 'warn', 'success', 'danger'];
-            const next = order[(order.indexOf(variant) + 1) % order.length];
-            editor.doc.transact(() => setBlockProp(block, 'variant', next), 'local');
-          }}
-        >
-          {icons[variant] ?? '💡'}
-        </button>
+        <span contentEditable={false}>
+          {textEditor.readOnly
+            ? <span className="obe-callout-icon" aria-hidden><PageIcon value={icon} fallback="💡" /></span>
+            : <IconPicker value={icon} onPick={(v) => editor.doc.transact(() => setBlockProp(block, 'icon', v), 'local')} className="obe-callout-icon" ariaLabel="Change callout icon" fallback="💡" />}
+        </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
       </div>
     );
