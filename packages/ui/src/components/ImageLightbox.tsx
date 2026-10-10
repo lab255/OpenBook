@@ -253,9 +253,11 @@ export default function ImageLightbox() {
             </>
           )}
 
-          {/* Zoom chrome: a live percentage + a reset-to-fit control. */}
-          {percent != null && (
-            <div className="obe-lightbox-zoombar" role="group" aria-label={t('blocks.image.zoomControls')}>
+          {/* Reserve the zoom row before measuring fit so loading/reset cannot resize the stage. */}
+          {state && (
+            <div className="obe-lightbox-zoombar" role="group" aria-label={t('blocks.image.zoomControls')}
+              style={{visibility: percent == null ? 'hidden' : undefined}}>
+
               <button
                 type="button"
                 className="obe-lightbox-zoombtn"
@@ -269,7 +271,7 @@ export default function ImageLightbox() {
                 <Minus className="h-4 w-4" aria-hidden />
               </button>
               <span className="obe-lightbox-zoomvalue">
-                {t('blocks.image.zoomLevel', {percent})}
+                {t('blocks.image.zoomLevel', {percent: percent ?? 100})}
               </span>
               <button
                 type="button"

@@ -206,6 +206,24 @@ describe('ImageLightbox overlay — zoom & pan (LBX-2)', () => {
     expect(screen.getByText('50%')).toBeTruthy();
   });
 
+  it('measures initial fit and Reset with the same reserved caption and zoom rows', () => {
+    renderOverlay();
+    act(() => openLightbox({src: TINY_PNG, alt: 'A cat', caption: 'Caption row', trigger: null}));
+    const dialog = screen.getByRole('dialog');
+    const img = dialog.querySelector('img')!;
+    // Simulate flex layout: inserting zoom chrome reduces the stage's fit size.
+    Object.defineProperty(img, 'offsetWidth', {configurable: true, get: () =>
+      dialog.querySelector('.obe-lightbox-zoombar') ? 784 : 848});
+    fireEvent.load(img);
+    const initial = dialog.querySelector('.obe-lightbox-zoomvalue')!.textContent;
+    expect(initial).toBe('49%');
+    fireEvent.doubleClick(dialog.querySelector('.obe-lightbox-stage')!);
+    expect(screen.getByText('100%')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Reset zoom to fit'));
+    expect(dialog.querySelector('.obe-lightbox-zoomvalue')!.textContent).toBe(initial);
+    expect((screen.getByLabelText('Reset zoom to fit') as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('keyboard +/- zoom and 0 resets to fit', () => {
     renderOverlay();
     openAndLoad();
