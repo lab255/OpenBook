@@ -67,7 +67,7 @@ const CATALOGUE_LITERAL = [
   {type: 'todo', category: 'core', nature: 'text', props: {checked: 'boolean'}, hint: '{checked?}'},
   {type: 'quote', category: 'core', nature: 'text'},
   {type: 'callout', category: 'core', nature: 'text', props: {variant: 'string'}, hint: '{variant:"info"|"warn"|"success"}'},
-  {type: 'code', category: 'core', nature: 'text', props: {language: 'string', live: 'boolean', name: 'string', collapsed: 'boolean'}, hint: '{language?,live?,name?,collapsed?}'},
+  {type: 'code', category: 'core', nature: 'text', props: {language: 'string', live: 'boolean', name: 'string', collapsed: 'boolean', wrap: 'boolean'}, hint: '{language?,live?,name?,collapsed?,wrap?}'},
   // A speaker note: editable on the page, shown only in the presenter view.
   {type: 'notes', category: 'core', nature: 'text', hint: 'speaker note — presenter view only, never exported'},
   {type: 'divider', category: 'core', nature: 'void'},

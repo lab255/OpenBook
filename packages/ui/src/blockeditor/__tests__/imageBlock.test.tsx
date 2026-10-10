@@ -240,6 +240,27 @@ describe('image block — render, resize, alt/caption', () => {
     }
   });
 
+  it('resizes symmetrically around the fixed frame centre and clamps both edges', () => {
+    const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG, width: '60%'}}]);
+    const {container} = render(<BlockEditor doc={doc} />);
+    const figure = container.querySelector('.obe-image')!;
+    const frame = container.querySelector('.obe-image-frame')!;
+    vi.spyOn(figure, 'getBoundingClientRect').mockReturnValue({width: 1000} as DOMRect);
+    vi.spyOn(frame, 'getBoundingClientRect').mockReturnValue({left: 200, width: 600} as DOMRect);
+    for (const [edge, clientX] of [['left', 250], ['right', 750]] as const) {
+      fireEvent.pointerDown(container.querySelector(`[data-edge="${edge}"]`)!);
+      fireEvent.pointerMove(window, {clientX});
+      expect(docToJSON(doc)[0].props?.width).toBe('50%');
+      fireEvent.pointerMove(window, {clientX: 500});
+      expect(docToJSON(doc)[0].props?.width).toBe('15%');
+      fireEvent.pointerMove(window, {clientX: 2000});
+      expect(docToJSON(doc)[0].props?.width).toBe('100%');
+      fireEvent.pointerUp(window);
+      fireEvent.pointerMove(window, {clientX: 500});
+      expect(docToJSON(doc)[0].props?.width).toBe('100%');
+    }
+  });
+
   it('editing the caption persists it to props', () => {
     const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG}}]);
     render(<BlockEditor doc={doc} />);

@@ -15,7 +15,7 @@ import type {EditorUI} from './BlockEditor';
 
 /**
  * The code block, unified with live computation (the old formula block): a
- * toolbar with show/hide · run · copy, and a ⚙ that opens the same settings
+ * toolbar with language · live Run · Copy, and a ⚙ that opens the same settings
  * popover every kit block uses — variable name, language, and the *live* toggle.
  * Live = the code evaluates over the document's reactive scope (inputs + every
  * named live block above it) and publishes under a name later live blocks,
@@ -50,7 +50,9 @@ export const CodeBlockView: React.FC<{
     return full.length > 240 ? `${full.slice(0, 240)} …` : full;
   })();
 
-  const set = (key: string, value: unknown): void => editor.doc.transact(() => setBlockProp(block, key, value), 'local');
+  const set = (key: string, value: unknown): void => {
+    if (!editor.readOnly) editor.doc.transact(() => setBlockProp(block, key, value), 'local');
+  };
 
   const onCopy = (): void => {
     void copyText(String(block.get('text') ?? '')).then((ok) => {
@@ -156,14 +158,15 @@ export const CodeBlockView: React.FC<{
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
-        <KitSettings blockId={id} title={name || 'Code'}>
+        {!editor.readOnly && <KitSettings media blockId={id} title={name || 'Code'}>
           {config}
-        </KitSettings>
+        </KitSettings>}
       </div>
       {collapsed ? (
         <button
           type="button"
           className="obe-code-collapsed"
+          disabled={editor.readOnly}
           contentEditable={false}
           onClick={() => set('collapsed', undefined)}
         >
