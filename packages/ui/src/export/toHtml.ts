@@ -401,7 +401,7 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
       const cell = (c: unknown) => inlineToHtml(parseInline(str(c)), ctx);
       const tint = (ri: number, ci: number): string => {
         const tok = colors[ri]?.[ci];
-        return typeof tok === 'string' && COLOR_EXPORT_HEX[tok] ? ` style="background:${COLOR_EXPORT_HEX[tok].hl}"` : '';
+        return typeof tok === 'string' && COLOR_EXPORT_HEX[tok] ? ` style="background:${COLOR_EXPORT_HEX[tok].bg}"` : '';
       };
       const spanAttrs = (ri: number, ci: number): string => {
         const raw = spans[ri]?.[ci];
@@ -1279,7 +1279,7 @@ const SCHEME_DUAL = `
 @media (prefers-color-scheme: dark) {
   body { background: #18181b; color: #e7e7ea; }
   .callout { background: hsl(0 0% 18.5%); }
-  :root { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
+  :root { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); --obe-x-head: hsl(0 0% 18.5% / 0.5); }
   /* Brighter text-colour tokens so palette colours stay legible on the dark page
      (the light-theme hex go muddy). Inline runs reference these via var(); when
      this query is inactive the var() falls back to the baked light hex. */
@@ -1425,9 +1425,9 @@ table.ledger-table td.ledger-empty { opacity: .6; font-style: italic; }
 .ledger-reversed { opacity: .6; font-size: .9em; }
 .ob-ledger-note { font-size: .85rem; opacity: .8; margin: 4px 0 0; }
 .ob-ledger-note.is-alarm { color: #b91c1c; font-weight: 600; opacity: 1; }
-table.block-table, table.db-table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: .95em; }
-table.block-table th, table.block-table td, table.db-table th, table.db-table td { border: 1px solid rgba(127,127,127,.3); padding: 4px 8px; text-align: left; vertical-align: top; }
-table.block-table th, table.db-table th { background: rgba(127,127,127,.08); font-weight: 600; padding-block: 6px; }
+table.block-table, table.db-table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 14px; line-height: 1.43; }
+table.block-table th, table.block-table td, table.db-table th, table.db-table td { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); padding: 6px 8px; text-align: left; vertical-align: top; }
+table.block-table th, table.db-table th { background: var(--obe-x-head, hsl(40 9% 96% / 0.5)); font-weight: 600; }
 table.db-table a.db-row { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; font-weight: 600; cursor: pointer; }
 table.db-table a.db-row:hover { text-decoration: underline; }
 .db-empty { opacity: .6; font-size: .9em; }

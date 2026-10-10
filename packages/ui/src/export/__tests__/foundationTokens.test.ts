@@ -18,6 +18,16 @@ function token(name: string): string {
 }
 
 describe('DSX foundation export mirrors', () => {
+  it('mirrors table metrics, borders and header fills in both themes', () => {
+    const body = parseFloat(token('obe-font-size'));
+    const ratio = Number(token('obe-small-size').match(/\* ([\d.]+)/)![1]);
+    expect(exporter).toContain(`font-size: ${body * ratio}px; line-height: ${token('obe-small-leading')};`);
+    expect(exporter).toContain('padding: 6px 8px; text-align: left; vertical-align: top;');
+    expect(exporter).toContain(`border: 1px solid var(--obe-x-border, hsl(${token('border')}))`);
+    expect(exporter).toContain(`background: var(--obe-x-head, hsl(${token('muted')} / 0.5))`);
+    expect(exporter).toContain(`--obe-x-head: hsl(${darkToken('muted')} / 0.5)`);
+  });
+
   it('declares theme-derived drop ink and the shared drag opacity', () => {
     expect(token('obe-drop')).toBe('hsl(var(--primary))');
     expect(token('obe-drag-dim')).toBe('0.4');

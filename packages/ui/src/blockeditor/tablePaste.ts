@@ -16,7 +16,7 @@ const htmlCellText = (cell: Element): string => {
 
 // Pre-DSX-P opaque export tints, kept so older exported HTML still pastes with its tokens.
 const LEGACY_HL: Record<string, string> = {'#e5e7eb': 'gray', '#ece0d8': 'brown', '#ffedd5': 'orange', '#fef3c7': 'yellow', '#dcfce7': 'green', '#dbeafe': 'blue', '#f3e8ff': 'purple', '#fce7f3': 'pink', '#fee2e2': 'red'};
-const colorByCss = new Map<string, string>([...Object.entries(LEGACY_HL), ...Object.entries(COLOR_EXPORT_HEX).map(([token, value]) => [value.hl.toLowerCase(), token] as [string, string])]);
+const colorByCss = new Map<string, string>([...Object.entries(LEGACY_HL), ...Object.entries(COLOR_EXPORT_HEX).flatMap(([token, value]) => [[value.hl.toLowerCase(), token], [value.bg.toLowerCase(), token]] as [string, string][])]);
 const cellColor = (cell: Element): string | undefined => {
   const raw = (cell as HTMLElement).style.backgroundColor || (cell as HTMLElement).style.background;
   if (!raw) return undefined;

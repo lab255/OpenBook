@@ -213,7 +213,7 @@ function tableCellTint(tableProps: Props, rowProps: Props, cellProps: Props): st
 /** An inline `style="background:…"` for a cell tint token, or '' (for the
  *  self-contained HTML/PDF exports that can't use the theme CSS classes). */
 const tintStyle = (token: string | null): string =>
-  token && COLOR_EXPORT_HEX[token] ? ` style="background:${COLOR_EXPORT_HEX[token].hl}"` : '';
+  token && COLOR_EXPORT_HEX[token] ? ` style="background:${COLOR_EXPORT_HEX[token].bg}"` : '';
 
 /** A canonical projected-cell span (absent or malformed means one). */
 const tableCellSpan = (props: Props, key: 'colspan' | 'rowspan'): number => {
