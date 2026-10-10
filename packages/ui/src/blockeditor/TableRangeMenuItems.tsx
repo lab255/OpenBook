@@ -158,10 +158,10 @@ export function rangeMenuItems(ctx: TableRangeMenuContext): RangeMenuItem[] {
     {kind: 'action', id: 'cut', label: t('menu.clipboard.cut'), icon: Scissors, disabled: !canWriteClipboard, toolbar: false, onSelect: () => copyRange(true)},
     {kind: 'action', id: 'paste', label: t('menu.clipboard.paste'), icon: ClipboardPaste, disabled: !canPasteClipboard, toolbar: false, onSelect: pasteRange},
     {kind: 'separator', id: 'clipboard-separator', toolbar: false},
-    {kind: 'action', id: 'insert-rows-above', label: rowCount === 1 ? t('menu.table.insertRowAbove') : t('menu.table.insertRowsAboveN', {n: rowCount}), icon: ArrowUp, toolbar: true, onSelect: () => insertRows(rowFrom)},
-    {kind: 'action', id: 'insert-rows-below', label: rowCount === 1 ? t('menu.table.insertRowBelow') : t('menu.table.insertRowsBelowN', {n: rowCount}), icon: ArrowDown, toolbar: true, onSelect: () => insertRows(rowTo + 1)},
-    {kind: 'action', id: 'insert-columns-left', label: colCount === 1 ? t('menu.table.insertColumnLeft') : t('menu.table.insertColumnsLeftN', {n: colCount}), icon: ArrowLeft, toolbar: true, onSelect: () => insertColumns(colFrom)},
-    {kind: 'action', id: 'insert-columns-right', label: colCount === 1 ? t('menu.table.insertColumnRight') : t('menu.table.insertColumnsRightN', {n: colCount}), icon: ArrowRight, toolbar: true, onSelect: () => insertColumns(colTo + 1)},
+    {kind: 'action', id: 'insert-rows-above', label: rowCount === 1 ? t('menu.table.insertRowAbove') : t('menu.table.insertRowsAboveN', {n: rowCount}), icon: ArrowUp, toolbar: false, onSelect: () => insertRows(rowFrom)},
+    {kind: 'action', id: 'insert-rows-below', label: rowCount === 1 ? t('menu.table.insertRowBelow') : t('menu.table.insertRowsBelowN', {n: rowCount}), icon: ArrowDown, toolbar: false, onSelect: () => insertRows(rowTo + 1)},
+    {kind: 'action', id: 'insert-columns-left', label: colCount === 1 ? t('menu.table.insertColumnLeft') : t('menu.table.insertColumnsLeftN', {n: colCount}), icon: ArrowLeft, toolbar: false, onSelect: () => insertColumns(colFrom)},
+    {kind: 'action', id: 'insert-columns-right', label: colCount === 1 ? t('menu.table.insertColumnRight') : t('menu.table.insertColumnsRightN', {n: colCount}), icon: ArrowRight, toolbar: false, onSelect: () => insertColumns(colTo + 1)},
     {kind: 'separator', id: 'insert-separator', toolbar: false},
     {kind: 'action', id: 'clear', label: t('menu.table.clearCells'), icon: Eraser, toolbar: true, onSelect: () => clearCellRange(doc, tableId, rect)},
     splitCell
@@ -169,8 +169,8 @@ export function rangeMenuItems(ctx: TableRangeMenuContext): RangeMenuItem[] {
       : {kind: 'action', id: 'merge', label: t('menu.table.mergeCells'), icon: TableCellsMerge, toolbar: true, onSelect: () => { tableMergeCells(doc, tableId, rect); onClearRange?.(); }},
     {kind: 'colour', id: 'tint', label: t('menu.table.tintCells'), current, toolbar: true, onPick: (token) => setTableCellRangeColor(doc, tableId, rect, token)},
     {kind: 'separator', id: 'delete-separator', toolbar: false},
-    {kind: 'action', id: 'delete-rows', label: deletesAllRows ? t('menu.table.deleteTable') : rowCount === 1 ? t('menu.table.deleteRow') : t('menu.table.deleteRowsN', {n: rowCount}), icon: Trash2, destructive: true, toolbar: true, onSelect: () => { tableDeleteRowRange(doc, tableId, rect.top, rect.bottom); onClearRange?.(); }},
-    {kind: 'action', id: 'delete-columns', label: deletesAllColumns ? t('menu.table.deleteTable') : colCount === 1 ? t('menu.table.deleteColumn') : t('menu.table.deleteColumnsN', {n: colCount}), icon: Trash2, destructive: true, toolbar: true, onSelect: () => { tableDeleteColumnRange(doc, tableId, rect.left, rect.right); onClearRange?.(); }},
+    {kind: 'action', id: 'delete-rows', label: deletesAllRows ? t('menu.table.deleteTable') : rowCount === 1 ? t('menu.table.deleteRow') : t('menu.table.deleteRowsN', {n: rowCount}), icon: Trash2, destructive: true, toolbar: false, onSelect: () => { tableDeleteRowRange(doc, tableId, rect.top, rect.bottom); onClearRange?.(); }},
+    {kind: 'action', id: 'delete-columns', label: deletesAllColumns ? t('menu.table.deleteTable') : colCount === 1 ? t('menu.table.deleteColumn') : t('menu.table.deleteColumnsN', {n: colCount}), icon: Trash2, destructive: true, toolbar: false, onSelect: () => { tableDeleteColumnRange(doc, tableId, rect.left, rect.right); onClearRange?.(); }},
   ];
 }
 
@@ -179,9 +179,13 @@ export const RANGE_COLOUR_MENU: Array<{id: string | null; label: TKey}> = [
   ...COLOR_TOKENS.map((colour) => ({id: colour.id, label: `menu.colour.${colour.id}` as TKey})),
 ];
 
-export const TableRangeMenuItems: React.FC<TableRangeMenuContext & {menu?: MenuComponentSet}> = ({menu = MENU_COMPONENTS.context, ...ctx}) => {
+export const TableRangeMenuItems: React.FC<TableRangeMenuContext & {menu?: MenuComponentSet; exclude?: 'toolbar'}> = ({menu = MENU_COMPONENTS.context, exclude, ...ctx}) => {
   const {Item, Separator, Sub, SubContent, SubTrigger} = menu;
-  return rangeMenuItems(ctx).map((item) => {
+  const filtered = rangeMenuItems(ctx).filter((item) => exclude !== 'toolbar' || !item.toolbar);
+  const items = filtered.filter((item, index) => item.kind !== 'separator' || (
+    index > 0 && index < filtered.length - 1 && filtered[index - 1].kind !== 'separator'
+  ));
+  return items.map((item) => {
     if (item.kind === 'separator') return <Separator key={item.id} />;
     if (item.kind === 'colour') return (
       <Sub key={item.id}>

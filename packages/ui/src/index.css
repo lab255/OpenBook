@@ -2257,7 +2257,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   color: hsl(var(--foreground) / 0.85);
 }
-.obe-range-toolbar-button:hover { background: var(--hover); }
+.obe-range-toolbar-button:hover { background: var(--obe-chrome-hover); }
 .obe-range-toolbar-button > svg { width: 0.875rem; height: 0.875rem; }
 .obe-range-toolbar-button:disabled { opacity: 0.4; }
 @media (pointer: coarse) {

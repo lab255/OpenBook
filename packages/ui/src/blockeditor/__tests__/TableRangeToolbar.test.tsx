@@ -1,6 +1,6 @@
 import React, {useRef} from 'react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {cleanup, fireEvent, render, screen, within} from '@testing-library/react';
 import {createDoc, findBlock, makeTable, blockPlainText, tableGrid, type CellRect} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
 import {TableRangeToolbar} from '../TableRangeToolbar';
@@ -110,6 +110,27 @@ describe('TableRangeToolbar', () => {
     fireEvent.click(screen.getByRole('button', {name: 'Clear contents'}));
     const grid = tableGrid(findBlock(doc, 'tbl')!.block);
     expect(grid.cells.flat().map((cell) => blockPlainText(cell!))).toEqual(['', '', '', '']);
+  });
+
+  it('shows three primary actions and a deduplicated overflow menu', async () => {
+    const {editor} = seed();
+    render(<Harness editor={editor} />);
+    const toolbar = screen.getByRole('toolbar');
+    const buttons = within(toolbar).getAllByRole('button');
+    expect(buttons.slice(0, 3).map((button) => button.getAttribute('aria-label'))).toEqual(['Clear contents', 'Merge cells', 'Cell colour']);
+    expect(buttons).toHaveLength(4);
+    fireEvent.keyDown(buttons[3], {key: 'Enter'});
+    const menu = await screen.findByRole('menu');
+    for (const name of ['Clear contents', 'Merge cells', 'Cell colour']) {
+      expect(within(menu).queryByRole('menuitem', {name})).toBeNull();
+    }
+    expect(within(menu).getByRole('menuitem', {name: 'Insert 2 rows above'})).toBeTruthy();
+    const entries = [...menu.querySelectorAll('[role="menuitem"], [role="separator"]')];
+    expect(entries[0].getAttribute('role')).toBe('menuitem');
+    expect(entries.at(-1)!.getAttribute('role')).toBe('menuitem');
+    entries.forEach((entry, index) => {
+      if (entry.getAttribute('role') === 'separator') expect(entries[index - 1].getAttribute('role')).toBe('menuitem');
+    });
   });
 
   it('uses German aria labels, roves with arrows, and Escape dismisses then refocuses the table', () => {
