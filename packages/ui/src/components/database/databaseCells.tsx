@@ -101,8 +101,8 @@ const findOption = (property: DatabaseProperty, value: unknown): DatabaseSelectO
   property.options?.find((o) => o.id === value);
 
 /** A colored select-option chip. */
-export const SelectChip: React.FC<{option: DatabaseSelectOption; pill?: boolean}> = ({option, pill = false}) => (
-  <span className={cn('inline-flex max-w-full items-center truncate px-1.5 py-0.5 text-xs', pill ? 'rounded-full' : 'rounded-sm')} style={chipStyle(option.color)}>
+export const SelectChip: React.FC<{option: DatabaseSelectOption; pill?: boolean; title?: string}> = ({option, pill = false, title}) => (
+  <span title={title} className={cn('inline-flex max-w-full items-center truncate px-1.5 py-0.5 text-xs', pill ? 'rounded-full' : 'rounded-sm')} style={chipStyle(option.color)}>
     {option.label}
   </span>
 );

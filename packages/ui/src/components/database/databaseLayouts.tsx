@@ -156,13 +156,13 @@ export const RowChips: React.FC<{
       const value = cellValue(row, property, resolveProperties ?? properties, rows);
       if (property.type === 'select' || property.type === 'status') {
         const option = property.options?.find((o) => o.id === value);
-        return option ? <SelectChip key={property.id} option={option} pill={property.type === 'status'} /> : null;
+        return option ? <SelectChip key={property.id} option={option} pill={property.type === 'status'} title={property.name} /> : null;
       }
       if (property.type === 'multi_select') {
         const ids = Array.isArray(value) ? (value as string[]) : [];
         const opts = (property.options ?? []).filter((o) => ids.includes(o.id));
         return opts.length ? (
-          <span key={property.id} className="flex flex-wrap items-center gap-1">
+          <span key={property.id} title={property.name} className="flex flex-wrap items-center gap-1">
             {opts.map((o) => (
               <SelectChip key={o.id} option={o} />
             ))}
@@ -496,7 +496,10 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
         >
           {view.coverPropertyId && <CardCover src={cover} heightClass={GALLERY_COVER[size]} icon={readPageIcon(row.id)} />}
           <div className={cn('flex flex-col gap-2', view.coverPropertyId ? 'px-3 pb-3' : 'p-3')}>
-            <div className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</div>
+            <div className="flex items-center gap-1.5">
+              {!view.coverPropertyId && <PageIcon value={readPageIcon(row.id)} className="shrink-0 text-sm leading-none" />}
+              <span className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</span>
+            </div>
             <RowChips row={row} properties={cardProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />
           </div>
         </button>
@@ -661,7 +664,10 @@ const BoardColumnCards: React.FC<{
             <div
               draggable={canMove}
               onDragStart={() => dnd.setDragRow(row.id)}
-              onDragEnd={() => dnd.setDragRow(null)}
+              onDragEnd={() => {
+                dnd.setDragRow(null);
+                dnd.setOverKey(null);
+              }}
               onClick={() => db.openRow(row.id)}
               style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
               className={cn(
