@@ -2481,14 +2481,17 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
     const checked = blockProp<boolean>(block, 'checked') ?? false;
     return (
       <div className={`obe-todo${checked ? ' obe-todo-done' : ''}`}>
-        <input
-          type="checkbox"
-          className="obe-todo-box"
-          checked={checked}
-          disabled={textEditor.readOnly}
-          aria-label={checked ? 'Mark as not done' : 'Mark as done'}
-          onChange={() => editor.doc.transact(() => setBlockProp(block, 'checked', !checked), 'local')}
-        />
+        <span className="obe-todo-check">
+          <input
+            type="checkbox"
+            className="obe-todo-box"
+            checked={checked}
+            disabled={textEditor.readOnly}
+            aria-label={checked ? 'Mark as not done' : 'Mark as done'}
+            onChange={() => editor.doc.transact(() => setBlockProp(block, 'checked', !checked), 'local')}
+          />
+          {checked && <Check className="obe-todo-tick" aria-hidden strokeWidth={3} />}
+        </span>
         <TextBlockView block={block} editor={textEditor} ui={ui} />
       </div>
     );

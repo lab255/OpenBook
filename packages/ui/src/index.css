@@ -1131,15 +1131,28 @@ a.obe-mention {
   font-variant-numeric: tabular-nums;
 }
 .obe-todo { flex: 1; display: flex; min-width: 0; align-items: flex-start; }
-.obe-todo-box {
+.obe-todo-check {
   flex: none;
+  display: grid;
   /* stylelint-disable-next-line declaration-property-value-allowed-list -- DSX-7: centre the checkbox on the padded text line. */
   margin: calc(var(--obe-block-pad-y) + (var(--obe-line) - 1rem) / 2) 4px 0 4px;
+}
+.obe-todo-check > * { grid-area: 1 / 1; }
+.obe-todo-box {
+  appearance: none;
+  margin: 0;
   width: 1rem;
   height: 1rem;
-  accent-color: hsl(var(--primary));
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
   cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
+.obe-todo-box:hover:not(:disabled) { background: var(--hover); }
+.obe-todo-box:checked { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
+.obe-todo-box:disabled { cursor: default; opacity: 1; }
+.obe-todo-tick { place-self: center; width: 0.75rem; height: 0.75rem; color: hsl(var(--primary-foreground)); pointer-events: none; }
 .obe-todo-done .obe-text {
   color: hsl(var(--muted-foreground));
   text-decoration: line-through;
