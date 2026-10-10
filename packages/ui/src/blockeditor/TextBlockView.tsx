@@ -203,13 +203,14 @@ export const TextBlockView: React.FC<{
       '###': {type: 'heading', props: {level: 3}},
       '-': {type: 'list', props: {kind: 'bullet'}},
       '*': {type: 'list', props: {kind: 'bullet'}},
-      '1.': {type: 'list', props: {kind: 'number'}},
       '[]': {type: 'todo'},
       '[ ]': {type: 'todo'},
       '[x]': {type: 'todo', props: {checked: true}},
+      // DSX-10 will move > to the toggle block; keep quote compatibility for now.
       '>': {type: 'quote'},
+      '"': {type: 'quote'},
     };
-    const hit = map[prefix];
+    const hit = map[prefix] ?? (/^\d+\.$/.test(prefix) ? {type: 'list' as const, props: {kind: 'number'}} : undefined);
     if (!hit || type !== 'paragraph') return false;
     apply(() => {
       text.delete(0, prefix.length);
@@ -235,6 +236,17 @@ export const TextBlockView: React.FC<{
     case 'insertReplacementText': {
       ev.preventDefault();
       const data = ev.data ?? '';
+      // The third dash consumes an otherwise-empty paragraph and leaves a
+      // fresh text block after the divider, as inserting via the slash menu does.
+      if (data === '-' && type === 'paragraph' && text.toString() === '--' && sel.start === 2 && sel.end === 2) {
+        apply(() => {
+          text.delete(0, 2);
+          editor.turnInto(id, 'divider');
+          editor.insertAfter(id, {type: 'paragraph'});
+        });
+        return;
+      }
+
       // Colon-terminated emoji insert (":smile:" → 😄), matching GitHub/Slack/
       // Discord muscle memory: when the ":" picker is already open on a
       // non-empty query that has matches, the closing ":" commits the top match
