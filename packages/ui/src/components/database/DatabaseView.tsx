@@ -93,7 +93,7 @@ const RowMenu: React.FC<{db: UseDatabase; rowId: string; bulk?: RowMenuBulk | nu
     <DropdownMenuTrigger asChild>
       <IconButton
         size="sm"
-        className="text-muted-foreground/60 opacity-0 transition group-hover:opacity-100"
+        className="text-muted-foreground/80 opacity-0 transition group-hover:opacity-100"
         aria-label="Row actions"
       >
         <MoreHorizontal className="h-4 w-4" />
@@ -132,7 +132,7 @@ const TitleCell: React.FC<{row: DatabaseRow; db: UseDatabase; dragHandle?: React
       <IconButton
         size="inline"
         onClick={tree.onToggle}
-        className="text-muted-foreground/60"
+        className="text-muted-foreground/80"
         aria-label={tree.collapsed ? 'Expand sub-items' : 'Collapse sub-items'}
       >
         <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', !tree.collapsed && 'rotate-90')} />
@@ -351,7 +351,7 @@ const DataRow: React.FC<ViewProps & {row: DatabaseRow; drag: DragApi; tree?: Row
       draggable
       onDragStart={() => drag.start(row.id)}
       onDragEnd={drag.end}
-      className="cursor-grab text-muted-foreground/30 opacity-0 transition group-hover:opacity-100 active:cursor-grabbing"
+      className="cursor-grab text-muted-foreground/80 opacity-0 transition group-hover:opacity-100 active:cursor-grabbing"
       aria-label="Drag to reorder"
       title="Drag to reorder"
     >
@@ -364,6 +364,7 @@ const DataRow: React.FC<ViewProps & {row: DatabaseRow; drag: DragApi; tree?: Row
       // Marks the row for a copied row link's scroll-to (the table doesn't wrap
       // rows in RowContextMenu, so the anchor attribute lives here directly).
       data-row-anchor={row.id}
+      data-selected={selection?.selected || undefined}
       onDragOver={(e) => {
         if (drag.canReorder && drag.dragRow) {
           e.preventDefault();
@@ -372,22 +373,19 @@ const DataRow: React.FC<ViewProps & {row: DatabaseRow; drag: DragApi; tree?: Row
       }}
       onDrop={() => drag.drop(row.id)}
       className={cn(
-        'group border-b border-border/70 transition-[background-color] last:border-0 hover:bg-hover',
+        'group border-b border-border/70 last:border-0',
         drag.dragRow === row.id && 'opacity-40',
         drag.overRow === row.id && drag.dragRow !== row.id && 'border-t-2 border-t-brand/60',
       )}
     >
       <td
         style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
-        className={cn(
-          'sticky left-0 z-10 border-r border-border px-2 py-0.5 align-middle',
-          selection?.selected ? 'bg-accent/40' : 'bg-card',
-        )}
+        className="sticky left-0 z-sticky border-r border-border bg-card px-2 py-0 align-middle"
       >
         {/* The title cell right-clicks into the same row menu as every other
             cell (no property section — there's no title quick-filter). */}
         <CellContextMenu db={db} view={db.activeView} row={row} bulk={bulk}>
-          <div className="relative flex items-center">
+          <div className="relative flex min-h-7 items-center">
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
               {selection && (
                 <input
@@ -410,12 +408,12 @@ const DataRow: React.FC<ViewProps & {row: DatabaseRow; drag: DragApi; tree?: Row
                 reserving permanent width — the name keeps the full column.
                 (Centered via inset-y + items-center, not translate: the desktop
                 WKWebView doesn't apply Tailwind v4's `translate` property.) */}
-            <div className="absolute inset-y-0 right-0 z-10 flex items-center gap-0.5 rounded-md bg-card pl-0.5 opacity-0 shadow-sm ring-1 ring-border/60 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+            <div className="absolute inset-y-0 right-0 z-raised flex items-center gap-0.5 rounded-md bg-card pl-0.5 opacity-0 shadow-sm ring-1 ring-border/60 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
               {tree && (
                 <IconButton
                   size="sm"
                   onClick={tree.onAddSub}
-                  className="text-muted-foreground/60"
+                  className="text-muted-foreground/80"
                   aria-label="Add sub-item"
                   title="Add sub-item"
                 >
@@ -425,7 +423,7 @@ const DataRow: React.FC<ViewProps & {row: DatabaseRow; drag: DragApi; tree?: Row
               <IconButton
                 size="sm"
                 onClick={() => db.openRow(row.id)}
-                className="text-muted-foreground/60"
+                className="text-muted-foreground/80"
                 aria-label="Open row"
                 title="Open in split"
               >
@@ -517,7 +515,7 @@ const GroupSummaryRow: React.FC<{
         {summarizeColumn(rows, property, summaryOf(property.id), db.rollupProperties, db.rollupRows)}
       </td>
     ))}
-    <td className="border-l border-border/60" />
+    <td />
   </tr>
 );
 
@@ -706,8 +704,8 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
       >
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/30 text-left text-xs font-medium text-muted-foreground">
-              <th className="sticky left-0 z-20 min-w-[220px] border-r border-border bg-card px-2 py-1.5 font-medium">
+            <tr className="border-b border-border text-left text-sm font-normal text-muted-foreground">
+              <th className="sticky left-0 z-sticky min-w-[220px] border-r border-border bg-card px-2 py-1.5 font-normal">
                 <span className="flex items-center gap-1.5">
                   <input
                     type="checkbox"
@@ -743,7 +741,7 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
                       setOverCol(null);
                     }}
                     className={cn(
-                      'group min-w-[140px] cursor-grab border-l border-border px-2 py-1.5 font-medium active:cursor-grabbing',
+                      'group min-w-[140px] cursor-grab border-l border-border px-2 py-1.5 font-normal active:cursor-grabbing',
                       dragCol === property.id && 'opacity-40',
                       overCol === property.id && dragCol !== property.id && 'border-l-2 border-l-brand/60',
                     )}
@@ -757,8 +755,8 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
                       <span className="flex items-center justify-between gap-1">
                         <span className="flex min-w-0 items-center gap-1">
                           <span className="truncate">{property.name}</span>
-                          {sortDir === 'asc' && <ArrowUp className="h-3 w-3 shrink-0 text-muted-foreground/60" />}
-                          {sortDir === 'desc' && <ArrowDown className="h-3 w-3 shrink-0 text-muted-foreground/60" />}
+                          {sortDir === 'asc' && <ArrowUp className="h-3 w-3 shrink-0 text-muted-foreground/80" />}
+                          {sortDir === 'desc' && <ArrowDown className="h-3 w-3 shrink-0 text-muted-foreground/80" />}
                         </span>
                         <PropertyMenu
                           ref={(handle) => {
@@ -816,7 +814,7 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
                           )}
                           {glyph && <span className="text-sm leading-none">{glyph}</span>}
                           <span>{groupHeading(group, groupProp)}</span>
-                          <span className="text-muted-foreground/60">{group.rows.length}</span>
+                          <span className="text-muted-foreground">{group.rows.length}</span>
                         </button>
                       </GroupContextMenu>
                     </td>
@@ -858,8 +856,8 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
           )}
 
           <tfoot>
-            <tr className="border-t border-border bg-muted/10 text-xs">
-              <td className="sticky left-0 z-10 border-r border-border bg-card align-middle">
+            <tr className="border-t border-border text-xs">
+              <td className="sticky left-0 z-sticky border-r border-border bg-card align-middle">
                 <SummaryPicker
                   current={summaryOf(TITLE_PROPERTY_ID)}
                   display={summarizeColumn(db.visibleRows, TITLE_PROPERTY_ID, summaryOf(TITLE_PROPERTY_ID), db.rollupProperties, db.rollupRows)}
@@ -867,7 +865,7 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
                 />
               </td>
               {columns.map((property) => (
-                <td key={property.id} className="border-l border-border/60 align-middle">
+                <td key={property.id} className="align-middle">
                   <SummaryPicker
                     current={summaryOf(property.id)}
                     display={summarizeColumn(db.visibleRows, property, summaryOf(property.id), db.rollupProperties, db.rollupRows)}
@@ -875,7 +873,7 @@ const TableView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, v
                   />
                 </td>
               ))}
-              <td className="border-l border-border/60" />
+              <td />
             </tr>
           </tfoot>
         </table>
@@ -891,7 +889,7 @@ const ListRow: React.FC<{db: UseDatabase; columns: DatabaseProperty[]; row: Data
     <RowContextMenu db={db} rowId={row.id}>
       <div
         style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
-        className="group flex cursor-pointer items-center justify-between gap-2 border-b border-border/70 px-3 py-2 last:border-0 hover:bg-hover"
+        className="group flex cursor-pointer items-center justify-between gap-2 border-b border-border/70 px-3 py-1 last:border-0 hover:bg-hover"
         onClick={() => db.openRow(row.id)}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -947,7 +945,7 @@ const ListView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, vi
                   )}
                   {glyph && <span className="text-sm leading-none">{glyph}</span>}
                   <span>{groupHeading(group, groupProp)}</span>
-                  <span className="text-muted-foreground/60">{group.rows.length}</span>
+                  <span className="text-muted-foreground">{group.rows.length}</span>
                 </button>
               </GroupContextMenu>
               {!isCollapsed && group.rows.map((row) => <ListRow key={row.id} db={db} columns={columns} row={row} />)}
@@ -970,7 +968,7 @@ const ListView: React.FC<ViewProps & {view: DbView}> = ({db, columns, schema, vi
       )}
       <button
         onClick={() => void db.addRow()}
-        className="flex w-full items-center gap-1 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+        className="flex w-full items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
       >
         <Plus className="h-4 w-4" /> New row
       </button>

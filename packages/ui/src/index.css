@@ -621,6 +621,10 @@
   background: linear-gradient(to right, hsl(var(--foreground) / 0.08), transparent);
 }
 
+tr[data-row-anchor][data-selected] > td {
+  background-image: linear-gradient(var(--obe-select-wash), var(--obe-select-wash));
+}
+
 @utility ob-edge-fade-x {
   mask-image: linear-gradient(to right, black calc(100% - 1.25rem), transparent);
 }

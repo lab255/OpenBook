@@ -684,7 +684,7 @@ export const PropertyMenu = React.forwardRef<
       <PopoverTrigger asChild>
         <IconButton
           size="inline"
-          className="text-muted-foreground/60 opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 data-[state=open]:opacity-100"
+          className="text-muted-foreground/80 opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 data-[state=open]:opacity-100"
           aria-label="Property options"
         >
           <MoreHorizontal className="h-3.5 w-3.5" />
