@@ -159,3 +159,13 @@ describe('block chrome rhythm', () => {
     expect(ruleBody('.obe-col-divider')).toContain('left: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2)');
   });
 });
+
+
+describe('container frame geometry', () => {
+  it('reserves the 24px inset and lets nested handles escape without clipping', () => {
+    expect(CSS).toContain('--obe-cnt-inset: var(--obe-gutter-btn)');
+    expect(CSS).toContain('--obe-gutter-btn: 24px');
+    expect(ruleBody('.obe-cnt')).not.toMatch(/overflow/);
+    expect(ruleBody('.obe-cnt-head')).toContain('border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0');
+  });
+});

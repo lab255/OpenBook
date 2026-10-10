@@ -229,6 +229,7 @@
     --obe-leading: 1.5;
     --obe-line: calc(var(--obe-font-size) * var(--obe-leading));
     --obe-gutter-btn: 24px;
+    --obe-cnt-inset: var(--obe-gutter-btn); /* 24px; must stay ≥22px so child handles (18px @ -22px) sit inside the frame */
     --obe-handle-w: 18px;
     /* FLOOR 4px — WCAG 2.5.8 spacing exception for the 18px handle depends on it. */
     --obe-gutter-gap: 4px;
@@ -3638,9 +3639,9 @@ a.obe-mention {
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
   margin: 0;
-  overflow: hidden;
 }
 .obe-cnt-head {
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
