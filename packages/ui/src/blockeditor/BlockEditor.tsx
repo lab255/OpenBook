@@ -3444,7 +3444,11 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                         key={`pad-${r}-${c}`}
                         aria-hidden
                         className={tdDropClass || undefined}
-                        onPointerEnter={showHandles ? () => setHoverCols([c, c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1]) : undefined}
+                        onPointerEnter={showHandles ? () => {
+                          const from = c;
+                          const to = c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1;
+                          setHoverCols(prev => prev && prev[0] === from && prev[1] === to ? prev : [from, to]);
+                        } : undefined}
                         onMouseDownCapture={extendCellSelect(r, c)}
                         onDragOver={showHandles ? overCol(c) : undefined}
                         onDrop={showHandles ? commitDrop : undefined}
@@ -3495,7 +3499,11 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                         className={tdDropClass || undefined}
                         colSpan={slot?.kind === 'cell' && slot.colspan > 1 ? slot.colspan : undefined}
                         rowSpan={slot?.kind === 'cell' && slot.rowspan > 1 ? slot.rowspan : undefined}
-                        onPointerEnter={showHandles ? () => setHoverCols([c, c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1]) : undefined}
+                        onPointerEnter={showHandles ? () => {
+                          const from = c;
+                          const to = c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1;
+                          setHoverCols(prev => prev && prev[0] === from && prev[1] === to ? prev : [from, to]);
+                        } : undefined}
                         onMouseDownCapture={extendCellSelect(r, c)}
                         onDragOver={showHandles ? overCol(c) : undefined}
                         onDrop={showHandles ? commitDrop : undefined}
