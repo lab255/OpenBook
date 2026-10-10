@@ -1,6 +1,6 @@
-/** Pins verified by downloading and hashing the actual artifacts (WSP-1).
+/** Own runtime pins activated from published runtime-binaries-v1 (2026-10-10).
  * Unsupported is per tool: consumers must require BOTH tools for a ready runtime.
- * Windows whisper needs the DLLs alongside the executable from the same archive.
+ * Release build metadata in version advances WSP-2 receipt identity; model pins stay independent.
  * Extraction/provisioning belongs to WSP-2. */
 export const RELEASE_TARGETS = [
   'aarch64-apple-darwin',
@@ -28,23 +28,28 @@ export type RuntimeArtifact = (ArtifactPin & {
   detail: string;
 };
 
-const noWhisperCli: RuntimeArtifact = {
-  status: 'unsupported',
-  reason: 'no-upstream-cli',
-  detail: 'whisper.cpp v1.8.2 publishes Windows CLI archives and an Apple XCFramework, but no macOS/Linux whisper-cli prebuilt. Owner must select a trusted builder or publish builds.',
-};
-
 export const RUNTIME_MANIFEST: Record<ReleaseTarget, Record<RuntimeTool, RuntimeArtifact>> = {
   'aarch64-apple-darwin': {
-    'whisper-cli': noWhisperCli,
+    'whisper-cli': {
+      status: 'supported', version: '1.8.2+runtime-binaries-v1',
+      url: 'https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1/whisper-cli-1.8.2-aarch64-apple-darwin.zip',
+      sha256: '9f62b22d4ffdc7340b42eef80a35293635cf06e499dba445677aa44bf49a8148',
+      size: 1047307, archive: 'zip', binaryPath: 'whisper-cli',
+    },
     ffmpeg: {
-      status: 'unsupported',
-      reason: 'no-native-prebuilt',
-      detail: 'The selected macOS provider (evermeet.cx) explicitly supplies Intel binaries only. A trusted native ARM provider is an owner decision; do not silently require Rosetta.',
+      status: 'supported', version: '7.1.1+runtime-binaries-v1',
+      url: 'https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1/ffmpeg-7.1.1-aarch64-apple-darwin.zip',
+      sha256: '541e623ed21d80e6ae6976faee8511924fe0e98445c7d7888f07d5bafe0bda65',
+      size: 1040200, archive: 'zip', binaryPath: 'ffmpeg',
     },
   },
   'x86_64-apple-darwin': {
-    'whisper-cli': noWhisperCli,
+    'whisper-cli': {
+      status: 'supported', version: '1.8.2+runtime-binaries-v1',
+      url: 'https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1/whisper-cli-1.8.2-x86_64-apple-darwin.zip',
+      sha256: 'f9518153a34a2619ae9446e0266cfad4af585e906b11feb3120329db3e3e91f3',
+      size: 1204029, archive: 'zip', binaryPath: 'whisper-cli',
+    },
     ffmpeg: {
       status: 'supported', version: '7.1.1',
       url: 'https://evermeet.cx/ffmpeg/ffmpeg-7.1.1.zip',
@@ -53,7 +58,12 @@ export const RUNTIME_MANIFEST: Record<ReleaseTarget, Record<RuntimeTool, Runtime
     },
   },
   'x86_64-unknown-linux-gnu': {
-    'whisper-cli': noWhisperCli,
+    'whisper-cli': {
+      status: 'supported', version: '1.8.2+runtime-binaries-v1',
+      url: 'https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1/whisper-cli-1.8.2-x86_64-unknown-linux-gnu.zip',
+      sha256: 'd51266bfd47aebbcfe61de981534ec86a6915427f2160e886b9a0df294678e3a',
+      size: 1545240, archive: 'zip', binaryPath: 'whisper-cli',
+    },
     ffmpeg: {
       status: 'supported', version: '7.0.2',
       url: 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-7.0.2-amd64-static.tar.xz',
@@ -63,12 +73,10 @@ export const RUNTIME_MANIFEST: Record<ReleaseTarget, Record<RuntimeTool, Runtime
   },
   'x86_64-pc-windows-msvc': {
     'whisper-cli': {
-      status: 'supported', version: '1.8.2',
-      url: 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.2/whisper-bin-x64.zip',
-      sha256: 'b1514ebc099765e39fa37eb780b92a140a94c86bb0b3b3d98226b38825979732',
-      size: 3832432, archive: 'zip', binaryPath: 'Release/whisper-cli.exe',
-      /** Install the ENTIRE directory beside the executable, including companion DLLs. */
-      extractDir: 'Release',
+      status: 'supported', version: '1.8.2+runtime-binaries-v1',
+      url: 'https://github.com/lab255/OpenBook/releases/download/runtime-binaries-v1/whisper-cli-1.8.2-x86_64-pc-windows-msvc.zip',
+      sha256: '34cd1bbc8113299b72783a5c7b082e3226dcb40b66ba945de8f4cd10d0d4a3db',
+      size: 940580, archive: 'zip', binaryPath: 'whisper-cli.exe',
     },
     ffmpeg: {
       status: 'supported', version: '8.1.2',
