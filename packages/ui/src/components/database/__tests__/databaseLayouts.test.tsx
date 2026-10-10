@@ -3,6 +3,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {cleanup, fireEvent, render, screen} from '@testing-library/react';
 import type {DatabaseProperty, DatabaseRow, DatabaseView} from '@book.dev/sdk';
 import {BoardView, CalendarView, GalleryView, RowChips} from '../databaseLayouts';
+import {readPageIcon} from '@/lib/pageIcon';
 import type {UseDatabase} from '../useDatabase';
 
 vi.mock('@/providers', () => ({useNavigation: () => ({setPageHint: vi.fn()})}));
@@ -30,10 +31,13 @@ const makeDb = (rows = [row, {...row, id: 'empty', name: 'Unassigned', propertie
 }) as unknown as UseDatabase;
 
 describe('card layout design system', () => {
-  it('uses status pills and select tags, with scalar property tooltips and checkbox names', () => {
+  it('uses status pills and select tags, with property tooltips and checkbox names', () => {
     render(<RowChips row={row} properties={properties} />);
     expect(screen.getByText('Todo').classList.contains('rounded-full')).toBe(true);
     for (const label of ['High', 'Tag']) expect(screen.getByText(label).classList.contains('rounded-sm')).toBe(true);
+    expect(screen.getByTitle('Status').textContent).toBe('Todo');
+    expect(screen.getByTitle('Priority').textContent).toBe('High');
+    expect(screen.getByTitle('Tags').textContent).toBe('Tag');
     expect(screen.getByTitle('Reviewed').textContent).toBe('✓ Reviewed');
     expect(screen.getByTitle('Cost').textContent).toBe('300');
     expect(screen.getByTitle('Due')).toBeTruthy();
@@ -48,8 +52,11 @@ describe('card layout design system', () => {
   it('omits unconfigured gallery covers and keeps configured missing-image fallbacks', () => {
     const {container, rerender} = render(<GalleryView db={makeDb()} view={view} properties={[]} />);
     expect(container.querySelector('.h-16, img')).toBeNull();
+    const titleRow = (): HTMLElement => screen.getByText('Card title').parentElement!;
+    expect(titleRow().textContent).toContain(readPageIcon(row.id));
     rerender(<GalleryView db={makeDb()} view={{...view, coverPropertyId: 'cover'}} properties={[]} />);
     expect(container.querySelector('.h-16.bg-muted')).toBeTruthy();
+    expect(titleRow().textContent).toBe('Card title');
     const covered = {...row, properties: {...row.properties, cover: 'https://example.com/cover.png'}};
     rerender(<GalleryView db={makeDb([covered])} view={{...view, coverPropertyId: 'cover'}} properties={[]} />);
     const image = container.querySelector('img')!;
@@ -74,6 +81,14 @@ describe('card layout design system', () => {
     expect(column.style.backgroundColor).toBe('');
     expect(column.classList.contains('bg-accent/50')).toBe(true);
     fireEvent.dragEnd(header);
+    expect(column.classList.contains('bg-accent/50')).toBe(false);
+    const card = screen.getByText('Card title').closest('[draggable="true"]')!;
+    fireEvent.dragStart(card);
+    fireEvent.dragOver(column);
+    expect(card.classList.contains('opacity-50')).toBe(true);
+    expect(column.classList.contains('bg-accent/50')).toBe(true);
+    fireEvent.dragEnd(card);
+    expect(card.classList.contains('opacity-50')).toBe(false);
     expect(column.classList.contains('bg-accent/50')).toBe(false);
     fireEvent.click(screen.getByLabelText('Collapse Todo column'));
     expect(container.querySelector('[data-col-key="todo"]')!.parentElement!.classList.contains('bg-muted/30')).toBe(false);

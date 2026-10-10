@@ -34,6 +34,7 @@ test('gallery grouping: cards split into sections by a property', {tag: ['@datab
   await expect(page.locator('[data-group="s_todo"] .grid button')).toHaveCount(1);
   const card = page.locator('[data-group="s_todo"] .grid button');
   await expect(card.locator('.h-16, img')).toHaveCount(0);
+  await expect(card.locator('.shrink-0.text-sm.leading-none')).toHaveText('📄');
   await expect(card).toHaveCSS('border-radius', '8px');
   await expect(card.locator(':scope > div')).toHaveCSS('padding-top', '12px');
   // Reconstruct the old empty cover treatment to measure the exact density delta.
