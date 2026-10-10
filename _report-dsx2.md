@@ -21,3 +21,22 @@ Verification: **`pnpm verify` GREEN, exit 0**, final full foreground run outside
 Verification history: Attempt 1 (sandbox) passed build/typecheck/lint, SDK/app/UI tests (UI: 255 files / 2,548 tests), and MCP checks, then reported a failure in the unchanged server disk-mirror integration suite; its 3 tests passed outside the sandbox (7.56s), and the already-failed run was stopped. Attempt 2 (outside sandbox) passed the mirror test and 105 server files / 1,439 server tests, but failed scheduled-backup teardown with ENOTEMPTY; 1 file / 8 tests were skipped by existing configuration. The isolated backup test reproduced the race, leading to the separate repair above. No tests, timeouts, skips or lint severities were weakened.
 
 Proposed gates: **code + design**. Manager captures should target todo (light/dark, checked/unchecked/disabled/focus), nested numbered/bullet lists and inherited ink, quote ink, callout (legacy/default vs explicit emoji/Lucide and all bg choices), notes, focused/unfocused placeholders, and divider insertion/caret flow. No Playwright or before/after captures run here, per brief; the root verification uses server/MCP integration scripts, not browser Playwright. No binaries committed; no changes to menus, gutter chrome, or unrelated block families. `_brief.md` is the supplied untracked input and remains uncommitted.
+
+## Pre-endorsed fix round — OB-967 (2026-10-10)
+
+All six fixes completed in this commit (`fix(ui): apply DSX-2 review fixes`); no push.
+
+| Fix | Outcome |
+|---|---|
+| 1 | Callout cursor/hover scoped to the button; neutral foreground/0.06 overlay; transition retained. |
+| 2 | Explicit todo focus-visible 2px ring with 2px offset. |
+| 3 | Existing numbered-marker class right-aligned with 0.25rem inline-end padding and nowrap; bullets stay centred. |
+| 4 | Depth-2 square bullet sized to 0.3125 × font size (5px), with margin recentred at half-size (0.15625). |
+| 5 | Manifest §3 records checked tick `--primary-foreground`, not white, for dark-mode contrast. |
+| 6 | `_report.md` renamed with `git mv` to `_report-dsx2.md`; this outcome appended. |
+
+No tests pin the changed CSS literals; no assertion updates were necessary, and no assertions were removed or weakened. No renderer change was needed because `obe-list-number` already exists. Visual review targets: callout button hover/read-only icon, todo focus, numbered markers, depth-2 square bullets.
+
+**`pnpm verify` GREEN, exit 0, foreground in-turn outside the sandbox.** Build, generated-file freshness, typecheck, lint, CSS controls, and 7 ESLint-rule tests passed. SDK: 32 files / 580 tests; UI: 255 / 2,548; app: 3 / 9; server: 106 / 1,441, with the existing 1 file / 8 tests skipped. Total: 396 files / 4,578 tests passed. MCP package checks passed; server end-to-end: 256 checks; MCP end-to-end: 70 checks. Log: `/tmp/dsx2-fix-verify-final.log`.
+
+First sandbox run failed in unchanged `mirror.integration.test.ts` with filesystem-watcher `EMFILE` errors (105 server files / 1,440 tests passed). The unchanged mirror suite passed outside the sandbox (1 file / 3 tests), followed by the full green rerun above. No unrelated repair or test change was needed. Supplied `_brief.md` and `_fixbrief.md` remain untracked.

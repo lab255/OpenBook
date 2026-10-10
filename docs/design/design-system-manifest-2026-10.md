@@ -148,6 +148,7 @@ Select exit: **none** — nested dismissable layer.
 ## 3. Radius scale
 
 DSX-2 exception: the compact 16px todo checkbox uses `--radius-sm` (4px).
+The checked todo tick uses `--primary-foreground` (not white) for correct contrast in dark mode.
 
 | Step | Token | Value | Surfaces (exhaustive by role) |
 |---|---|---:|---|

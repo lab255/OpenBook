@@ -1131,6 +1131,7 @@ a.obe-mention {
   padding-top: var(--obe-block-pad-y);
   font-variant-numeric: tabular-nums;
 }
+.obe-list-number { text-align: end; padding-inline-end: 0.25rem; white-space: nowrap; }
 .obe-list-bullet::before {
   content: '';
   display: block;
@@ -1141,7 +1142,12 @@ a.obe-mention {
   background: currentColor;
 }
 .obe-list-bullet[data-depth='1']::before { background: transparent; border: 1.5px solid currentColor; }
-.obe-list-bullet[data-depth='2']::before { border-radius: 0; }
+.obe-list-bullet[data-depth='2']::before {
+  width: calc(var(--obe-font-size) * 0.3125); /* 5px */
+  height: calc(var(--obe-font-size) * 0.3125); /* 5px */
+  margin: calc(var(--obe-line) / 2 - var(--obe-font-size) * 0.15625) auto 0;
+  border-radius: 0;
+}
 .obe-todo { flex: 1; display: flex; min-width: 0; align-items: flex-start; }
 .obe-todo-check {
   flex: none;
@@ -1162,6 +1168,7 @@ a.obe-mention {
   transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
 .obe-todo-box:hover:not(:disabled) { background: var(--hover); }
+.obe-todo-box:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .obe-todo-box:checked { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
 .obe-todo-box:disabled { cursor: default; opacity: 1; }
 .obe-todo-tick { place-self: center; width: 0.75rem; height: 0.75rem; color: hsl(var(--primary-foreground)); pointer-events: none; }
@@ -1201,11 +1208,11 @@ a.obe-mention {
   font-size: var(--obe-icon-size);
   line-height: 1;
   transition: background-color var(--motion-fast) var(--ease-out-soft);
-  cursor: pointer;
   border-radius: var(--radius-md);
   padding: 0;
 }
-.obe-callout-icon:hover { background: var(--hover); }
+button.obe-callout-icon { cursor: pointer; }
+button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-blockbody[class*='obe-bg-']:has(> .obe-callout) { background: none; padding-inline: 0; margin-inline: 0; }
 .obe-bg-gray > .obe-callout { background: var(--obe-bg-gray); }
 .obe-bg-brown > .obe-callout { background: var(--obe-bg-brown); }
