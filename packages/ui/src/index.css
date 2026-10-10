@@ -1559,29 +1559,18 @@ a.obe-mention {
   background: transparent;
   padding: 0;
   color: hsl(var(--foreground));
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   font-weight: 500;
 }
 .obe-artifact-title::placeholder { color: var(--obe-placeholder); }
 .obe-artifact-title-static {
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   font-weight: 500;
   color: hsl(var(--foreground));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.obe-artifact-tool {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  padding: 0.25rem;
-  border-radius: var(--radius-sm);
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-}
-.obe-artifact-tool:hover { background: var(--hover); color: hsl(var(--foreground)); }
 .obe-artifact-frame { position: relative; }
 /* The fixed-height loading placeholder — same footprint as the frame it
    becomes, so late-resolving artifacts never shift a long page. */
@@ -1606,36 +1595,12 @@ a.obe-mention {
   inset: 0;
   margin: auto;
   width: 100%;
-  height: 4px;
+  height: 6px;
   border-radius: var(--radius-sm);
-  background: hsl(var(--foreground) / 0.35);
-  box-shadow: 0 0 0 2px hsl(var(--background) / 0.7);
+  background: hsl(var(--foreground) / 0.6);
+  box-shadow: 0 0 0 1px hsl(var(--background) / 0.9);
 }
 .obe-artifact-frame:hover .obe-artifact-resize { opacity: 1; }
-/* Run full-window (top-right, hover-revealed like the resize handle). A
-   VIEWING affordance, not authoring chrome — deliberately NOT hidden by the
-   present-mode / read-only chrome rules below, so readers and presenters can
-   expand an artifact edge-to-edge. */
-.obe-artifact-expand {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border-radius: var(--radius-md);
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--background) / 0.85);
-  box-shadow: 0 0 0 1px hsl(var(--border));
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--motion-fast) var(--ease-out-soft);
-}
-.obe-artifact-expand:hover { background: var(--hover); color: hsl(var(--foreground)); }
-/* Keyboard reveal + themed ring live in the shared focus-visible rule below. */
-.obe-artifact-frame:hover .obe-artifact-expand { opacity: 1; }
-
 /* ── Present mode (slide deck) ───────────────────────────────────────────────
    A page rendered as slides (split at dividers): a centred sheet that fades and
    slides up on change, read-only but with live widgets, editing chrome hidden,
