@@ -81,6 +81,16 @@ describe('table drag grips (render gating)', () => {
     }
   });
 
+  it('reveals only the hovered logical column and clears on leaving the table', () => {
+    const {container} = render(<BlockEditor doc={seedTableDoc()} />);
+    const cells = container.querySelectorAll('tbody > tr:nth-child(2) > td');
+    fireEvent.pointerEnter(cells[1]);
+    const grips = container.querySelectorAll('.obe-table-col-grip');
+    expect([...grips].map((grip) => grip.hasAttribute('data-revealed'))).toEqual([false, true, false]);
+    fireEvent.pointerLeave(container.querySelector('.obe-table-wrap')!);
+    expect(container.querySelectorAll('.obe-table-col-grip[data-revealed]')).toHaveLength(0);
+  });
+
   it('renders keyboard-focusable buttons with localized row/column option names', () => {
     const {container} = render(<BlockEditor doc={seedTableDoc(3, 3)} />);
     const row = screen.getByRole('button', {name: 'Row 3 options'});

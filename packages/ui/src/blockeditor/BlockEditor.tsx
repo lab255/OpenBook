@@ -3045,12 +3045,13 @@ interface TableGripMenuProps {
   editor: BlockEditorController;
   style?: React.CSSProperties;
   spanOffset?: number;
+  revealed?: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
 }
 
 const TableGripMenu: React.FC<TableGripMenuProps> = ({
-  axis, tableId, index, itemId, count, header, editor, style, spanOffset, onDragStart, onDragEnd,
+  axis, tableId, index, itemId, count, header, editor, style, spanOffset, revealed, onDragStart, onDragEnd,
 }) => {
   const [open, setOpen] = useState(false);
   const [ctxOpen, setCtxOpen] = useState(false);
@@ -3084,6 +3085,7 @@ const TableGripMenu: React.FC<TableGripMenuProps> = ({
       data-drag-from={index}
       data-drag-id={itemId}
       data-span-offset={spanOffset}
+      data-revealed={revealed ? '' : undefined}
       draggable
       style={style}
       onMouseDown={(e) => e.stopPropagation()}
@@ -3167,6 +3169,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   // Drag handles are chrome — hidden in readOnly and in a kit-locked / present
   // context (acceptance #4; also enumerated in the `.ob-present` CSS hide-list).
   const showHandles = !editor.readOnly && !lockText;
+  const [hoverCols, setHoverCols] = useState<[number, number] | null>(null);
   const storedWidths = columns.map((column) => tableColumnWidth(block, column.id));
   const [previewWidths, setPreviewWidths] = useState<Record<string, number>>({});
   const renderedWidths = columns.map((column, index) => previewWidths[column.id] ?? storedWidths[index]);
@@ -3280,7 +3283,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   };
 
   return (
-    <div className={[showHandles ? 'obe-table-wrap obe-has-grips' : 'obe-table-wrap', activeCellSel && 'obe-cell-selecting'].filter(Boolean).join(' ')}>
+    <div onPointerLeave={() => setHoverCols(null)} className={[showHandles ? 'obe-table-wrap obe-has-grips' : 'obe-table-wrap', activeCellSel && 'obe-cell-selecting'].filter(Boolean).join(' ')}>
       <table ref={tableRef} tabIndex={-1} className={hasWidths ? 'obe-table obe-table-fixed' : 'obe-table'}>
         <colgroup>
           {showHandles && <col className="obe-table-grip-host-col" style={{width: 0}} />}
@@ -3374,10 +3377,9 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                               header={header}
                               editor={editor}
                               spanOffset={offset}
+                              revealed={!!hoverCols && from >= hoverCols[0] && from <= hoverCols[1]}
                               style={{
-                                left: `${(offset / slot.colspan) * 100}%`,
-                                right: 'auto',
-                                width: `${100 / slot.colspan}%`,
+                                left: `calc(${((offset + 0.5) / slot.colspan) * 100}% - var(--obe-gutter-btn) / 2)`,
                               }}
                               onDragStart={startDrag({axis: 'col', from, id: gripColId})}
                               onDragEnd={clearDrag}
@@ -3417,6 +3419,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                         key={`pad-${r}-${c}`}
                         aria-hidden
                         className={tdDropClass || undefined}
+                        onPointerEnter={showHandles ? () => setHoverCols([c, c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1]) : undefined}
                         onMouseDownCapture={extendCellSelect(r, c)}
                         onDragOver={showHandles ? overCol(c) : undefined}
                         onDrop={showHandles ? commitDrop : undefined}
@@ -3467,6 +3470,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                         className={tdDropClass || undefined}
                         colSpan={slot?.kind === 'cell' && slot.colspan > 1 ? slot.colspan : undefined}
                         rowSpan={slot?.kind === 'cell' && slot.rowspan > 1 ? slot.rowspan : undefined}
+                        onPointerEnter={showHandles ? () => setHoverCols([c, c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1]) : undefined}
                         onMouseDownCapture={extendCellSelect(r, c)}
                         onDragOver={showHandles ? overCol(c) : undefined}
                         onDrop={showHandles ? commitDrop : undefined}

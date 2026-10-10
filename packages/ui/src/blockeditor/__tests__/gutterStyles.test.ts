@@ -78,8 +78,9 @@ describe('table grip geometry', () => {
 
   it('keeps the row grip fully outside the cells and aligns the table gutter', () => {
     const grip = ruleBody('.obe-table-row-grip');
-    expect(grip).toMatch(/left:\s*-1\.25rem/);
-    expect(grip).toMatch(/width:\s*1\.25rem/);
+    expect(grip).toContain('left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear)))');
+    expect(grip).toContain('width: var(--obe-handle-w)');
+    expect(grip).toContain('height: var(--obe-gutter-btn)');
     // The grip yields the column gap to the resize divider by STACKING, never by
     // `pointer-events: none` — an unhittable drag origin kills HTML5 dragstart
     // once the pointer leaves the row and `tr:hover` drops (TABLE-2).
@@ -91,14 +92,24 @@ describe('table grip geometry', () => {
     expect(revealedGrip).not.toMatch(/pointer-events/);
     expect(revealedGrip).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);
     expect(ruleBody('.obe-row[data-block-type=\'table\']:has(.obe-has-grips)')).toMatch(
-      /--obe-lead-offset:\s*calc\(var\(--obe-block-pad-y\) - var\(--obe-gutter-clear\)\)/,
+      /--obe-lead-offset:\s*calc\(var\(--obe-block-pad-y\) \+ var\(--obe-table-grip-top\) - var\(--obe-gutter-btn\)\)/,
     );
+  });
+
+  it('centres compact column grips and removes the tools and top band', () => {
+    const grip = CSS.match(/\n\.obe-table-col-grip \{([^}]*top:[^}]*)\}/)![1];
+    expect(grip).toContain('top: calc(-1 * var(--obe-handle-w) / 2)');
+    expect(grip).toContain('width: var(--obe-gutter-btn)');
+    expect(ruleBody('.obe-table-wrap.obe-has-grips')).not.toContain('padding-top');
+    expect(CSS).not.toContain('.obe-table-tools');
+    expect(ruleBody('.obe-table-row-grip,\n.obe-table-col-grip')).toContain('color: var(--obe-chrome-ink)');
   });
 
   it('reveals both row and column grips on keyboard focus', () => {
     const focusedGrip = ruleBody(
       '.obe-table tr .obe-table-row-grip:focus-visible,\n.obe-table-col-grip:focus-visible',
     );
+    expect(focusedGrip).toContain('outline: var(--obe-focus-ring)');
     expect(focusedGrip).toMatch(/opacity:\s*1/);
     expect(focusedGrip).toMatch(/pointer-events:\s*auto/);
     expect(focusedGrip).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);

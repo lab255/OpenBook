@@ -226,7 +226,11 @@ test('merged top-row anchor exposes one correctly bound grip segment per column'
   const first = (await anchorSegments.nth(0).boundingBox())!;
   const second = (await anchorSegments.nth(1).boundingBox())!;
   expect(Math.abs(first.width - second.width)).toBeLessThanOrEqual(1);
-  expect(Math.abs(first.x + first.width - second.x)).toBeLessThanOrEqual(1);
+  const anchorCell = (await table.locator('tbody > tr').first().locator('td').first().boundingBox())!;
+  const firstCentre = first.x + first.width / 2;
+  const secondCentre = second.x + second.width / 2;
+  expect(Math.abs(secondCentre - firstCentre - anchorCell.width / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(firstCentre - anchorCell.x - anchorCell.width / 4)).toBeLessThanOrEqual(1);
 });
 
 test('table grip menus insert a row and delete a column', {tag: ['@editor', '@p1']}, async ({page}) => {
