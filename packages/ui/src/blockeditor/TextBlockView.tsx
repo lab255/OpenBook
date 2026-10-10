@@ -57,6 +57,7 @@ const PLACEHOLDERS: Partial<Record<BlockType, string>> = {
   list: 'List item',
   quote: 'Quote',
   callout: 'Callout',
+  notes: 'Note for the presenter',
   code: 'Code',
 };
 
@@ -705,8 +706,9 @@ export const TextBlockView: React.FC<{
     }
   };
 
-  const placeholder =
-    type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : (PLACEHOLDERS[type] ?? '');
+  const focusOnlyHint = ['list', 'todo', 'quote', 'callout', 'notes'].includes(type);
+  const placeholder = focusOnlyHint && editor.focusedId !== id ? undefined
+    : type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : (PLACEHOLDERS[type] ?? '');
 
   // A brand-new page is a single empty paragraph: show the "/" hint without
   // waiting for focus, so an empty document teaches its own entry point (the
