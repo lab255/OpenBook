@@ -688,7 +688,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     close: async () => {
       await ai.dispose();
       await mcp.dispose();
-      backups.stop();
+      await backups.stop();
       // Detach the ledger auto-export and let an in-flight write finish before
       // the store closes (a debounced-but-unfired export is dropped — the next
       // boot's first mutation re-exports). Never throws (errors are contained).

@@ -684,3 +684,29 @@ describe('backup HTTP routes', () => {
     expect((await res.json()).error).toContain('exceeds the 100-level nesting cap');
   });
 });
+
+
+it('stop drains every in-flight scheduled check before releasing its caller', async () => {
+  const config = {...await store.getBackupConfig(), enabled: false};
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  vi.spyOn(store, 'getBackupConfig').mockImplementation(async () => {
+    await gate;
+    return config;
+  });
+  const s = scheduler();
+  const first = s.tick();
+  const second = s.tick();
+  let stopped = false;
+  const stopping = Promise.resolve(s.stop()).then(() => { stopped = true; });
+  try {
+    // Both checks are suspended at the store read; timer cancellation alone
+    // would let stop resolve here while the checks still own the store.
+    await Promise.resolve();
+    expect(stopped).toBe(false);
+  } finally {
+    release();
+    await Promise.all([first, second, stopping]);
+  }
+  expect(stopped).toBe(true);
+});
