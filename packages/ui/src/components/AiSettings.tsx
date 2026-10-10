@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {ChevronDown, ChevronRight, Trash2} from 'lucide-react';
 import {providerSettings, type AiConfig, type AiEffort, type AiProvider, type AiProviderSettings, type AiSkill, type AiStatus, type AiTranscriptionConfig} from '@book.dev/sdk';
 import {ScopeChip, SettingsField, SettingsScreen, SettingsSection, SettingsToggle, SETTINGS_CONTROL_CLASS} from '@/components/settings/primitives';
+import {LocalTranscription} from './LocalTranscription';
 import {Button} from '@/components/ui/button';
 import {Select} from '@/components/ui/select';
 import {useData} from '@/data';
@@ -88,7 +89,8 @@ export default function AiSettings() {
 
   // Poll while a model download is in flight.
   useEffect(() => {
-    if (!status?.download || status.download.done || status.download.error) return;
+    const provisioning = Object.values(status?.transcription?.runtime?.tools ?? {}).some((tool) => tool.status === 'provisioning');
+    if (!provisioning && (!status?.download || status.download.done || status.download.error)) return;
     const timer = setTimeout(() => void refresh(), 1000);
     return () => clearTimeout(timer);
   }, [status, refresh]);
@@ -298,12 +300,6 @@ export default function AiSettings() {
             <option value="openai-compat">{t('ai.transcription.cloud')}</option>
           </Select>
         </SettingsField>
-        <p className="text-xs text-muted-foreground">
-          {t('ai.transcription.localHint')}{' '}
-          <a className="underline" href="https://github.com/lab255/OpenBook/blob/main/docs/local-transcription.md" target="_blank" rel="noreferrer">
-            {t('ai.transcription.localDocs')}
-          </a>
-        </p>
         {audio.provider === 'openai-compat' && (
           <>
             <p className="text-sm text-muted-foreground">{t('ai.transcription.privacy')}</p>
@@ -356,15 +352,7 @@ export default function AiSettings() {
             </SettingsField>
           </>
         )}
-        {audio.provider === 'local' && status?.transcription && (
-          <>
-            <p className="text-sm text-muted-foreground">{t(status.transcription.modelPresent ? 'ai.transcription.modelPresent' : 'ai.transcription.modelAbsent')} {t(status.transcription.ready ? 'ai.transcription.ready' : status.transcription.runtimeAvailable ? 'ai.transcription.modelMissing' : 'ai.transcription.runtimeMissing')}</p>
-            <Button size="sm" variant="outline" disabled={downloading || status.transcription.modelPresent} onClick={() => void client.aiDownloadModel(status.transcription?.downloadUrl).then(() => refresh())}>
-              {downloading && download?.url === status.transcription.downloadUrl ? (progress === null ? t('ai.transcription.downloading') : t('ai.transcription.downloadingProgress', {progress})) : t('ai.transcription.download')}
-            </Button>
-            {download?.url === status.transcription.downloadUrl && download.error && <p className="text-xs text-destructive">{download.error}</p>}
-          </>
-        )}
+        {audio.provider === 'local' && status?.transcription && <LocalTranscription status={status} refresh={refresh} />}
         {audio.provider !== 'local' && <p className="text-xs text-muted-foreground">{t('ai.transcription.localInactive')}</p>}
         {saveError && <p role="alert" className="text-xs text-destructive">{saveError}</p>}
       </SettingsSection>

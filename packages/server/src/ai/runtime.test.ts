@@ -92,7 +92,7 @@ it.each(['corrupt', 'truncated', 'invalid-archive'])('keeps old installation int
   const bad = kind === 'truncated' ? bytes.subarray(0, 5) : Buffer.alloc(bytes.length, 1);
   const nextPin = {...pin, version: '2', ...(kind === 'invalid-archive' ? {sha256: createHash('sha256').update(bad).digest('hex')} : {})};
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bad))));
-  await expect(new ManagedRuntime(root, 'fixture', {'whisper-cli': nextPin, ffmpeg: nextPin}).provision()).rejects.toThrow(kind === 'invalid-archive' ? 'Failed to install' : 'mismatch');
+  await expect(new ManagedRuntime(root, 'fixture', {'whisper-cli': nextPin, ffmpeg: nextPin}).provision()).rejects.toThrow(kind === 'invalid-archive' ? 'Command failed' : 'mismatch');
   expect(await readFile(path.join(root, 'whisper-cli', 'current.json'), 'utf8')).toBe(before);
   expect(await old.binary('whisper-cli')).not.toBeNull();
   expect((await readdir(path.join(root, 'whisper-cli'))).filter((file) => file.startsWith('.extract-') || file.endsWith('.part'))).toEqual([]);
@@ -179,8 +179,59 @@ it('rejects an archive containing parent traversal without writing outside stagi
   const badPin = {...pin, sha256: createHash('sha256').update(traversal).digest('hex')};
   const root = path.join(dir, 'bin');
   const runtime = new ManagedRuntime(root, 'fixture', {'whisper-cli': badPin, ffmpeg: pin});
-  await expect(runtime.provision()).rejects.toThrow('Failed to install whisper-cli');
+  await expect(runtime.provision()).rejects.toThrow(/whisper-cli: (?:Command failed|ENOENT)/);
   expect(await runtime.binary('whisper-cli')).toBeNull();
   expect(await readdir(path.join(root, 'whisper-cli'))).toEqual(['archive.zip', 'archive.zip.verified.json']);
   await expect(readFile(path.join(root, 'whisper-cli', 'oops', 'whisper-cli.exe'))).rejects.toMatchObject({code: 'ENOENT'});
+});
+
+it('reports the active tool and download failures, and clears failure on retry', async () => {
+  const {pin, bytes} = await fixture('zip');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  vi.stubGlobal('fetch', vi.fn(async () => { await gate; throw new Error('offline'); }));
+  const runtime = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': pin, ffmpeg: pin});
+  const pending = runtime.provision();
+  const rejection = expect(pending).rejects.toThrow('whisper-cli');
+  await expect.poll(async () => (await runtime.status()).tools['whisper-cli'].status).toBe('provisioning');
+  release();
+  await rejection;
+  expect((await runtime.status()).tools['whisper-cli']).toMatchObject({status: 'failed', detail: expect.stringContaining('offline')});
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(bytes))));
+  await runtime.provision();
+  expect((await runtime.status()).tools['whisper-cli'].status).toBe('provisioned');
+});
+
+it('exposes stale model files and override names without exposing executable paths', async () => {
+  const models = path.join(dir, 'models');
+  await mkdir(models);
+  await writeFile(path.join(models, 'ggml-base.bin'), 'legacy');
+  const local = new LocalWhisper(models, process.execPath, path.join(dir, 'missing'));
+  expect(await local.status()).toMatchObject({modelPresent: false, modelUpdateAvailable: true, runtime: {tools: {
+    'whisper-cli': {override: 'OPENBOOK_WHISPER_BIN', available: true},
+    ffmpeg: {override: 'OPENBOOK_FFMPEG_BIN', available: false},
+  }}});
+  await local.dispose();
+});
+
+it('abort clears the stage without marking failed', async () => {
+  const {pin} = await fixture('zip');
+  const controller = new AbortController();
+  let started = false;
+  vi.stubGlobal('fetch', vi.fn(async (_url: string, options: RequestInit) => {
+    started = true;
+    return new Promise<Response>((_resolve, reject) => {
+      options.signal!.addEventListener('abort', () => reject(options.signal!.reason), {once: true});
+    });
+  }));
+  const runtime = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': pin, ffmpeg: pin});
+  const pending = runtime.provision(controller.signal);
+  const rejection = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+  await expect.poll(() => started).toBe(true);
+  expect((await runtime.status()).tools['whisper-cli'].status).toBe('provisioning');
+  controller.abort();
+  await rejection;
+  const status = (await runtime.status()).tools['whisper-cli'];
+  expect(status.status).toBe('missing');
+  expect(status.detail).toBeUndefined();
 });
