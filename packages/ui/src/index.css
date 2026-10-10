@@ -1887,8 +1887,9 @@ a.obe-mention {
 .obe-group-btn-on { color: hsl(var(--primary)); }
 .obe-group-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
 /* Exported groups (static HTML). */
-.obe-x-group { border: 1px solid #e5e7eb; border-radius: var(--radius-lg); padding: 0.5rem 1rem; margin: 0.75rem 0; }
-.obe-x-group-name { margin: 0 0 0.25rem; font-size: 0.9rem; }
+.obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: var(--radius-lg); padding: var(--obe-block-pad-y) var(--obe-cnt-inset); margin: 0.75rem 0; }
+.dark .obe-x-group, .dark .obe-x-section { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
+.obe-x-group-name { margin: 0 0 0.25rem; font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); letter-spacing: 0.04em; color: var(--obe-x-muted, hsl(40 3% 43.2%)); }
 /* Exported plugin-block placeholder (LX-1): a block whose plugin the reader
    doesn't have. Readable unstyled too (bold label + hint), since a paste target
    rarely carries this sheet. */

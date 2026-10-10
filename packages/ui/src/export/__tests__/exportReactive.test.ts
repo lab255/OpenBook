@@ -260,7 +260,7 @@ describe('export block fidelity', () => {
   it('lays columns side-by-side in HTML but flattens them for Markdown', () => {
     const html = toHtml(fancy(), 'T', '');
     expect(html).toContain('<div class="cols">');
-    expect(html).toMatch(/<div class="col">[\s\S]*LEFTCOL[\s\S]*<\/div><div class="col">[\s\S]*RIGHTCOL/);
+    expect(html).toMatch(/<div class="col" style="flex:6 1 0">[\s\S]*LEFTCOL[\s\S]*<\/div><div class="col" style="flex:6 1 0">[\s\S]*RIGHTCOL/);
     const md = toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot: fancy()}));
     expect(md).toContain('LEFTCOL');
     expect(md).toContain('RIGHTCOL');

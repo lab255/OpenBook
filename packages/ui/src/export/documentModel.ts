@@ -189,6 +189,7 @@ export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets =
       out.push({type: 'paragraph', runs: parseInline(str(data.text))});
       break;
     case 'header': {
+      if (data.container && !str(data.text)) break;
       const level = typeof data.level === 'number' ? Math.min(6, Math.max(1, data.level)) : 2;
       out.push({type: 'header', level, runs: parseInline(str(data.text))});
       break;
