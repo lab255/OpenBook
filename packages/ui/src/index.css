@@ -3343,7 +3343,6 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-weight: 600;
   border-bottom: 1px dotted hsl(var(--muted-foreground));
   cursor: help;
-  outline: none;
 }
 .obe-kit-term-mark {
   display: inline-flex;
@@ -3354,7 +3353,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: 9999px;
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
-  font-size: 0.65rem;
+  /* stylelint-disable-next-line design-tokens/role-values -- glyph sized to its 15px circle */
+  font-size: 10px;
   font-weight: 700;
 }
 .obe-kit-tip {
@@ -3369,9 +3369,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
-  font-size: 0.8rem;
+  font-size: var(--obe-caption-size);
   font-weight: 400;
-  line-height: 1.45;
+  line-height: var(--obe-caption-leading);
   box-shadow: var(--shadow-menu);
   opacity: 0;
   pointer-events: none;
@@ -3392,12 +3392,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   padding: 0.5rem 0.75rem;
   text-decoration: none;
   color: inherit;
-  transition: border-color var(--motion-fast) var(--ease-out-soft), box-shadow var(--motion-fast) var(--ease-out-soft);
+  transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-linkcard:hover { border-color: hsl(var(--ring)); box-shadow: 0 2px 10px rgb(0 0 0 / 0.05); }
-.obe-kit-linkcard-title { font-size: 0.92rem; font-weight: 600; }
-.obe-kit-linkcard-desc { font-size: 0.82rem; color: hsl(var(--muted-foreground)); }
-.obe-kit-linkcard-url { font-size: 0.74rem; color: hsl(var(--muted-foreground) / 0.7); }
+.obe-kit-linkcard:not([aria-disabled='true']):hover { border-color: hsl(var(--foreground) / 0.2); }
+.obe-kit-linkcard[aria-disabled='true'] { cursor: default; border-style: dashed; }
+.obe-kit-linkcard-title { font-size: var(--obe-small-size); font-weight: 600; }
+.obe-kit-linkcard-desc { font-size: var(--obe-small-size); color: hsl(var(--muted-foreground)); }
+.obe-kit-linkcard-url { font-size: var(--obe-caption-size); color: hsl(var(--muted-foreground)); }
 
 /* ── June-2026 kit inputs ──────────────────────────────────────────────────── */
 
@@ -3658,7 +3659,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: block;
   height: 0.55rem;
   border-radius: 9999px;
-  background: hsl(var(--muted) / 0.7);
+  background: hsl(var(--muted));
   overflow: hidden;
 }
 .obe-kit-progress-fill {
