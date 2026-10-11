@@ -30,9 +30,10 @@ for (const dark of [false, true]) {
   test(`kit chrome geometry and keyboard focus (${dark ? 'dark' : 'light'})`, async ({page, request}, testInfo) => {
     await page.setViewportSize({width: 1280, height: 1000});
     const id = await newPage(request, `Kit chrome ${dark}`, {editor: 'blocks', blockdoc: {blocks}, editorjs: {blocks: []}, values: [], names: []});
+    if (dark) await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
     await page.goto(`/?page=${id}`);
     await expect(page.locator('.obe-kit-chart')).toBeVisible();
-    await page.evaluate((dark) => document.documentElement.classList.toggle('dark', dark), dark);
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(dark);
     for (const [input, frame] of [
       ['.obe-kit-stepper input', '.obe-kit-stepper'],
       ['.obe-kit-tag-input', '.obe-kit-tags'],
@@ -72,7 +73,7 @@ for (const dark of [false, true]) {
     await expect(page.locator('figure.obe-kit-chart > figcaption.obe-kit-head')).toBeVisible();
     await expect(page.locator('.obe-kit-chart .obe-kit-desc')).toHaveCount(0);
     const measurements = await page.locator('[data-block-row]').evaluateAll((rows) => rows.map((row) => ({
-      id: row.getAttribute('data-block-id'), type: row.getAttribute('data-block-type'), height: row.getBoundingClientRect().height,
+      id: row.getAttribute('data-block-row'), type: row.getAttribute('data-block-type'), height: row.getBoundingClientRect().height,
       padding: row.querySelector('.obe-kit') ? getComputedStyle(row.querySelector('.obe-kit')!).padding : null,
     })));
     for (const row of measurements.filter((r) => r.padding !== null)) expect(row.padding).toBe('0px');
