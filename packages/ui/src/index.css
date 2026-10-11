@@ -3915,7 +3915,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   white-space: nowrap;
 }
 
-.ob-leaflet .leaflet-bar {
+.ob-leaflet .leaflet-control-container .leaflet-bar {
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
@@ -3925,6 +3925,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   color: hsl(var(--foreground));
   border-color: hsl(var(--border));
 }
+
+.ob-leaflet .leaflet-bar a:hover, .ob-leaflet .leaflet-bar a:focus-visible { background-color: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.ob-leaflet .leaflet-control-container .leaflet-bar a.leaflet-disabled { background-color: hsl(var(--card)); color: hsl(var(--muted-foreground) / 0.5); }
 
 /* Form dates expose the native empty scaffold at rest, unlike table cells. */
 [data-form-input] .ob-date-empty:required:invalid:not(:focus) {

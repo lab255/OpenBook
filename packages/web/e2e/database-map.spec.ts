@@ -43,6 +43,11 @@ test('map renders Leaflet tiles, group-coloured markers, and a legend', {tag: ['
     });
     expect(colors.bg).toBe(colors.expectedBg);
     expect(colors.fg).toBe(colors.expectedFg);
+    if (dark) {
+      const zoomButton = page.locator('.leaflet-bar a').first();
+      await zoomButton.hover();
+      await expect(zoomButton).not.toHaveCSS('background-color', 'rgb(244, 244, 244)');
+    }
   }
   await expect(page.getByRole('link', {name: 'OpenStreetMap'})).toBeVisible();
 
