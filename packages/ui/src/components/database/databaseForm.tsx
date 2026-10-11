@@ -1,3 +1,5 @@
+import {inputVariants} from '@/components/ui/input';
+import {chipBgVar, chipFgVar} from '@/lib/dataColorVars';
 import React, {useEffect, useState} from 'react';
 import {AlertTriangle, Check, Copy, Globe2, GripVertical, Plus, RotateCw, Trash2, Unlink, X} from 'lucide-react';
 import {
@@ -151,7 +153,7 @@ export interface DatabaseFormProps {
   canManagePublication?: boolean;
 }
 
-const fieldClass = 'w-full rounded border border-border bg-background px-2 py-1.5 text-sm outline-hidden focus-visible:shadow-[var(--ring-field)]';
+const fieldClass = inputVariants({inputSize: 'sm'});
 
 const MetadataInput: React.FC<{
   label: string;
@@ -389,7 +391,7 @@ const DatabaseFormFill: React.FC<Pick<DatabaseFormProps, 'view' | 'properties' |
 
   if (view.formConfig?.acceptingResponses !== true) {
     return (
-      <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 text-center shadow-sm" data-database-form-closed>
+      <div className="mx-auto max-w-2xl rounded-lg border border-border bg-card p-6 text-center shadow-sm" data-database-form-closed>
         <h2 className="text-xl font-semibold">{view.formConfig?.title?.trim() || view.name}</h2>
         <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">
           {view.formConfig?.closedMessage?.trim() || t('database.formView.closed')}
@@ -404,7 +406,7 @@ const DatabaseFormFill: React.FC<Pick<DatabaseFormProps, 'view' | 'properties' |
       ? safeFormRedirectUrl(confirmation.redirectUrl)
       : null;
     return (
-      <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 text-center shadow-sm" data-database-form-confirmation role="status">
+      <div className="mx-auto max-w-2xl rounded-lg border border-border bg-card p-6 text-center shadow-sm" data-database-form-confirmation role="status">
         {redirectUrl ? (
           <Button asChild data-form-confirmation-redirect>
             <a href={redirectUrl} rel="noopener noreferrer">{t('database.formView.continue')}</a>
@@ -424,7 +426,7 @@ const DatabaseFormFill: React.FC<Pick<DatabaseFormProps, 'view' | 'properties' |
   }
 
   return (
-    <form className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 shadow-sm" data-database-form-fill onSubmit={(event) => void submit(event)} noValidate>
+    <form className="mx-auto max-w-2xl rounded-lg border border-border bg-card p-6 shadow-sm" data-database-form-fill onSubmit={(event) => void submit(event)} noValidate>
       <h2 className="text-xl font-semibold">{view.formConfig?.title?.trim() || view.name}</h2>
       {view.formConfig?.description && <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{view.formConfig.description}</p>}
       <div className="mt-6 space-y-5">
@@ -451,7 +453,7 @@ const DatabaseFormFill: React.FC<Pick<DatabaseFormProps, 'view' | 'properties' |
                 {metadata.required && <span className="ml-1 text-destructive" aria-hidden>*</span>}
               </span>
               {metadata.help && <span id={`${property.id}-help`} className="mt-1 block text-xs text-muted-foreground">{metadata.help}</span>}
-              <span className={cn('group mt-2 block min-h-9 overflow-visible rounded-md border bg-background', error ? 'border-destructive' : 'border-border')}>
+              <span className={cn('group [&_[data-empty-hint]]:opacity-100 [&_[data-empty-hint]]:text-placeholder-foreground mt-2 block min-h-9 overflow-visible rounded-md border bg-background', error ? 'border-destructive' : 'border-border')}>
                 {property.type === 'text' && metadata.multiline ? (
                   <textarea
                     defaultValue={typeof values[property.id] === 'string' ? values[property.id] as string : ''}
@@ -464,7 +466,7 @@ const DatabaseFormFill: React.FC<Pick<DatabaseFormProps, 'view' | 'properties' |
                   <PropertyValueCell
                     property={inputProperty}
                     value={values[property.id]}
-                    placeholder={metadata.placeholder}
+                    placeholder={metadata.placeholder ?? (['select', 'status', 'multi_select'].includes(property.type) ? t('database.formView.choose') : undefined)}
                     onChange={(value) => updateValue(property.id, value)}
                     onAddOption={(optionLabel) => onAddOption(property.id, optionLabel)}
                     controlProps={common}
@@ -548,7 +550,7 @@ const DatabaseFormBuilder: React.FC<DatabaseFormProps> = ({view, properties, onU
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]" data-database-form-builder>
-      <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <section className="min-w-0 rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">{t('database.formView.fields')}</h2>
@@ -626,7 +628,7 @@ const DatabaseFormBuilder: React.FC<DatabaseFormProps> = ({view, properties, onU
                   <button
                     type="button"
                     onClick={() => remove(property.id)}
-                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-destructive"
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-destructive"
                     aria-label={`${t('database.formView.remove')}: ${property.name}`}
                     title={t('database.formView.removeHint')}
                   >
@@ -634,8 +636,8 @@ const DatabaseFormBuilder: React.FC<DatabaseFormProps> = ({view, properties, onU
                   </button>
                 </div>
                 {!writable && (
-                  <div className="mb-3 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs text-foreground" role="note">
-                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="mb-3 flex gap-2 rounded-md bg-[var(--obe-callout-warn)] px-2.5 py-2 text-xs text-foreground" role="note">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--obe-fg-yellow)]" />
                     {t('database.formView.unsupported')}
                   </div>
                 )}
@@ -728,7 +730,7 @@ const DatabaseFormBuilder: React.FC<DatabaseFormProps> = ({view, properties, onU
         </div>
       </section>
 
-      <aside className="h-fit rounded-xl border border-border bg-card p-4 shadow-sm">
+      <aside className="h-fit rounded-lg border border-border bg-card p-4 shadow-sm">
         <h2 className="text-base font-semibold">{t('database.formView.settings')}</h2>
         <div className="mt-4 space-y-3">
           <MetadataInput
@@ -912,7 +914,7 @@ const DatabaseFormPublicationControls: React.FC<DatabaseFormProps> = ({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm" data-database-form-publication>
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm" data-database-form-publication>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -921,7 +923,8 @@ const DatabaseFormPublicationControls: React.FC<DatabaseFormProps> = ({
             {published !== null && (
               <Badge
                 variant="secondary"
-                className={cn('rounded-full px-2 py-0.5 text-[11px]', published && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300')}
+                className="rounded-full px-2 py-0.5 text-xs"
+                style={published ? {backgroundColor: chipBgVar('green'), color: chipFgVar('green')} : undefined}
               >
                 {t(published ? 'database.formView.published' : 'database.formView.notPublished')}
               </Badge>
@@ -952,7 +955,7 @@ const DatabaseFormPublicationControls: React.FC<DatabaseFormProps> = ({
           <span className="text-sm font-medium">{t('database.formView.revealTitle')}</span>
           <span className="text-xs text-muted-foreground">{t('database.formView.revealHint')}</span>
           <div className="flex min-w-0 items-center gap-2">
-            <a href={fillUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate rounded bg-background px-2.5 py-1.5 font-mono text-xs text-primary underline-offset-2 hover:underline">
+            <a href={fillUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate rounded-sm bg-background px-2.5 py-1.5 font-mono text-xs text-primary underline-offset-2 hover:underline">
               {fillUrl}
             </a>
             <Button size="sm" variant="secondary" onClick={() => void copyFillUrl()}>
@@ -999,7 +1002,7 @@ const DatabaseFormPublicationControls: React.FC<DatabaseFormProps> = ({
                     <span className="flex justify-end gap-2">
                       {field.metadata.required && <span>{t('database.formView.required')}</span>}
                       {PUBLIC_REVIEW_CALLOUT_TYPES.has(field.property.type as FormWritablePropertyType) && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-foreground">
+                        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-foreground">
                           {t('database.formView.reviewChoiceField')}
                         </span>
                       )}
@@ -1011,7 +1014,7 @@ const DatabaseFormPublicationControls: React.FC<DatabaseFormProps> = ({
             })}
           </div>
           {(hasPublicChoice || published || !hasTitle) && (
-            <div className="space-y-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+            <div className="space-y-3 rounded-md bg-[var(--obe-callout-warn)] px-3 py-2 text-sm text-foreground">
               {hasPublicChoice && <p>{t('database.formView.reviewChoiceWarning')}</p>}
               {published && <p>{t('database.formView.rotateWarning')}</p>}
               {!hasTitle && (
@@ -1079,7 +1082,7 @@ export const DatabaseForm: React.FC<DatabaseFormProps> = (props) => {
   if (!(props.canSubmit ?? props.canEdit)) {
     return (
       <div className="space-y-4" data-database-form>
-        <div className="mx-auto max-w-2xl rounded-xl border border-border bg-card p-6 text-center shadow-sm" data-database-form-readonly role="note">
+        <div className="mx-auto max-w-2xl rounded-lg border border-border bg-card p-6 text-center shadow-sm" data-database-form-readonly role="note">
           <h2 className="text-xl font-semibold">{props.view.formConfig?.title?.trim() || props.view.name}</h2>
           <p className="mt-3 text-sm text-muted-foreground">{t('database.formView.noSubmitAccess')}</p>
         </div>
@@ -1098,7 +1101,7 @@ export const DatabaseForm: React.FC<DatabaseFormProps> = (props) => {
                 type="button"
                 onClick={() => setMode(next)}
                 aria-pressed={mode === next}
-                className={cn('rounded px-3 py-1 text-xs font-medium transition-colors', mode === next ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+                className={cn('rounded-sm px-3 py-1 text-xs font-medium transition-colors', mode === next ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
               >
                 {t(next === 'builder' ? 'database.formView.builder' : 'database.formView.fill')}
               </button>
@@ -1108,7 +1111,7 @@ export const DatabaseForm: React.FC<DatabaseFormProps> = (props) => {
       )}
       {mode === 'builder' && props.canEdit && removedFieldNotice && (
         <div
-          className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100"
+          className="flex items-start gap-2 rounded-md bg-[var(--obe-callout-warn)] px-3 py-2 text-sm text-foreground"
           data-database-form-field-removed-notice
           role="status"
         >
@@ -1118,7 +1121,7 @@ export const DatabaseForm: React.FC<DatabaseFormProps> = (props) => {
           </span>
           <button
             type="button"
-            className="rounded p-0.5 text-current/70 hover:bg-amber-500/10 hover:text-current"
+            className="rounded-sm p-0.5 text-current/80 hover:bg-hover hover:text-current"
             aria-label={t('common.close')}
             onClick={() => setRemovedFieldNotice(null)}
           >

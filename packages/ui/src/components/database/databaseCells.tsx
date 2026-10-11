@@ -573,7 +573,7 @@ const DateCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'on
         aria-label={property.name}
         {...controlProps}
       >
-        {text || <span className={emptyHint}>Empty</span>}
+        {text || <span data-empty-hint className={emptyHint}>Empty</span>}
       </button>
     );
   }
@@ -957,7 +957,7 @@ const MultiSelectCell: React.FC<PropertyValueCellProps> = ({property, value, pla
           {selected.length > 0 ? (
             selected.map((o) => <SelectChip key={o.id} option={o} />)
           ) : (
-            <span className={emptyHint}>{placeholder || 'Empty'}</span>
+            <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>
           )}
         </button>
       </DropdownMenuTrigger>
@@ -1140,7 +1140,7 @@ const SelectCell: React.FC<PropertyValueCellProps> = ({property, value, placehol
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-sm hover:bg-hover" {...controlProps}>
-          {selected ? <SelectChip option={selected} /> : <span className={emptyHint}>{placeholder || 'Empty'}</span>}
+          {selected ? <SelectChip option={selected} /> : <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>}
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         </button>
       </DropdownMenuTrigger>
@@ -1216,7 +1216,7 @@ const StatusCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
               {selected.label}
             </span>
           ) : (
-            <span className={emptyHint}>{placeholder || 'Empty'}</span>
+            <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>
           )}
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         </button>

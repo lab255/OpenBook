@@ -1561,6 +1561,7 @@ export const de: PartialMessages = {
       },
     },
     formView: {
+      choose: 'Auswählen…',
       builder: 'Erstellen',
       fill: 'Ausfüllen',
       builderIntro: 'Felder bilden das aktuelle Datenbankschema ab. Wird eine Spalte umbenannt oder geändert, aktualisiert sich dieses Formular automatisch. Beim Entfernen eines Feldes bleiben seine Datenbankspalte und vorhandenen Werte erhalten.',

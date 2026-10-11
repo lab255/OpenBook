@@ -40,3 +40,50 @@ test(
     await expect(page.getByRole('table').getByLabel('Contact email')).toHaveValue('reader@example.com');
   },
 );
+
+test('form fill exposes empty choices and dates without hover', {tag: ['@database']}, async ({page, request}) => {
+  const {SERVER} = await import('./seed');
+  const hostResponse = await request.post(`${SERVER}/api/pages`, {data: {name: `Form hints ${Date.now()}`, data: {editorjs: {blocks: []}, values: [], names: []}}});
+  const {id: pageId} = await hostResponse.json();
+  const properties = [
+    {id: 'status', name: 'Status', type: 'status'},
+    {id: 'team', name: 'Team', type: 'select'},
+    {id: 'tags', name: 'Tags', type: 'multi_select'},
+    {id: 'date', name: 'Start', type: 'date'},
+  ];
+  const response = await request.post(`${SERVER}/api/databases`, {data: {pageId, name: 'Hints', schema: {
+    properties,
+    views: [{id: 'form', name: 'Form', type: 'form', filters: [], sorts: [], visiblePropertyIds: properties.map((p) => p.id), formFields: {}, formConfig: {acceptingResponses: true}}],
+  }}});
+  expect(response.ok()).toBe(true);
+  await page.goto(`/?page=${pageId}`);
+  const input = page.locator('[data-form-field-id] input').first();
+  await expect(input).toBeVisible();
+  expect(await input.evaluate((node) => node.getBoundingClientRect().height)).toBe(28);
+  await page.getByRole('button', {name: 'Fill', exact: true}).click();
+  await page.mouse.move(0, 0);
+  for (const dark of [false, true]) {
+    await page.evaluate((value) => localStorage.setItem('theme', value ? 'dark' : 'light'), dark);
+    await page.reload();
+    await page.getByRole('button', {name: 'Fill', exact: true}).click();
+    await expect(page.locator('html')).toHaveClass(new RegExp(dark ? 'dark' : 'light'));
+    const hints = page.locator('[data-form-input] [data-empty-hint]');
+    await expect(hints).toHaveCount(3);
+    for (const hint of await hints.all()) {
+      await expect(hint).toHaveText('Select…');
+      await expect(hint).toHaveCSS('opacity', '1');
+    }
+    const date = page.getByLabel('Start', {exact: true});
+    const colors = await date.evaluate((node) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'hsl(var(--placeholder-foreground))';
+      node.parentElement!.appendChild(probe);
+      const result = {date: getComputedStyle(node).color, placeholder: getComputedStyle(probe).color,
+        indicator: getComputedStyle(node, '::-webkit-calendar-picker-indicator').opacity};
+      probe.remove();
+      return result;
+    });
+    expect(colors.date).toBe(colors.placeholder);
+    expect(colors.indicator).toBe('1');
+  }
+});

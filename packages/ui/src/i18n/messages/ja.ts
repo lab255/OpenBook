@@ -1554,6 +1554,7 @@ export const ja: PartialMessages = {
       },
     },
     formView: {
+      choose: '選択…',
       builder: '作成',
       fill: '入力',
       builderIntro: 'フィールドは最新のデータベーススキーマを参照します。列名や種類を変更すると、このフォームにも自動で反映されます。フォームからフィールドを削除しても、データベースの列と既存の値は保持されます。',

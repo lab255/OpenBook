@@ -377,12 +377,27 @@ describe('database form builder', () => {
     expect(screen.getByRole('button', {name: 'Remove from form: Computed'}).getAttribute('title'))
       .toBe('The database column and its existing values are kept.');
     const note = screen.getByRole('note');
-    expect(note.className).toContain('border-amber-500/40');
+    expect(note.className).toContain('bg-[var(--obe-callout-warn)]');
+    expect(note.className).not.toMatch(/amber-\d/);
     expect(note.className).toContain('text-foreground');
   });
 });
 
 describe('database form fill renderer', () => {
+  it('shows choice hints at rest while preserving custom placeholders', () => {
+    const properties: DatabaseProperty[] = [
+      {id: 'select', name: 'Team', type: 'select'},
+      {id: 'status', name: 'Status', type: 'status'},
+      {id: 'multi', name: 'Tags', type: 'multi_select'},
+    ];
+    renderFill({...formView, visiblePropertyIds: properties.map((p) => p.id), formFields: {multi: {placeholder: 'Pick tags'}}}, properties);
+    expect(screen.getAllByText('Select…')).toHaveLength(2);
+    for (const hint of [...screen.getAllByText('Select…'), screen.getByText('Pick tags')]) {
+      expect(hint.hasAttribute('data-empty-hint')).toBe(true);
+      expect(hint.closest('.group')?.className).toContain('[&_[data-empty-hint]]:opacity-100');
+    }
+  });
+
   it('shows read-only members a friendly access state instead of a submit control', () => {
     const {container} = render(<DatabaseForm view={formView} properties={[email]} canEdit={false} {...actions()} />);
 

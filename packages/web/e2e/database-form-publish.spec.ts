@@ -160,7 +160,7 @@ async function publishByApi(instance: ClaimedInstance, databaseId: string): Prom
     `/api/databases/${databaseId}/views/${FORM_VIEW_ID}/capability`,
     {method: 'POST'},
   );
-  return new URL(result.url, 'http://localhost:3000').toString();
+  return new URL(result.url, `http://localhost:${process.env.OPENBOOK_WEB_PORT ?? 3000}`).toString();
 }
 
 async function fillRequiredEmail(page: Page, value: string): Promise<void> {

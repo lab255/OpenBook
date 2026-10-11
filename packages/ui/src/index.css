@@ -3926,6 +3926,14 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-color: hsl(var(--border));
 }
 
+/* Form dates expose the native empty scaffold at rest, unlike table cells. */
+[data-form-input] .ob-date-empty:required:invalid:not(:focus) {
+  color: hsl(var(--placeholder-foreground));
+}
+[data-form-input] .ob-date-empty:required:invalid:not(:focus)::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
 /* The light primary/white pair is 3.82:1 at caption size. Shade only this tag. */
 .ob-db-today {
   background-color: color-mix(in srgb, hsl(var(--primary)) 88%, black);

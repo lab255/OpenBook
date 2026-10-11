@@ -209,7 +209,7 @@ reference the palette by name.
 
 Decision: **variant tints are the editor palette's block-background tints**; the default
 (info) variant is the theme neutral. No border (the reference editor's callout is a
-borderless tinted panel; borders double up with block-bg colours).
+borderless tinted panel; borders double up with block-bg colours); warning tints also serve app warning notes.
 
 | Token | Maps to | Light | Dark | `--foreground` on it (L / D) |
 |---|---|---|---|---:|
