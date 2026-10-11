@@ -2680,36 +2680,21 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
    hovered/focused (or its popover is open). Same affordance for every kit block;
    the gutter context menu's "Configure" reaches the same popover. */
 .obe-kit-gear {
-  position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
+  position: absolute; top: 0; right: 0;
   z-index: var(--z-index-control);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid hsl(var(--border) / 0.7);
-  background: hsl(var(--card));
-  color: hsl(var(--muted-foreground));
-  padding: 0.25rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
+  display: inline-grid; place-items: center;
+  width: var(--obe-gutter-btn); height: var(--obe-gutter-btn);
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--obe-chrome-ink);
+  cursor: pointer; opacity: 0; pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit:hover .obe-kit-gear,
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-kit-gear,
 .obe-kit:focus-within .obe-kit-gear,
 .obe-kit-gear:focus-visible,
-.obe-kit-gear[data-state='open'] {
-  opacity: 1;
-  pointer-events: auto;
-}
-.obe-kit-gear:hover,
-.obe-kit-gear[data-state='open'] {
-  color: hsl(var(--foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--border));
-}
+.obe-kit-gear[data-state='open'] { opacity: 1; pointer-events: auto; }
+.obe-kit-gear:hover { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+.obe-kit-gear[data-state='open'] { background: var(--obe-chrome-active); color: var(--obe-chrome-ink-hover); }
 .obe-kit-config {
   flex-basis: 100%;
   display: flex;
