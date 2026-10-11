@@ -7,6 +7,8 @@ const blocks = [
   {id: 'radio', type: 'radio', props: {label: 'Radio', opts: options}},
   {id: 'checks', type: 'checklist', props: {label: 'Checks', opts: options}},
   {id: 'dropdown', type: 'dropdown', props: {label: 'Dropdown', opts: options}},
+  {id: 'compact-dropdown', type: 'dropdown', props: {label: 'Compact dropdown', compact: true, opts: options}},
+  {id: 'compact-radio', type: 'radio', props: {label: 'Compact radio', compact: true, opts: options}},
   {id: 'toggle', type: 'toggle', props: {label: 'Toggle'}},
   {id: 'location', type: 'location', props: {label: 'Location'}},
   {id: 'button', type: 'actionbutton', props: {label: 'Click me'}},
@@ -57,14 +59,15 @@ for (const dark of [false, true]) {
     await expect(page.locator('.obe-kit-tip')).toHaveCSS('opacity', '1');
     for (const [selector, height] of [
       ['.obe-kit-textinput', '32px'], ['.obe-kit-num', '32px'], ['.obe-kit-mini', '32px'],
-      ['.obe-kit-dropdown-select', '32px'], ['.obe-kit-searchtrigger', '32px'],
-      ['.obe-kit-stepper', '28px'], ['.obe-kit-action', '32px'],
+      ['.obe-kit-wide .obe-kit-dropdown-select', '32px'], ['.obe-kit-searchtrigger', '32px'],
+      ['.obe-kit:not(.obe-kit-wide) .obe-kit-dropdown-select', '28px'],
+      ['.obe-kit:not(.obe-kit-wide) .obe-kit-pill', '28px'], ['.obe-kit-stepper', '28px'], ['.obe-kit-action', '32px'],
       ['.obe-kit-richtext-btn', '24px'], ['.obe-kit-switch', '20px'],
       ['.obe-kit-wide .obe-kit-pill', '36px'], ['.obe-kit-wide .obe-kit-check', '36px'],
     ]) {
       for (const control of await page.locator(selector).all()) await expect(control).toHaveCSS('height', height);
     }
-    for (const selector of ['.obe-kit-dropdown-select', '.obe-kit-searchtrigger']) {
+    for (const selector of ['.obe-kit-wide .obe-kit-dropdown-select', '.obe-kit-searchtrigger']) {
       const widths = await page.locator(selector).evaluate((el) => ({
         control: el.getBoundingClientRect().width,
         frame: el.closest('.obe-kit')!.getBoundingClientRect().width,
@@ -82,6 +85,28 @@ for (const dark of [false, true]) {
         const value = getComputedStyle(probe).backgroundColor; probe.remove(); return value;
       }, token);
       await expect(cover).toHaveCSS('background-color', expected);
+    }
+    const compactChoice = page.locator('.obe-kit:not(.obe-kit-wide) .obe-kit-pill').first();
+    const choiceBorder = await compactChoice.evaluate((el) => getComputedStyle(el).borderColor);
+    await compactChoice.hover();
+    await expect(compactChoice).toHaveCSS('border-color', choiceBorder);
+    const hoverFill = await compactChoice.evaluate((el) => {
+      const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--obe-chrome-hover)';
+      el.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color;
+    });
+    await expect(compactChoice).toHaveCSS('background-color', hoverFill);
+    await compactChoice.click();
+    const selectedBorder = await compactChoice.evaluate((el) => {
+      const probe = document.createElement('span'); probe.style.color = 'hsl(var(--primary))';
+      el.append(probe); const color = getComputedStyle(probe).color; probe.remove(); return color;
+    });
+    await expect(compactChoice).toHaveCSS('border-color', selectedBorder);
+    for (const selector of ['.obe-kit-card', '.obe-kit-searchtrigger', '.obe-kit-action']) {
+      const control = page.locator(selector).first();
+      await control.evaluate((el) => el.setAttribute('disabled', ''));
+      await expect(control).toHaveCSS('opacity', '0.5');
+      await expect(control).toHaveCSS('cursor', 'default');
+      await control.evaluate((el) => el.removeAttribute('disabled'));
     }
     const label = page.locator('.obe-kit-number .obe-kit-label');
     await expect(label).toHaveCSS('font-weight', '600');
