@@ -1,3 +1,4 @@
+import {chipBgVar, chipFgVar} from '@/lib/dataColorVars';
 import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {CalendarCheck, ChevronRight, GripVertical} from 'lucide-react';
 import {
@@ -218,8 +219,8 @@ interface LinkState {
 }
 
 const cnBar = (dragging: boolean): string =>
-  `group/bar absolute flex select-none items-center overflow-visible rounded px-1.5 text-left text-xs font-medium text-white shadow-sm ${
-    dragging ? 'cursor-grabbing ring-2 ring-white/60' : 'cursor-grab hover:opacity-90'
+  `group/bar absolute flex select-none items-center overflow-visible rounded-sm px-1.5 text-left text-xs font-medium shadow-sm focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)] ${
+    dragging ? 'cursor-grabbing ring-2 ring-ring/60' : 'cursor-grab hover:opacity-90'
   }`;
 
 /**
@@ -403,12 +404,12 @@ const TimelineCanvas: React.FC<{
   const topH = axis.top.length ? 22 : 0;
   const gridTicks = axis.top.length ? axis.top : axis.bottom;
 
-  const barColor = (row: DatabaseRow): string => {
+  const barToken = (row: DatabaseRow): string => {
     if (selectProp) {
       const opt = selectProp.options?.find((o) => o.id === row.properties[selectProp.id]);
-      if (opt?.color) return swatchColor(opt.color) ?? swatchColor('blue')!;
+      if (opt?.color && swatchColor(opt.color)) return opt.color;
     }
-    return swatchColor('blue')!;
+    return 'blue';
   };
 
   // ── Scroll: centre today, and extend the range near the edges ───────────────
@@ -877,14 +878,16 @@ const TimelineCanvas: React.FC<{
                       }
                       db.openRow(l.row.id);
                     }}
-                    onKeyDown={(e) => e.key === 'Enter' && db.openRow(l.row.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); db.openRow(l.row.id); } }}
                     className={cn(cnBar(!!preview), 'z-control', link?.targetId === l.row.id && 'ring-2 ring-brand')}
                     style={{
                       left,
                       width,
                       top: l.top + BAR_PAD,
                       height: rowH - BAR_PAD * 2,
-                      backgroundColor: barColor(l.row),
+                      backgroundColor: chipBgVar(barToken(l.row)),
+                      color: chipFgVar(barToken(l.row)),
+                      borderLeft: `3px solid ${swatchColor(barToken(l.row))}`,
                       touchAction: 'none',
                     }}
                     title={`${name} — drag to reschedule`}
@@ -892,7 +895,7 @@ const TimelineCanvas: React.FC<{
                     {canResize && (
                       <span
                         onPointerDown={(e) => begin(e, l.row.id, 'start')}
-                        className="absolute left-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-l bg-black/0 transition-colors group-hover/bar:bg-black/25"
+                        className="absolute left-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-l bg-transparent transition-colors group-hover/bar:bg-current/20"
                         aria-hidden
                       />
                     )}
@@ -909,7 +912,7 @@ const TimelineCanvas: React.FC<{
                     {canResize && (
                       <span
                         onPointerDown={(e) => begin(e, l.row.id, 'end')}
-                        className="absolute right-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-r bg-black/0 transition-colors group-hover/bar:bg-black/25"
+                        className="absolute right-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-r bg-transparent transition-colors group-hover/bar:bg-current/20"
                         aria-hidden
                       />
                     )}
@@ -919,7 +922,7 @@ const TimelineCanvas: React.FC<{
                         onClick={(e) => e.stopPropagation()}
                         // Inside the bar's right edge so the dependency origin
                         // stays tied to the actual date-span geometry.
-                        className="absolute right-0.5 top-1/2 z-control h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-white/30 opacity-0 transition-opacity group-hover/bar:opacity-100"
+                        className="absolute right-0.5 top-1/2 z-control h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-current bg-card opacity-0 transition-opacity group-hover/bar:opacity-100"
                         aria-label={t('database.timeline.linkDependency')}
                         title={t('database.timeline.addDependency')}
                       />
