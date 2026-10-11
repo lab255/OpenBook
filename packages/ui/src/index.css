@@ -2399,6 +2399,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   .obe-table-add { opacity: 1; }
 }
 
+.obe-kit-stepper:focus-within, .obe-kit-tags:focus-within, .obe-formula:focus-within {
+  border-color: hsl(var(--ring));
+}
 /* Block editor: keyboard focus visibility (a11y) */
 .obe-group-btn:focus-visible,
 .obe-cnt-add:focus-visible,
@@ -2415,6 +2418,20 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-artifact-tool:focus-visible,
 .obe-artifact-resize:focus-visible,
 .obe-artifact-expand:focus-visible,
+.obe-kit-gear:focus-visible,
+.obe-kit-stepper button:focus-visible,
+.obe-kit-pill:focus-visible,
+.obe-kit-switch:focus-visible,
+.obe-kit-action:focus-visible,
+.obe-kit-mini:focus-visible,
+.obe-kit-card:focus-visible,
+.obe-kit-richtext-btn:focus-visible,
+.obe-kit-searchtrigger:focus-visible,
+.obe-kit-tag-x:focus-visible,
+.obe-kit-term:focus-visible,
+.obe-kit-linkcard:focus-visible,
+.obe-kit-check input:focus-visible,
+.obe-kit-range input[type='range']:focus-visible,
 .obe-image-placeholder:focus-visible {
   outline: var(--obe-focus-ring);
   outline-offset: var(--obe-focus-offset);
