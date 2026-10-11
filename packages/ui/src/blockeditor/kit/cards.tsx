@@ -4,8 +4,7 @@ import type {BlockEditorController} from '../useBlockEditor';
 import type {CustomBlockProps} from '../registry';
 import {formatValue, statusOf} from './scope';
 import {useCachedEval} from './useCachedEval';
-import {appendVar, ConfigField, ConfigInput, KitInlineText, NameDescriptionFields, ScopeHints} from './KitFrame';
-import {KitSettings} from './KitSettings';
+import {appendVar, ConfigField, ConfigInput, KitFrame, KitInlineText, NameDescriptionFields, ScopeHints} from './KitFrame';
 
 /**
  * The kit's display blocks: a status light driven by an expression, a term
@@ -32,7 +31,8 @@ const StatusLightBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const status = statusOf(value, error, okAt, warnAt);
 
   return (
-    <div className="obe-kit obe-kit-status" contentEditable={false} data-status={status}>
+    <KitFrame block={block} editor={editor} kind="status" defaultName="Status" symbol={false} hideHeader rootProps={{'data-status': status}}
+      control={<>
       <span className={`obe-kit-light obe-kit-light-${status}`} aria-hidden />
       <KitInlineText
         className="obe-kit-status-label"
@@ -43,7 +43,8 @@ const StatusLightBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
         onCommit={(v) => set(editor, block, 'label', v)}
       />
       <span className="obe-kit-status-value">{error ? `⚠ ${error}` : formatValue(value)}</span>
-      <KitSettings blockId={blockId(block)} title={label || 'Status'}>
+      </>}
+      config={
         <div className="flex flex-col gap-3">
           <ConfigField label="Label">
             <ConfigInput value={label} readOnly={editor.readOnly} aria-label="Status label" onChange={(e) => set(editor, block, 'label', e.target.value)} />
@@ -69,8 +70,8 @@ const StatusLightBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
             </ConfigField>
           </div>
         </div>
-      </KitSettings>
-    </div>
+      }
+    />
   );
 };
 
@@ -81,7 +82,8 @@ const TooltipCardBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const tip = blockProp<string>(block, 'tip') ?? '';
 
   return (
-    <div className="obe-kit obe-kit-tooltip" contentEditable={false}>
+    <KitFrame block={block} editor={editor} kind="tooltip" defaultName="Tooltip" symbol={false} hideHeader labelKey="term"
+      control={<>
       <span className="obe-kit-term" tabIndex={0}>
         <KitInlineText
           className="obe-kit-term-text"
@@ -100,7 +102,8 @@ const TooltipCardBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
           </span>
         )}
       </span>
-      <KitSettings blockId={blockId(block)} title={term || 'Tooltip'}>
+      </>}
+      config={
         <div className="flex flex-col gap-3">
           <ConfigField label="Term">
             <ConfigInput value={term} readOnly={editor.readOnly} aria-label="Term" onChange={(e) => set(editor, block, 'term', e.target.value)} />
@@ -109,8 +112,8 @@ const TooltipCardBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
             <ConfigInput value={tip} readOnly={editor.readOnly} aria-label="Tooltip text" placeholder="Shown on hover or focus" onChange={(e) => set(editor, block, 'tip', e.target.value)} />
           </ConfigField>
         </div>
-      </KitSettings>
-    </div>
+      }
+    />
   );
 };
 
@@ -123,21 +126,23 @@ const LinkCardBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const href = url && (/^https?:\/\//.test(url) ? url : `https://${url}`);
 
   return (
-    <div className="obe-kit obe-kit-linkcard-wrap" contentEditable={false}>
-      <a className="obe-kit-linkcard" href={href || undefined} target="_blank" rel="noreferrer" aria-disabled={!href}>
+    <KitFrame block={block} editor={editor} kind="linkcard-wrap" defaultName="Link card" symbol={false} hideHeader labelKey="title"
+      control={<>
+      <a className="obe-kit-linkcard" href={href || undefined} target="_blank" rel="noreferrer" aria-disabled={!href} tabIndex={href ? undefined : -1}>
         <span className="obe-kit-linkcard-title">{title}</span>
         {description && <span className="obe-kit-linkcard-desc">{description}</span>}
         {url && <span className="obe-kit-linkcard-url">{url.replace(/^https?:\/\//, '')}</span>}
       </a>
-      <KitSettings blockId={blockId(block)} title={title || 'Link card'}>
+      </>}
+      config={
         <div className="flex flex-col gap-3">
           <NameDescriptionFields block={block} editor={editor} nameKey="title" namePlaceholder="Untitled" />
           <ConfigField label="URL">
             <ConfigInput value={url} readOnly={editor.readOnly} aria-label="Card URL" placeholder="https://…" spellCheck={false} onChange={(e) => set(editor, block, 'url', e.target.value)} />
           </ConfigField>
         </div>
-      </KitSettings>
-    </div>
+      }
+    />
   );
 };
 

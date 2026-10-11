@@ -376,11 +376,11 @@ todo, quote, callout, code, divider, image, table, columns, group, database embe
 | slider | `reactiveBlocks.tsx:65` | KitFrame | — |
 | form | `FormBlockView.tsx:181` | KitFrame (`symbol={false}`) | — |
 | meeting | `MeetingBlockView.tsx:115` | KitFrame | — |
-| **statuslight** | `kit/cards.tsx:35` | hand-rolled root + `KitSettings` | **adopt**: `symbol={false}`, header = label |
+| **statuslight** | `kit/cards.tsx:35` | hand-rolled root + `KitSettings` | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
 | **tooltipcard** | `kit/cards.tsx:84` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader` (the term labels itself) |
-| **linkcard** | `kit/cards.tsx:126` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader` (the card labels itself) |
-| **progressbar** | `kit/progress.tsx:36` | hand-rolled | **adopt**: `symbol={false}`, header = label; value readout stays in `control` |
-| **kitchart** | `kit/charts.tsx:1522` | hand-rolled `<figure>` + own caption | **adopt**: KitFrame gains a figure-root option so its header renders as the `figcaption` (accessible name preserved) |
+| **linkcard** | `kit/cards.tsx:126` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader`, `kind="linkcard-wrap"` (the card labels itself) |
+| **progressbar** | `kit/progress.tsx:36` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
+| **kitchart** | `kit/charts.tsx:1522` | hand-rolled `<figure>` + own caption | **adopt**: `as="figure"`, header = `title` renders as the `figcaption` (accessible name preserved) |
 
 Acceptance: `grep -n "KitSettings" blockeditor/kit/*.tsx` matches only `KitFrame.tsx`
 (today it also matches `cards.tsx`, `progress.tsx`, `charts.tsx`).

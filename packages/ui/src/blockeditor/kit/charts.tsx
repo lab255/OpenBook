@@ -29,8 +29,7 @@ import type {BlockEditorController} from '../useBlockEditor';
 import type {CustomBlockDef, CustomBlockProps} from '../registry';
 import {useCachedEval, useCachedInputScope} from './useCachedEval';
 import {useKitLock, useKitPageLock} from './lock';
-import {appendVar, ConfigField, ConfigInput, KitInlineText, NameDescriptionFields, ScopeHints} from './KitFrame';
-import {KitSettings} from './KitSettings';
+import {appendVar, ConfigField, ConfigInput, KitFrame, NameDescriptionFields, ScopeHints} from './KitFrame';
 import {axisTickLabel, extent, funnelRows, linePoints, paletteFor, pieArcs, scale, ticks, toLabelled, toPoints, toSeries} from './chartMath';
 import {useDataScheme} from '@/lib/dataScheme';
 import {useOptionalData} from '@/data';
@@ -1457,16 +1456,8 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const source = blockProp<string>(block, 'source') ?? '';
   const labels = splitLabels(blockProp<string>(block, 'labels') ?? '');
   const title = blockProp<string>(block, 'title') ?? '';
-  const description = blockProp<string>(block, 'description') ?? '';
-  // Whether the inline title/description are edit affordances here. Under a
-  // page lock (read-only viewer, the export viewer) KitInlineText renders its
-  // locked branch — a plain span of `value || placeholder` — so an EMPTY field
-  // must not render at all or the placeholder shows as ghost text ("Chart
-  // title" / "Add a description…") on a locked page. Empty + editable keeps
-  // rendering: present mode hides it via the :placeholder-shown CSS instead.
   const pageLocked = useKitPageLock();
   const groupLocked = useKitLock();
-  const chromeEditable = !editor.readOnly && !pageLocked;
   // Change-kind writes the block, so it's offered only when the chart is truly
   // editable — never in the read-only viewer, a locked group, or an export. Copy
   // value stays available everywhere (present mode included), matching the
@@ -1519,29 +1510,10 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   ) : null;
 
   return (
-    <figure className="obe-kit obe-kit-chart" contentEditable={false} data-chart-kind={kind}>
-      <figcaption className="obe-kit-chart-head">
-        {(chromeEditable || title) && (
-          <KitInlineText
-            className="obe-kit-chart-title"
-            value={title}
-            placeholder="Chart title"
-            readOnly={editor.readOnly}
-            ariaLabel="Chart title"
-            onCommit={(v) => setProp(editor, block, 'title', v)}
-          />
-        )}
-        {(chromeEditable || description) && (
-          <KitInlineText
-            className="obe-kit-desc obe-kit-desc-edit"
-            value={description}
-            placeholder="Add a description…"
-            readOnly={editor.readOnly}
-            ariaLabel="Description"
-            onCommit={(v) => setProp(editor, block, 'description', v)}
-          />
-        )}
-      </figcaption>
+    <KitFrame block={block} editor={editor} kind="chart" defaultName={`${kind} chart`}
+      as="figure" labelKey="title" symbol={false} headerPlaceholder="Chart title"
+      hideEmptyHeaderWhenLocked rootProps={{'data-chart-kind': kind}}
+      control={
       <KitChartPlot
         kind={kind}
         value={value}
@@ -1572,7 +1544,8 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
             : undefined
         }
       />
-      <KitSettings blockId={blockId(block)} title={title || `${kind} chart`}>
+      }
+      config={
         <div className="flex flex-col gap-3">
           <NameDescriptionFields block={block} editor={editor} nameKey="title" namePlaceholder="Chart title" />
           <ConfigField label="Kind">
@@ -1635,8 +1608,8 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
           )}
           {def.configFields?.({block, editor, setProp: (key, v) => setProp(editor, block, key, v)})}
         </div>
-      </KitSettings>
-    </figure>
+      }
+    />
   );
 };
 

@@ -3,8 +3,7 @@ import {Select} from '@/components/ui/select';
 import {blockId, blockProp} from '../model';
 import type {CustomBlockProps} from '../registry';
 import {useCachedEval} from './useCachedEval';
-import {appendVar, ConfigField, ConfigInput, kitSet, KitInlineText, ScopeHints} from './KitFrame';
-import {KitSettings} from './KitSettings';
+import {appendVar, ConfigField, ConfigInput, KitFrame, kitSet, KitInlineText, ScopeHints} from './KitFrame';
 
 /**
  * Progress bar — a DISPLAY block computed from an expression over the page's
@@ -33,7 +32,8 @@ const ProgressBarBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const readout = error ? `⚠ ${error}` : format === 'fraction' ? `${trim(raw)} / ${trim(max)}` : `${pct}%`;
 
   return (
-    <div className="obe-kit obe-kit-progress" contentEditable={false} data-progress={pct}>
+    <KitFrame block={block} editor={editor} kind="progress" defaultName="Progress" symbol={false} hideHeader rootProps={{'data-progress': pct}}
+      control={<>
       <span className="obe-kit-progress-head">
         <KitInlineText
           className="obe-kit-progress-label"
@@ -48,7 +48,8 @@ const ProgressBarBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       <span className="obe-kit-progress-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
         <span className="obe-kit-progress-fill" style={{width: `${pct}%`}} />
       </span>
-      <KitSettings blockId={blockId(block)} title={label || 'Progress'}>
+      </>}
+      config={
         <div className="flex flex-col gap-3">
           <ConfigField label="Label">
             <ConfigInput value={label} readOnly={editor.readOnly} aria-label="Progress label" onChange={(e) => set(editor, block, 'label', e.target.value)} />
@@ -89,8 +90,8 @@ const ProgressBarBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
             </ConfigField>
           </div>
         </div>
-      </KitSettings>
-    </div>
+      }
+    />
   );
 };
 
