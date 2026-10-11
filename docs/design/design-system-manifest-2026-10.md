@@ -292,6 +292,7 @@ Shared hue *names* stay aligned (one mental model), values do not.
 | `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#e0eefa`), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49`) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
 | `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (3.81 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
 | `--obe-drag-dim` | `0.4` | table `0.45` :2116; block rows none |
+| `--obe-disabled-opacity` | `0.5` — one rule: `.obe-kit :is(button, input, select, textarea, [role='switch']):disabled`, `.obe-kit-card`, `.obe-kit-searchtrigger`; never on read-only/present pages | card `0.55`, search trigger `0.6`; app `disabled:opacity-50` |
 | `--obe-focus-ring` / `--obe-focus-offset` | `2px solid hsl(var(--ring))` / `2px` | offset `1px` :2450 vs `2px` :2108, :3949 |
 
 ### 8.2 Gutter geometry — one rule replaces the per-type offsets

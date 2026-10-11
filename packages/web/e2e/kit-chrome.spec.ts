@@ -65,6 +65,7 @@ for (const dark of [false, true]) {
       ['.obe-kit-richtext-btn', '24px'], ['.obe-kit-switch', '20px'],
       ['.obe-kit-wide .obe-kit-pill', '36px'], ['.obe-kit-wide .obe-kit-check', '36px'],
     ]) {
+      expect(await page.locator(selector).count()).toBeGreaterThan(0);
       for (const control of await page.locator(selector).all()) await expect(control).toHaveCSS('height', height);
     }
     for (const selector of ['.obe-kit-wide .obe-kit-dropdown-select', '.obe-kit-searchtrigger']) {
@@ -134,5 +135,28 @@ for (const dark of [false, true]) {
     for (const row of measurements) if (row.type && caps[row.type]) expect(row.height, row.type).toBeLessThanOrEqual(caps[row.type]);
     console.log(`Kit heights ${dark ? 'dark' : 'light'} ${JSON.stringify(measurements)}`);
     await testInfo.attach('kit-heights', {body: JSON.stringify(measurements, null, 2), contentType: 'application/json'});
+  });
+
+  test(`read-only meeting todo stays undimmed (${dark ? 'dark' : 'light'})`, async ({page, request}) => {
+    const id = await newPage(request, `Read-only meeting ${dark}`, {
+      editor: 'blocks',
+      blockdoc: {blocks: [{id: 'meeting', type: 'meeting', children: [
+        {id: 'todo', type: 'todo', text: [{t: 'Follow up'}]},
+      ]}]},
+      editorjs: {blocks: []}, values: [], names: [],
+    });
+    if (dark) await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
+    await page.route('**/api/instance', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      const real = await route.fetch();
+      const info = await real.json();
+      await route.fulfill({json: {...info, guestAccess: 'read'}});
+    });
+    await page.goto(`/?page=${id}`);
+    await expect(page.locator('.obe-root')).toHaveClass(/obe-readonly/);
+    const todo = page.locator('.obe-kit-meeting [data-block-row="todo"] .obe-todo-box');
+    await expect(todo).toBeDisabled();
+    await expect(todo).toHaveCSS('opacity', '1');
+    await page.unrouteAll({behavior: 'wait'});
   });
 }

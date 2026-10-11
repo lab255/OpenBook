@@ -337,7 +337,7 @@ const ButtonBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       </ConfigField>
       <ConfigField label="Action">
         <Select unstyled
-          className="obe-kit-select w-full rounded-md border border-border bg-card px-2 py-1 text-sm"
+          className="cursor-pointer w-full rounded-md border border-border bg-card px-2 py-1 text-sm"
           value={action}
           disabled={editor.readOnly}
           aria-label="Button action"
