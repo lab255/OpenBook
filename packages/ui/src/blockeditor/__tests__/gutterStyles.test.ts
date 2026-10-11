@@ -70,6 +70,17 @@ describe('block gutter pane geometry', () => {
 });
 
 describe('table grip geometry', () => {
+  it('pads only editable tables first below group and tab header rules', () => {
+    const spacing = ruleBody(
+      '.obe-group-body > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips),\n.obe-cnt-panel > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips)',
+    );
+    expect(spacing).toContain('padding-top: 12px');
+    expect(spacing).toContain('--obe-row-space-above: 12px');
+    expect(ruleBody(
+      '.obe-group-body > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips) > .obe-blockbody,\n.obe-cnt-panel > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips) > .obe-blockbody',
+    )).toContain('padding-top: var(--obe-block-pad-y)');
+  });
+
   it('does not charge the row grip or add-row control to the table width', () => {
     expect(ruleBody('.obe-table-wrap.obe-has-grips')).not.toMatch(/padding-left/);
     expect(ruleBody('.obe-table-add-row')).toMatch(/left:\s*0/);
@@ -92,7 +103,7 @@ describe('table grip geometry', () => {
     expect(revealedGrip).not.toMatch(/pointer-events/);
     expect(revealedGrip).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);
     expect(ruleBody('.obe-row[data-block-type=\'table\']:has(.obe-has-grips)')).toMatch(
-      /--obe-lead-offset:\s*calc\(var\(--obe-block-pad-y\) \+ var\(--obe-table-grip-top\) - var\(--obe-gutter-btn\)\)/,
+      /--obe-lead-offset:\s*calc\(var\(--obe-row-space-above, 0px\) \+ var\(--obe-block-pad-y\) \+ var\(--obe-table-grip-top\) - var\(--obe-gutter-btn\)\)/,
     );
   });
 

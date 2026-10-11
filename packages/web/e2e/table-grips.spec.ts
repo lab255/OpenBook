@@ -75,11 +75,16 @@ test('table rows share the 33px pitch and compact chrome geometry', {tag: ['@edi
       fontSize: getComputedStyle(element).fontSize,
       lineHeight: getComputedStyle(element).lineHeight,
       blockHeight: element.closest('.obe-row')!.getBoundingClientRect().height,
+      spaceAbove: getComputedStyle(element.closest('.obe-row')!).getPropertyValue('--obe-row-space-above').trim(),
+      handleOffset: element.closest('.obe-row')!.querySelector('.obe-handle')!.getBoundingClientRect().y
+        - element.closest('.obe-row')!.getBoundingClientRect().y,
     };
   });
   expect(metrics.rows).toHaveLength(3);
   for (const height of metrics.rows) expect(Math.abs(height - 33.02)).toBeLessThan(0.1);
   expect(metrics.top).toBe('0px');
+  expect(metrics.spaceAbove).toBe('0px');
+  expect(metrics.handleOffset).toBeCloseTo(-16, 1);
   expect(metrics.bottom).toBe('16px');
   expect(metrics.fontSize).toBe('14px');
   expect(metrics.lineHeight).toBe('20.02px');
@@ -138,6 +143,95 @@ test('table fills the content column without blocking the block drag handle', {t
     return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest('.obe-handle') === handle;
   });
   expect(hitTargetIsHandle).toBe(true);
+});
+
+test.describe('in groups', () => {
+  test.use({freshWorkspace: true});
+
+  test('first editable table clears the group header rule', {tag: ['@editor', '@p1']}, async ({page, request}) => {
+    const pageId = await newPage(request, `Table header clearance ${Date.now()}`, {
+      editor: 'blocks',
+      blockdoc: {blocks: [{
+        id: 'group', type: 'group', props: {name: 'Table group'},
+        children: [{id: 'text', type: 'paragraph', text: []}],
+      }]},
+      editorjs: {blocks: []}, values: [], names: [],
+    });
+    await page.goto(`/?page=${pageId}`);
+    await page.locator('.obe-group-body .obe-text').click();
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+    const row = page.locator('.obe-group-body > .obe-row[data-block-type="table"]:first-child');
+    await expect(row).toHaveCSS('padding-top', '12px');
+    await row.locator('.obe-table').hover();
+    const header = (await page.locator('.obe-group-head').boundingBox())!;
+    const handle = (await row.locator(':scope > .obe-gutter .obe-handle').boundingBox())!;
+    const headerBottom = header.y + header.height;
+    console.log('DSX-5b F2 group clearance', JSON.stringify({
+      headerBottom, handleTop: handle.y, handleBottom: handle.y + handle.height,
+      clearance: handle.y - headerBottom,
+    }));
+    expect(handle.y).toBeGreaterThanOrEqual(headerBottom);
+    const geometry = await row.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const table = element.querySelector('.obe-table')!.getBoundingClientRect();
+      const grip = element.querySelector('.obe-table-row-grip')!.getBoundingClientRect();
+      return {rowTop: box.y, tableTop: table.y, gripTop: grip.y};
+    });
+    console.log('DSX-5b F2b nested geometry', JSON.stringify(geometry));
+    expect(handle.y + handle.height).toBeLessThanOrEqual(geometry.gripTop);
+    // The 12px gap precedes the ordinary block box, including its 4px inset.
+    expect(geometry.rowTop + 12 - handle.y).toBeCloseTo(16, 1);
+    expect(geometry.tableTop - geometry.rowTop).toBe(16);
+    await row.locator(':scope > .obe-gutter .obe-handle').click();
+    await expect(row).toHaveClass(/obe-row-selected/);
+    expect(await row.evaluate((element) => getComputedStyle(element, '::before').top)).toBe('12px');
+  });
+});
+
+test.describe('in tabs', () => {
+  test.use({freshWorkspace: true});
+
+  test('first editable table clears the tab header rule', {tag: ['@editor', '@p1']}, async ({page, request}) => {
+    const pageId = await newPage(request, `Table header clearance ${Date.now()}`, {
+      editor: 'blocks',
+      blockdoc: {blocks: [{
+        id: 'tabs', type: 'tabs', props: {active: 0},
+        children: [{id: 'tab', type: 'tab', props: {label: 'Table tab'},
+          children: [{id: 'text', type: 'paragraph', text: []}]}],
+      }]},
+      editorjs: {blocks: []}, values: [], names: [],
+    });
+    await page.goto(`/?page=${pageId}`);
+    await page.locator('.obe-cnt-panel .obe-text').click();
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+    const row = page.locator('.obe-cnt-panel > .obe-row[data-block-type="table"]:first-child');
+    await expect(row).toHaveCSS('padding-top', '12px');
+    await row.locator('.obe-table').hover();
+    const header = (await page.locator('.obe-cnt-head').boundingBox())!;
+    const handle = (await row.locator(':scope > .obe-gutter .obe-handle').boundingBox())!;
+    const headerBottom = header.y + header.height;
+    console.log('DSX-5b F2b tabs clearance', JSON.stringify({
+      headerBottom, handleTop: handle.y, handleBottom: handle.y + handle.height,
+      clearance: handle.y - headerBottom,
+    }));
+    expect(handle.y).toBeGreaterThanOrEqual(headerBottom);
+    const geometry = await row.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const table = element.querySelector('.obe-table')!.getBoundingClientRect();
+      const grip = element.querySelector('.obe-table-row-grip')!.getBoundingClientRect();
+      return {rowTop: box.y, tableTop: table.y, gripTop: grip.y};
+    });
+    console.log('DSX-5b F2b nested geometry', JSON.stringify(geometry));
+    expect(handle.y + handle.height).toBeLessThanOrEqual(geometry.gripTop);
+    // The 12px gap precedes the ordinary block box, including its 4px inset.
+    expect(geometry.rowTop + 12 - handle.y).toBeCloseTo(16, 1);
+    expect(geometry.tableTop - geometry.rowTop).toBe(16);
+    await row.locator(':scope > .obe-gutter .obe-handle').click();
+    await expect(row).toHaveClass(/obe-row-selected/);
+    expect(await row.evaluate((element) => getComputedStyle(element, '::before').top)).toBe('12px');
+  });
 });
 
 test.describe('in columns', () => {

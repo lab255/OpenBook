@@ -949,7 +949,7 @@ tr[data-row-anchor][data-selected] > td {
 }
 .obe-row[data-block-type='table']:has(.obe-has-grips) {
   /* End the block handle above the first row grip; both remain draggable. */
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + var(--obe-table-grip-top) - var(--obe-gutter-btn));
+  --obe-lead-offset: calc(var(--obe-row-space-above, 0px) + var(--obe-block-pad-y) + var(--obe-table-grip-top) - var(--obe-gutter-btn));
   --obe-lead-line: var(--obe-gutter-btn);
 }
 .obe-row[data-block-type='code'] {
@@ -1941,6 +1941,17 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-group-btn:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-group-btn-on { color: hsl(var(--primary)); }
 .obe-group-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
+/* Editable tables first below a header rule need room for their block handle. */
+.obe-group-body > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips),
+.obe-cnt-panel > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips) {
+  padding-top: 12px;
+  --obe-row-space-above: 12px;
+}
+/* Keep the normal table inset inside the selection slab, below the space above. */
+.obe-group-body > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips) > .obe-blockbody,
+.obe-cnt-panel > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips) > .obe-blockbody {
+  padding-top: var(--obe-block-pad-y);
+}
 /* Exported groups (static HTML). */
 .obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: var(--radius-lg); padding: var(--obe-block-pad-y) var(--obe-cnt-inset); margin: 0.75rem 0; }
 .dark .obe-x-group, .dark .obe-x-section { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
