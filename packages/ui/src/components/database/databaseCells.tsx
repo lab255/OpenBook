@@ -510,7 +510,7 @@ const RatingCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
           key={n}
           type="button"
           onClick={() => onChange(current === n ? null : n)}
-          className={cn('text-base leading-none transition-colors', n <= current ? 'text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400/60')}
+          className={cn('text-base leading-none transition-colors', n <= current ? 'text-[var(--obe-fg-yellow)]' : 'text-muted-foreground/30 hover:text-[var(--obe-fg-yellow)]/60')}
           aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
           aria-pressed={n <= current}
         >
