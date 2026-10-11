@@ -1,3 +1,14 @@
+## 3.22.0 (2026-10-11)
+
+### 🚀 Features
+
+- **server:** activate signed runtime-binaries-v1 manifest pins — macOS managed installs go live (WSP-7) ([#396](https://github.com/lab255/OpenBook/pull/396))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
 ## 3.21.0 (2026-10-10)
 
 ### 🚀 Features
