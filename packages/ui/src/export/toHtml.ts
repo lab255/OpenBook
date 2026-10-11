@@ -55,7 +55,7 @@ import {
   renderLedgerReportBlock,
   type LedgerExportRecords,
 } from './exportLedgerReports';
-import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../blockeditor/colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../blockeditor/colors';
 import {kitChartRuntime, kitChartSvg} from './kitChart';
 import {formatValue} from './format';
 import {inlineScriptHash, pageCsp} from './exportCsp';
@@ -1338,11 +1338,11 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .kitinput { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .kit-label { font-weight: 600; font-size: .92rem; }
 .kit-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.kit-pill { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
+.kit-pill { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
 .kit-pill .kit-dot { display: none; }
-.kit-pill.kit-on { background: #6366f1; border-color: #6366f1; color: #fff; }
+.kit-pill.kit-on { background: ${KIT_EXPORT_PRIMARY}; border-color: ${KIT_EXPORT_PRIMARY}; color: #fff; }
 .kit-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: .9rem; }
-.kit-check input, .kit-toggle input { accent-color: #6366f1; }
+.kit-check input, .kit-toggle input { accent-color: ${KIT_EXPORT_PRIMARY}; }
 .kitinput select, .kitinput input[type=text] { font: inherit; font-size: .9rem; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; padding: 4px 8px; }
 .kit-wide { display: block; }
 .kit-wide .kit-label { display: block; margin-bottom: 8px; }
@@ -1350,22 +1350,22 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .kit-wide .kit-pill, .kit-wide .kit-check { width: 100%; border-radius: 8px; padding: 9px 14px; display: flex; justify-content: flex-start; }
 .kit-wide .kit-pill { background: transparent; color: inherit; }
 .kit-wide .kit-pill:hover, .kit-wide .kit-check:hover { background: rgba(127,127,127,.1); }
-.kit-wide .kit-pill .kit-dot { display: inline-block; width: 13px; height: 13px; border-radius: 999px; border: 1.5px solid rgba(127,127,127,.6); flex-shrink: 0; }
-.kit-wide .kit-pill.kit-on { background: rgba(99,102,241,.1); border-color: #6366f1; }
-.kit-wide .kit-pill.kit-on .kit-dot { border-color: #6366f1; background: radial-gradient(circle, #6366f1 0 38%, transparent 42%); }
+.kit-wide .kit-pill .kit-dot { display: inline-block; width: 13px; height: 13px; border-radius: 9999px; border: 1.5px solid rgba(127,127,127,.6); flex-shrink: 0; }
+.kit-wide .kit-pill.kit-on { background: ${hexAlpha(KIT_EXPORT_PRIMARY, 0.08)}; border-color: ${KIT_EXPORT_PRIMARY}; }
+.kit-wide .kit-pill.kit-on .kit-dot { border-color: ${KIT_EXPORT_PRIMARY}; background: radial-gradient(circle, ${KIT_EXPORT_PRIMARY} 0 38%, transparent 42%); }
 .kit-wide select { width: 100%; padding: 8px 10px; }
 .kit-btn { font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.08); color: inherit; border-radius: 8px; padding: 6px 16px; text-decoration: none; display: inline-block; }
 .kit-btn:hover { background: rgba(127,127,127,.16); }
 .kitlight { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .kit-light-val { font-weight: 500; opacity: .6; font-size: .9em; }
-.kit-light-dot { width: 12px; height: 12px; border-radius: 999px; background: ${hexAlpha(DATA_PALETTE[scheme].gray.fill, 0.35)}; box-shadow: inset 0 0 0 1px ${DATA_STROKE}; }
+.kit-light-dot { width: 12px; height: 12px; border-radius: 9999px; background: ${hexAlpha(DATA_PALETTE[scheme].gray.fill, 0.35)}; box-shadow: inset 0 0 0 1px ${DATA_STROKE}; }
 ${statusLightCss(scheme)}
 .kitprogress { display: flex; flex-direction: column; gap: 6px; }
 .kit-prog-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .kit-prog-label { font-weight: 600; font-size: .92rem; }
 .kit-prog-val { font-variant-numeric: tabular-nums; opacity: .65; font-size: .9em; }
-.kit-prog-track { height: 8px; border-radius: 999px; background: rgba(127,127,127,.18); overflow: hidden; }
-.kit-prog-fill { height: 100%; border-radius: 999px; background: #6366f1; transition: width .25s ease; }
+.kit-prog-track { height: 8px; border-radius: 9999px; background: rgba(127,127,127,.18); overflow: hidden; }
+.kit-prog-fill { height: 100%; border-radius: 9999px; background: ${KIT_EXPORT_PRIMARY}; transition: width 180ms cubic-bezier(0.32,0.72,0,1); }
 .slider input[type=range] { vertical-align: middle; width: 60%; }
 .expr code { color: #4f46e5; }
 /* Long stringified readouts (arrays from live code) must wrap, not blow the

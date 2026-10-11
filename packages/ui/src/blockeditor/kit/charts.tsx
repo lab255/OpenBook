@@ -35,6 +35,7 @@ import {useDataScheme} from '@/lib/dataScheme';
 import {useOptionalData} from '@/data';
 import {useNavigation} from '@/providers';
 import {cn} from '@/lib/utils';
+import {readableTextColor} from '@/lib/presence';
 import {ellipsizeMeasured} from './chartLabels';
 
 /**
@@ -289,7 +290,7 @@ const PieDonut: React.FC<{value: unknown; labels: string[]; donut: boolean; pale
     <>
       {arcs.map((a, i) => (
         <Mark key={i} datum={{key: `slice-${i}`, label: slices[i].label, value: slices[i].value}} at={a.labelAt(donut ? r * 0.78 : r * 0.6)}>
-          <path d={a.path} fill={palette[i % palette.length]} stroke="hsl(var(--background, 0 0% 100%))" strokeWidth={1.5} />
+          <path d={a.path} fill={palette[i % palette.length]} stroke="hsl(var(--card))" strokeWidth={1.5} />
         </Mark>
       ))}
       <g className="obe-chart-legend">
@@ -338,7 +339,7 @@ const Funnel: React.FC<{value: unknown; labels: string[]; palette: string[]}> = 
           <Mark datum={{key: `row-${i}`, label: stages[i].label, value: stages[i].value}} at={{x: W / 2, y: 12 + r.y + r.height / 2}}>
             <rect x={PAD + r.x} y={12 + r.y} width={r.width} height={r.height} rx={4} fill={palette[i % palette.length]} opacity={0.85} />
           </Mark>
-          <text className="obe-chart-funnel-label" x={W / 2} y={12 + r.y + r.height / 2 + 4}>
+          <text fill={readableTextColor(palette[i % palette.length])} className="obe-chart-funnel-label" x={W / 2} y={12 + r.y + r.height / 2 + 4}>
             {stages[i].label} · {stages[i].value}
           </text>
         </g>

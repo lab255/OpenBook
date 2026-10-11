@@ -96,6 +96,15 @@ describe('reactive export from a block document', () => {
     expect(html).toContain('<span data-val>86</span>'); // best
     expect(html).toContain('data-status="ok"'); // status light colour
     expect(html).toContain('width:72%'); // progress fill
+    expect(html).toContain('.kit-pill.kit-on { background: #1f86db; border-color: #1f86db;');
+    expect(html).toContain('accent-color: #1f86db');
+    expect(html).toContain('background: rgba(31,134,219,0.08); border-color: #1f86db');
+    expect(html).toContain('border-radius: 9999px; background: #1f86db; transition: width 180ms cubic-bezier(0.32,0.72,0,1)');
+    // Only static styles: the bundled viewer also carries the out-of-scope data palette.
+    const staticCss = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
+    expect(staticCss).toBeTruthy();
+    expect(staticCss).not.toMatch(/#6366f1|rgba\(99,102,241/);
+
     expect(html).toContain('<figcaption class="chart-title">Baskets</figcaption>');
     expect(html).toContain('<svg'); // the kit chart is drawn at build time (first paint)
     expect(html).not.toContain('= <span data-val>—</span>'); // nothing left uncomputed

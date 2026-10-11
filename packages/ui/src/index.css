@@ -215,6 +215,7 @@
   }
 
   :root {
+    --obe-chart-ink-on-pale: #233246;
     /* DSX foundation: plain CSS tokens also travel with the standalone viewer. */
     --motion-fast: 120ms;
     --motion-base: 180ms;
@@ -414,6 +415,7 @@
   }
 
   .dark {
+    --obe-chart-ink-on-pale: #233246;
     --obe-select-wash: hsl(var(--ring) / 0.2);
     --obe-fg-gray: hsl(0 0% 66%);
     --obe-fg-brown: hsl(25 40% 62%);
@@ -2472,8 +2474,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: hsl(var(--muted) / 0.5);
-  border: 1px solid hsl(var(--border) / 0.7);
+  background: var(--obe-code-bg);
+  border: 1px solid var(--obe-code-border);
   border-radius: var(--radius-lg);
   padding: 0.5rem;
 }
@@ -3261,6 +3263,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 .obe-chart-svg-bare { border: none; border-radius: 0; background: none; }
 .obe-chart-grid line { stroke: hsl(var(--border) / 0.55); stroke-dasharray: 2 4; }
+/* stylelint-disable design-tokens/role-values -- SVG viewBox units, scaled with the plot */
 .obe-chart-grid text, .obe-chart-xlabels text, .obe-chart-legend text {
   font-size: 10px;
   fill: hsl(var(--muted-foreground));
@@ -3273,7 +3276,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-chart-center-label { fill: hsl(var(--muted-foreground)); font-size: 11px; }
 .obe-chart-legend text { text-anchor: start; font-size: 11px; }
 .obe-chart-msg { fill: hsl(var(--muted-foreground) / 0.8); font-size: 12px; text-anchor: middle; }
-.obe-chart-funnel-label { fill: hsl(var(--background)); font-size: 11px; font-weight: 600; text-anchor: middle; pointer-events: none; }
+.obe-chart-funnel-label { font-size: 11px; font-weight: 600; text-anchor: middle; pointer-events: none; }
 
 /* KPI / number tile (DASH-5) — the MetricCard look rendered in SVG. */
 .obe-chart-kpi-caption { fill: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-anchor: middle; text-transform: uppercase; }
@@ -3286,9 +3289,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* High-intensity cells are a near-opaque pale fill in BOTH themes, so the theme
    foreground ink washes out on them in dark mode — pin a dark ink that contrasts
    the pale fill regardless of theme. */
-.obe-chart-heat-label-strong { fill: #233246; }
+.obe-chart-heat-label-strong { fill: var(--obe-chart-ink-on-pale); }
 .obe-chart-heat-rowlabel { fill: hsl(var(--muted-foreground)); font-size: 11px; text-anchor: end; }
 .obe-chart-heat-empty { fill: hsl(var(--muted-foreground) / 0.08); }
+
+/* stylelint-enable design-tokens/role-values */
 
 /* ── Chart interactivity (DASH-2): hover tooltip, highlight, context menu ──── */
 .obe-chart-plot { position: relative; }
@@ -3324,7 +3329,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   background: hsl(var(--popover));
   color: hsl(var(--popover-foreground));
   box-shadow: var(--shadow-menu);
-  font-size: 0.72rem;
+  font-size: var(--obe-caption-size);
   line-height: 1.2;
   white-space: nowrap;
   pointer-events: none;
@@ -3676,6 +3681,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-family: var(--obe-font-mono);
   font-size: var(--obe-caption-size);
   color: hsl(var(--muted-foreground));
+}
+
+.obe-kit-status-value[data-error], .obe-kit-progress-value[data-error] {
+  color: hsl(var(--destructive));
+  font-family: inherit;
 }
 .obe-kit-progress-track {
   display: block;
