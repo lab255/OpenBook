@@ -33,6 +33,9 @@ export const isColorToken = (v: string | undefined | null): v is string => !!v &
  */
 type ExportColors = Record<string, {fg: string; bg: string; hl: string}>;
 
+/** Light-theme primary for static kit inputs and PDF first paint. */
+export const KIT_EXPORT_PRIMARY = '#1f86db';
+
 export const COLOR_EXPORT_HEX: ExportColors = {
   gray: {fg: '#737373', bg: '#8080801a', hl: '#8c8c8c47'},
   brown: {fg: '#835b3f', bg: '#b9764621', hl: '#bf75404d'},
