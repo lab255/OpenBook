@@ -2399,7 +2399,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   .obe-table-add { opacity: 1; }
 }
 
-.obe-kit-stepper:focus-within, .obe-kit-tags:focus-within, .obe-formula:focus-within {
+.obe-kit-stepper:has(input:focus), .obe-kit-tags:focus-within, .obe-formula:focus-within {
   border-color: hsl(var(--ring));
 }
 /* Block editor: keyboard focus visibility (a11y) */
@@ -2619,6 +2619,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-head {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0;
   min-width: 4.5rem;
 }
@@ -3219,7 +3220,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Chart */
 .obe-kit-chart { display: block; margin: 0; }
-.obe-kit-label, .obe-kit-chart-title {
+.obe-kit-label {
   font-size: var(--obe-caption-size);
   line-height: var(--obe-caption-leading);
   font-weight: 600;
@@ -3648,7 +3649,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Progress bar (display, no published value). */
 .obe-kit-progress { flex-direction: column; align-items: stretch; gap: 0.25rem; }
-.obe-kit-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.obe-kit-progress-head { padding-inline-end: var(--obe-gutter-btn); display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
 .obe-kit-progress-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-progress-value {
   font-family: var(--obe-font-mono);
