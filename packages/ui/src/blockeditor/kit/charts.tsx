@@ -138,14 +138,14 @@ export const Mark: React.FC<{datum: ChartDatum; at: ChartPoint; children: React.
 };
 
 /** Light horizontal grid + tick labels shared by the XY kinds. */
-const Grid: React.FC<{d: ReturnType<typeof extent>}> = ({d}) => (
+const Grid: React.FC<{d: ReturnType<typeof extent>; w?: number; h?: number; padL?: number}> = ({d, w = W, h = H, padL = PAD}) => (
   <g className="obe-chart-grid">
     {ticks(d).map((t) => {
-      const y = scale(t, d, H - PAD, PAD);
+      const y = scale(t, d, h - PAD, PAD);
       return (
         <g key={t}>
-          <line x1={PAD} x2={W - PAD} y1={y} y2={y} />
-          <text x={PAD - 6} y={y + 3}>
+          <line x1={padL} x2={w - PAD} y1={y} y2={y} />
+          <text x={padL - 6} y={y + 3}>
             {axisTickLabel(t)}
           </text>
         </g>
@@ -182,13 +182,13 @@ const SeriesLegend: React.FC<{series: Array<{name: string}>; palette: string[]; 
 };
 
 /** X-axis labels under the plot, when the block provides them. */
-const XLabels: React.FC<{labels: string[]; n: number}> = ({labels, n}) => {
+const XLabels: React.FC<{labels: string[]; n: number; w?: number; h?: number; padL?: number}> = ({labels, n, w = W, h = H, padL = PAD}) => {
   if (labels.length === 0 || n === 0) return null;
-  const span = W - PAD * 2;
+  const span = w - padL - PAD;
   return (
     <g className="obe-chart-xlabels">
       {labels.slice(0, n).map((l, i) => (
-        <text key={i} x={n === 1 ? W / 2 : PAD + (i / (n - 1)) * span} y={H - 8}>
+        <text key={i} x={n === 1 ? (padL + w - PAD) / 2 : padL + (i / (n - 1)) * span} y={h - 8}>
           {l}
         </text>
       ))}
@@ -386,23 +386,23 @@ const matrixColor = (m: ChartMatrixInput, item: {key: string; color?: string}, i
  * segment/bar is a {@link Mark} carrying its rows + group/series highlight tags,
  * so the shared scaffold gives hover, highlight, tooltip, and click-to-drill.
  */
-const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({matrix, palette}) => {
+const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]; w?: number; h?: number; padL?: number}> = ({matrix, palette, w = W, h = H, padL = PAD}) => {
   const {groups, series, stacked, percent} = matrix;
   if (groups.length === 0) return null;
   const max = Math.max(1, ...groups.map((g) => g.total));
   const n = groups.length;
-  const groupW = (W - PAD * 2) / n;
+  const groupW = (w - padL - PAD) / n;
   const barW = Math.max(groupW * 0.62, 2);
-  const track = H - PAD * 2;
+  const track = h - PAD * 2;
   const seriesColorOf = (seriesKey: string): string => {
     const si = series.findIndex((s) => s.key === seriesKey);
     return matrixColor(matrix, series[si] ?? {key: seriesKey}, si, palette);
   };
   return (
     <>
-      <Grid d={extent([0, max])} />
+      <Grid d={extent([0, max])} w={w} h={h} padL={padL} />
       {groups.map((g, gi) => {
-        const cx = PAD + gi * groupW + groupW / 2;
+        const cx = padL + gi * groupW + groupW / 2;
         const x = cx - barW / 2;
         const denom = percent ? g.total || 1 : max;
         // Stack the segments bottom-up; a no-breakdown group is one full bar.
@@ -411,9 +411,9 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({ma
         return (
           <g key={g.key}>
             {segs.map((seg) => {
-              const h = (seg.value / denom) * track;
-              const yTop = H - PAD - (acc + h);
-              acc += h;
+              const barH = (seg.value / denom) * track;
+              const yTop = h - PAD - (acc + barH);
+              acc += barH;
               const s = series.find((x) => x.key === seg.seriesKey);
               const label = stacked && s?.label ? `${g.label} · ${s.label}` : g.label;
               const fill = stacked ? seriesColorOf(seg.seriesKey) : matrixColor(matrix, g, gi, palette);
@@ -423,7 +423,7 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({ma
                   datum={{key: stacked ? `${g.key}::${seg.seriesKey}` : g.key, label, value: seg.value, rows: seg.rows, tags: [g.key, seg.seriesKey]}}
                   at={{x: cx, y: yTop}}
                 >
-                  <rect x={x} y={yTop} width={barW} height={Math.max(h, 1)} rx={2} fill={fill} />
+                  <rect x={x} y={yTop} width={barW} height={Math.max(barH, 1)} rx={2} fill={fill} />
                 </Mark>
               );
             })}
@@ -441,7 +441,7 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({ma
           const label = g.label ?? '';
           const shown = ellipsize(label, Math.max(3, Math.floor(groupW / 6)));
           return (
-            <text key={g.key} x={PAD + i * groupW + groupW / 2} y={H - 8}>
+            <text key={g.key} x={padL + i * groupW + groupW / 2} y={h - 8}>
               {shown}
               {shown !== label && <title>{label}</title>}
             </text>
@@ -835,6 +835,7 @@ export interface ChartRenderArgs {
   editor?: BlockEditorController;
   /** SVG viewBox dimensions, so a kind can place its own overlays. */
   width?: number;
+  padLeft?: number;
   height?: number;
 }
 
@@ -903,8 +904,8 @@ registerChartKind({
 registerChartKind({
   kind: 'bar',
   label: 'bar',
-  render: ({value, labels, palette, matrix}) =>
-    matrix ? <MatrixBars matrix={matrix} palette={palette} /> : <Bars value={value} labels={labels} palette={palette} />,
+  render: ({value, labels, palette, matrix, width, height, padLeft}) =>
+    matrix ? <MatrixBars matrix={matrix} palette={palette} w={width} h={height} padL={padLeft} /> : <Bars value={value} labels={labels} palette={palette} />,
 });
 registerChartKind({
   kind: 'pie',
@@ -1249,6 +1250,7 @@ export interface KitChartPlotProps {
   /** viewBox width/height. Default 640×240 (the wide plot); the DB pie passes a square box. */
   viewW?: number;
   viewH?: number;
+  padLeft?: number;
   /** Drop the SVG's own border/radius/card background. The DB chart-views wrap
    *  the plot in their own readout card, so the default frame would nest a second
    *  concentric border inside it — a bare plot avoids the double frame (DASH-4). */
@@ -1278,6 +1280,7 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
   ariaLabel,
   viewW = W,
   viewH = H,
+  padLeft = PAD,
   frameless = false,
   message,
   block,
@@ -1386,7 +1389,7 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
         {message}
       </text>
     ) : (
-      def.render({value, labels, palette, interactions, matrix, active: active?.datum ?? null, block, editor, width: viewW, height: viewH})
+      def.render({value, labels, palette, interactions, matrix, active: active?.datum ?? null, block, editor, width: viewW, height: viewH, padLeft})
     );
 
   return (

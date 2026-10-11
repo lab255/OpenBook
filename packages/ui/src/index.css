@@ -3238,6 +3238,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 }
 /* Borderless plot: the DB chart-views wrap the plot in their own readout card,
    so the default frame would nest a second concentric border (DASH-4). */
+.ob-db-chart .obe-chart-grid text,
+.ob-db-chart .obe-chart-xlabels text {
+  font-size: var(--obe-caption-size);
+}
+
 .obe-chart-svg-bare { border: none; border-radius: 0; background: none; }
 .obe-chart-grid line { stroke: hsl(var(--border) / 0.55); stroke-dasharray: 2 4; }
 .obe-chart-grid text, .obe-chart-xlabels text, .obe-chart-legend text {

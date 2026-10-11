@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useLayoutEffect, useRef, useState} from 'react';
 import {X} from 'lucide-react';
 import {
   aggregateMatrix,
@@ -39,6 +39,7 @@ const fmt = (n: number): string => {
 
 /** Square viewBox for the DB pie/sunburst — the kit's default box is wide (640×240). */
 const PIE_SIZE = 240;
+const CHART_H = 240;
 
 /** Human label for the view's measure, e.g. `Count` or `Sum of Cost`. */
 const measureLabel = (view: DbView, properties: DatabaseProperty[]): string => {
@@ -140,6 +141,17 @@ export const BarChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
   const [readout, setReadout] = useState<Hover>(null);
   // The series lit from the breakdown legend — passed to the plot to dim the rest.
   const [legendKey, setLegendKey] = useState<string | null>(null);
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = useState(640);
+  useLayoutEffect(() => {
+    const node = plotRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setPlotWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [view.groupByPropertyId, db.visibleRows.length]);
   if (!view.groupByPropertyId) return <ViewSetupCard kind="chart" db={db} view={view} properties={properties} />;
 
   const {groups, series} = aggregateMatrix(db.visibleRows, view, properties);
@@ -154,17 +166,22 @@ export const BarChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
         {groups.length === 0 ? (
           <NoData />
         ) : (
-          <KitChartPlot
-            kind="bar"
-            matrix={matrix}
-            palette={paletteFor(scheme)}
-            ariaLabel="Bar chart"
-            frameless
-            mode="action"
-            highlightKey={legendKey}
-            onSelect={(d: ChartDatum) => setDrill({title: d.label, rows: d.rows ?? []})}
-            onActiveChange={(d: ChartDatum | null) => setReadout(d ? {label: d.label, value: d.value} : null)}
-          />
+          <div ref={plotRef} className="ob-db-chart">
+            <KitChartPlot
+              viewW={plotWidth}
+              viewH={Math.min(CHART_H, Math.round(plotWidth * 240 / 640))}
+              padLeft={40}
+              kind="bar"
+              matrix={matrix}
+              palette={paletteFor(scheme)}
+              ariaLabel="Bar chart"
+              frameless
+              mode="action"
+              highlightKey={legendKey}
+              onSelect={(d: ChartDatum) => setDrill({title: d.label, rows: d.rows ?? []})}
+              onActiveChange={(d: ChartDatum | null) => setReadout(d ? {label: d.label, value: d.value} : null)}
+            />
+          </div>
         )}
         {stacked && groups.length > 0 && (
           <SeriesLegend
