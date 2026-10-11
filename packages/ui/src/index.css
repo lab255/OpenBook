@@ -3328,7 +3328,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-status-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-status-value {
   font-family: var(--obe-font-mono);
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
 }
 
@@ -3652,7 +3652,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-progress-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-progress-value {
   font-family: var(--obe-font-mono);
-  font-size: 0.8rem;
+  font-size: var(--obe-caption-size);
   color: hsl(var(--muted-foreground));
 }
 .obe-kit-progress-track {
