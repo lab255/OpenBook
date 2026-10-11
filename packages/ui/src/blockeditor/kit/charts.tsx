@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
   CHART_TOTAL_SERIES,
   PARENT_GROUP_ID,
@@ -36,6 +36,7 @@ import {useDataScheme} from '@/lib/dataScheme';
 import {useOptionalData} from '@/data';
 import {useNavigation} from '@/providers';
 import {cn} from '@/lib/utils';
+import {ellipsizeMeasured} from './chartLabels';
 
 /**
  * The kit's chart block: one block, many kinds (line, area, bar, pie, donut,
@@ -68,9 +69,7 @@ export const fmtChartValue = (n: number): string =>
 /** SVG coord → clamped percentage of a span, so an overlay stays inside the plot. */
 const pctIn = (v: number, span: number, min = 6, max = 94): number => Math.max(min, Math.min(max, (v / span) * 100));
 
-/** Truncate a label to `max` chars with an ellipsis (drives the DB bar x-labels,
- *  which have no truncation of their own — a long/many-group label set overflows
- *  otherwise). Returns the original when it already fits. */
+/** Character-budget truncation for the kit's default labels. */
 const ellipsize = (label: string, max: number): string =>
   label.length > max ? `${label.slice(0, Math.max(1, max - 1)).trimEnd()}…` : label;
 
@@ -380,6 +379,52 @@ export interface ChartMatrixInput {
 const matrixColor = (m: ChartMatrixInput, item: {key: string; color?: string}, index: number, palette: string[]): string =>
   m.colorOf?.(item, index) ?? palette[index % palette.length];
 
+const MatrixBarLabels: React.FC<{groups: ChartGroup[]; groupW: number; padL: number; h: number}> = ({groups, groupW, padL, h}) => {
+  const container = useRef<SVGGElement>(null);
+  const measurer = useRef<SVGTextElement | null>(null);
+  const [labels, setLabels] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    const parent = container.current;
+    if (!parent) return;
+    // Reuse one SVG text node in the actual label container so CSS, inherited
+    // font metrics and letter spacing match the visible captions exactly.
+    const text = measurer.current ??= document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    if (typeof text.getComputedTextLength !== 'function') return;
+    text.setAttribute('visibility', 'hidden');
+    let active = true;
+    const update = (): void => {
+      if (!active) return;
+      parent.appendChild(text);
+      try {
+        setLabels(groups.map((g) => ellipsizeMeasured(g.label ?? '', groupW - 4, (label) => {
+          text.textContent = label;
+          return text.getComputedTextLength();
+        })));
+      } finally {
+        text.remove();
+      }
+    };
+    update();
+    // Remeasure if a web font replaces the initial fallback font.
+    void document.fonts?.ready.then(update);
+    return () => { active = false; };
+  }, [groups, groupW]);
+  return (
+    <g ref={container} className="obe-chart-xlabels">
+      {groups.map((g, i) => {
+        const label = g.label ?? '';
+        const shown = labels[i] ?? label;
+        return (
+          <text key={g.key} x={padL + i * groupW + groupW / 2} y={h - 8}>
+            {shown}
+            {shown !== label && <title>{label}</title>}
+          </text>
+        );
+      })}
+    </g>
+  );
+};
+
 /**
  * Vertical bars from a {@link ChartMatrixInput}: one column per group, stacked
  * into its breakdown segments (or a single total bar without a breakdown). Every
@@ -430,24 +475,8 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]; w?: num
           </g>
         );
       })}
-      {/* X-labels: the DB bar has no truncation of its own, so long/many-group
-          labels collide or overflow. Truncate each to its column width (budget
-          scales with `groupW`, so labels shrink as groups multiply and never
-          collide) with a hover <title> carrying the full text. Kept horizontal
-          and centred — angled labels clip against the fixed-height viewBox — and
-          identical to the flat `Bars` + static export so all three read alike. */}
-      <g className="obe-chart-xlabels">
-        {groups.map((g, i) => {
-          const label = g.label ?? '';
-          const shown = ellipsize(label, Math.max(3, Math.floor(groupW / 7.5)));
-          return (
-            <text key={g.key} x={padL + i * groupW + groupW / 2} y={h - 8}>
-              {shown}
-              {shown !== label && <title>{label}</title>}
-            </text>
-          );
-        })}
-      </g>
+      {/* Measure horizontal captions in their rendered font, reserving a 4px gap. */}
+      <MatrixBarLabels groups={groups} groupW={groupW} padL={padL} h={h} />
     </>
   );
 };
