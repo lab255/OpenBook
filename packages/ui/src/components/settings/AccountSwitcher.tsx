@@ -1,4 +1,4 @@
-import {STATUS_INK_CLASS} from '@/lib/statusStyles';
+import {STATUS_INK_CLASS, STATUS_DOT_CLASS} from '@/lib/statusStyles';
 import {ArrowPathIcon, ArrowTopRightOnSquareIcon, PlusIcon} from '@heroicons/react/24/outline';
 import {CheckIcon} from '@radix-ui/react-icons';
 import {Trash2} from 'lucide-react';
@@ -206,7 +206,7 @@ function StatusPill({active, status}: {active: boolean; status: AccountStatus}) 
     );
   }
   const tone: Record<'syncing' | 'error' | 'live', {dot: string; text: string; label: string}> = {
-    syncing: {dot: 'bg-amber-500 animate-pulse', text: STATUS_INK_CLASS.warn, label: t('account.switcher.syncing')},
+    syncing: {dot: cn(STATUS_DOT_CLASS.warn, 'animate-pulse'), text: STATUS_INK_CLASS.warn, label: t('account.switcher.syncing')},
     error: {dot: 'bg-destructive', text: 'text-destructive', label: t('account.switcher.error')},
     live: {dot: 'bg-brand', text: 'text-brand', label: t('account.switcher.active')},
   };
