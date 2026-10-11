@@ -42,7 +42,7 @@ const StatusLightBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
           ariaLabel="Status label"
           onCommit={(v) => set(editor, block, 'label', v)}
         />
-        <span className="obe-kit-status-value">{error ? `⚠ ${error}` : formatValue(value)}</span>
+        <span className="obe-kit-status-value" data-error={error ? true : undefined}>{error ? `⚠ ${error}` : formatValue(value)}</span>
       </>}
       config={
         <div className="flex flex-col gap-3">

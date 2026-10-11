@@ -1,3 +1,6 @@
+// @ts-expect-error -- Vitest runs in Node; the browser package omits Node ambient types.
+import {readFileSync} from 'node:fs';
+import {readableTextColor} from '@/lib/presence';
 import {describe, it, expect, afterEach, beforeAll, vi} from 'vitest';
 import {render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
 import {createDoc, rootBlocks, type BlockMap} from '../../model';
@@ -273,4 +276,16 @@ describe('additive render contract — no interactions', async () => {
     expect(container.querySelectorAll('.obe-chart-mark').length).toBe(0);
     expect(container.querySelector('.obe-chart-kpi-value')?.textContent).toBe('82');
   });
+});
+
+it('funnel labels use per-stage readable ink without a CSS fill override', () => {
+  const palette = ['#1b2a4a', '#e4a33c'];
+  const {container} = render(<KitChartPlot kind="funnel" value={[10, 5]} labels={['Visit', 'Won']} palette={palette} ariaLabel="Funnel" />);
+  const labels = container.querySelectorAll('.obe-chart-funnel-label');
+  expect(labels).toHaveLength(2);
+  labels.forEach((label, i) => expect(label.getAttribute('fill')).toBe(readableTextColor(palette[i])));
+  const css: string = readFileSync('src/index.css', 'utf8');
+  const rule = css.match(/\.obe-chart-funnel-label\s*\{([^}]+)\}/)?.[1];
+  expect(rule).toBeTruthy();
+  expect(rule).not.toMatch(/\bfill\s*:/);
 });

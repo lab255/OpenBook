@@ -43,7 +43,7 @@ const ProgressBarBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
             ariaLabel="Progress label"
             onCommit={(v) => set(editor, block, 'label', v)}
           />
-          <span className="obe-kit-progress-value">{readout}</span>
+          <span className="obe-kit-progress-value" data-error={error ? true : undefined}>{readout}</span>
         </span>
         <span className="obe-kit-progress-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
           <span className="obe-kit-progress-fill" style={{width: `${pct}%`}} />
