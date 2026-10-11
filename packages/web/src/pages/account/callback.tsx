@@ -45,6 +45,7 @@ export default function AccountCallback() {
         font: '15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
       }}
     >
+      {/* eslint-disable-next-line tailwind/no-palette-color -- standalone OAuth callback page, no app stylesheet */}
       <p style={{color: '#6b6b6b'}}>{message}</p>
     </main>
   );

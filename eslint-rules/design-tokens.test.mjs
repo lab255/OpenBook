@@ -14,7 +14,9 @@ tester.run('no-arbitrary-motion', noArbitraryMotion, {
     {code: 'const menuClass = `duration-200 ${active}`;', errors: [{messageId: 'token'}]}],
 });
 tester.run('no-palette-color', noPaletteColor, {
-  valid: [jsx('bg-muted text-muted-foreground bg-[var(--data-red)] text-[hsl(var(--foreground))]'), '<div style={{color: "var(--obe-code-num)"}} />', '<div title="#ffffff" />'],
+  valid: [jsx('bg-[var(--data-green-chip-bg)] text-[var(--data-green-chip-fg)]'),
+    jsx('bg-[color-mix(in_srgb,var(--data-green-chip-bg)_50%,transparent)]'),
+    jsx('bg-muted text-muted-foreground bg-[var(--data-red)] text-[hsl(var(--foreground))]'), '<div style={{color: "var(--obe-code-num)"}} />', '<div title="#ffffff" />'],
   invalid: [...invalid(['dark:bg-red-500/20', 'text-slate-100', 'border-t-blue-300', 'bg-[#fff]', 'text-[rgb(0,0,0)]', 'bg-[hsl(0_0%_0%)]']),
     {code: '<div style={{color: "#fff"}} />', errors: [{messageId: 'token'}]},
     {code: '<div style={{borderColor: "rgb(0,0,0)"}} />', errors: [{messageId: 'token'}]}],

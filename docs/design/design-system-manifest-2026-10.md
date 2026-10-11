@@ -209,7 +209,7 @@ reference the palette by name.
 
 Decision: **variant tints are the editor palette's block-background tints**; the default
 (info) variant is the theme neutral. No border (the reference editor's callout is a
-borderless tinted panel; borders double up with block-bg colours); warning tints also serve app warning notes.
+borderless tinted panel; borders double up with block-bg colours); warning tints also serve app warning notes and banners (`WARN_SURFACE_CLASS`: tint + `--foreground` text + `--obe-fg-yellow` icon; borderless; full-bleed banners keep a `--border` separator).
 
 | Token | Maps to | Light | Dark | `--foreground` on it (L / D) |
 |---|---|---|---|---:|
@@ -273,7 +273,7 @@ The scale (:131-145) is complete; this section only governs use.
 | Source | `blockeditor/colors.ts` (`COLOR_TOKENS`, 9) + `--obe-fg/bg/hl-*` | `sdk/src/dataColors.ts` (12 tokens × pastel/vivid/muted) + `lib/dataColorVars.ts` (`--data-*`) |
 | Meaning | **Authored emphasis** stored in the document | **Encodes data**: category, series, status |
 | Chosen by | The author (persisted per block/run) | The viewer's appearance preference |
-| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers; board column tint = chip-bg at 50% via color-mix |
+| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers; board column tint = chip-bg at 50% via color-mix; app status inks, status chips/badges, status dots, diff marks (added/changed/removed), identity monograms + dataflow kind chips (via `DATA_CHIP_CLASS` / `STATUS_*_CLASS`) |
 
 **Rule:** if the colour carries meaning *about data*, it reads `--data-*`; if it is
 emphasis an author placed on prose or a block, it reads `--obe-*`. Never cross:
@@ -419,12 +419,12 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
 | Font size (editor) | `declaration-property-value-allowed-list` `font-size` in `.obe-*` | `var(--obe-*-size)`, `var(--obe-code-inline)`, `inherit`, `em` ≤ 1 | other literals | ~120 |
 | Reduced-motion blocks | assert script counts `prefers-reduced-motion: reduce` occurrences | the global block + listed end-state exceptions (§2.3) | any other | 4 |
 
-### 10.2 ESLint (TSX, `packages/ui/src`, `packages/web/src`)
+### 10.2 ESLint (TSX, `packages/ui/src`, `packages/web/src`, `packages/app/src`)
 
 | Rule (new file in `eslint-rules/`) | Flags | Allowed | Baseline |
 |---|---|---|---:|
 | `tailwind/no-arbitrary-motion` | `duration-<n>`, `duration-[…]`, `delay-<n>`, `ease-(in|out|in-out|linear)`, `ease-[…]`, `animate-[…]`, raw `zoom-in-95`/`zoom-out-95` outside the shared overlay constant | `duration-(--motion-*)`, `ease-out-soft`, `ease-in-out-soft`, `ease-spring` (switch files only), bare `transition*` (reads the retuned default) | 13 durations + 3 easings + 15 files with raw zoom |
-| `tailwind/no-palette-color` | Tailwind palette literals `(bg|text|border|ring|fill|stroke|outline|from|via|to|decoration|caret|accent)-(slate|gray|…|rose)-\d{2,3}`, arbitrary colour brackets `-[#…]`/`-[rgb(…)]`/`-[hsl(<digit>…)]`, and hex/rgb literals in JSX `style={{…}}` colour keys | semantic utilities (`bg-muted`, `text-muted-foreground`, …), `var(--data-*)` via `dataColorVars` helpers, `var(--obe-*)` | 208 palette utilities |
+| `tailwind/no-palette-color` | Tailwind palette literals `(bg|text|border|ring|fill|stroke|outline|from|via|to|decoration|caret|accent)-(slate|gray|…|rose)-\d{2,3}`, arbitrary colour brackets `-[#…]`/`-[rgb(…)]`/`-[hsl(<digit>…)]`, and hex/rgb literals in JSX `style={{…}}` colour keys | semantic utilities (`bg-muted`, `text-muted-foreground`, …), `var(--data-*)` via `dataColorVars` helpers, `var(--obe-*)` | 0 (**error**; 2 described disables: Windows caption close, standalone OAuth callback) |
 | `tailwind/no-raw-z` | `z-<n>`, `z-[…]` | named tiers (`z-menu`, `z-overlay`, …) | 43 |
 
 ---
@@ -437,6 +437,7 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
 | F2 | **Dead CSS:** `index.css:727-930` (`.block-callout/-accordion/-divider/-button/-toc`) has no TS/TSX consumer in any package. Delete (removes a fourth placeholder alpha and literal callout hues). | foundation |
 | F3 | **Editor palette contrast:** `.obe-fg-orange` (4.08) and `.obe-fg-yellow` (3.92) fail 4.5:1 as text on the light page; `COLOR_EXPORT_HEX` (`colors.ts:35`) has drifted from the CSS values (e.g. gray `#6b7280` vs `hsl(0 0% 45%)` `#737373`). §5.1 hoists values verbatim; the fix belongs to a palette audit (open question 3). | foundation / palette |
 | F4 | `.obe-gutter` comment (:1024) references "`.obe-row`'s top padding" that no longer exists (`padding: 0` :981). Removed by §8.2. | chrome family |
+| DSX-8 F1 | **Destructive text contrast:** `--destructive` is 4.36:1 on white and 4.01 on muted; dark 3.47 and 3.09 on popover. This affects app-wide error text, TrashList and Diagnostics bad status. Retune foundation light L 53% → about 48%, dark L 52% → about 62%, then re-run `sidebar-accent-contrast` and `lib/__tests__/themes.test.ts`. Outside the palette-literal sweep. | foundation |
 
 ---
 
