@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it} from 'vitest';
 import {cleanup, render} from '@testing-library/react';
+// @ts-expect-error -- node:fs is available to Vitest, not the browser package.
 import {readdirSync, readFileSync} from 'node:fs';
 import {createDoc, rootBlocks} from '../../model';
 import type {BlockEditorController} from '../../useBlockEditor';
@@ -57,7 +58,7 @@ describe('display blocks share KitFrame', () => {
   });
   it('only the shared frame owns settings within the kit family', () => {
     const dir = 'src/blockeditor/kit/';
-    const owners = readdirSync(dir).filter((file) => file.endsWith('.tsx') && readFileSync(dir + file, 'utf8').includes('KitSettings'));
+    const owners = readdirSync(dir).filter((file: string) => file.endsWith('.tsx') && readFileSync(dir + file, 'utf8').includes('KitSettings'));
     expect(owners.sort()).toEqual(['KitFrame.tsx', 'KitSettings.tsx']);
   });
 });

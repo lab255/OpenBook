@@ -1514,36 +1514,36 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       as="figure" labelKey="title" symbol={false} headerPlaceholder="Chart title"
       hideEmptyHeaderWhenLocked rootProps={{'data-chart-kind': kind}}
       control={
-      <KitChartPlot
-        kind={kind}
-        value={value}
-        labels={effectiveLabels}
-        palette={palette}
-        ariaLabel={title || `${kind} chart`}
-        message={message}
-        block={block}
-        editor={editor}
-        menuExtra={
-          canChangeKind
-            ? () => (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <BarChart3 className="mr-2 h-4 w-4" /> Change chart kind
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup value={kind} onValueChange={(k) => setProp(editor, block, 'kind', k)}>
-                    {chartKinds().map((k) => (
-                      <DropdownMenuRadioItem key={k.kind} value={k.kind}>
-                        {k.label}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )
-            : undefined
-        }
-      />
+        <KitChartPlot
+          kind={kind}
+          value={value}
+          labels={effectiveLabels}
+          palette={palette}
+          ariaLabel={title || `${kind} chart`}
+          message={message}
+          block={block}
+          editor={editor}
+          menuExtra={
+            canChangeKind
+              ? () => (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <BarChart3 className="mr-2 h-4 w-4" /> Change chart kind
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup value={kind} onValueChange={(k) => setProp(editor, block, 'kind', k)}>
+                      {chartKinds().map((k) => (
+                        <DropdownMenuRadioItem key={k.kind} value={k.kind}>
+                          {k.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )
+              : undefined
+          }
+        />
       }
       config={
         <div className="flex flex-col gap-3">

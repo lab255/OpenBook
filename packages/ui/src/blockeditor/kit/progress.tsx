@@ -34,20 +34,20 @@ const ProgressBarBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   return (
     <KitFrame block={block} editor={editor} kind="progress" defaultName="Progress" symbol={false} hideHeader rootProps={{'data-progress': pct}}
       control={<>
-      <span className="obe-kit-progress-head">
-        <KitInlineText
-          className="obe-kit-progress-label"
-          value={label}
-          placeholder="Progress"
-          readOnly={editor.readOnly}
-          ariaLabel="Progress label"
-          onCommit={(v) => set(editor, block, 'label', v)}
-        />
-        <span className="obe-kit-progress-value">{readout}</span>
-      </span>
-      <span className="obe-kit-progress-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-        <span className="obe-kit-progress-fill" style={{width: `${pct}%`}} />
-      </span>
+        <span className="obe-kit-progress-head">
+          <KitInlineText
+            className="obe-kit-progress-label"
+            value={label}
+            placeholder="Progress"
+            readOnly={editor.readOnly}
+            ariaLabel="Progress label"
+            onCommit={(v) => set(editor, block, 'label', v)}
+          />
+          <span className="obe-kit-progress-value">{readout}</span>
+        </span>
+        <span className="obe-kit-progress-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+          <span className="obe-kit-progress-fill" style={{width: `${pct}%`}} />
+        </span>
       </>}
       config={
         <div className="flex flex-col gap-3">

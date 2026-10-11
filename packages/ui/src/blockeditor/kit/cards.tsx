@@ -33,16 +33,16 @@ const StatusLightBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   return (
     <KitFrame block={block} editor={editor} kind="status" defaultName="Status" symbol={false} hideHeader rootProps={{'data-status': status}}
       control={<>
-      <span className={`obe-kit-light obe-kit-light-${status}`} aria-hidden />
-      <KitInlineText
-        className="obe-kit-status-label"
-        value={label}
-        placeholder="Status"
-        readOnly={editor.readOnly}
-        ariaLabel="Status label"
-        onCommit={(v) => set(editor, block, 'label', v)}
-      />
-      <span className="obe-kit-status-value">{error ? `⚠ ${error}` : formatValue(value)}</span>
+        <span className={`obe-kit-light obe-kit-light-${status}`} aria-hidden />
+        <KitInlineText
+          className="obe-kit-status-label"
+          value={label}
+          placeholder="Status"
+          readOnly={editor.readOnly}
+          ariaLabel="Status label"
+          onCommit={(v) => set(editor, block, 'label', v)}
+        />
+        <span className="obe-kit-status-value">{error ? `⚠ ${error}` : formatValue(value)}</span>
       </>}
       config={
         <div className="flex flex-col gap-3">
@@ -84,24 +84,24 @@ const TooltipCardBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   return (
     <KitFrame block={block} editor={editor} kind="tooltip" defaultName="Tooltip" symbol={false} hideHeader labelKey="term"
       control={<>
-      <span className="obe-kit-term" tabIndex={0}>
-        <KitInlineText
-          className="obe-kit-term-text"
-          value={term}
-          placeholder="Term"
-          readOnly={editor.readOnly}
-          ariaLabel="Term"
-          onCommit={(v) => set(editor, block, 'term', v)}
-        />
-        <span className="obe-kit-term-mark" aria-hidden>
+        <span className="obe-kit-term" tabIndex={0}>
+          <KitInlineText
+            className="obe-kit-term-text"
+            value={term}
+            placeholder="Term"
+            readOnly={editor.readOnly}
+            ariaLabel="Term"
+            onCommit={(v) => set(editor, block, 'term', v)}
+          />
+          <span className="obe-kit-term-mark" aria-hidden>
           ?
-        </span>
-        {tip && (
-          <span role="tooltip" className="obe-kit-tip">
-            {tip}
           </span>
-        )}
-      </span>
+          {tip && (
+            <span role="tooltip" className="obe-kit-tip">
+              {tip}
+            </span>
+          )}
+        </span>
       </>}
       config={
         <div className="flex flex-col gap-3">
@@ -128,11 +128,11 @@ const LinkCardBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   return (
     <KitFrame block={block} editor={editor} kind="linkcard-wrap" defaultName="Link card" symbol={false} hideHeader labelKey="title"
       control={<>
-      <a className="obe-kit-linkcard" href={href || undefined} target="_blank" rel="noreferrer" aria-disabled={!href} tabIndex={href ? undefined : -1}>
-        <span className="obe-kit-linkcard-title">{title}</span>
-        {description && <span className="obe-kit-linkcard-desc">{description}</span>}
-        {url && <span className="obe-kit-linkcard-url">{url.replace(/^https?:\/\//, '')}</span>}
-      </a>
+        <a className="obe-kit-linkcard" href={href || undefined} target="_blank" rel="noreferrer" aria-disabled={!href} tabIndex={href ? undefined : -1}>
+          <span className="obe-kit-linkcard-title">{title}</span>
+          {description && <span className="obe-kit-linkcard-desc">{description}</span>}
+          {url && <span className="obe-kit-linkcard-url">{url.replace(/^https?:\/\//, '')}</span>}
+        </a>
       </>}
       config={
         <div className="flex flex-col gap-3">
