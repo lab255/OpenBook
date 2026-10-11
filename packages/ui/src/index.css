@@ -247,6 +247,8 @@
     --obe-chrome-active: var(--hover-strong);
     --obe-focus-ring: 2px solid hsl(var(--ring));
     --obe-focus-offset: 2px;
+    --obe-drop: hsl(var(--primary));
+    --obe-drag-dim: 0.4;
     --obe-columns-gap: 28px;
     --obe-title-size: calc(var(--obe-font-size) * 2.5);
     --obe-title-leading: 1.2;
@@ -947,8 +949,8 @@ tr[data-row-anchor][data-selected] > td {
 }
 .obe-row[data-block-type='table']:has(.obe-has-grips) {
   /* End the block handle above the first row grip; both remain draggable. */
-  --obe-lead-offset: calc(var(--obe-block-pad-y) - var(--obe-gutter-clear));
-  --obe-lead-line: var(--obe-line);
+  --obe-lead-offset: calc(var(--obe-row-space-above, 0px) + var(--obe-block-pad-y) + var(--obe-table-grip-top) - var(--obe-gutter-btn));
+  --obe-lead-line: var(--obe-gutter-btn);
 }
 .obe-row[data-block-type='code'] {
   /* Border, inner pad, action row, divider, and its spacing. */
@@ -1939,6 +1941,17 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-group-btn:hover:not(:disabled) { color: hsl(var(--foreground)); background: var(--hover); }
 .obe-group-btn-on { color: hsl(var(--primary)); }
 .obe-group-body { padding: var(--obe-block-pad-y) var(--obe-cnt-inset); }
+/* Editable tables first below a header rule need room for their block handle. */
+.obe-group-body > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips),
+.obe-cnt-panel > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips) {
+  padding-top: 12px;
+  --obe-row-space-above: 12px;
+}
+/* Keep the normal table inset inside the selection slab, below the space above. */
+.obe-group-body > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips) > .obe-blockbody,
+.obe-cnt-panel > .obe-row[data-block-type='table']:first-child:has(.obe-has-grips) > .obe-blockbody {
+  padding-top: var(--obe-block-pad-y);
+}
 /* Exported groups (static HTML). */
 .obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: var(--radius-lg); padding: var(--obe-block-pad-y) var(--obe-cnt-inset); margin: 0.75rem 0; }
 .dark .obe-x-group, .dark .obe-x-section { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
@@ -1952,11 +1965,18 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-x-plugin > p.obe-x-plugin-text { margin-top: 0.5rem; }
 
 /* Tables */
-.obe-table-wrap { flex: 1; min-width: 0; position: relative; padding: 0 0 16px 0; }
+.obe-row[data-block-type='table'] {
+  --obe-table-pad-y: 6px;
+  --obe-table-pad-x: 8px;
+  --obe-table-line: calc(var(--obe-small-size) * var(--obe-small-leading));
+  --obe-table-grip-top: calc(var(--obe-table-pad-y) + (var(--obe-table-line) - var(--obe-gutter-btn)) / 2);
+}
+.obe-table-wrap { flex: 1; min-width: 0; position: relative; padding: 0; }
 .obe-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-table-line);
 }
 /* TBL-12 — fixed only after a width is stored; auto columns share the fluid remainder. */
 .obe-table-fixed { table-layout: fixed; width: 100%; }
@@ -1984,41 +2004,27 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   vertical-align: top;
   min-width: 4rem;
 }
-.obe-table td .obe-text { padding: 4px 8px; }
+.obe-table td .obe-text { padding: var(--obe-table-pad-y) var(--obe-table-pad-x); }
 .obe-table-header td {
   font-weight: 600;
 }
-.obe-table-header td .obe-text { padding-block: 6px; }
 /* Header fill only where the cell has no row/column tint (TBL-4) — a tinted
    header cell shows its `obe-bg-*` colour instead, staying bold. */
 .obe-table-header td:not([class*='obe-bg-']) {
   background: hsl(var(--muted) / 0.5);
 }
-/* ── Multi-cell selection (TBL-5) ────────────────────────────────────────────
-   A rectangle of selected table cells — distinct from obe-row-selected (a whole
-   top-level block). Token-based accent wash + inset ring: theme-aware, dark-safe,
-   and translucent so it never obscures the cell text (aligns with the marquee's
-   --ring usage). `obe-cell-selecting` hides the native blue mid-drag so only the
-   cell highlight reads (the native range is collapsed on mouseup).
-
-   The selection paints ENTIRELY through box-shadow — the wash is a second inset
-   layer (a 999px spread fills the cell), never a `background`. TBL-6 made that
-   load-bearing: a range keeps its highlight after "Cell colour" applies, and a
-   `background` here both out-specifies `.obe-bg-*` (0,2,1 vs 0,1,0) and, as a
-   shorthand, resets background-color — so the tint the user just picked painted
-   nothing at all on the primary path. Shadows compose instead of colliding: the
-   ring reads over the tint, and the tint reads through the wash. Any future
-   background declaration on this selector re-breaks that (see
-   tableCellTintPaint.test.ts). */
+/* Range wash uses one inset shadow per cell; the outline is a separate
+   overlay. Never set a background here: it overrides the cell's obe-bg-* tint.
+   The translucent wash composes over both tinted cells and header fills. */
 .obe-table td.obe-cell-selected {
-  box-shadow:
-    inset 0 0 0 2px hsl(var(--ring) / 0.55),
-    inset 0 0 0 999px hsl(var(--ring) / 0.16);
+  box-shadow: inset 0 0 0 999px var(--obe-select-wash);
 }
-.obe-table-header td.obe-cell-selected {
-  box-shadow:
-    inset 0 0 0 2px hsl(var(--ring) / 0.55),
-    inset 0 0 0 999px hsl(var(--ring) / 0.22);
+.obe-table-range {
+  position: absolute;
+  pointer-events: none;
+  z-index: var(--z-index-drop-indicator);
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -1px;
 }
 .obe-cell-selecting ::selection { background: transparent; }
 .obe-cell-selecting ::-moz-selection { background: transparent; }
@@ -2026,48 +2032,22 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   position: absolute;
   display: grid;
   place-items: center;
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: var(--obe-chrome-ink);
   border-radius: var(--radius-md);
-  font-size: 13px;
   opacity: 0;
   transition: opacity var(--motion-fast) var(--ease-out-soft);
   cursor: pointer;
 }
 .obe-table-wrap:hover .obe-table-add { opacity: 1; }
-.obe-table-add:hover { background: var(--hover); color: hsl(var(--foreground)); }
+.obe-table-add:hover { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
 .obe-table-add-row { left: 0; right: 0; bottom: 0; height: 1rem; }
 .obe-table-add-col { top: 0; bottom: 16px; right: -16px; width: 1rem; }
-.obe-table-tools {
-  position: absolute;
-  top: -1.7rem;
-  right: 0;
-  display: flex;
-  gap: 4px;
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) var(--ease-out-soft);
-}
-.obe-table-wrap:hover .obe-table-tools,
-.obe-table-tools:focus-within { opacity: 1; pointer-events: auto; }
-.obe-table-tools button {
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  border-radius: var(--radius-md);
-  padding: 4px 8px;
-  cursor: pointer;
-}
-.obe-table-tools button:hover { background: var(--hover); }
-.obe-table-tools button[aria-pressed='true'] { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
 
 /* TBL-2 drag-reorder: row grips overhang fully into the block gutter or column
-   gap, while the table edge stays flush with paragraph text (TABLE-1). Top
-   space is reserved for column grips only when handles are shown (editable,
-   unlocked) — readOnly/present stay tight. Cells position column grips; every
+   gap, while the table edge stays flush with paragraph text (TABLE-1). Column grips straddle the top border; only editable,
+   unlocked tables reserve space for the add-row control. Cells position column grips; every
    row gets a zero-width header-cell host so rowspan cannot swallow its grip. */
-.obe-table-wrap.obe-has-grips { padding-top: 1.25rem; }
-.obe-has-grips .obe-table-add-col { top: 1.25rem; }
+.obe-table-wrap.obe-has-grips { padding-bottom: 16px; }
 .obe-table td { position: relative; }
 .obe-table .obe-table-row-grip-host {
   position: relative;
@@ -2081,7 +2061,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   position: absolute;
   display: grid;
   place-items: center;
-  color: hsl(var(--muted-foreground) / 0.7);
+  color: var(--obe-chrome-ink);
   border-radius: var(--radius-sm);
   opacity: 0;
   transition: opacity var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
@@ -2093,8 +2073,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font: inherit;
 }
 .obe-table-grip-anchor { position: absolute; pointer-events: none; }
-.obe-table-row-grip-anchor { left: -1.25rem; top: 0; bottom: 0; width: 1.25rem; }
-.obe-table-col-grip-anchor { top: -1.25rem; left: 0; right: 0; height: 1.25rem; }
+.obe-table-row-grip-anchor { left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear))); top: var(--obe-table-grip-top); width: var(--obe-handle-w); height: var(--obe-gutter-btn); }
+.obe-table-col-grip-anchor { top: calc(-1 * var(--obe-handle-w) / 2); left: calc(50% - var(--obe-gutter-btn) / 2); width: var(--obe-gutter-btn); height: var(--obe-handle-w); }
 .obe-table-row-grip:active,
 .obe-table-col-grip:active { cursor: grabbing; }
 /* The row grip overhangs into the block gutter / column gap. At rest it sits at
@@ -2104,10 +2084,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
    HTML5 drag, because Chromium re-hit-tests the drag ORIGIN when the drag
    threshold is crossed, and by then the pointer has left the row (killing
    `tr:hover`) so the grip is no longer hittable and dragstart never fires. */
-.obe-table-row-grip { left: -1.25rem; top: 0; bottom: 0; width: 1.25rem; }
-.obe-table-col-grip { top: -1.25rem; left: 0; right: 0; height: 1.25rem; }
+.obe-table-row-grip { left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear))); top: var(--obe-table-grip-top); width: var(--obe-handle-w); height: var(--obe-gutter-btn); }
+.obe-table-col-grip { top: calc(-1 * var(--obe-handle-w) / 2); left: calc(50% - var(--obe-gutter-btn) / 2); width: var(--obe-gutter-btn); height: var(--obe-handle-w); }
 .obe-table tr:hover .obe-table-row-grip {
-  opacity: 0.55;
+  opacity: 1;
   z-index: var(--z-index-local-overlay);
 }
 .obe-table tr .obe-table-row-grip:focus-visible,
@@ -2115,22 +2095,22 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   opacity: 1;
   pointer-events: auto;
   z-index: var(--z-index-local-overlay);
+  outline: var(--obe-focus-ring);
+  outline-offset: var(--obe-focus-offset);
 }
-.obe-table-wrap:hover .obe-table-col-grip { opacity: 0.55; }
-.obe-table-row-grip:hover,
-.obe-table-col-grip:hover { opacity: 1; background: var(--hover); }
-.obe-table tr .obe-table-row-grip:focus-visible,
-.obe-table-col-grip:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-}
+.obe-table-col-grip { background: hsl(var(--background)); }
+.obe-table-col-grip[data-revealed] { opacity: 1; z-index: var(--z-index-local-overlay); }
+.obe-table-row-grip:hover { opacity: 1; background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+.obe-table-col-grip:hover { opacity: 1; background: linear-gradient(var(--obe-chrome-hover), var(--obe-chrome-hover)), hsl(var(--background)); color: var(--obe-chrome-ink-hover); }
+.obe-table-row-grip[aria-expanded='true'] { opacity: 1; background: var(--obe-chrome-active); }
+.obe-table-col-grip[aria-expanded='true'] { opacity: 1; background: linear-gradient(var(--obe-chrome-active), var(--obe-chrome-active)), hsl(var(--background)); }
 /* Insertion indicators — a primary-coloured bar at the target boundary. */
-.obe-table tr.obe-drop-row-above > td { box-shadow: inset 0 2px 0 0 hsl(var(--primary)); }
-.obe-table tr.obe-drop-row-below > td { box-shadow: inset 0 -2px 0 0 hsl(var(--primary)); }
-.obe-table td.obe-drop-col-before { box-shadow: inset 2px 0 0 0 hsl(var(--primary)); }
-.obe-table td.obe-drop-col-after { box-shadow: inset -2px 0 0 0 hsl(var(--primary)); }
+.obe-table tr.obe-drop-row-above > td { box-shadow: inset 0 2px 0 0 var(--obe-drop); }
+.obe-table tr.obe-drop-row-below > td { box-shadow: inset 0 -2px 0 0 var(--obe-drop); }
+.obe-table td.obe-drop-col-before { box-shadow: inset 2px 0 0 0 var(--obe-drop); }
+.obe-table td.obe-drop-col-after { box-shadow: inset -2px 0 0 0 var(--obe-drop); }
 .obe-table tr.obe-row-dragging > td,
-.obe-table td.obe-col-dragging { opacity: 0.45; }
+.obe-table td.obe-col-dragging { opacity: var(--obe-drag-dim); }
 
 /* Slash menu */
 @keyframes obe-menu-enter {
@@ -2289,7 +2269,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   color: hsl(var(--foreground) / 0.85);
 }
-.obe-range-toolbar-button:hover { background: var(--hover); }
+.obe-range-toolbar-button:hover { background: var(--obe-chrome-hover); }
 .obe-range-toolbar-button > svg { width: 0.875rem; height: 0.875rem; }
 .obe-range-toolbar-button:disabled { opacity: 0.4; }
 @media (pointer: coarse) {
@@ -2416,7 +2396,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Touch: gutters are always visible (no hover on touch screens) */
 @media (hover: none) {
   .obe-gutter { opacity: 0.85; }
-  .obe-table-add { opacity: 0.7; }
+  .obe-table-add { opacity: 1; }
 }
 
 /* Block editor: keyboard focus visibility (a11y) */
@@ -2428,7 +2408,6 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-tb-btn:focus-visible,
 .obe-range-toolbar-button:focus-visible,
 .obe-table-add:focus-visible,
-.obe-table-tools button:focus-visible,
 .obe-callout-icon:focus-visible,
 .obe-todo-box:focus-visible,
 .obe-media-btn:focus-visible,

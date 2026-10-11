@@ -20,7 +20,7 @@ import {readFileSync} from 'node:fs';
  *
  * So this test reads the real stylesheet and asserts the cascade directly: the
  * selection rules must declare no background of any kind, and must carry the
- * wash as a second inset box-shadow layer instead. It fails on the old CSS.
+ * wash as one inset box-shadow layer. A separate overlay paints the outline.
  */
 
 const CSS = readFileSync('src/index.css', 'utf8');
@@ -34,7 +34,7 @@ function ruleBody(selector: string): string {
   return CSS.slice(open + 1, close);
 }
 
-const SELECTION_RULES = ['.obe-table td.obe-cell-selected', '.obe-table-header td.obe-cell-selected'];
+const SELECTION_RULES = ['.obe-table td.obe-cell-selected'];
 
 describe('cell-selection highlight never resets the cell tint', () => {
   it.each([false, true])('keeps the computed tint paint under the selection shadows (header: %s)', (header) => {
@@ -47,7 +47,6 @@ describe('cell-selection highlight never resets the cell tint', () => {
     style.textContent = `
       .obe-bg-blue { background-color: rgba(1, 2, 3, 0.13); }
       .obe-table td.obe-cell-selected { ${ruleBody('.obe-table td.obe-cell-selected')} }
-      .obe-table-header td.obe-cell-selected { ${ruleBody('.obe-table-header td.obe-cell-selected')} }
     `;
     document.head.append(style);
 
@@ -63,7 +62,7 @@ describe('cell-selection highlight never resets the cell tint', () => {
 
     const paint = getComputedStyle(td);
     expect(paint.backgroundColor).toBe('rgba(1, 2, 3, 0.13)');
-    expect(paint.boxShadow).toContain('inset 0 0 0 2px');
+    expect(paint.boxShadow).not.toContain('2px');
     expect(paint.boxShadow).toContain('inset 0 0 0 999px');
 
     table.remove();
@@ -77,16 +76,13 @@ describe('cell-selection highlight never resets the cell tint', () => {
     expect(body).not.toMatch(/(^|[;\s])background(-[a-z]+)?\s*:/);
   });
 
-  it.each(SELECTION_RULES)('%s paints the ring AND the wash as inset shadows', (selector) => {
+  it.each(SELECTION_RULES)('%s paints only the wash as an inset shadow', (selector) => {
     const body = ruleBody(selector);
     const shadow = /box-shadow\s*:([^;]+)/.exec(body);
     expect(shadow, 'box-shadow declaration').toBeTruthy();
     const layers = shadow![1].split(',').map((s) => s.trim());
-    expect(layers).toHaveLength(2);
-    expect(layers[0]).toMatch(/^inset 0 0 0 2px /); // the 2px ring
-    expect(layers[1]).toMatch(/^inset 0 0 0 \d{3,}px /); // the flood-fill wash
-    // Both layers are --ring tokens, so the highlight stays theme-aware.
-    expect(layers.every((l) => l.includes('var(--ring)'))).toBe(true);
+    expect(layers).toHaveLength(1);
+    expect(layers[0]).toMatch(/^inset 0 0 0 \d{3,}px var\(--obe-select-wash\)$/);
   });
 
   // The tint classes must stay plain background-color (no shorthand), so a

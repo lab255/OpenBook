@@ -226,8 +226,8 @@ describe('table colours — export', () => {
     const json = docToJSON(doc).find((b) => b.id === 'tbl')!;
     const html = blocksToHtml([json]);
     // Row 1 cell is green; a non-row-1 cell in col 2 is blue.
-    expect(html).toContain(`background:${COLOR_EXPORT_HEX.green.hl}`);
-    expect(html).toContain(`background:${COLOR_EXPORT_HEX.blue.hl}`);
+    expect(html).toContain(`background:${COLOR_EXPORT_HEX.green.bg}`);
+    expect(html).toContain(`background:${COLOR_EXPORT_HEX.blue.bg}`);
   });
 
   it('HTML/PDF projection (projectBlocksForExport) carries a parallel cellColors grid', () => {

@@ -7,7 +7,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {MENU_COMPONENTS, MENU_DESTRUCTIVE_CLASS, MENU_WIDTH_MD} from '@/components/ui/menu-components';
+import {MENU_COMPONENTS, MENU_DESTRUCTIVE_CLASS, MENU_WIDTH_MD, MENU_WIDTH_SM} from '@/components/ui/menu-components';
 import {t} from '../i18n';
 import {INLINE_TOOLBAR_POSITION_OPTIONS, observePopupPosition, type PopupPosition} from './popupPosition';
 import {
@@ -65,6 +65,7 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
     onPosition: setPosition,
     options: {
       ...INLINE_TOOLBAR_POSITION_OPTIONS,
+      align: 'start',
       preferredPlacement: ctx.rect.top === 0 ? 'below' : 'above',
       clampHorizontallyToBoundary: true,
     },
@@ -130,13 +131,12 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
                 tabIndex={activeIndex === index ? 0 : -1}
                 aria-label={item.label}
                 title={item.label}
-                onPointerDown={(event) => event.preventDefault()}
                 onKeyDown={buttonKeyDown(index)}
               >
                 <Palette aria-hidden />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent onCloseAutoFocus={(event) => event.preventDefault()}>
+            <DropdownMenuContent className={MENU_WIDTH_SM} onCloseAutoFocus={(event) => event.preventDefault()}>
               {RANGE_COLOUR_MENU.map((colour) => (
                 <DropdownMenuItem key={colour.id ?? 'default'} onSelect={() => item.onPick(colour.id)}>
                   <span className={`obe-mi-sw obe-mi-sw-fill ${colour.id ? `obe-hl-${colour.id}` : 'obe-mi-sw-reset'}`} aria-hidden />
@@ -175,7 +175,6 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
             tabIndex={activeIndex === items.length ? 0 : -1}
             aria-label={t('menu.table.rangeToolbarMore')}
             title={t('menu.table.rangeToolbarMore')}
-            onPointerDown={(event) => event.preventDefault()}
             onKeyDown={buttonKeyDown(items.length)}
           >
             <Ellipsis aria-hidden />
@@ -183,7 +182,7 @@ export const TableRangeToolbar: React.FC<TableRangeMenuContext & {
         </DropdownMenuTrigger>
         <DropdownMenuContent className={MENU_WIDTH_MD} onCloseAutoFocus={(event) => event.preventDefault()}>
           <DropdownMenuLabel>{t('menu.table.sectionSelection')}</DropdownMenuLabel>
-          <TableRangeMenuItems menu={MENU_COMPONENTS.dropdown} {...ctx} />
+          <TableRangeMenuItems exclude="toolbar" menu={MENU_COMPONENTS.dropdown} {...ctx} />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
