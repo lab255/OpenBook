@@ -265,7 +265,7 @@ The scale (:131-145) is complete; this section only governs use.
 | Source | `blockeditor/colors.ts` (`COLOR_TOKENS`, 9) + `--obe-fg/bg/hl-*` | `sdk/src/dataColors.ts` (12 tokens × pastel/vivid/muted) + `lib/dataColorVars.ts` (`--data-*`) |
 | Meaning | **Authored emphasis** stored in the document | **Encodes data**: category, series, status |
 | Chosen by | The author (persisted per block/run) | The viewer's appearance preference |
-| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers |
+| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers; board column tint = chip-bg at 50% via color-mix |
 
 **Rule:** if the colour carries meaning *about data*, it reads `--data-*`; if it is
 emphasis an author placed on prose or a block, it reads `--obe-*`. Never cross:
