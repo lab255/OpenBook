@@ -34,24 +34,31 @@
   --color-ring: hsl(var(--ring));
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
+
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
+
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
+
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-muted-foreground-strong: hsl(var(--muted-foreground-strong));
   --color-placeholder-foreground: hsl(var(--placeholder-foreground));
+
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
+
   /* The interactive highlight: a translucent tint of the accent colour (the
      same one the sidebar items use), so hover/focus states across the whole
      interface read as the theme colour rather than a flat neutral gray.
      `--hover` already carries its alpha, so `bg-hover` needs no /opacity. */
   --color-hover: var(--hover);
   --color-hover-strong: var(--hover-strong);
+
   /* Sidebar selection (APPFIT-3.9): the selected row is marked with the brand
      tint — a primary wash, primary ink and a primary rail. That reads on the
      TINTED (default) sidebar, whose sheet is a pale accent panel. On the opt-in
@@ -62,29 +69,38 @@
   --color-sidebar-selection: hsl(var(--primary));
   --color-sidebar-selection-wash: hsl(var(--primary) / 0.15);
   --color-sidebar-selection-wash-strong: hsl(var(--primary) / 0.2);
+
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
+
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
+
   --color-sheet-1: hsl(var(--sheet-1));
   --color-sheet-1-foreground: hsl(var(--sheet-1-foreground));
+
   /* --sheet-2 is still composed (it's the deeper companion sheet in manifest
      §2.2) but currently has no consumer — kept as a painted token for a future
      second-surface use, not dead-stripped. */
   --color-sheet-2: hsl(var(--sheet-2));
   --color-sheet-2-foreground: hsl(var(--sheet-2-foreground));
+
   /* The neutral desk (book cover) behind the page sheets — stays a neutral
      canvas even when the sidebar sheets go full-accent (OB-377). */
   --color-desk: hsl(var(--desk));
+
   --color-brand: hsl(var(--brand));
   --color-brand-foreground: hsl(var(--brand-foreground));
   --color-brand-subtle: hsl(var(--brand-subtle));
+
   --font-sans:
     ui-sans-serif, -apple-system, BlinkMacSystemFont, Inter, Segoe UI, Roboto,
     Helvetica Neue, Arial, sans-serif;
   --font-serif: ui-serif, Lyon-Text, Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
   --container-content: 46rem;
+
   /* ── Spacing + control-height scale ──────────────────────────────────────
      The 4px grid is the only legal spacing grid for new work. Control heights
      use this semantic scale so components do not introduce one-off sizes. */
@@ -92,14 +108,18 @@
   --height-control-sm: 28px;
   --height-control-md: 32px;
   --height-control-lg: 36px;
+
   --radius-xl: calc(var(--radius) + 4px);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
   --animate-accordion-down: accordion-down var(--motion-base) var(--ease-out-soft);
   --animate-accordion-up: accordion-up var(--motion-base) var(--ease-out-soft);
+
   --transition-property-height: height;
   --transition-property-spacing: margin, padding;
+
   /* ── Chrome stacking scale ────────────────────────────────────────────────
      Local 1–6 tiers order editor adornments without escaping their stacking
      contexts. Inline .obe-kit-tip affordances use 20; real Radix tooltips
@@ -125,6 +145,7 @@
   --z-index-nested-menu: 55;
   --z-index-lightbox: 60;
   --z-index-toast: 100;
+
   /* ── Motion system ──────────────────────────────────────────────────────────
      One considered curve + tempo for the whole UI. `--default-transition-*` are
      the Tailwind v4 theme keys every `transition`/`transition-colors` utility
@@ -138,6 +159,7 @@
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+
   /* Literal shadow tokens declared in @theme bake into utilities. The
      scheme-dependent sheet/menu/overlay tokens therefore live in :root and
      use explicit @utility declarations so their .dark overrides stay live. */
@@ -145,6 +167,7 @@
      contact shadow plus a wider ambient one, warm-tinted to match the palette
      (Apple's "floating just off the surface" look rather than a hard drop). */
   --shadow-lift: 0 1px 2px hsl(20 14% 12% / 0.05), 0 10px 24px -6px hsl(20 14% 12% / 0.12);
+
   @keyframes accordion-down {
     from {
       height: 0;
@@ -303,6 +326,7 @@
     --obe-code-str: hsl(140 50% 30%);
     --obe-code-num: hsl(28 80% 38%);
     --obe-code-lit: hsl(210 72% 42%);
+
     /* Warm, refined light palette */
     --background: 0 0% 100%;
     --foreground: 34 9% 19%;
@@ -422,6 +446,7 @@
     --obe-code-str: hsl(140 50% 60%);
     --obe-code-num: hsl(28 85% 62%);
     --obe-code-lit: hsl(210 75% 67%);
+
     /* Refined dark palette: main surface dark, sidebar slightly lighter.
        Softened 2026-06-13: lifted the base, eased the text, and calmed the
        accent so dark mode reads less harsh (lower contrast, less glare). */
@@ -2713,9 +2738,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   color: hsl(var(--foreground));
 }
 .obe-kit-name { width: 7rem; font-family: var(--obe-font-mono); }
-.obe-kit-num { width: 4rem; font-variant-numeric: tabular-nums;
-  height: var(--height-control-md);
-}
+.obe-kit-num { width: 4rem; height: var(--height-control-md); font-variant-numeric: tabular-nums; }
 .obe-kit-mono { font-family: var(--obe-font-mono); }
 .obe-kit-empty { font-size: var(--obe-caption-size); color: hsl(var(--muted-foreground)); font-style: italic; }
 
@@ -2777,8 +2800,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   text-decoration: none;
   transition: color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-mini:hover { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover);
-}
+.obe-kit-mini:hover { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover); }
 
 /* Radio pills + checklist */
 .obe-kit-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; }
@@ -2793,9 +2815,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
   min-height: var(--height-control-sm);
 }
-.obe-kit-pill:hover:not(:disabled):not(.obe-kit-pill-on) { color: var(--obe-chrome-ink-hover);
-  background: var(--obe-chrome-hover);
-}
+.obe-kit-pill:hover:not(:disabled):not(.obe-kit-pill-on) { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover); }
 .obe-kit-pill-on {
   background: hsl(var(--primary));
   border-color: hsl(var(--primary));
@@ -3208,9 +3228,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-action:hover { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 4%); }
 /* Colour-only press — deepen the fill toward --press-ink (matches Button), no geometry shift. */
 .obe-kit-action:active { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 8%); }
-.obe-kit-select { cursor: pointer;
-  height: var(--height-control-sm);
-}
+.obe-kit-select { cursor: pointer; height: var(--height-control-sm); }
 
 /* Chart */
 .obe-kit-chart { display: block; margin: 0; }
@@ -3489,9 +3507,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-richtext-btn:hover { color: var(--obe-chrome-ink-hover);
-  background: var(--obe-chrome-hover);
-}
+.obe-kit-richtext-btn:hover { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover); }
 .obe-kit-richtext-b { font-weight: 700; }
 .obe-kit-richtext-i { font-style: italic; }
 .obe-kit-richtext-u { text-decoration: underline; }
