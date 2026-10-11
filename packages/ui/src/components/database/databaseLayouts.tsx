@@ -662,6 +662,9 @@ const BoardColumnCards: React.FC<{
         return (
           <RowContextMenu key={row.id} db={db} rowId={row.id}>
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); db.openRow(row.id); } }}
               draggable={canMove}
               onDragStart={() => dnd.setDragRow(row.id)}
               onDragEnd={() => {
@@ -671,7 +674,7 @@ const BoardColumnCards: React.FC<{
               onClick={() => db.openRow(row.id)}
               style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
               className={cn(
-                'group cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20',
+                'group cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20 focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]',
                 dnd.dragRow === row.id && 'opacity-50',
               )}
             >

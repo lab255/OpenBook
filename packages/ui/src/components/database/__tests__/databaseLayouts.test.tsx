@@ -31,6 +31,19 @@ const makeDb = (rows = [row, {...row, id: 'empty', name: 'Unassigned', propertie
 }) as unknown as UseDatabase;
 
 describe('card layout design system', () => {
+  it('opens a focusable draggable board card with Enter and Space', () => {
+    const db = makeDb();
+    render(<BoardView db={db} view={view} properties={properties} cardProperties={[]} />);
+    const card = screen.getByText('Card title').closest<HTMLElement>('[draggable="true"]')!;
+    expect(card.tagName).toBe('DIV');
+    expect(card.getAttribute('role')).toBe('button');
+    expect(card.tabIndex).toBe(0);
+    fireEvent.keyDown(card, {key: 'Enter'});
+    fireEvent.keyDown(card, {key: ' '});
+    expect(db.openRow).toHaveBeenCalledTimes(2);
+    expect(db.openRow).toHaveBeenLastCalledWith(row.id);
+  });
+
   it('uses status pills and select tags, with property tooltips and checkbox names', () => {
     render(<RowChips row={row} properties={properties} />);
     expect(screen.getByText('Todo').classList.contains('rounded-full')).toBe(true);
