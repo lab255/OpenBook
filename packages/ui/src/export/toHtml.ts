@@ -287,20 +287,21 @@ function visibleProps(schema: DatabaseSchema): DatabaseProperty[] {
   return chosen.filter((p) => p.type !== 'files' && p.type !== 'backlinks');
 }
 
-const tag = (label: string, color: string | undefined, scheme: DataColorScheme): string => {
-  const chip = DATA_PALETTE[scheme][isDataColorToken(color) ? color : 'gray'].chip.light;
-  return `<span class="tag" style="background:${chip.bg};color:${chip.fg}">${escapeHtml(label)}</span>`;
+const tag = (label: string, color: string | undefined, scheme: DataColorScheme, kind: 'select' | 'status'): string => {
+  const token = isDataColorToken(color) ? color : 'gray';
+  const chip = DATA_PALETTE[scheme][token].chip.light;
+  return `<span class="tag" data-kind="${kind}" style="background:var(--data-${token}-chip-bg, ${chip.bg});color:var(--data-${token}-chip-fg, ${chip.fg})">${escapeHtml(label)}</span>`;
 };
 
 function cellHtml(row: DatabaseRow, prop: DatabaseProperty, props: DatabaseProperty[], rows: DatabaseRow[], ctx: RenderCtx): string {
   const raw = cellValue(row, prop, props, rows);
   if (prop.type === 'select' || prop.type === 'status') {
     const opt = prop.options?.find((o) => o.id === raw);
-    return opt ? tag(opt.label, opt.color, ctx.scheme) : '';
+    return opt ? tag(opt.label, opt.color, ctx.scheme, prop.type) : '';
   }
   if (prop.type === 'multi_select') {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
-    return (prop.options ?? []).filter((o) => ids.includes(o.id)).map((o) => tag(o.label, o.color, ctx.scheme)).join(' ');
+    return (prop.options ?? []).filter((o) => ids.includes(o.id)).map((o) => tag(o.label, o.color, ctx.scheme, 'select')).join(' ');
   }
   if (prop.type === 'relation' || prop.type === 'dependency') {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
@@ -934,7 +935,7 @@ function document_(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <title>${escapeHtml(headTitle)}</title>
-<style>${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : SCHEME_DUAL}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
+<style>${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : schemeDual(ctx.scheme)}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
 </head>
 <body${!hydrate && rootId ? ` data-root="${escapeHtml(rootId)}"` : ''}>
 ${legacyHeader}${bodyHtml}
@@ -1274,7 +1275,7 @@ export function toHtmlSite(
 const SCHEME_LIGHT = `
 :root { color-scheme: light; }
 `;
-const SCHEME_DUAL = `
+const schemeDual = (scheme: DataColorScheme): string => `
 :root { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
   body { background: #18181b; color: #e7e7ea; }
@@ -1286,6 +1287,7 @@ const SCHEME_DUAL = `
   :root {
     ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtc-${token}: ${value.fg};`).join('\n    ')}
     ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtb-${token}: ${value.bg};`).join('\n    ')}
+    ${Object.entries(DATA_PALETTE[scheme]).map(([token, value]) => `--data-${token}-chip-bg: ${value.chip.dark.bg}; --data-${token}-chip-fg: ${value.chip.dark.fg};`).join('\n    ')}
   }
   /* Palette highlight tints are translucent; let marked text inherit the light page ink. */
   mark[style] { color: inherit; }
@@ -1315,7 +1317,7 @@ pre { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 8px;
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; }
 pre code { font-size: 14px; line-height: 1.5; }
 /* Unstyled highlights keep an opaque tint and dark text. Translucent palette
-   highlights inherit the light page ink in dark mode via SCHEME_DUAL. */
+   highlights inherit the light page ink in dark mode via schemeDual. */
 mark { background: #fde68a; color: #1c1917; padding: 0 .1em; border-radius: 2px; }
 hr { border: none; border-top: 1px solid rgba(127,127,127,.3); width: 30%; margin: 2em auto; }
 a.mention { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; color: inherit; }
@@ -1432,7 +1434,8 @@ table.block-table th, table.db-table th { background: var(--obe-x-head, hsl(40 9
 table.db-table a.db-row { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; font-weight: 600; cursor: pointer; }
 table.db-table a.db-row:hover { text-decoration: underline; }
 .db-empty { opacity: .6; font-size: .9em; }
-.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .82em; margin: 1px 2px 1px 0; }
+.tag[data-kind=status] { border-radius:9999px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: .82em; margin: 1px 2px 1px 0; }
 .callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: none; }
 .callout::before { content: "💡"; }
 .callout[data-variant=warn]::before, .callout[data-variant=warning]::before { content: "⚠️"; }

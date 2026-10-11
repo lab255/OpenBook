@@ -1,3 +1,4 @@
+import {sectionLabel} from './databaseRecipes';
 import React, {useImperativeHandle, useMemo, useState} from 'react';
 import {Select} from '@/components/ui/select';
 import {
@@ -267,7 +268,7 @@ export function importCsvFile(importCsv: (text: string) => Promise<number>): voi
 }
 
 const fieldClass = inputVariants({inputSize: 'sm'});
-const sectionLabel = 'text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground';
+
 
 /** The `+` column header: add a new property to the database. */
 /** Relation cardinality choices (forward-side perspective). */

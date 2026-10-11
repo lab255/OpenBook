@@ -1546,6 +1546,7 @@ export const zh: PartialMessages = {
       },
     },
     formView: {
+      choose: '选择…',
       builder: '构建',
       fill: '填写',
       builderIntro: '字段实时映射数据库架构。重命名或更改列类型后，此表单会自动更新。从表单中移除字段时，数据库列及其现有值会保留。',

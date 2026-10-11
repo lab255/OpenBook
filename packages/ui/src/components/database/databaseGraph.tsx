@@ -12,7 +12,7 @@ const ROW_GAP = 66;
 const PAD = 24;
 
 const Hint: React.FC<{children: React.ReactNode}> = ({children}) => (
-  <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">{children}</div>
+  <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">{children}</div>
 );
 
 /**
@@ -44,12 +44,12 @@ export const GraphView: React.FC<{db: UseDatabase; view: DbView; properties: Dat
   };
 
   return (
-    <div className="overflow-auto rounded-md border border-border bg-muted/10" style={{maxHeight: 560}}>
+    <div className="overflow-auto rounded-lg border border-border bg-muted/10" style={{maxHeight: 560}}>
       <div className="relative" style={{width, height}}>
         <svg className="pointer-events-none absolute inset-0" width={width} height={height}>
           <defs>
             <marker id="ob-graph-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-              <path d="M0,0 L7,3.5 L0,7 Z" className="fill-muted-foreground/70" />
+              <path d="M0,0 L7,3.5 L0,7 Z" className="fill-muted-foreground/80" />
             </marker>
           </defs>
           {graph.edges.map((e, i) => {
@@ -65,7 +65,7 @@ export const GraphView: React.FC<{db: UseDatabase; view: DbView; properties: Dat
               <path
                 key={i}
                 d={`M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2 - 2} ${y2}`}
-                className="stroke-muted-foreground/55"
+                className="stroke-muted-foreground/80"
                 strokeWidth={1.5}
                 fill="none"
                 markerEnd="url(#ob-graph-arrow)"
@@ -82,7 +82,7 @@ export const GraphView: React.FC<{db: UseDatabase; view: DbView; properties: Dat
             <button
               key={n.id}
               onClick={() => db.openRow(n.id)}
-              className="absolute flex flex-col justify-center gap-0.5 rounded-md border border-border bg-card px-2.5 text-left shadow-sm transition-colors hover:border-foreground/30 hover:bg-hover"
+              className="absolute flex flex-col justify-center gap-0.5 rounded-md border border-border bg-card px-2.5 text-left shadow-sm transition-colors hover:border-foreground/20 hover:bg-hover focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
               style={{left: p.x, top: p.y, width: NODE_W, height: NODE_H}}
               title={row?.name?.trim() || 'Untitled'}
             >
@@ -91,7 +91,7 @@ export const GraphView: React.FC<{db: UseDatabase; view: DbView; properties: Dat
                 <span className="truncate text-sm font-medium">{row?.name?.trim() || 'Untitled'}</span>
               </span>
               {count > 0 && (
-                <span className="truncate text-[10px] text-muted-foreground">
+                <span className="truncate text-xs text-muted-foreground">
                   depends on {count} {count === 1 ? 'row' : 'rows'}
                 </span>
               )}

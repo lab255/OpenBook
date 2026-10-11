@@ -2387,6 +2387,7 @@ export const en = {
       },
     },
     formView: {
+      choose: 'Select…',
       builder: 'Build',
       fill: 'Fill',
       builderIntro: 'Fields project the live database schema. Rename or change a column and this form updates automatically. Removing a field from the form keeps its database column and existing values.',

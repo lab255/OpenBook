@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
   CHART_TOTAL_SERIES,
   PARENT_GROUP_ID,
@@ -35,6 +35,7 @@ import {useDataScheme} from '@/lib/dataScheme';
 import {useOptionalData} from '@/data';
 import {useNavigation} from '@/providers';
 import {cn} from '@/lib/utils';
+import {ellipsizeMeasured} from './chartLabels';
 
 /**
  * The kit's chart block: one block, many kinds (line, area, bar, pie, donut,
@@ -67,9 +68,7 @@ export const fmtChartValue = (n: number): string =>
 /** SVG coord → clamped percentage of a span, so an overlay stays inside the plot. */
 const pctIn = (v: number, span: number, min = 6, max = 94): number => Math.max(min, Math.min(max, (v / span) * 100));
 
-/** Truncate a label to `max` chars with an ellipsis (drives the DB bar x-labels,
- *  which have no truncation of their own — a long/many-group label set overflows
- *  otherwise). Returns the original when it already fits. */
+/** Character-budget truncation for the kit's default labels. */
 const ellipsize = (label: string, max: number): string =>
   label.length > max ? `${label.slice(0, Math.max(1, max - 1)).trimEnd()}…` : label;
 
@@ -137,14 +136,14 @@ export const Mark: React.FC<{datum: ChartDatum; at: ChartPoint; children: React.
 };
 
 /** Light horizontal grid + tick labels shared by the XY kinds. */
-const Grid: React.FC<{d: ReturnType<typeof extent>}> = ({d}) => (
+const Grid: React.FC<{d: ReturnType<typeof extent>; w?: number; h?: number; padL?: number}> = ({d, w = W, h = H, padL = PAD}) => (
   <g className="obe-chart-grid">
     {ticks(d).map((t) => {
-      const y = scale(t, d, H - PAD, PAD);
+      const y = scale(t, d, h - PAD, PAD);
       return (
         <g key={t}>
-          <line x1={PAD} x2={W - PAD} y1={y} y2={y} />
-          <text x={PAD - 6} y={y + 3}>
+          <line x1={padL} x2={w - PAD} y1={y} y2={y} />
+          <text x={padL - 6} y={y + 3}>
             {axisTickLabel(t)}
           </text>
         </g>
@@ -181,13 +180,13 @@ const SeriesLegend: React.FC<{series: Array<{name: string}>; palette: string[]; 
 };
 
 /** X-axis labels under the plot, when the block provides them. */
-const XLabels: React.FC<{labels: string[]; n: number}> = ({labels, n}) => {
+const XLabels: React.FC<{labels: string[]; n: number; w?: number; h?: number; padL?: number}> = ({labels, n, w = W, h = H, padL = PAD}) => {
   if (labels.length === 0 || n === 0) return null;
-  const span = W - PAD * 2;
+  const span = w - padL - PAD;
   return (
     <g className="obe-chart-xlabels">
       {labels.slice(0, n).map((l, i) => (
-        <text key={i} x={n === 1 ? W / 2 : PAD + (i / (n - 1)) * span} y={H - 8}>
+        <text key={i} x={n === 1 ? (padL + w - PAD) / 2 : padL + (i / (n - 1)) * span} y={h - 8}>
           {l}
         </text>
       ))}
@@ -379,29 +378,75 @@ export interface ChartMatrixInput {
 const matrixColor = (m: ChartMatrixInput, item: {key: string; color?: string}, index: number, palette: string[]): string =>
   m.colorOf?.(item, index) ?? palette[index % palette.length];
 
+const MatrixBarLabels: React.FC<{groups: ChartGroup[]; groupW: number; padL: number; h: number}> = ({groups, groupW, padL, h}) => {
+  const container = useRef<SVGGElement>(null);
+  const measurer = useRef<SVGTextElement | null>(null);
+  const [labels, setLabels] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    const parent = container.current;
+    if (!parent) return;
+    // Reuse one SVG text node in the actual label container so CSS, inherited
+    // font metrics and letter spacing match the visible captions exactly.
+    const text = measurer.current ??= document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    if (typeof text.getComputedTextLength !== 'function') return;
+    text.setAttribute('visibility', 'hidden');
+    let active = true;
+    const update = (): void => {
+      if (!active) return;
+      parent.appendChild(text);
+      try {
+        setLabels(groups.map((g) => ellipsizeMeasured(g.label ?? '', groupW - 4, (label) => {
+          text.textContent = label;
+          return text.getComputedTextLength();
+        })));
+      } finally {
+        text.remove();
+      }
+    };
+    update();
+    // Remeasure if a web font replaces the initial fallback font.
+    void document.fonts?.ready.then(update);
+    return () => { active = false; };
+  }, [groups, groupW]);
+  return (
+    <g ref={container} className="obe-chart-xlabels">
+      {groups.map((g, i) => {
+        const label = g.label ?? '';
+        const shown = labels[i] ?? label;
+        return (
+          <text key={g.key} x={padL + i * groupW + groupW / 2} y={h - 8}>
+            {shown}
+            {shown !== label && <title>{label}</title>}
+          </text>
+        );
+      })}
+    </g>
+  );
+};
+
 /**
  * Vertical bars from a {@link ChartMatrixInput}: one column per group, stacked
  * into its breakdown segments (or a single total bar without a breakdown). Every
  * segment/bar is a {@link Mark} carrying its rows + group/series highlight tags,
  * so the shared scaffold gives hover, highlight, tooltip, and click-to-drill.
  */
-const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({matrix, palette}) => {
+const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]; w?: number; h?: number; padL?: number}> = ({matrix, palette, w = W, h = H, padL = PAD}) => {
   const {groups, series, stacked, percent} = matrix;
   if (groups.length === 0) return null;
   const max = Math.max(1, ...groups.map((g) => g.total));
   const n = groups.length;
-  const groupW = (W - PAD * 2) / n;
+  const groupW = (w - padL - PAD) / n;
   const barW = Math.max(groupW * 0.62, 2);
-  const track = H - PAD * 2;
+  const track = h - PAD * 2;
   const seriesColorOf = (seriesKey: string): string => {
     const si = series.findIndex((s) => s.key === seriesKey);
     return matrixColor(matrix, series[si] ?? {key: seriesKey}, si, palette);
   };
   return (
     <>
-      <Grid d={extent([0, max])} />
+      <Grid d={extent([0, max])} w={w} h={h} padL={padL} />
       {groups.map((g, gi) => {
-        const cx = PAD + gi * groupW + groupW / 2;
+        const cx = padL + gi * groupW + groupW / 2;
         const x = cx - barW / 2;
         const denom = percent ? g.total || 1 : max;
         // Stack the segments bottom-up; a no-breakdown group is one full bar.
@@ -410,9 +455,9 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({ma
         return (
           <g key={g.key}>
             {segs.map((seg) => {
-              const h = (seg.value / denom) * track;
-              const yTop = H - PAD - (acc + h);
-              acc += h;
+              const barH = (seg.value / denom) * track;
+              const yTop = h - PAD - (acc + barH);
+              acc += barH;
               const s = series.find((x) => x.key === seg.seriesKey);
               const label = stacked && s?.label ? `${g.label} · ${s.label}` : g.label;
               const fill = stacked ? seriesColorOf(seg.seriesKey) : matrixColor(matrix, g, gi, palette);
@@ -422,31 +467,15 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]}> = ({ma
                   datum={{key: stacked ? `${g.key}::${seg.seriesKey}` : g.key, label, value: seg.value, rows: seg.rows, tags: [g.key, seg.seriesKey]}}
                   at={{x: cx, y: yTop}}
                 >
-                  <rect x={x} y={yTop} width={barW} height={Math.max(h, 1)} rx={2} fill={fill} />
+                  <rect x={x} y={yTop} width={barW} height={Math.max(barH, 1)} rx={2} fill={fill} />
                 </Mark>
               );
             })}
           </g>
         );
       })}
-      {/* X-labels: the DB bar has no truncation of its own, so long/many-group
-          labels collide or overflow. Truncate each to its column width (budget
-          scales with `groupW`, so labels shrink as groups multiply and never
-          collide) with a hover <title> carrying the full text. Kept horizontal
-          and centred — angled labels clip against the fixed-height viewBox — and
-          identical to the flat `Bars` + static export so all three read alike. */}
-      <g className="obe-chart-xlabels">
-        {groups.map((g, i) => {
-          const label = g.label ?? '';
-          const shown = ellipsize(label, Math.max(3, Math.floor(groupW / 6)));
-          return (
-            <text key={g.key} x={PAD + i * groupW + groupW / 2} y={H - 8}>
-              {shown}
-              {shown !== label && <title>{label}</title>}
-            </text>
-          );
-        })}
-      </g>
+      {/* Measure horizontal captions in their rendered font, reserving a 4px gap. */}
+      <MatrixBarLabels groups={groups} groupW={groupW} padL={padL} h={h} />
     </>
   );
 };
@@ -834,6 +863,7 @@ export interface ChartRenderArgs {
   editor?: BlockEditorController;
   /** SVG viewBox dimensions, so a kind can place its own overlays. */
   width?: number;
+  padLeft?: number;
   height?: number;
 }
 
@@ -902,8 +932,8 @@ registerChartKind({
 registerChartKind({
   kind: 'bar',
   label: 'bar',
-  render: ({value, labels, palette, matrix}) =>
-    matrix ? <MatrixBars matrix={matrix} palette={palette} /> : <Bars value={value} labels={labels} palette={palette} />,
+  render: ({value, labels, palette, matrix, width, height, padLeft}) =>
+    matrix ? <MatrixBars matrix={matrix} palette={palette} w={width} h={height} padL={padLeft} /> : <Bars value={value} labels={labels} palette={palette} />,
 });
 registerChartKind({
   kind: 'pie',
@@ -1248,6 +1278,7 @@ export interface KitChartPlotProps {
   /** viewBox width/height. Default 640×240 (the wide plot); the DB pie passes a square box. */
   viewW?: number;
   viewH?: number;
+  padLeft?: number;
   /** Drop the SVG's own border/radius/card background. The DB chart-views wrap
    *  the plot in their own readout card, so the default frame would nest a second
    *  concentric border inside it — a bare plot avoids the double frame (DASH-4). */
@@ -1277,6 +1308,7 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
   ariaLabel,
   viewW = W,
   viewH = H,
+  padLeft = PAD,
   frameless = false,
   message,
   block,
@@ -1385,7 +1417,7 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
         {message}
       </text>
     ) : (
-      def.render({value, labels, palette, interactions, matrix, active: active?.datum ?? null, block, editor, width: viewW, height: viewH})
+      def.render({value, labels, palette, interactions, matrix, active: active?.datum ?? null, block, editor, width: viewW, height: viewH, padLeft})
     );
 
   return (

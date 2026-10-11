@@ -3236,6 +3236,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 }
 /* Borderless plot: the DB chart-views wrap the plot in their own readout card,
    so the default frame would nest a second concentric border (DASH-4). */
+.ob-db-chart .obe-chart-grid text,
+.ob-db-chart .obe-chart-xlabels text {
+  font-size: var(--obe-caption-size);
+}
+
 .obe-chart-svg-bare { border: none; border-radius: 0; background: none; }
 .obe-chart-grid line { stroke: hsl(var(--border) / 0.55); stroke-dasharray: 2 4; }
 .obe-chart-grid text, .obe-chart-xlabels text, .obe-chart-legend text {
@@ -3908,4 +3913,34 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ob-leaflet .leaflet-control-container .leaflet-bar {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.ob-leaflet .leaflet-bar a {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+.ob-leaflet .leaflet-bar a:hover, .ob-leaflet .leaflet-bar a:focus-visible { background-color: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.ob-leaflet .leaflet-control-container .leaflet-bar a.leaflet-disabled { background-color: hsl(var(--card)); color: hsl(var(--muted-foreground) / 0.5); }
+
+/* Form dates expose the native empty scaffold at rest, unlike table cells. */
+[data-form-input] .ob-date-empty:required:invalid:not(:focus) {
+  color: hsl(var(--placeholder-foreground));
+}
+[data-form-input] .ob-date-empty:required:invalid:not(:focus)::-webkit-calendar-picker-indicator {
+  opacity: 1;
+}
+
+/* The light primary/white pair is 3.82:1 at caption size. Shade only this tag. */
+.ob-db-today {
+  background-color: color-mix(in srgb, hsl(var(--primary)) 88%, black);
+}
+.dark .ob-db-today {
+  background-color: hsl(var(--primary));
 }
