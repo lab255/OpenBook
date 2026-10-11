@@ -3914,3 +3914,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The light primary/white pair is 3.82:1 at caption size. Shade only this tag. */
+.ob-db-today {
+  background-color: color-mix(in srgb, hsl(var(--primary)) 88%, black);
+}
+.dark .ob-db-today {
+  background-color: hsl(var(--primary));
+}
