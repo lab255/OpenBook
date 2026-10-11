@@ -1,3 +1,13 @@
+## 3.22.1 (2026-10-11)
+
+### 🩹 Fixes
+
+- **ui:** kit chart ink + static export parity — funnel contrast, chart tokens, export primary (DSX-6c) ([#403](https://github.com/lab255/OpenBook/pull/403))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.22.0 (2026-10-11)
 
 ### 🚀 Features
