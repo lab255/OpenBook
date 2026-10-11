@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import React from 'react';
 import type {PageMeta, VerificationValue} from '@book.dev/sdk';
 import {
@@ -206,7 +207,7 @@ export const VerificationEditor: React.FC<{value?: VerificationValue; onChange: 
             {by ? t('properties.verifiedBy', {name: by}) : t('properties.verified')}
             {at ? ` · ${new Date(at).toLocaleDateString()}` : ''}
             {expiresAt && (
-              <div className={expired ? 'text-amber-600 dark:text-amber-400' : ''}>
+              <div className={expired ? STATUS_INK_CLASS.warn : ''}>
                 {expired
                   ? t('properties.verifyExpiredOn', {date: new Date(expiresAt).toLocaleDateString()})
                   : t('properties.verifyExpiresOn', {date: new Date(expiresAt).toLocaleDateString()})}

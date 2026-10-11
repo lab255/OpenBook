@@ -1,4 +1,4 @@
-import {WARN_SURFACE_CLASS} from '@/lib/statusStyles';
+import {WARN_SURFACE_CLASS, STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useState} from 'react';
 import {getForwardingAudience, type InstanceInfo} from '@book.dev/sdk';
 import {useData} from '@/data/DataProvider';
@@ -23,7 +23,7 @@ type Tone = 'ok' | 'warn' | 'bad' | 'muted';
 
 const TONE_CLASS: Record<Tone, string> = {
   ok: 'text-emerald-600 dark:text-emerald-400',
-  warn: 'text-amber-600 dark:text-amber-400',
+  warn: STATUS_INK_CLASS.warn,
   bad: 'text-destructive',
   muted: 'text-muted-foreground',
 };
@@ -335,7 +335,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
               {localAudience && <DiagnosticRow label={t('diagnostics.localAudience')} value={localAudience} tone="muted" />}
             </div>
             {forwarding.host && info.audience && info.audience !== forwarding.host && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">{t('diagnostics.audienceMismatch')}</p>
+              <p className={cn('text-xs', STATUS_INK_CLASS.warn)}>{t('diagnostics.audienceMismatch')}</p>
             )}
           </SettingsSection>
 

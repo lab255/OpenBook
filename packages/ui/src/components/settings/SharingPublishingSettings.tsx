@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useState} from 'react';
 import type {ServerInfo} from '@book.dev/sdk';
 import {useAccount, useForwarding, usePlatformCapabilities, useTranslation, type ForwardingStatus} from '@/providers';
@@ -33,7 +35,7 @@ function ForwardingStatusBadge({status}: {status: ForwardingStatus}) {
     return <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400"><span aria-hidden="true">●</span> {t('forwarding.status.live')}</span>;
   }
   if (status === 'connecting' || status === 'reconnecting') {
-    return <span className="text-xs font-medium text-amber-600 dark:text-amber-400"><span aria-hidden="true">○</span> {t('forwarding.status.connecting')}</span>;
+    return <span className={cn('text-xs font-medium', STATUS_INK_CLASS.warn)}><span aria-hidden="true">○</span> {t('forwarding.status.connecting')}</span>;
   }
   if (status === 'stalled') {
     return <span className="text-xs font-medium text-red-600 dark:text-red-400"><span aria-hidden="true">●</span> {t('forwarding.status.stalled')}</span>;
@@ -146,7 +148,7 @@ export function ForwardingSection() {
           page is public but the address isn't). Renders only while online + owned. */}
       {canManage && <SiteVisibilityControl />}
       {error && (
-        <div className={enabled && errorClass === 'ipc' ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'}>
+        <div className={enabled && errorClass === 'ipc' ? STATUS_INK_CLASS.warn : 'text-destructive'}>
           <p className="text-sm">
             {t(
               errorClass === 'ipc'
