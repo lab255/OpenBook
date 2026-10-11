@@ -195,10 +195,12 @@ const DropdownBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const options = resolveOptions(block);
   const value = blockProp<string>(block, 'value') ?? '';
   const known = options.some((o) => o.value === value);
+  const wide = kitWide(block);
 
   const control = (
     <Select unstyled
       className="obe-kit-select obe-kit-dropdown-select"
+      wrapperClassName={wide ? 'w-full' : undefined}
       value={known ? value : ''}
       aria-label={`${name} value`}
       disabled={editor.readOnly}
@@ -335,7 +337,7 @@ const ButtonBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       </ConfigField>
       <ConfigField label="Action">
         <Select unstyled
-          className="obe-kit-select w-full rounded-md border border-border bg-card px-2 py-1 text-sm"
+          className="cursor-pointer w-full rounded-md border border-border bg-card px-2 py-1 text-sm"
           value={action}
           disabled={editor.readOnly}
           aria-label="Button action"

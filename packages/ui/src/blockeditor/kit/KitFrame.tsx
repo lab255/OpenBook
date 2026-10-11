@@ -29,7 +29,7 @@ export const kitWide = (block: BlockMap): boolean => !blockProp<boolean>(block, 
 export const ConfigField: React.FC<{label: string; hint?: string; children: React.ReactNode}> = ({label, hint, children}) => (
   <label className="flex flex-col gap-1">
     <span className="text-xs font-medium text-foreground/80">{label}</span>
-    {hint && <span className="-mt-0.5 text-[0.7rem] text-muted-foreground">{hint}</span>}
+    {hint && <span className="-mt-0.5 text-xs text-muted-foreground">{hint}</span>}
     {children}
   </label>
 );
@@ -61,20 +61,20 @@ export const ScopeHints: React.FC<{editor: BlockEditorController; onPick: (name:
   const cached = useCachedInputScope(editor);
   const names = Object.keys(cached.value ?? {}).sort();
   if (cached.pending && !cached.value) {
-    return <span className="text-[0.7rem] text-muted-foreground">Loading variables…</span>;
+    return <span className="text-xs text-muted-foreground">Loading variables…</span>;
   }
   if (names.length === 0) {
-    return <span className="text-[0.7rem] text-muted-foreground">No named inputs on this page yet — add a slider, number, or other input block.</span>;
+    return <span className="text-xs text-muted-foreground">No named inputs on this page yet — add a slider, number, or other input block.</span>;
   }
   return (
     <div className="flex flex-wrap items-center gap-1 pt-0.5">
-      <span className="text-[0.7rem] text-muted-foreground">Variables:</span>
+      <span className="text-xs text-muted-foreground">Variables:</span>
       {names.map((name) => (
         <button
           key={name}
           type="button"
           disabled={editor.readOnly}
-          className="cursor-pointer rounded border border-border bg-muted/40 px-1 py-0.5 font-mono text-[0.7rem] text-foreground/80 transition-colors hover:bg-hover"
+          className="cursor-pointer rounded-sm border border-border bg-muted/40 px-1 py-0.5 font-mono text-xs text-foreground/80 transition-colors hover:bg-hover"
           // preventDefault on mousedown keeps focus in the expression input.
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick(name)}
@@ -107,7 +107,7 @@ export const ConfigToggle: React.FC<{
   <label className="flex cursor-pointer items-center justify-between gap-3">
     <span className="flex flex-col">
       <span className="text-xs font-medium text-foreground/80">{label}</span>
-      {hint && <span className="text-[0.7rem] text-muted-foreground">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </span>
     <input
       type="checkbox"

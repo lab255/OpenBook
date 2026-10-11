@@ -1183,7 +1183,7 @@ const ChartDbConfig: React.FC<{block: BlockMap; editor: BlockEditorController; s
             )}
           </div>
           {noNumericMeasure && (
-            <span className="text-[0.7rem] text-muted-foreground">No numeric property to measure — add a number column to this database.</span>
+            <span className="text-xs text-muted-foreground">No numeric property to measure — add a number column to this database.</span>
           )}
         </div>
       )}
@@ -1226,9 +1226,9 @@ const ChartDbConfig: React.FC<{block: BlockMap; editor: BlockEditorController; s
             )}
           </div>
           {filterInput && filterInputNames.length === 0 ? (
-            <span className="text-[0.7rem] text-muted-foreground">No named inputs on this page yet — add a dropdown or radio input to filter by.</span>
+            <span className="text-xs text-muted-foreground">No named inputs on this page yet — add a dropdown or radio input to filter by.</span>
           ) : (
-            <span className="text-[0.7rem] text-muted-foreground">Scope this chart to a control’s value — reuse the same input across charts for a dashboard-wide filter.</span>
+            <span className="text-xs text-muted-foreground">Scope this chart to a control’s value — reuse the same input across charts for a dashboard-wide filter.</span>
           )}
         </div>
       )}
@@ -1607,7 +1607,7 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
                     aria-pressed={active}
                     onClick={() => setProp(editor, block, 'sourceMode', mode)}
                     className={cn(
-                      'flex-1 cursor-pointer rounded px-2 py-1 text-xs transition-colors',
+                      'flex-1 cursor-pointer rounded-sm px-2 py-1 text-xs transition-colors',
                       active ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
