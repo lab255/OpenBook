@@ -1,3 +1,4 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import React from 'react';
 import type {PageMeta, VerificationValue} from '@book.dev/sdk';
@@ -189,9 +190,10 @@ export const VerificationEditor: React.FC<{value?: VerificationValue; onChange: 
             type="button"
             className={cn(
               'inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+              DATA_CHIP_CLASS[expired ? 'yellow' : 'green'],
               expired
-                ? 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300'
-                : 'bg-green-500/10 text-green-700 hover:bg-green-500/20 dark:text-green-300',
+                ? 'hover:bg-[color-mix(in_srgb,var(--data-yellow-chip-bg),var(--press-ink)_6%)]'
+                : 'hover:bg-[color-mix(in_srgb,var(--data-green-chip-bg),var(--press-ink)_6%)]',
             )}
           >
             {expired ? (
