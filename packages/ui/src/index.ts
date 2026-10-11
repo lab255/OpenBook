@@ -48,3 +48,5 @@ export {registerCustomBlock, registerReactiveBlocks, registerArtifactKit, blocks
 // offline-capable HTML file with the reactive runtime (sliders/charts/formulas)
 // inlined. `toSlideDeck`/`toHtmlSite` are the deck + multi-page variants.
 export {toHtml, toSlideDeck, toHtmlSite} from './export/toHtml';
+
+export * from './lib/statusStyles';
