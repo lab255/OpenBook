@@ -1,3 +1,4 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import {t} from '@/i18n';
 import {Fragment, useEffect, useMemo, useState} from 'react';
 import {useData} from '@/data';
@@ -67,14 +68,14 @@ function WordRuns({runs}: {runs: WordRun[]}) {
           return (
             <ins
               key={i}
-              className="rounded-sm bg-emerald-500/20 px-0.5 text-emerald-800 no-underline dark:text-emerald-300"
+              className={cn('rounded-sm px-0.5 no-underline', DATA_CHIP_CLASS.green)}
             >
               {run.value}
             </ins>
           );
         if (run.status === 'removed')
           return (
-            <del key={i} className="rounded-sm bg-destructive/15 px-0.5 text-destructive">
+            <del key={i} className={cn('rounded-sm px-0.5', DATA_CHIP_CLASS.red)}>
               {run.value}
             </del>
           );
@@ -93,20 +94,20 @@ function DiffRow({entry}: {entry: BlockDiffEntry}) {
   // Marker glyph + accessible status label (never colour-only).
   const marker =
     entry.status === 'added'
-      ? {sym: '＋', label: t('history.diffAdded'), tone: 'text-emerald-600 dark:text-emerald-400'}
+      ? {sym: '＋', label: t('history.diffAdded'), tone: 'text-[var(--data-green-chip-fg)]'}
       : entry.status === 'removed'
-        ? {sym: '−', label: t('history.diffRemoved'), tone: 'text-destructive'}
+        ? {sym: '−', label: t('history.diffRemoved'), tone: 'text-[var(--data-red-chip-fg)]'}
         : entry.status === 'changed'
-          ? {sym: '~', label: t('history.diffChanged'), tone: 'text-amber-600 dark:text-amber-400'}
+          ? {sym: '~', label: t('history.diffChanged'), tone: 'text-[var(--data-yellow-chip-fg)]'}
           : {sym: '', label: '', tone: 'text-muted-foreground'};
 
   const rowTint =
     entry.status === 'added'
-      ? 'bg-emerald-500/10'
+      ? 'bg-[color-mix(in_srgb,var(--data-green-chip-bg)_50%,transparent)]'
       : entry.status === 'removed'
-        ? 'bg-destructive/10'
+        ? 'bg-[color-mix(in_srgb,var(--data-red-chip-bg)_50%,transparent)]'
         : entry.status === 'changed'
-          ? 'bg-amber-500/10'
+          ? 'bg-[color-mix(in_srgb,var(--data-yellow-chip-bg)_50%,transparent)]'
           : '';
 
   // Body: word-runs for a changed text block; a "{Type} changed" badge for an
@@ -133,24 +134,24 @@ function DiffRow({entry}: {entry: BlockDiffEntry}) {
   } else if (entry.status === 'removed') {
     body = isTextType(type) ? (
       text ? (
-        <span className="text-destructive line-through">{text}</span>
+        <span className="text-[var(--data-red-chip-fg)] line-through">{text}</span>
       ) : (
         <em className="text-muted-foreground">{t('history.diffEmptyBlock')}</em>
       )
     ) : (
-      <span className="rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+      <span className="rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-[var(--data-red-chip-fg)]">
         {blockTypeLabel(type)}
       </span>
     );
   } else if (entry.status === 'added') {
     body = isTextType(type) ? (
       text ? (
-        <span className="text-emerald-700 dark:text-emerald-300">{text}</span>
+        <span className="text-[var(--data-green-chip-fg)]">{text}</span>
       ) : (
         <em className="text-muted-foreground">{t('history.diffEmptyBlock')}</em>
       )
     ) : (
-      <span className="rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+      <span className="rounded-sm border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-[var(--data-green-chip-fg)]">
         {blockTypeLabel(type)}
       </span>
     );

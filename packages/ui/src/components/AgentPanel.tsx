@@ -532,9 +532,9 @@ export function AgentPanel() {
                       </p>
                       {(s.before || s.after) && (
                         <p className="mt-0.5 break-words font-mono text-[10px] leading-relaxed text-muted-foreground">
-                          {s.before && <span className="text-destructive/80">- {s.before}</span>}
+                          {s.before && <span className="text-[var(--data-red-chip-fg)]">- {s.before}</span>}
                           {s.before && s.after && ' '}
-                          {s.after && <span className="text-emerald-600 dark:text-emerald-400">+ {s.after}</span>}
+                          {s.after && <span className="text-[var(--data-green-chip-fg)]">+ {s.after}</span>}
                         </p>
                       )}
                     </li>
