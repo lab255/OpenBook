@@ -376,14 +376,15 @@ todo, quote, callout, code, divider, image, table, columns, group, database embe
 | slider | `reactiveBlocks.tsx:65` | KitFrame | — |
 | form | `FormBlockView.tsx:181` | KitFrame (`symbol={false}`) | — |
 | meeting | `MeetingBlockView.tsx:115` | KitFrame | — |
-| **statuslight** | `kit/cards.tsx:35` | hand-rolled root + `KitSettings` | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
-| **tooltipcard** | `kit/cards.tsx:84` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader` (the term labels itself) |
-| **linkcard** | `kit/cards.tsx:126` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader`, `kind="linkcard-wrap"` (the card labels itself) |
-| **progressbar** | `kit/progress.tsx:36` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
-| **kitchart** | `kit/charts.tsx:1522` | hand-rolled `<figure>` + own caption | **adopt**: `as="figure"`, header = `title` renders as the `figcaption` (accessible name preserved) |
+| **statuslight** | `kit/cards.tsx:35` | KitFrame | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
+| **tooltipcard** | `kit/cards.tsx:84` | KitFrame | **adopt**: `symbol={false}`, `hideHeader` (the term labels itself) |
+| **linkcard** | `kit/cards.tsx:126` | KitFrame | **adopt**: `symbol={false}`, `hideHeader`, `kind="linkcard-wrap"` (the card labels itself) |
+| **progressbar** | `kit/progress.tsx:36` | KitFrame | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
+| **kitchart** | `kit/charts.tsx:1522` | KitFrame (`as="figure"`) | **adopt**: `as="figure"`, header = `title` renders as the `figcaption` (accessible name preserved) |
 
-Acceptance: `grep -n "KitSettings" blockeditor/kit/*.tsx` matches only `KitFrame.tsx`
-(today it also matches `cards.tsx`, `progress.tsx`, `charts.tsx`).
+Compact kits (status, progress), whose label shares a row with its value, keep the label inline in `control` with `hideHeader`.
+
+Acceptance: `grep -n "KitSettings" blockeditor/kit/*.tsx` matches only `KitFrame.tsx`.
 
 ---
 
