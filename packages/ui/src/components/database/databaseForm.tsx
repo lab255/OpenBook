@@ -310,7 +310,7 @@ const NewFieldDialog: React.FC<{
         </label>
         <label>
           <span className="mb-1 block text-sm font-medium">{t('database.formView.type')}</span>
-          <Select value={type} onChange={(event) => setType(event.target.value as FormWritablePropertyType)} aria-label={t('database.formView.type')}>
+          <Select inputSize="sm" value={type} onChange={(event) => setType(event.target.value as FormWritablePropertyType)} aria-label={t('database.formView.type')}>
             {FORM_PROPERTY_TYPES.map((propertyType) => (
               <option key={propertyType} value={propertyType}>{t(FORM_TYPE_KEY[propertyType])}</option>
             ))}
@@ -754,6 +754,7 @@ const DatabaseFormBuilder: React.FC<DatabaseFormProps> = ({view, properties, onU
           <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-muted-foreground">{t('database.formView.confirmationType')}</span>
             <Select
+              inputSize="sm"
               value={view.formConfig?.confirmation?.type ?? 'message'}
               onChange={(event) => updateConfig({confirmation: event.target.value === 'redirect'
                 ? {type: 'redirect', redirectUrl: ''}
