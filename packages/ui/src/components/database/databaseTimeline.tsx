@@ -773,7 +773,7 @@ const TimelineCanvas: React.FC<{
         <div ref={scrollRef} onScroll={onScroll} className="min-w-0 flex-1 overflow-x-auto">
           <div style={{width: bodyW}}>
             {/* Date axis (two tiers). */}
-            <div className="relative border-b border-border bg-muted/30" style={{height: HEADER_H}}>
+            <div className="relative isolate border-b border-border bg-muted/30" style={{height: HEADER_H}}>
               {axis.top.map((t) => (
                 <div
                   key={t.key}
@@ -796,30 +796,30 @@ const TimelineCanvas: React.FC<{
               ))}
               {/* Today marker tag, aligned with the body's vertical bar. */}
               <div
-                className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-b bg-brand px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
+                className="pointer-events-none absolute z-raised -translate-x-1/2 rounded-b bg-brand px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
                 style={{left: todayX, top: 0}}
               >
                 Today
               </div>
             </div>
 
-            <div ref={bodyRef} className="relative" style={{height: bodyH}}>
+            <div ref={bodyRef} className="relative isolate" style={{height: bodyH}}>
               {/* Background: clicking empty canvas (no row lane) adds a new row here. */}
-              <div className="absolute inset-0 z-0" onClick={onCreateClick} title="Click to add a new item here" />
+              <div className="absolute inset-0" onClick={onCreateClick} title="Click to add a new item here" />
               {gridTicks.map((t) => (
                 <div key={t.key} className="pointer-events-none absolute top-0 h-full border-l border-border/25" style={{left: t.left}} />
               ))}
               {bands.map((b) => (
                 <div
                   key={b.key}
-                  className="pointer-events-none absolute left-0 z-[1] border-b border-border/60 bg-muted/20"
+                  className="pointer-events-none absolute left-0 z-raised border-b border-border/60 bg-muted/20"
                   style={{top: b.top, width: bodyW, height: BAND_H}}
                 />
               ))}
-              <div className="pointer-events-none absolute top-0 z-10 h-full w-0.5 -translate-x-1/2 bg-brand/70" style={{left: todayX}} title="Today" />
+              <div className="pointer-events-none absolute top-0 z-pane-overlay h-full w-0.5 -translate-x-1/2 bg-brand/70" style={{left: todayX}} title="Today" />
 
               {laid.length === 0 && (
-                <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                <div className="pointer-events-none absolute inset-0 z-raised flex items-center justify-center px-6 text-center text-sm text-muted-foreground">
                   No rows have a date yet — click anywhere on the timeline to add one.
                 </div>
               )}
@@ -841,7 +841,7 @@ const TimelineCanvas: React.FC<{
                       }}
                       aria-label={t('database.timeline.scheduleRow', {name})}
                       title={t('database.timeline.placeItem')}
-                      className="group/lane absolute left-0 z-[1] flex cursor-copy items-center"
+                      className="group/lane absolute left-0 z-raised flex cursor-copy items-center"
                       style={{top: l.top + BAR_PAD, height: rowH - BAR_PAD * 2, width: bodyW}}
                     >
                       <span className="sticky left-2 rounded border border-dashed border-border bg-background/70 px-2 py-0.5 text-xs text-muted-foreground/70 transition-colors group-hover/lane:border-brand group-hover/lane:text-brand">
@@ -878,7 +878,7 @@ const TimelineCanvas: React.FC<{
                       db.openRow(l.row.id);
                     }}
                     onKeyDown={(e) => e.key === 'Enter' && db.openRow(l.row.id)}
-                    className={cn(cnBar(!!preview), 'z-[2]', link?.targetId === l.row.id && 'ring-2 ring-brand')}
+                    className={cn(cnBar(!!preview), 'z-control', link?.targetId === l.row.id && 'ring-2 ring-brand')}
                     style={{
                       left,
                       width,
@@ -892,7 +892,7 @@ const TimelineCanvas: React.FC<{
                     {canResize && (
                       <span
                         onPointerDown={(e) => begin(e, l.row.id, 'start')}
-                        className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize rounded-l bg-black/0 transition-colors group-hover/bar:bg-black/25"
+                        className="absolute left-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-l bg-black/0 transition-colors group-hover/bar:bg-black/25"
                         aria-hidden
                       />
                     )}
@@ -909,7 +909,7 @@ const TimelineCanvas: React.FC<{
                     {canResize && (
                       <span
                         onPointerDown={(e) => begin(e, l.row.id, 'end')}
-                        className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize rounded-r bg-black/0 transition-colors group-hover/bar:bg-black/25"
+                        className="absolute right-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-r bg-black/0 transition-colors group-hover/bar:bg-black/25"
                         aria-hidden
                       />
                     )}
@@ -919,7 +919,7 @@ const TimelineCanvas: React.FC<{
                         onClick={(e) => e.stopPropagation()}
                         // Inside the bar's right edge so the dependency origin
                         // stays tied to the actual date-span geometry.
-                        className="absolute right-0.5 top-1/2 z-20 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-white/30 opacity-0 transition-opacity group-hover/bar:opacity-100"
+                        className="absolute right-0.5 top-1/2 z-control h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-white/30 opacity-0 transition-opacity group-hover/bar:opacity-100"
                         aria-label={t('database.timeline.linkDependency')}
                         title={t('database.timeline.addDependency')}
                       />
@@ -931,14 +931,14 @@ const TimelineCanvas: React.FC<{
               {link && (() => {
                 const a = linkAnchor(link.sourceRowId);
                 return a ? (
-                  <svg className="pointer-events-none absolute inset-0 z-raised-chrome" width={bodyW} height={bodyH}>
+                  <svg className="pointer-events-none absolute inset-0 z-local-overlay" width={bodyW} height={bodyH}>
                     <path d={`M ${a.x} ${a.y} L ${link.toX} ${link.toY}`} className="stroke-brand" strokeWidth={2} strokeDasharray="4 3" fill="none" />
                   </svg>
                 ) : null;
               })()}
 
               {arrows.length > 0 && (
-                <svg className="pointer-events-none absolute inset-0 z-[3]" width={bodyW} height={bodyH}>
+                <svg className="pointer-events-none absolute inset-0 z-drop-indicator" width={bodyW} height={bodyH}>
                   <defs>
                     <marker id="ob-dep-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
                       <path d="M0,0 L6,3 L0,6 Z" className="fill-muted-foreground/70" />
