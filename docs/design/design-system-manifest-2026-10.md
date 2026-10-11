@@ -26,7 +26,7 @@ call. Matching it is not a goal in itself; each row states our own reason.
 | # | Rule |
 |---|---|
 | G1 | **Export parity.** Core block visuals stay plain CSS in `index.css` (comment at :932-935). Every token a core block reads is a CSS custom property declared in the plain `:root` / `.dark` layer (:215-350). `@theme` may *alias* a token for Tailwind utilities; core block CSS never depends on a Tailwind-generated variable or utility. Nothing here prescribes Tailwind for core block visuals. |
-| G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). |
+| G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). Kit inputs: `KIT_EXPORT_PRIMARY` = `#1f86db` (light `--primary` `207 75% 49%`, `colors.ts`, equality-tested in `colors.test.ts`). |
 | G3 | **Token namespaces.** Editor/content tokens: `--obe-*`. Motion durations: `--motion-*`. Easings: existing `--ease-*`. Radius: existing `--radius-*` (+ one new step). z-index: existing `--z-index-*`. No other new prefixes. |
 | G4 | **Mode pairs.** Any colour token that is not derived from a theme variable (`--foreground`, `--muted`, `--ring`, …) declares both a `:root` and a `.dark` value. A literal colour with no dark value is a defect. |
 | G5 | **Sequencing.** A foundation change lands first (declare tokens §1-§5, global retunes §2.4, lint guards §10 at `warn`); family tasks then migrate their own selectors. Guards flip to `error` when their baseline reaches zero. |
@@ -240,6 +240,14 @@ darkened until they pass 4.5:1 on the code-block surface. Surface:
 
 Dark values are exactly the editor palette's dark `fg` values for those hues, so dark
 code reads as the same family as coloured prose.
+
+### 5.4 Chart ink
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--obe-chart-ink-on-pale` | `#233246` | `#233246` (same; explicit G4 pair) | label ink on near-opaque pale data fills (`.obe-chart-heat-label-strong`) |
+
+Funnel stage labels take no token: ink is `readableTextColor(fill)` per stage (chrome ink derived from the data colour; data values untouched).
 
 ---
 
