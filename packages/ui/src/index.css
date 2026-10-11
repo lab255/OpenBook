@@ -3915,6 +3915,17 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   white-space: nowrap;
 }
 
+.ob-leaflet .leaflet-bar {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.ob-leaflet .leaflet-bar a {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
 /* The light primary/white pair is 3.82:1 at caption size. Shade only this tag. */
 .ob-db-today {
   background-color: color-mix(in srgb, hsl(var(--primary)) 88%, black);
