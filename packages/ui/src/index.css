@@ -34,31 +34,24 @@
   --color-ring: hsl(var(--ring));
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
-
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-muted-foreground-strong: hsl(var(--muted-foreground-strong));
   --color-placeholder-foreground: hsl(var(--placeholder-foreground));
-
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-
   /* The interactive highlight: a translucent tint of the accent colour (the
      same one the sidebar items use), so hover/focus states across the whole
      interface read as the theme colour rather than a flat neutral gray.
      `--hover` already carries its alpha, so `bg-hover` needs no /opacity. */
   --color-hover: var(--hover);
   --color-hover-strong: var(--hover-strong);
-
   /* Sidebar selection (APPFIT-3.9): the selected row is marked with the brand
      tint — a primary wash, primary ink and a primary rail. That reads on the
      TINTED (default) sidebar, whose sheet is a pale accent panel. On the opt-in
@@ -69,38 +62,29 @@
   --color-sidebar-selection: hsl(var(--primary));
   --color-sidebar-selection-wash: hsl(var(--primary) / 0.15);
   --color-sidebar-selection-wash-strong: hsl(var(--primary) / 0.2);
-
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
-
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-
   --color-sheet-1: hsl(var(--sheet-1));
   --color-sheet-1-foreground: hsl(var(--sheet-1-foreground));
-
   /* --sheet-2 is still composed (it's the deeper companion sheet in manifest
      §2.2) but currently has no consumer — kept as a painted token for a future
      second-surface use, not dead-stripped. */
   --color-sheet-2: hsl(var(--sheet-2));
   --color-sheet-2-foreground: hsl(var(--sheet-2-foreground));
-
   /* The neutral desk (book cover) behind the page sheets — stays a neutral
      canvas even when the sidebar sheets go full-accent (OB-377). */
   --color-desk: hsl(var(--desk));
-
   --color-brand: hsl(var(--brand));
   --color-brand-foreground: hsl(var(--brand-foreground));
   --color-brand-subtle: hsl(var(--brand-subtle));
-
   --font-sans:
     ui-sans-serif, -apple-system, BlinkMacSystemFont, Inter, Segoe UI, Roboto,
     Helvetica Neue, Arial, sans-serif;
   --font-serif: ui-serif, Lyon-Text, Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
   --container-content: 46rem;
-
   /* ── Spacing + control-height scale ──────────────────────────────────────
      The 4px grid is the only legal spacing grid for new work. Control heights
      use this semantic scale so components do not introduce one-off sizes. */
@@ -108,18 +92,14 @@
   --height-control-sm: 28px;
   --height-control-md: 32px;
   --height-control-lg: 36px;
-
   --radius-xl: calc(var(--radius) + 4px);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
-
   --animate-accordion-down: accordion-down var(--motion-base) var(--ease-out-soft);
   --animate-accordion-up: accordion-up var(--motion-base) var(--ease-out-soft);
-
   --transition-property-height: height;
   --transition-property-spacing: margin, padding;
-
   /* ── Chrome stacking scale ────────────────────────────────────────────────
      Local 1–6 tiers order editor adornments without escaping their stacking
      contexts. Inline .obe-kit-tip affordances use 20; real Radix tooltips
@@ -145,7 +125,6 @@
   --z-index-nested-menu: 55;
   --z-index-lightbox: 60;
   --z-index-toast: 100;
-
   /* ── Motion system ──────────────────────────────────────────────────────────
      One considered curve + tempo for the whole UI. `--default-transition-*` are
      the Tailwind v4 theme keys every `transition`/`transition-colors` utility
@@ -159,7 +138,6 @@
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
-
   /* Literal shadow tokens declared in @theme bake into utilities. The
      scheme-dependent sheet/menu/overlay tokens therefore live in :root and
      use explicit @utility declarations so their .dark overrides stay live. */
@@ -167,7 +145,6 @@
      contact shadow plus a wider ambient one, warm-tinted to match the palette
      (Apple's "floating just off the surface" look rather than a hard drop). */
   --shadow-lift: 0 1px 2px hsl(20 14% 12% / 0.05), 0 10px 24px -6px hsl(20 14% 12% / 0.12);
-
   @keyframes accordion-down {
     from {
       height: 0;
@@ -262,6 +239,7 @@
     --obe-caption-size: calc(var(--obe-font-size) * 0.75);
     --obe-caption-leading: 1.33;
     --obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --obe-disabled-opacity: 0.5;
     --obe-placeholder: hsl(var(--muted-foreground) / 0.6);
     --obe-callout-info: hsl(var(--muted));
     --obe-callout-warn: var(--obe-bg-yellow);
@@ -325,7 +303,6 @@
     --obe-code-str: hsl(140 50% 30%);
     --obe-code-num: hsl(28 80% 38%);
     --obe-code-lit: hsl(210 72% 42%);
-
     /* Warm, refined light palette */
     --background: 0 0% 100%;
     --foreground: 34 9% 19%;
@@ -445,7 +422,6 @@
     --obe-code-str: hsl(140 50% 60%);
     --obe-code-num: hsl(28 85% 62%);
     --obe-code-lit: hsl(210 75% 67%);
-
     /* Refined dark palette: main surface dark, sidebar slightly lighter.
        Softened 2026-06-13: lifted the base, eased the text, and calmed the
        accent so dark mode reads less harsh (lower contrast, less glare). */
@@ -2463,7 +2439,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   min-width: 2.5rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
 }
 .obe-kit-wide .obe-kit-range { width: 100%; }
@@ -2481,13 +2457,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   min-width: 0;
   background: transparent;
   font-family: var(--obe-font-mono);
-  font-size: 0.85rem;
+  font-size: var(--obe-code-size);
   outline: none;
 }
-.obe-formula-eq { color: hsl(var(--muted-foreground) / 0.7); }
+.obe-formula-eq { color: var(--obe-chrome-ink); }
 .obe-formula-out {
   font-family: var(--obe-font-mono);
-  font-size: 0.9rem;
+  font-size: var(--obe-code-size);
   font-weight: 600;
   color: hsl(var(--primary));
   white-space: nowrap;
@@ -2614,6 +2590,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   padding: 0;
   position: relative;
 }
+.obe-kit :is(button, input, select, textarea, [role='switch']):disabled,
+.obe-kit-card:disabled, .obe-kit-searchtrigger:disabled { opacity: var(--obe-disabled-opacity); cursor: default; }
+.obe-kit-select:hover:not(:disabled) { border-color: hsl(var(--foreground) / 0.2); }
+.obe-kit-wide .obe-kit-searchtrigger { width: 100%; }
 /* Header column: display name over an optional description, decoupled from the
    reactive variable symbol. */
 .obe-kit-head {
@@ -2665,8 +2645,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   align-items: center;
   gap: 0.5rem;
   align-self: flex-start;
-  font-size: 0.7rem;
-  color: hsl(var(--muted-foreground) / 0.85);
+  font-size: var(--obe-caption-size);
+  color: hsl(var(--muted-foreground));
   cursor: pointer;
 }
 .obe-kit-symbol-hint:disabled { cursor: default; }
@@ -2719,7 +2699,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.72rem;
+  font-size: var(--obe-caption-size);
   color: hsl(var(--muted-foreground));
 }
 .obe-kit-field-grow { flex: 1; min-width: 10rem; }
@@ -2729,13 +2709,15 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
+  font-size: var(--obe-caption-size);
   color: hsl(var(--foreground));
 }
 .obe-kit-name { width: 7rem; font-family: var(--obe-font-mono); }
-.obe-kit-num { width: 4rem; font-variant-numeric: tabular-nums; }
+.obe-kit-num { width: 4rem; font-variant-numeric: tabular-nums;
+  height: var(--height-control-md);
+}
 .obe-kit-mono { font-family: var(--obe-font-mono); }
-.obe-kit-empty { font-size: 0.78rem; color: hsl(var(--muted-foreground) / 0.7); font-style: italic; }
+.obe-kit-empty { font-size: var(--obe-caption-size); color: hsl(var(--muted-foreground)); font-style: italic; }
 
 /* Number stepper */
 .obe-kit-stepper {
@@ -2745,9 +2727,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   overflow: hidden;
   background: hsl(var(--card));
+  height: var(--height-control-sm);
 }
 .obe-kit-stepper button {
-  width: 2rem;
+  width: var(--height-control-sm);
   border: none;
   background: transparent;
   font-size: 1rem;
@@ -2755,7 +2738,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-stepper button:hover:not(:disabled) { background: var(--hover); color: hsl(var(--foreground)); }
+.obe-kit-stepper button:hover:not(:disabled) { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
 .obe-kit-stepper input {
   width: 4.5rem;
   text-align: center;
@@ -2763,7 +2746,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-inline: 1px solid hsl(var(--border) / 0.6);
   background: transparent;
   font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
+  font-size: var(--obe-small-size);
   outline: none;
 }
 
@@ -2774,26 +2757,28 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   background: hsl(var(--card));
-  padding: 0.375rem 0.625rem;
-  font-size: 0.9rem;
+  padding: 0 0.625rem;
+  font-size: var(--obe-small-size);
+  height: var(--height-control-md);
 }
 .obe-kit-textinput:focus { outline: none; border-color: hsl(var(--ring)); }
 .obe-kit-mini {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.8rem;
-  height: 1.8rem;
+  width: var(--height-control-md);
+  height: var(--height-control-md);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
-  font-size: 0.9rem;
+  font-size: var(--obe-small-size);
   cursor: pointer;
   text-decoration: none;
   transition: color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-mini:hover { color: hsl(var(--foreground)); border-color: hsl(var(--ring)); }
+.obe-kit-mini:hover { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover);
+}
 
 /* Radio pills + checklist */
 .obe-kit-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; }
@@ -2801,13 +2786,16 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border: 1px solid hsl(var(--border));
   border-radius: 9999px;
   background: hsl(var(--card));
-  padding: 0.25rem 0.75rem;
-  font-size: 0.82rem;
+  padding: 0 0.75rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
+  min-height: var(--height-control-sm);
 }
-.obe-kit-pill:hover:not(:disabled) { border-color: hsl(var(--ring)); color: hsl(var(--foreground)); }
+.obe-kit-pill:hover:not(:disabled):not(.obe-kit-pill-on) { color: var(--obe-chrome-ink-hover);
+  background: var(--obe-chrome-hover);
+}
 .obe-kit-pill-on {
   background: hsl(var(--primary));
   border-color: hsl(var(--primary));
@@ -2818,7 +2806,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.88rem;
+  font-size: var(--obe-small-size);
   cursor: pointer;
 }
 .obe-kit-check input { accent-color: hsl(var(--primary)); }
@@ -3146,12 +3134,14 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-lg);
   background: hsl(var(--card));
-  padding: 0.5rem 0.75rem;
-  font-size: 0.88rem;
+  padding: 0 0.75rem;
+  font-size: var(--obe-small-size);
   transition: border-color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
+  min-height: var(--height-control-lg);
 }
-.obe-kit-wide .obe-kit-pill:hover, .obe-kit-wide .obe-kit-check:hover {
-  background: hsl(var(--accent));
+.obe-kit-wide .obe-kit-pill:hover:not(.obe-kit-pill-on), .obe-kit-wide .obe-kit-check:hover {
+  background: var(--obe-chrome-hover);
+  border-color: hsl(var(--foreground) / 0.2);
 }
 .obe-kit-wide .obe-kit-pill { color: hsl(var(--foreground)); }
 .obe-kit-wide .obe-kit-pill-on {
@@ -3162,7 +3152,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   width: 0.85rem;
   height: 0.85rem;
   border-radius: 9999px;
-  border: 1.5px solid hsl(var(--muted-foreground) / 0.5);
+  border: 1.5px solid var(--obe-chrome-ink);
   flex-shrink: 0;
 }
 .obe-kit-pill-on .obe-kit-pill-dot {
@@ -3172,17 +3162,18 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-dropdown-select { min-width: 9rem; }
 .obe-kit-wide .obe-kit-dropdown-select {
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.88rem;
+  padding: 0 0.75rem;
+  font-size: var(--obe-small-size);
+  height: var(--height-control-md);
 }
 
 /* Toggle switch */
 .obe-kit-switch {
-  width: 2.4rem;
-  height: 1.35rem;
+  width: 36px;
+  height: 20px;
   border-radius: 9999px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--muted));
+  border: 0;
+  background: hsl(var(--input));
   position: relative;
   cursor: pointer;
   transition: background var(--motion-base) var(--ease-out-soft);
@@ -3190,16 +3181,16 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-switch-on { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
 .obe-kit-knob {
   position: absolute;
-  top: 1px;
+  top: 2px;
   left: 2px;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
   background: hsl(var(--background));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  box-shadow: var(--shadow-sheet);
   transition: transform var(--motion-base) var(--ease-spring);
 }
-.obe-kit-switch-on .obe-kit-knob { transform: translateX(1rem); }
+.obe-kit-switch-on .obe-kit-knob { transform: translateX(16px); }
 
 /* Action button */
 .obe-kit-action {
@@ -3207,16 +3198,19 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
-  padding: 0.25rem 1rem;
-  font-size: 0.88rem;
-  font-weight: 550;
+  padding: 0 1rem;
+  font-size: var(--obe-small-size);
+  font-weight: 600;
   cursor: pointer;
   transition: opacity var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
+  height: var(--height-control-md);
 }
-.obe-kit-action:hover { opacity: 0.9; }
+.obe-kit-action:hover { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 4%); }
 /* Colour-only press — deepen the fill toward --press-ink (matches Button), no geometry shift. */
 .obe-kit-action:active { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 8%); }
-.obe-kit-select { cursor: pointer; }
+.obe-kit-select { cursor: pointer;
+  height: var(--height-control-sm);
+}
 
 /* Chart */
 .obe-kit-chart { display: block; margin: 0; }
@@ -3432,9 +3426,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   text-align: left;
   transition: border-color var(--motion-fast) var(--ease-out-soft), box-shadow var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-card:hover:not(:disabled) { border-color: hsl(var(--ring)); }
+.obe-kit-card:hover:not(:disabled):not(.obe-kit-card-on) { border-color: hsl(var(--foreground) / 0.2); }
 .obe-kit-card-on { border-color: hsl(var(--primary)); box-shadow: 0 0 0 1px hsl(var(--primary)); }
-.obe-kit-card:disabled { opacity: 0.55; cursor: default; }
 .obe-kit-card-cover {
   display: block;
   width: 100%;
@@ -3442,20 +3435,20 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-sm);
   background-size: cover;
   background-position: center;
-  background-color: hsl(var(--muted) / 0.6);
 }
-.obe-kit-card-cover-empty { border: 1px dashed hsl(var(--border)); background-color: transparent; }
+.obe-kit-card-cover:not([class*='obe-bg-']) { background-color: hsl(var(--muted)); }
+.obe-kit-card-cover-empty { border: 1px dashed hsl(var(--border)); }
 .obe-kit-card-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.8rem;
+  font-size: var(--obe-h1-size);
 }
-.obe-kit-card-label { font-size: 0.82rem; font-weight: 550; line-height: 1.2; }
+.obe-kit-card-label { font-size: var(--obe-small-size); font-weight: 600; line-height: 1.2; }
 .obe-kit-card-tick {
   position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
+  top: 0.5rem;
+  right: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3476,8 +3469,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   background: hsl(var(--card));
   padding: 0.5rem 0.75rem;
   font: inherit;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
   color: hsl(var(--foreground));
 }
 .obe-kit-longtext:focus { outline: none; border-color: hsl(var(--ring)); }
@@ -3486,34 +3479,36 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-richtext { width: 100%; display: flex; flex-direction: column; gap: 0.25rem; }
 .obe-kit-richtext-bar { display: flex; gap: 0.25rem; }
 .obe-kit-richtext-btn {
-  width: 1.6rem;
-  height: 1.6rem;
+  width: var(--obe-gutter-btn);
+  height: var(--obe-gutter-btn);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-richtext-btn:hover { border-color: hsl(var(--ring)); color: hsl(var(--foreground)); }
+.obe-kit-richtext-btn:hover { color: var(--obe-chrome-ink-hover);
+  background: var(--obe-chrome-hover);
+}
 .obe-kit-richtext-b { font-weight: 700; }
 .obe-kit-richtext-i { font-style: italic; }
 .obe-kit-richtext-u { text-decoration: underline; }
 .obe-kit-richtext-body {
   min-height: 3rem;
   border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.5rem 0.75rem;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
   outline: none;
 }
 .obe-kit-richtext-body:focus { border-color: hsl(var(--ring)); }
 .obe-kit-richtext-body:empty::before {
   content: attr(data-placeholder);
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: var(--obe-placeholder);
 }
 
 /* Inline review: a quiet accent on blocks with an open suggestion or a comment,
@@ -3599,14 +3594,14 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   background: hsl(var(--card));
-  padding: 0.375rem 0.625rem;
-  font-size: 0.88rem;
+  padding: 0 0.625rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--foreground));
   cursor: pointer;
   transition: border-color var(--motion-fast) var(--ease-out-soft);
+  height: var(--height-control-md);
 }
-.obe-kit-searchtrigger:hover:not(:disabled) { border-color: hsl(var(--ring)); }
-.obe-kit-searchtrigger:disabled { opacity: 0.6; cursor: default; }
+.obe-kit-searchtrigger:hover:not(:disabled) { border-color: hsl(var(--foreground) / 0.2); }
 .obe-kit-search-placeholder { color: var(--obe-placeholder); }
 
 /* Tag field: chips + a free-entry input. */
@@ -3620,7 +3615,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.25rem 0.5rem;
-  min-height: 2rem;
+  min-height: var(--height-control-md);
 }
 .obe-kit-tag {
   display: inline-flex;
@@ -3629,7 +3624,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: 9999px;
   background: hsl(var(--muted) / 0.7);
   padding: 0 0.25rem 0 0.5rem;
-  font-size: 0.8rem;
+  font-size: var(--obe-caption-size);
 }
 .obe-kit-tag-x {
   display: inline-flex;
@@ -3639,14 +3634,14 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   color: hsl(var(--muted-foreground));
   cursor: pointer;
 }
-.obe-kit-tag-x:hover { color: hsl(var(--foreground)); background: var(--hover); }
+.obe-kit-tag-x:hover { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover); }
 .obe-kit-tag-entry { flex: 1; min-width: 4rem; }
 .obe-kit-tag-input {
   width: 100%;
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--obe-small-size);
   outline: none;
   color: hsl(var(--foreground));
 }

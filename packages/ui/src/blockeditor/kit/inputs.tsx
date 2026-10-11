@@ -195,10 +195,12 @@ const DropdownBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const options = resolveOptions(block);
   const value = blockProp<string>(block, 'value') ?? '';
   const known = options.some((o) => o.value === value);
+  const wide = kitWide(block);
 
   const control = (
     <Select unstyled
       className="obe-kit-select obe-kit-dropdown-select"
+      wrapperClassName={wide ? 'w-full' : undefined}
       value={known ? value : ''}
       aria-label={`${name} value`}
       disabled={editor.readOnly}
