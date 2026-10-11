@@ -941,8 +941,8 @@ tr[data-row-anchor][data-selected] > td {
   --obe-lead-line: var(--height-control-md);
 }
 .obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit) {
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + 0.25rem);
-  --obe-lead-line: calc(0.8rem * var(--obe-leading));
+  --obe-lead-offset: var(--obe-block-pad-y);
+  --obe-lead-line: calc(var(--obe-caption-size) * var(--obe-caption-leading));
 }
 .obe-row[data-block-type='callout'] {
   --obe-lead-offset: calc(var(--obe-block-pad-y) + 1rem);
@@ -2611,14 +2611,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.25rem;
+  padding: 0;
   position: relative;
-}
-.obe-kit-label {
-  font-size: 0.8rem;
-  font-weight: 550;
-  color: hsl(var(--muted-foreground));
-  min-width: 4.5rem;
 }
 /* Header column: display name over an optional description, decoupled from the
    reactive variable symbol. */
@@ -2632,37 +2626,34 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   min-width: 0;
 }
 .obe-kit-desc {
-  font-size: 0.7rem;
-  line-height: 1.3;
-  color: hsl(var(--muted-foreground) / 0.8);
+  font-size: var(--obe-caption-size);
+  line-height: var(--obe-caption-leading);
+  color: hsl(var(--muted-foreground));
 }
 /* Edit-in-place label: reads as plain text (inherits the caller's font/size/
-   weight/colour), auto-sizes to its content, and only reveals an outline on
+   weight/colour), auto-sizes to its content, and only reveals a background tint on
    hover/focus — so the display name is WYSIWYG-editable right on the block. */
 .obe-kit-inline {
   field-sizing: content;
   min-width: 2ch;
   max-width: 100%;
   font-family: inherit;
-  line-height: inherit;
-  color: inherit;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   padding: 0;
   margin: 0;
   cursor: text;
-  transition: border-color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
+  transition: background var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-inline:hover { border-color: hsl(var(--border) / 0.6); }
-.obe-kit-inline:focus { outline: none; border-color: hsl(var(--ring)); background: hsl(var(--card)); }
+.obe-kit-inline:hover { background: var(--obe-chrome-hover); }
+.obe-kit-inline:focus { outline: none; background: var(--obe-chrome-hover); }
 .obe-kit-inline::placeholder { color: var(--obe-placeholder); }
 
 /* The inline description edits in place (WYSIWYG) and only renders when it has
    text (see KitFrame) — so it never collapses/unfurls and never shifts the
    layout. An empty description is added from the settings gear. */
 .obe-kit-desc-edit {
-  opacity: 0.85;
   transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
 
@@ -3228,8 +3219,12 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Chart */
 .obe-kit-chart { display: block; margin: 0; }
-.obe-kit-chart-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 1.4rem; }
-.obe-kit-chart-title { font-size: 0.82rem; font-weight: 550; color: hsl(var(--muted-foreground)); }
+.obe-kit-label, .obe-kit-chart-title {
+  font-size: var(--obe-caption-size);
+  line-height: var(--obe-caption-leading);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
 .obe-chart-svg {
   display: block;
   width: 100%;
@@ -3330,7 +3325,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-light-ok { background: var(--data-status-ok, #9fdf9f); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-ok, #9fdf9f) 25%, transparent); }
 .obe-kit-light-warn { background: var(--data-status-warn, #dac495); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-warn, #dac495) 25%, transparent); }
 .obe-kit-light-bad { background: var(--data-status-bad, #deaea6); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #deaea6) 25%, transparent); }
-.obe-kit-status-label { font-size: 0.88rem; font-weight: 550; }
+.obe-kit-status-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-status-value {
   font-family: var(--obe-font-mono);
   font-size: 0.82rem;
@@ -3343,8 +3338,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.9rem;
-  font-weight: 550;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
+  font-weight: 600;
   border-bottom: 1px dotted hsl(var(--muted-foreground));
   cursor: help;
   outline: none;
@@ -3652,7 +3648,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Progress bar (display, no published value). */
 .obe-kit-progress { flex-direction: column; align-items: stretch; gap: 0.25rem; }
 .obe-kit-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.obe-kit-progress-label { font-size: 0.85rem; font-weight: 550; }
+.obe-kit-progress-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-progress-value {
   font-family: var(--obe-font-mono);
   font-size: 0.8rem;
