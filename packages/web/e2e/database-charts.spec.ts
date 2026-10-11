@@ -98,3 +98,36 @@ test('bar plot height and caption size follow the density ledger', {tag: ['@data
   await testInfo.attach('density-ledger', {body: JSON.stringify(measurements, null, 2), contentType: 'application/json'});
   console.log('DSX chart ledger', JSON.stringify(measurements));
 });
+
+// Nine groups reproduce the crowded captions at narrow database widths.
+test('bar group labels stay separated at 600px and 900px', {tag: ['@database']}, async ({page, request}, testInfo) => {
+  const labels = ['Engineering', 'Operations', 'Marketing', 'Customer success', 'Product design', 'Finance', 'Human resources', 'Sales', 'Support'];
+  const options = labels.map((label, i) => ({id: `group_${i}`, label, color: 'blue'}));
+  const p = await request.post(`${SERVER}/api/pages`, {data: {name: `Bar labels ${Date.now()}`, data: {editorjs: {blocks: []}, values: [], names: []}}});
+  const pageId = ((await p.json()) as {id: string}).id;
+  const d = await request.post(`${SERVER}/api/databases`, {data: {pageId, name: 'Teams', schema: {
+    properties: [{id: 'team', name: 'Team', type: 'select', options}],
+    views: [{id: 'bar', name: 'Bar', type: 'bar', filters: [], sorts: [], groupByPropertyId: 'team'}],
+  }}});
+  const dbId = ((await d.json()) as {id: string}).id;
+  for (const option of options) {
+    await request.post(`${SERVER}/api/databases/${dbId}/rows`, {data: {name: `${option.label} ${dbId.slice(0, 8)}`, properties: {team: option.id}}});
+  }
+  await page.goto(`/?page=${pageId}`);
+  const svg = page.locator('svg[aria-label="Bar chart"]');
+  await expect(svg.locator('.obe-chart-xlabels text')).toHaveCount(9);
+  const measurements = [];
+  for (const width of [600, 900]) {
+    await page.setViewportSize({width, height: 900});
+    await expect.poll(() => svg.evaluate((node) => Math.abs(node.getBoundingClientRect().width - (node as SVGSVGElement).viewBox.baseVal.width))).toBeLessThan(0.1);
+    const measured = await svg.locator('.obe-chart-xlabels text').evaluateAll((nodes) => {
+      const boxes = nodes.map((node) => node.getBoundingClientRect());
+      return {minGap: Math.min(...boxes.slice(1).map((box, i) => box.left - boxes[i].right))};
+    });
+    expect(measured.minGap).toBeGreaterThan(0);
+    measurements.push({viewport: width, ...measured});
+    await page.screenshot({path: testInfo.outputPath(`nine-groups-${width}.png`)});
+  }
+  await testInfo.attach('label-gaps', {body: JSON.stringify(measurements), contentType: 'application/json'});
+  console.log('DSX label gaps', JSON.stringify(measurements));
+});

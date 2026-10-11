@@ -439,7 +439,7 @@ const MatrixBars: React.FC<{matrix: ChartMatrixInput; palette: string[]; w?: num
       <g className="obe-chart-xlabels">
         {groups.map((g, i) => {
           const label = g.label ?? '';
-          const shown = ellipsize(label, Math.max(3, Math.floor(groupW / 6)));
+          const shown = ellipsize(label, Math.max(3, Math.floor(groupW / 7.5)));
           return (
             <text key={g.key} x={padL + i * groupW + groupW / 2} y={h - 8}>
               {shown}
