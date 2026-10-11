@@ -332,6 +332,19 @@ describe('toHtmlSite', () => {
     expect(html).toContain('style="background:#dbeddb;color:#1e761e">Done</span>');
   });
 
+  it('exports select/multi-select corners and status pills', () => {
+    for (const type of ['select', 'multi_select', 'status'] as const) {
+      const fixture = structuredClone(bundle);
+      const database = fixture.pages.find((page) => page.database)!.database!;
+      database.schema.properties[0].type = type;
+      database.rows[0].properties.p_status = type === 'multi_select' ? ['s_done'] : 's_done';
+      const output = toHtmlSite(fixture);
+      expect(output).toContain(`class="tag" data-kind="${type === 'status' ? 'status' : 'select'}"`);
+      expect(output).toContain('.tag { display: inline-block; padding: 1px 8px; border-radius: 4px;');
+      expect(output).toContain('.tag[data-kind=status] { border-radius:9999px; }');
+    }
+  });
+
   it('embeds the navigation runtime', () => {
     expect(html).toContain('hashchange');
     expect(html).toContain('id="ob-back"');

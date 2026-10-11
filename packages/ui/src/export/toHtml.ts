@@ -287,20 +287,20 @@ function visibleProps(schema: DatabaseSchema): DatabaseProperty[] {
   return chosen.filter((p) => p.type !== 'files' && p.type !== 'backlinks');
 }
 
-const tag = (label: string, color: string | undefined, scheme: DataColorScheme): string => {
+const tag = (label: string, color: string | undefined, scheme: DataColorScheme, kind: 'select' | 'status'): string => {
   const chip = DATA_PALETTE[scheme][isDataColorToken(color) ? color : 'gray'].chip.light;
-  return `<span class="tag" style="background:${chip.bg};color:${chip.fg}">${escapeHtml(label)}</span>`;
+  return `<span class="tag" data-kind="${kind}" style="background:${chip.bg};color:${chip.fg}">${escapeHtml(label)}</span>`;
 };
 
 function cellHtml(row: DatabaseRow, prop: DatabaseProperty, props: DatabaseProperty[], rows: DatabaseRow[], ctx: RenderCtx): string {
   const raw = cellValue(row, prop, props, rows);
   if (prop.type === 'select' || prop.type === 'status') {
     const opt = prop.options?.find((o) => o.id === raw);
-    return opt ? tag(opt.label, opt.color, ctx.scheme) : '';
+    return opt ? tag(opt.label, opt.color, ctx.scheme, prop.type) : '';
   }
   if (prop.type === 'multi_select') {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
-    return (prop.options ?? []).filter((o) => ids.includes(o.id)).map((o) => tag(o.label, o.color, ctx.scheme)).join(' ');
+    return (prop.options ?? []).filter((o) => ids.includes(o.id)).map((o) => tag(o.label, o.color, ctx.scheme, 'select')).join(' ');
   }
   if (prop.type === 'relation' || prop.type === 'dependency') {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
@@ -1432,7 +1432,8 @@ table.block-table th, table.db-table th { background: var(--obe-x-head, hsl(40 9
 table.db-table a.db-row { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; font-weight: 600; cursor: pointer; }
 table.db-table a.db-row:hover { text-decoration: underline; }
 .db-empty { opacity: .6; font-size: .9em; }
-.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .82em; margin: 1px 2px 1px 0; }
+.tag[data-kind=status] { border-radius:9999px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: .82em; margin: 1px 2px 1px 0; }
 .callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: none; }
 .callout::before { content: "💡"; }
 .callout[data-variant=warn]::before, .callout[data-variant=warning]::before { content: "⚠️"; }
