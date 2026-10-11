@@ -10,7 +10,7 @@ const blocks = [
   {id: 'toggle', type: 'toggle', props: {label: 'Toggle'}},
   {id: 'location', type: 'location', props: {label: 'Location'}},
   {id: 'button', type: 'actionbutton', props: {label: 'Click me'}},
-  {id: 'cards', type: 'choicecards', props: {label: 'Choices', opts: options}},
+  {id: 'cards', type: 'choicecards', props: {label: 'Choices', opts: [{label: 'Blue', color: 'blue'}, {label: 'Plain'}]}},
   {id: 'longtext', type: 'longtext', props: {label: 'Long text'}},
   {id: 'rich', type: 'richtext', props: {label: 'Rich text'}},
   {id: 'search', type: 'searchselect', props: {label: 'Search', opts: options}},
@@ -55,6 +55,34 @@ for (const dark of [false, true]) {
     await expect(page.locator('.obe-kit-term')).toHaveCSS('outline-width', '2px');
     await expect(page.locator('.obe-kit-term')).toHaveCSS('outline-offset', '2px');
     await expect(page.locator('.obe-kit-tip')).toHaveCSS('opacity', '1');
+    for (const [selector, height] of [
+      ['.obe-kit-textinput', '32px'], ['.obe-kit-num', '32px'], ['.obe-kit-mini', '32px'],
+      ['.obe-kit-dropdown-select', '32px'], ['.obe-kit-searchtrigger', '32px'],
+      ['.obe-kit-stepper', '28px'], ['.obe-kit-action', '32px'],
+      ['.obe-kit-richtext-btn', '24px'], ['.obe-kit-switch', '20px'],
+      ['.obe-kit-wide .obe-kit-pill', '36px'], ['.obe-kit-wide .obe-kit-check', '36px'],
+    ]) {
+      for (const control of await page.locator(selector).all()) await expect(control).toHaveCSS('height', height);
+    }
+    for (const selector of ['.obe-kit-dropdown-select', '.obe-kit-searchtrigger']) {
+      const widths = await page.locator(selector).evaluate((el) => ({
+        control: el.getBoundingClientRect().width,
+        frame: el.closest('.obe-kit')!.getBoundingClientRect().width,
+      }));
+      expect(Math.abs(widths.control - widths.frame)).toBeLessThan(1);
+    }
+    for (const [selector, token] of [
+      ['.obe-kit-card-cover.obe-bg-blue', 'var(--obe-bg-blue)'],
+      ['.obe-kit-card-cover-empty', 'hsl(var(--muted))'],
+    ]) {
+      const cover = page.locator(selector);
+      const expected = await cover.evaluate((el, color) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = color; el.append(probe);
+        const value = getComputedStyle(probe).backgroundColor; probe.remove(); return value;
+      }, token);
+      await expect(cover).toHaveCSS('background-color', expected);
+    }
     const label = page.locator('.obe-kit-number .obe-kit-label');
     await expect(label).toHaveCSS('font-weight', '600');
     await expect(label).toHaveCSS('border-width', '0px');
