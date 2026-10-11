@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import type {PageSnapshot} from '@book.dev/sdk';
+import {DATA_PALETTE, type PageSnapshot} from '@book.dev/sdk';
 import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../../blockeditor/colors';
 import {blocksToMarkdown, projectBlocksForExport} from '../../blockeditor/exportBlocks';
 import type {BlockJSON} from '../../blockeditor/model';
@@ -329,10 +329,10 @@ describe('toHtmlSite', () => {
     expect(html).toContain('Done'); // the select option label as a tag
     // The tag inlines the canonical soft-pastel green chip colours (OB-378),
     // matching the in-app SelectChip — not the old fill@20%-alpha wash.
-    expect(html).toContain('style="background:#dbeddb;color:#1e761e">Done</span>');
+    expect(html).toContain('style="background:var(--data-green-chip-bg, #dbeddb);color:var(--data-green-chip-fg, #1e761e)">Done</span>');
   });
 
-  it('exports select/multi-select corners and status pills', () => {
+  it('exports select/multi-select corners, status pills, and active-scheme dark chips', () => {
     for (const type of ['select', 'multi_select', 'status'] as const) {
       const fixture = structuredClone(bundle);
       const database = fixture.pages.find((page) => page.database)!.database!;
@@ -342,6 +342,9 @@ describe('toHtmlSite', () => {
       expect(output).toContain(`class="tag" data-kind="${type === 'status' ? 'status' : 'select'}"`);
       expect(output).toContain('.tag { display: inline-block; padding: 1px 8px; border-radius: 4px;');
       expect(output).toContain('.tag[data-kind=status] { border-radius:9999px; }');
+      const dark = output.slice(output.indexOf('@media (prefers-color-scheme: dark)'));
+      expect(dark).toContain(`--data-green-chip-bg: ${DATA_PALETTE.pastel.green.chip.dark.bg}`);
+      expect(dark).toContain(`--data-green-chip-fg: ${DATA_PALETTE.pastel.green.chip.dark.fg}`);
     }
   });
 

@@ -49,7 +49,7 @@ describe('DSX foundation export mirrors', () => {
 
   it('mirrors borderless callout tints and supports authored warn plus legacy warning', () => {
     expect(exporter).toContain(`.callout { background: hsl(${token('muted')}); }`);
-    const dual = exporter.slice(exporter.indexOf('const SCHEME_DUAL ='), exporter.indexOf('const stylesFor ='));
+    const dual = exporter.slice(exporter.indexOf('const schemeDual ='), exporter.indexOf('const stylesFor ='));
     expect(dual).toContain(`.callout { background: hsl(${darkToken('muted')}); }`);
     for (const [variant, hue] of [['warn', 'yellow'], ['success', 'green'], ['danger', 'red']]) {
       expect(token(`obe-callout-${variant}`)).toBe(`var(--obe-bg-${hue})`);
