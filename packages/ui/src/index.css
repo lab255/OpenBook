@@ -941,8 +941,8 @@ tr[data-row-anchor][data-selected] > td {
   --obe-lead-line: var(--height-control-md);
 }
 .obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit) {
-  --obe-lead-offset: calc(var(--obe-block-pad-y) + 0.25rem);
-  --obe-lead-line: calc(0.8rem * var(--obe-leading));
+  --obe-lead-offset: var(--obe-block-pad-y);
+  --obe-lead-line: calc(var(--obe-caption-size) * var(--obe-caption-leading));
 }
 .obe-row[data-block-type='callout'] {
   --obe-lead-offset: calc(var(--obe-block-pad-y) + 1rem);
@@ -2399,6 +2399,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   .obe-table-add { opacity: 1; }
 }
 
+.obe-kit-stepper:has(input:focus), .obe-kit-tags:focus-within, .obe-formula:focus-within {
+  border-color: hsl(var(--ring));
+}
 /* Block editor: keyboard focus visibility (a11y) */
 .obe-group-btn:focus-visible,
 .obe-cnt-add:focus-visible,
@@ -2415,6 +2418,20 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-artifact-tool:focus-visible,
 .obe-artifact-resize:focus-visible,
 .obe-artifact-expand:focus-visible,
+.obe-kit-gear:focus-visible,
+.obe-kit-stepper button:focus-visible,
+.obe-kit-pill:focus-visible,
+.obe-kit-switch:focus-visible,
+.obe-kit-action:focus-visible,
+.obe-kit-mini:focus-visible,
+.obe-kit-card:focus-visible,
+.obe-kit-richtext-btn:focus-visible,
+.obe-kit-searchtrigger:focus-visible,
+.obe-kit-tag-x:focus-visible,
+.obe-kit-term:focus-visible,
+.obe-kit-linkcard:focus-visible,
+.obe-kit-check input:focus-visible,
+.obe-kit-range input[type='range']:focus-visible,
 .obe-image-placeholder:focus-visible {
   outline: var(--obe-focus-ring);
   outline-offset: var(--obe-focus-offset);
@@ -2594,20 +2611,15 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.25rem;
+  padding: 0;
   position: relative;
-}
-.obe-kit-label {
-  font-size: 0.8rem;
-  font-weight: 550;
-  color: hsl(var(--muted-foreground));
-  min-width: 4.5rem;
 }
 /* Header column: display name over an optional description, decoupled from the
    reactive variable symbol. */
 .obe-kit-head {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 0;
   min-width: 4.5rem;
 }
@@ -2615,37 +2627,34 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   min-width: 0;
 }
 .obe-kit-desc {
-  font-size: 0.7rem;
-  line-height: 1.3;
-  color: hsl(var(--muted-foreground) / 0.8);
+  font-size: var(--obe-caption-size);
+  line-height: var(--obe-caption-leading);
+  color: hsl(var(--muted-foreground));
 }
 /* Edit-in-place label: reads as plain text (inherits the caller's font/size/
-   weight/colour), auto-sizes to its content, and only reveals an outline on
+   weight/colour), auto-sizes to its content, and only reveals a background tint on
    hover/focus — so the display name is WYSIWYG-editable right on the block. */
 .obe-kit-inline {
   field-sizing: content;
   min-width: 2ch;
   max-width: 100%;
   font-family: inherit;
-  line-height: inherit;
-  color: inherit;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   padding: 0;
   margin: 0;
   cursor: text;
-  transition: border-color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft);
+  transition: background var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-inline:hover { border-color: hsl(var(--border) / 0.6); }
-.obe-kit-inline:focus { outline: none; border-color: hsl(var(--ring)); background: hsl(var(--card)); }
+.obe-kit-inline:hover { background: var(--obe-chrome-hover); }
+.obe-kit-inline:focus { outline: none; background: var(--obe-chrome-hover); }
 .obe-kit-inline::placeholder { color: var(--obe-placeholder); }
 
 /* The inline description edits in place (WYSIWYG) and only renders when it has
    text (see KitFrame) — so it never collapses/unfurls and never shifts the
    layout. An empty description is added from the settings gear. */
 .obe-kit-desc-edit {
-  opacity: 0.85;
   transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
 
@@ -2680,36 +2689,21 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
    hovered/focused (or its popover is open). Same affordance for every kit block;
    the gutter context menu's "Configure" reaches the same popover. */
 .obe-kit-gear {
-  position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
+  position: absolute; top: 0; right: 0;
   z-index: var(--z-index-control);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid hsl(var(--border) / 0.7);
-  background: hsl(var(--card));
-  color: hsl(var(--muted-foreground));
-  padding: 0.25rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), background var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft);
+  display: inline-grid; place-items: center;
+  width: var(--obe-gutter-btn); height: var(--obe-gutter-btn);
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--obe-chrome-ink);
+  cursor: pointer; opacity: 0; pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit:hover .obe-kit-gear,
+.obe-row:hover:not(:has(.obe-row:hover)) > .obe-blockbody .obe-kit-gear,
 .obe-kit:focus-within .obe-kit-gear,
 .obe-kit-gear:focus-visible,
-.obe-kit-gear[data-state='open'] {
-  opacity: 1;
-  pointer-events: auto;
-}
-.obe-kit-gear:hover,
-.obe-kit-gear[data-state='open'] {
-  color: hsl(var(--foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--border));
-}
+.obe-kit-gear[data-state='open'] { opacity: 1; pointer-events: auto; }
+.obe-kit-gear:hover { background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+.obe-kit-gear[data-state='open'] { background: var(--obe-chrome-active); color: var(--obe-chrome-ink-hover); }
 .obe-kit-config {
   flex-basis: 100%;
   display: flex;
@@ -3226,8 +3220,12 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Chart */
 .obe-kit-chart { display: block; margin: 0; }
-.obe-kit-chart-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 1.4rem; }
-.obe-kit-chart-title { font-size: 0.82rem; font-weight: 550; color: hsl(var(--muted-foreground)); }
+.obe-kit-label {
+  font-size: var(--obe-caption-size);
+  line-height: var(--obe-caption-leading);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
 .obe-chart-svg {
   display: block;
   width: 100%;
@@ -3328,10 +3326,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-light-ok { background: var(--data-status-ok, #9fdf9f); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-ok, #9fdf9f) 25%, transparent); }
 .obe-kit-light-warn { background: var(--data-status-warn, #dac495); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-warn, #dac495) 25%, transparent); }
 .obe-kit-light-bad { background: var(--data-status-bad, #deaea6); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #deaea6) 25%, transparent); }
-.obe-kit-status-label { font-size: 0.88rem; font-weight: 550; }
+.obe-kit-status-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-status-value {
   font-family: var(--obe-font-mono);
-  font-size: 0.82rem;
+  font-size: var(--obe-small-size);
   color: hsl(var(--muted-foreground));
 }
 
@@ -3341,11 +3339,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.9rem;
-  font-weight: 550;
+  font-size: var(--obe-small-size);
+  line-height: var(--obe-small-leading);
+  font-weight: 600;
   border-bottom: 1px dotted hsl(var(--muted-foreground));
   cursor: help;
-  outline: none;
 }
 .obe-kit-term-mark {
   display: inline-flex;
@@ -3356,7 +3354,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: 9999px;
   background: hsl(var(--muted));
   color: hsl(var(--muted-foreground));
-  font-size: 0.65rem;
+  /* stylelint-disable-next-line design-tokens/role-values -- glyph sized to its 15px circle */
+  font-size: 10px;
   font-weight: 700;
 }
 .obe-kit-tip {
@@ -3371,9 +3370,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   padding: 0.5rem 0.75rem;
-  font-size: 0.8rem;
+  font-size: var(--obe-caption-size);
   font-weight: 400;
-  line-height: 1.45;
+  line-height: var(--obe-caption-leading);
   box-shadow: var(--shadow-menu);
   opacity: 0;
   pointer-events: none;
@@ -3394,12 +3393,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   padding: 0.5rem 0.75rem;
   text-decoration: none;
   color: inherit;
-  transition: border-color var(--motion-fast) var(--ease-out-soft), box-shadow var(--motion-fast) var(--ease-out-soft);
+  transition: border-color var(--motion-fast) var(--ease-out-soft);
 }
-.obe-kit-linkcard:hover { border-color: hsl(var(--ring)); box-shadow: 0 2px 10px rgb(0 0 0 / 0.05); }
-.obe-kit-linkcard-title { font-size: 0.92rem; font-weight: 600; }
-.obe-kit-linkcard-desc { font-size: 0.82rem; color: hsl(var(--muted-foreground)); }
-.obe-kit-linkcard-url { font-size: 0.74rem; color: hsl(var(--muted-foreground) / 0.7); }
+.obe-kit-linkcard:not([aria-disabled='true']):hover { border-color: hsl(var(--foreground) / 0.2); }
+.obe-kit-linkcard[aria-disabled='true'] { cursor: default; border-style: dashed; }
+.obe-kit-linkcard-title { font-size: var(--obe-small-size); font-weight: 600; }
+.obe-kit-linkcard-desc { font-size: var(--obe-small-size); color: hsl(var(--muted-foreground)); }
+.obe-kit-linkcard-url { font-size: var(--obe-caption-size); color: hsl(var(--muted-foreground)); }
 
 /* ── June-2026 kit inputs ──────────────────────────────────────────────────── */
 
@@ -3649,18 +3649,18 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Progress bar (display, no published value). */
 .obe-kit-progress { flex-direction: column; align-items: stretch; gap: 0.25rem; }
-.obe-kit-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.obe-kit-progress-label { font-size: 0.85rem; font-weight: 550; }
+.obe-kit-progress-head { padding-inline-end: var(--obe-gutter-btn); display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.obe-kit-progress-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-progress-value {
   font-family: var(--obe-font-mono);
-  font-size: 0.8rem;
+  font-size: var(--obe-caption-size);
   color: hsl(var(--muted-foreground));
 }
 .obe-kit-progress-track {
   display: block;
   height: 0.55rem;
   border-radius: 9999px;
-  background: hsl(var(--muted) / 0.7);
+  background: hsl(var(--muted));
   overflow: hidden;
 }
 .obe-kit-progress-fill {
