@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {sectionLabel} from './databaseRecipes';
 import React, {useRef, useState} from 'react';
 import {BadgeCheck, Check, ChevronDown, ExternalLink, MapPin, Plus, X} from 'lucide-react';
@@ -83,10 +84,10 @@ export const VerificationBadge: React.FC<{value: unknown}> = ({value}) => {
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs',
-        verified ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground',
+        verified ? STATUS_INK_CLASS.ok : 'text-muted-foreground',
       )}
     >
-      <BadgeCheck className={cn('h-3.5 w-3.5', verified ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50')} />
+      <BadgeCheck className={cn('h-3.5 w-3.5', verified ? STATUS_INK_CLASS.ok : 'text-muted-foreground/50')} />
       {verified ? 'Verified' : 'Unverified'}
     </span>
   );

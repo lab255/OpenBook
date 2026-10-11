@@ -1,5 +1,5 @@
 import {cn} from '@/lib/utils';
-import {WARN_SURFACE_CLASS, WARN_ICON_CLASS} from '@/lib/statusStyles';
+import {WARN_SURFACE_CLASS, WARN_ICON_CLASS, STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {AppWindow, Blocks, Check, FileText, Image, Loader2, TriangleAlert, Upload} from 'lucide-react';
 import {notionAssetResolver, urlAssetResolver, type AssetBytes, type ImportedDoc} from '@book.dev/sdk';
@@ -625,7 +625,7 @@ export default function ImportDialog() {
         {phase.step === 'done' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
-              <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <Check className={cn('mt-0.5 h-5 w-5 shrink-0', STATUS_INK_CLASS.ok)} aria-hidden />
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm font-medium">{t('importer.done')}</span>
                 <span className="text-xs text-muted-foreground">

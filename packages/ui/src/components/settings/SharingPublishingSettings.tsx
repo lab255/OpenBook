@@ -32,7 +32,7 @@ import {useSharingCapability} from '@/components/ShareDialog';
 function ForwardingStatusBadge({status}: {status: ForwardingStatus}) {
   const {t} = useTranslation();
   if (status === 'online') {
-    return <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400"><span aria-hidden="true">●</span> {t('forwarding.status.live')}</span>;
+    return <span className={cn('text-xs font-medium', STATUS_INK_CLASS.ok)}><span aria-hidden="true">●</span> {t('forwarding.status.live')}</span>;
   }
   if (status === 'connecting' || status === 'reconnecting') {
     return <span className={cn('text-xs font-medium', STATUS_INK_CLASS.warn)}><span aria-hidden="true">○</span> {t('forwarding.status.connecting')}</span>;

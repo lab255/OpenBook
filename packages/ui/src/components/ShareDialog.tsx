@@ -338,7 +338,7 @@ function PublishRow({
   if (live) {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <Globe className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <Globe className={cn('h-4 w-4 shrink-0', STATUS_INK_CLASS.ok)} />
         <span className="font-medium">{t('share.publishState.liveAt')}</span>
         <a className="min-w-0 truncate font-mono text-muted-foreground underline" title={host} href={`https://${host}`} target="_blank" rel="noreferrer">{host}</a>
       </div>

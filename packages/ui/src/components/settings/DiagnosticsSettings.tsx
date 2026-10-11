@@ -22,7 +22,7 @@ import {cn} from '@/lib/utils';
 type Tone = 'ok' | 'warn' | 'bad' | 'muted';
 
 const TONE_CLASS: Record<Tone, string> = {
-  ok: 'text-emerald-600 dark:text-emerald-400',
+  ok: STATUS_INK_CLASS.ok,
   warn: STATUS_INK_CLASS.warn,
   bad: 'text-destructive',
   muted: 'text-muted-foreground',
@@ -290,7 +290,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
               </div>
             )}
             {repair === 'done' && !drifted && (
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('diagnostics.repaired')}</p>
+              <p className={cn('text-xs font-medium', STATUS_INK_CLASS.ok)}>{t('diagnostics.repaired')}</p>
             )}
           </SettingsSection>
 

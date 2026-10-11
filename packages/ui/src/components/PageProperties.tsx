@@ -195,9 +195,9 @@ export const VerificationEditor: React.FC<{value?: VerificationValue; onChange: 
             )}
           >
             {expired ? (
-              <ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <ShieldAlert className={cn('h-3.5 w-3.5', STATUS_INK_CLASS.warn)} />
             ) : (
-              <BadgeCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              <BadgeCheck className={cn('h-3.5 w-3.5', STATUS_INK_CLASS.ok)} />
             )}
             {expired ? t('properties.verifyExpired') : t('properties.verified')}
           </button>

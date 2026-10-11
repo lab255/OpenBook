@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useState} from 'react';
 import {Bot, Check, ChevronDown, ChevronRight, Copy, User, X} from 'lucide-react';
 import type {CommentInput, StoredComment, StoredSuggestion} from '@book.dev/sdk';
@@ -83,7 +84,7 @@ export function SuggestionCard({
             </span>
             <span className="flex-1" />
             {!open && (
-              <span className={cn('text-[11px] font-medium', s.status === 'accepted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+              <span className={cn('text-[11px] font-medium', s.status === 'accepted' ? STATUS_INK_CLASS.ok : 'text-muted-foreground')}>
                 {s.status === 'accepted' ? 'Accepted' : 'Rejected'}
               </span>
             )}

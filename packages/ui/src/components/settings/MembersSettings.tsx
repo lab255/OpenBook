@@ -56,7 +56,7 @@ const STATUS_LABEL: Record<MemberStatus, TKey> = {
 };
 
 const STATUS_TONE: Record<MemberStatus, string> = {
-  active: 'text-emerald-600 dark:text-emerald-400',
+  active: STATUS_INK_CLASS.ok,
   invited: STATUS_INK_CLASS.warn,
   suspended: 'text-muted-foreground',
 };
