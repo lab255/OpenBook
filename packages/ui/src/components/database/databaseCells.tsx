@@ -1,3 +1,4 @@
+import {sectionLabel} from './databaseRecipes';
 import React, {useRef, useState} from 'react';
 import {BadgeCheck, Check, ChevronDown, ExternalLink, MapPin, Plus, X} from 'lucide-react';
 import {
@@ -891,7 +892,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
       <PopoverContent align="start" className="w-64 space-y-2 p-2.5">
         <div className="flex gap-1.5">
           <label className="flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Latitude</span>
+            <span className={sectionLabel}>Latitude</span>
             <input
               value={lat}
               onChange={(e) => setLat(e.target.value)}
@@ -902,7 +903,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
             />
           </label>
           <label className="flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Longitude</span>
+            <span className={sectionLabel}>Longitude</span>
             <input
               value={lng}
               onChange={(e) => setLng(e.target.value)}
@@ -914,7 +915,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
           </label>
         </div>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Label</span>
+          <span className={sectionLabel}>Label</span>
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
@@ -924,7 +925,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
           />
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Address</span>
+          <span className={sectionLabel}>Address</span>
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -1227,7 +1228,7 @@ const StatusCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
           if (opts.length === 0) return null;
           return (
             <React.Fragment key={group.id}>
-              <div className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              <div className={cn('px-2 pb-0.5 pt-1.5', sectionLabel)}>
                 {group.label}
               </div>
               {opts.map((o) => (
