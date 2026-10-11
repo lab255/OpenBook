@@ -1,3 +1,4 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import React from 'react';
 import {cn} from '@/lib/utils';
 import {useTranslation, type ProfilePreferences} from '@/providers';
@@ -18,23 +19,14 @@ export function initialsOf(name: string): string {
     .join('');
 }
 
-/** Static class strings so Tailwind sees every variant. */
-const MONOGRAM_HUES = [
-  'bg-rose-500/15 text-rose-700 dark:text-rose-300',
-  'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  'bg-green-500/15 text-green-700 dark:text-green-300',
-  'bg-teal-500/15 text-teal-700 dark:text-teal-300',
-  'bg-sky-500/15 text-sky-700 dark:text-sky-300',
-  'bg-violet-500/15 text-violet-700 dark:text-violet-300',
-  'bg-pink-500/15 text-pink-700 dark:text-pink-300',
-  'bg-slate-500/15 text-slate-700 dark:text-slate-300',
-];
+/** Preserve each name's hue slot across data-colour schemes. */
+const MONOGRAM_TOKENS = ['red', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'gray'] as const;
 
 /** A stable hue for a given name (same input → same color, every session). */
 export function monogramHue(seed: string): string {
   let h = 0;
   for (const ch of seed) h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
-  return MONOGRAM_HUES[h % MONOGRAM_HUES.length];
+  return DATA_CHIP_CLASS[MONOGRAM_TOKENS[h % MONOGRAM_TOKENS.length]];
 }
 
 export const ProfileAvatar: React.FC<{
