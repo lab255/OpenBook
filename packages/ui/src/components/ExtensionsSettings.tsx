@@ -1,3 +1,4 @@
+import {WARN_SURFACE_CLASS} from '@/lib/statusStyles';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ArrowUpCircle, BadgeCheck, Ban, Building2, KeyRound, Puzzle, Search, ShieldAlert, ShieldCheck, Store, Trash2, TriangleAlert, Upload, X} from 'lucide-react';
 import {
@@ -537,7 +538,7 @@ const StoreSection: React.FC<{
                     confirm.download,
                     statuses.find((status) => status.plugin.manifest.id === confirm.download?.pkg.manifest.id)?.plugin,
                   ) && (
-                    <p className="rounded-md border border-amber-500/40 px-3 py-2 text-xs text-amber-700 dark:text-amber-300" data-store-provenance-warning>
+                    <p className={cn('rounded-md px-3 py-2 text-xs', WARN_SURFACE_CLASS)} data-store-provenance-warning>
                       {t('extensions.storeProvenanceChanged')}
                     </p>
                   )}

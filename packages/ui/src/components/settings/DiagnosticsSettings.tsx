@@ -1,3 +1,4 @@
+import {WARN_SURFACE_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useState} from 'react';
 import {getForwardingAudience, type InstanceInfo} from '@book.dev/sdk';
 import {useData} from '@/data/DataProvider';
@@ -273,8 +274,8 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
               />
             </div>
             {drifted && (
-              <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{t('diagnostics.drift')}</p>
+              <div className={cn('flex flex-col gap-2 rounded-md px-3 py-2', WARN_SURFACE_CLASS)}>
+                <p className="text-xs font-medium">{t('diagnostics.drift')}</p>
                 <p className="text-xs text-muted-foreground">{t('diagnostics.driftExplain')}</p>
                 {canRepair ? (
                   <div>

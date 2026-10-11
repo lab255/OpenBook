@@ -117,7 +117,7 @@ export function UpdateAdvisoryWarning({
           'border-2',
           vulnerable
             ? 'border-destructive bg-destructive/5'
-            : 'border-amber-500 bg-amber-500/5',
+            : 'border-[var(--obe-fg-yellow)] bg-[var(--obe-callout-warn)]',
         )}
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
@@ -135,7 +135,7 @@ export function UpdateAdvisoryWarning({
                 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
                 vulnerable
                   ? 'bg-destructive/15 text-destructive'
-                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+                  : 'bg-[var(--obe-callout-warn)] text-[var(--obe-fg-yellow)]',
               )}
             >
               {vulnerable ? (
