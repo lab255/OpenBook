@@ -38,7 +38,7 @@ function ForwardingStatusBadge({status}: {status: ForwardingStatus}) {
     return <span className={cn('text-xs font-medium', STATUS_INK_CLASS.warn)}><span aria-hidden="true">○</span> {t('forwarding.status.connecting')}</span>;
   }
   if (status === 'stalled') {
-    return <span className="text-xs font-medium text-red-600 dark:text-red-400"><span aria-hidden="true">●</span> {t('forwarding.status.stalled')}</span>;
+    return <span className={cn('text-xs font-medium', STATUS_INK_CLASS.bad)}><span aria-hidden="true">●</span> {t('forwarding.status.stalled')}</span>;
   }
   return <span className="text-xs text-muted-foreground"><span aria-hidden="true">○</span> {t('forwarding.status.offline')}</span>;
 }
