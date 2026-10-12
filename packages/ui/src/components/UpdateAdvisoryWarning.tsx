@@ -116,8 +116,8 @@ export function UpdateAdvisoryWarning({
         className={cn(
           'border-2',
           vulnerable
-            ? 'border-destructive bg-destructive/5'
-            : 'border-[var(--obe-fg-yellow)] bg-[var(--obe-callout-warn)]',
+            ? 'border-destructive bg-[image:linear-gradient(hsl(var(--destructive)/0.05),hsl(var(--destructive)/0.05))]'
+            : 'border-[var(--obe-fg-yellow)] bg-[image:linear-gradient(var(--obe-callout-warn),var(--obe-callout-warn))]',
         )}
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
