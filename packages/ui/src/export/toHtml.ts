@@ -440,8 +440,10 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     }
     case 'callout': {
       const icon = str(d.icon);
-      const customIcon = icon && !icon.startsWith('lucide:')
-        ? `<span class="callout__icon">${escapeHtml(icon)}</span>` : '';
+      // Reserve authored Lucide icons instead of showing the wrong variant glyph.
+      // The hydrated viewer renders the SVG; static output stays dependency-light.
+      const customIcon = icon
+        ? `<span class="callout__icon">${escapeHtml(pageIconToText(icon))}</span>` : '';
       html.push(
         `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"${d.bg ? ` data-bg="${escapeHtml(str(d.bg))}"` : ''}>${customIcon}<div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
       );
