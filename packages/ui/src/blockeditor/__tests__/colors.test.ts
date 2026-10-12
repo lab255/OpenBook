@@ -81,3 +81,14 @@ it('static kit primary matches the light-theme primary', () => {
   expect(primary).toBeTruthy();
   expect(KIT_EXPORT_PRIMARY).toBe(hex(rgba(primary!)));
 });
+
+for (const dark of [false, true]) {
+  it(`primary text meets 4.5:1 in ${dark ? 'dark' : 'light'} mode`, () => {
+    const theme = css.match(dark ? /\.dark\s*\{([^}]+)\}/ : /:root\s*\{([^}]+)\}/)?.[1];
+    const primary = theme?.match(/--primary:\s*([^;]+);/)?.[1];
+    const foreground = theme?.match(/--primary-foreground:\s*([^;]+);/)?.[1];
+    expect(primary).toBeTruthy();
+    expect(foreground).toBeTruthy();
+    expect(contrast(rgba(primary!), rgba(foreground!))).toBeGreaterThanOrEqual(4.5);
+  });
+}

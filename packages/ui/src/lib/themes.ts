@@ -94,7 +94,7 @@ const DEFAULT_LIGHT: ThemeTokens = {
   cardForeground: '34 9% 19%',
   popover: '0 0% 100%',
   popoverForeground: '34 9% 19%',
-  primary: '207 75% 49%',
+  primary: '207 75% 44%',
   primaryForeground: '0 0% 100%',
   secondary: '40 9% 96%',
   secondaryForeground: '34 9% 19%',

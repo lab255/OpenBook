@@ -798,7 +798,7 @@ const TimelineCanvas: React.FC<{
               {/* Today marker tag, aligned with the body's vertical bar. */}
               <div
                 data-timeline-today
-                className="ob-db-today pointer-events-none absolute z-raised -translate-x-1/2 rounded-b-sm bg-primary px-1.5 py-0.5 text-xs font-medium leading-none text-primary-foreground"
+                className="pointer-events-none absolute z-raised -translate-x-1/2 rounded-b-sm bg-primary px-1.5 py-0.5 text-xs font-medium leading-none text-primary-foreground"
                 style={{left: todayX, top: 0}}
               >
                 Today

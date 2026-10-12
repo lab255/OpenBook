@@ -336,7 +336,7 @@
     --card-foreground: 34 9% 19%;
     --popover: 0 0% 100%;
     --popover-foreground: 34 9% 19%;
-    --primary: 207 75% 49%;
+    --primary: 207 75% 44%;
     --primary-foreground: 0 0% 100%;
     --secondary: 40 9% 96%;
     --secondary-foreground: 34 9% 19%;
@@ -4059,10 +4059,3 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   opacity: 1;
 }
 
-/* The light primary/white pair is 3.82:1 at caption size. Shade only this tag. */
-.ob-db-today {
-  background-color: color-mix(in srgb, hsl(var(--primary)) 88%, black);
-}
-.dark .ob-db-today {
-  background-color: hsl(var(--primary));
-}
