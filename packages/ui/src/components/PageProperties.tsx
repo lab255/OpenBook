@@ -1,3 +1,5 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import React from 'react';
 import type {PageMeta, VerificationValue} from '@book.dev/sdk';
 import {
@@ -188,15 +190,16 @@ export const VerificationEditor: React.FC<{value?: VerificationValue; onChange: 
             type="button"
             className={cn(
               'inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-medium transition-colors',
+              DATA_CHIP_CLASS[expired ? 'yellow' : 'green'],
               expired
-                ? 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300'
-                : 'bg-green-500/10 text-green-700 hover:bg-green-500/20 dark:text-green-300',
+                ? 'hover:bg-[color-mix(in_srgb,var(--data-yellow-chip-bg),var(--press-ink)_6%)]'
+                : 'hover:bg-[color-mix(in_srgb,var(--data-green-chip-bg),var(--press-ink)_6%)]',
             )}
           >
             {expired ? (
-              <ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <ShieldAlert className={cn('h-3.5 w-3.5', STATUS_INK_CLASS.warn)} />
             ) : (
-              <BadgeCheck className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              <BadgeCheck className={cn('h-3.5 w-3.5', STATUS_INK_CLASS.ok)} />
             )}
             {expired ? t('properties.verifyExpired') : t('properties.verified')}
           </button>
@@ -206,7 +209,7 @@ export const VerificationEditor: React.FC<{value?: VerificationValue; onChange: 
             {by ? t('properties.verifiedBy', {name: by}) : t('properties.verified')}
             {at ? ` · ${new Date(at).toLocaleDateString()}` : ''}
             {expiresAt && (
-              <div className={expired ? 'text-amber-600 dark:text-amber-400' : ''}>
+              <div className={expired ? STATUS_INK_CLASS.warn : ''}>
                 {expired
                   ? t('properties.verifyExpiredOn', {date: new Date(expiresAt).toLocaleDateString()})
                   : t('properties.verifyExpiresOn', {date: new Date(expiresAt).toLocaleDateString()})}

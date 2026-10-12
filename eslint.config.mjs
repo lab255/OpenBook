@@ -66,15 +66,12 @@ export default tseslint.config(
     rules: {'tailwind/no-arbitrary-spacing': 'error'},
   },
   {
-    // DSX warn rollout: baseline 13 duration + 3 easing utilities, 208 palette
-    // utilities, 43 numeric z utilities; preserve existing debt without CI failure.
-    // Measured with these guards at 1d6ef346: motion 33→16, palette 152→152,
-    // z 40→40 (includes primitives; excludes generated/vendor sources).
-    // DSX-4 removes ArtifactOverlay’s raw z-50 finding (uses z-lightbox).
-    files: ['packages/{ui,web}/src/**/*.{ts,tsx}'],
+    // DSX-8: palette baseline is zero with two described exceptions; enforce
+    // the guard in desktop app sources too. Motion and raw-z remain warnings.
+    files: ['packages/{ui,web,app}/src/**/*.{ts,tsx}'],
     rules: {
       'tailwind/no-arbitrary-motion': 'warn',
-      'tailwind/no-palette-color': 'warn',
+      'tailwind/no-palette-color': 'error',
       'tailwind/no-raw-z': 'warn',
     },
   },

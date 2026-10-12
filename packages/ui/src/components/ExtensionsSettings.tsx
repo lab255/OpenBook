@@ -1,3 +1,5 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
+import {WARN_SURFACE_CLASS, STATUS_INK_CLASS} from '@/lib/statusStyles';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ArrowUpCircle, BadgeCheck, Ban, Building2, KeyRound, Puzzle, Search, ShieldAlert, ShieldCheck, Store, Trash2, TriangleAlert, Upload, X} from 'lucide-react';
 import {
@@ -178,6 +180,8 @@ export default function ExtensionsSettings() {
  * download → offline verification → a consent dialog that shows the
  * verification outcome — no plugin code executes before both have happened.
  */
+const TRUST_CHIP_CLASS = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium';
+
 const StoreSection: React.FC<{
   statuses: PluginStatus[];
   updates: Map<string, StoreResolution>;
@@ -317,7 +321,7 @@ const StoreSection: React.FC<{
                 <span className="text-sm font-medium">{store.name}</span>
                 <p className="truncate font-mono text-[11px] text-muted-foreground/70">{store.baseUrl}</p>
                 {revocationFeedStatus(store.baseUrl).state !== 'fresh' && (
-                  <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-300" data-store-revocations-stale>
+                  <p className={cn('mt-0.5 flex items-center gap-1 text-[11px]', STATUS_INK_CLASS.warn)} data-store-revocations-stale>
                     <TriangleAlert className="h-3 w-3" />
                     {t('extensions.storeRevocationsStale')}
                   </p>
@@ -438,7 +442,7 @@ const StoreSection: React.FC<{
                       <span className="text-sm font-semibold">{row.entry.name}</span>
                       <span className="text-xs text-muted-foreground">v{row.entry.latestVersion}</span>
                       {claimsFirstParty && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300" data-store-badge-first-party>
+                        <span className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.blue)} data-store-badge-first-party>
                           <Building2 className="h-3 w-3" />
                           {t('extensions.storeClaimsFirstParty')}
                         </span>
@@ -498,24 +502,24 @@ const StoreSection: React.FC<{
               ) : (
                 <div className="flex flex-col gap-2" data-store-trust>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-300" data-store-badge-signed>
+                    <span className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.green)} data-store-badge-signed>
                       <BadgeCheck className="h-3 w-3" />
                       {t('extensions.storePublisherSigned')}
                     </span>
                     {confirm.download.trust.firstParty && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300" data-store-badge-first-party>
+                      <span className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.blue)} data-store-badge-first-party>
                         <Building2 className="h-3 w-3" />
                         {t('extensions.storeFirstParty')}
                       </span>
                     )}
                     {confirm.download.trust.notarised && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-300" data-store-badge-notarised>
+                      <span className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.green)} data-store-badge-notarised>
                         <ShieldCheck className="h-3 w-3" />
                         {t('extensions.storeNotarised')}
                       </span>
                     )}
                     {!confirm.download.trust.notarised && !confirm.download.trust.firstParty && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300" data-store-badge-unreviewed>
+                      <span className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.yellow)} data-store-badge-unreviewed>
                         <ShieldAlert className="h-3 w-3" />
                         {t('extensions.storeUnreviewed')}
                       </span>
@@ -529,7 +533,7 @@ const StoreSection: React.FC<{
                     <p className="text-xs text-muted-foreground">{t('extensions.storeConfirmFirstParty', {store: confirm.resolution.store.name})}</p>
                   )}
                   {!confirm.download.trust.notarised && !confirm.download.trust.firstParty && (
-                    <p className="text-xs text-amber-700 dark:text-amber-300" data-store-unreviewed-warning>
+                    <p className={cn('text-xs', STATUS_INK_CLASS.warn)} data-store-unreviewed-warning>
                       {t('extensions.storeConfirmUnreviewed', {store: confirm.resolution.store.name})}
                     </p>
                   )}
@@ -537,7 +541,7 @@ const StoreSection: React.FC<{
                     confirm.download,
                     statuses.find((status) => status.plugin.manifest.id === confirm.download?.pkg.manifest.id)?.plugin,
                   ) && (
-                    <p className="rounded-md border border-amber-500/40 px-3 py-2 text-xs text-amber-700 dark:text-amber-300" data-store-provenance-warning>
+                    <p className={cn('rounded-md px-3 py-2 text-xs', WARN_SURFACE_CLASS)} data-store-provenance-warning>
                       {t('extensions.storeProvenanceChanged')}
                     </p>
                   )}
@@ -714,7 +718,7 @@ const ExtensionCard: React.FC<{
           <span className="text-xs text-muted-foreground">v{m.version}</span>
           {status.state === 'revoked' && (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:text-red-300"
+              className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.red)}
               title={t('extensions.revokedHint', {reason: status.error ?? ''})}
               data-extension-revoked
             >
@@ -724,7 +728,7 @@ const ExtensionCard: React.FC<{
           )}
           {updateTo && (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:text-blue-300"
+              className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.blue)}
               data-extension-update={updateTo}
             >
               <ArrowUpCircle className="h-3 w-3" />
@@ -733,7 +737,7 @@ const ExtensionCard: React.FC<{
           )}
           {status.verifiedBy ? (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-300"
+              className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.green)}
               title={t('extensions.verifiedBy', {registry: status.verifiedBy})}
               data-extension-verified
             >
@@ -742,7 +746,7 @@ const ExtensionCard: React.FC<{
             </span>
           ) : (
             <span
-              className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+              className={cn(TRUST_CHIP_CLASS, DATA_CHIP_CLASS.yellow)}
               title={t('extensions.unverifiedHint')}
               data-extension-unverified
             >

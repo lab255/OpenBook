@@ -389,7 +389,7 @@ export const GroupContextMenu: React.FC<{
                       aria-label={c}
                       title={c}
                       className={cn(
-                        'h-5 w-5 justify-center rounded-full border border-black/10 p-0 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 focus:ring-2 focus:ring-foreground/30 focus:ring-offset-1 dark:border-white/15',
+                        'h-5 w-5 justify-center rounded-full border border-foreground/10 p-0 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 focus:ring-2 focus:ring-foreground/30 focus:ring-offset-1 dark:border-foreground/20',
                         (option?.color ?? 'gray') === c && 'ring-2 ring-foreground/50 ring-offset-1',
                       )}
                       style={{backgroundColor: swatchColor(c)}}

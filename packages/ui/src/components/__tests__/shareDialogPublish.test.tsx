@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {describe, it, expect, afterEach, beforeEach, vi} from 'vitest';
 import {render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
 import type {DataClient, InstanceInfo, PageVisibility, PageVisibilityUpdate, SiteVisibility} from '@book.dev/sdk';
@@ -371,7 +372,7 @@ describe('ShareDialog — enabled form reachability (FORM-8)', () => {
     open();
 
     const message = await screen.findByText('This form isn\'t ready — bind a database to accept responses');
-    expect(message.closest('[data-form-not-ready]')?.className).toContain('text-amber-700');
+    expect(message.closest('[data-form-not-ready]')?.className).toContain(STATUS_INK_CLASS.warn);
     expect(screen.queryByText('This page accepts public submissions')).toBeNull();
     expect(screen.queryByText(/Signed-out visitors can submit at/)).toBeNull();
 
