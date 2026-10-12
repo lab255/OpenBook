@@ -329,6 +329,9 @@
     --obe-code-num: hsl(28 80% 38%);
     --obe-code-lit: hsl(210 72% 42%);
 
+    /* Board column washes stay quieter on dark surfaces. */
+    --data-column-tint: 50%;
+
     /* Warm, refined light palette */
     --background: 0 0% 100%;
     --foreground: 34 9% 19%;
@@ -416,6 +419,7 @@
   }
 
   .dark {
+    --data-column-tint: 35%;
     --obe-chart-ink-on-pale: #233246;
     --obe-select-wash: hsl(var(--ring) / 0.2);
     --obe-fg-gray: hsl(0 0% 66%);
