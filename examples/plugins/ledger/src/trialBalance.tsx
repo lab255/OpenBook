@@ -1,33 +1,9 @@
+import {ui} from './ui';
 import React from 'react';
 import {formatAmount} from '@book.dev/plugin-sdk';
 import {buildTrialBalance, describeDraftExclusion, describeTrialBalanceAssertion, type TrialBalance} from './reports';
 import {describeClosedPeriodMarker} from './periods';
-import {
-  AccountName,
-  EmptyState,
-  ReportError,
-  SetupPrompt,
-  SideAmount,
-  SrOnly,
-  TableRegion,
-  TruncationNotice,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  numericHeadStyle,
-  numericStyle,
-  readBool,
-  readProps,
-  tableStyle,
-  tdStyle,
-  thStyle,
-  titleStyle,
-  useLedgerReport,
-  wrapStyle,
-  writeProp,
-  type BlockLike,
-  type EditorLike,
-} from './reportShell';
+import {AccountName, EmptyState, ReportError, SetupPrompt, SideAmount, SrOnly, TableRegion, TruncationNotice, readBool, readProps, useLedgerReport, wrapStyle, writeProp, type BlockLike, type EditorLike} from './reportShell';
 
 /**
  * The TRIAL BALANCE block (LGR-8) — read-only, live, and computed entirely by
@@ -70,6 +46,7 @@ export function describeTrialBalanceScope(report: TrialBalance, opts: {truncated
 /** The abnormal-balance marker, kept OUT of the numeric flow (see D4). */
 const AbnormalMark = ({row}: {row: TrialBalance['rows'][number]}) => (
   <span
+    data-ui-mark="alarm"
     style={{
       // A fixed-width leading box, present on every row: the glyph can then
       // never add advance width to the number beside it, so the decimals of an
@@ -78,7 +55,6 @@ const AbnormalMark = ({row}: {row: TrialBalance['rows'][number]}) => (
       width: '1em',
       marginRight: '0.15rem',
       textAlign: 'left',
-      color: 'hsl(var(--destructive))',
     }}
   >
     {row.abnormal ? (
@@ -123,16 +99,16 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
 
   if (data.state === 'loading') {
     return (
-      <div data-ledger-trial-balance data-ledger-loading contentEditable={false} style={frameStyle}>
-        <span style={mutedStyle}>Loading trial balance…</span>
+      <div data-ledger-trial-balance data-ledger-loading contentEditable={false} className={ui.frame}>
+        <span className={ui.muted}>Loading trial balance…</span>
       </div>
     );
   }
 
   if (data.state === 'uninitialized') {
     return (
-      <div data-ledger-trial-balance data-ledger-setup contentEditable={false} style={frameStyle}>
-        <h3 style={titleStyle}>
+      <div data-ledger-trial-balance data-ledger-setup contentEditable={false} className={ui.frame}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Trial balance
         </h3>
         <SetupPrompt label="Set up books" readOnly={pageLocked} onDone={data.reload} />
@@ -144,12 +120,12 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
   const anyAbnormal = report !== null && report.rows.some((r) => r.abnormal);
 
   return (
-    <div data-ledger-trial-balance contentEditable={false} style={frameStyle}>
-      <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
-        <h3 style={titleStyle}>
+    <div data-ledger-trial-balance contentEditable={false} className={ui.frame}>
+      <div className={ui.header}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Trial balance
         </h3>
-        <label style={{...mutedStyle, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer'}}>
+        <label className={ui.check} style={{marginLeft: 'auto'}}>
           <input type="checkbox" data-ledger-show-zero checked={showZero} onChange={(e) => toggleZero(e.target.checked)} />
           Show zero-balance accounts
         </label>
@@ -157,14 +133,14 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
 
       {/* The exclusion is stated on EVERY render — a report you cannot tie back
           to what you typed is worse than no report. */}
-      <div data-ledger-drafts-excluded={report !== null ? report.draftCount : 0} style={mutedStyle}>
+      <div data-ledger-drafts-excluded={report !== null ? report.draftCount : 0} className={ui.muted}>
         {describeDraftExclusion(report !== null ? report.draftCount : 0)}
       </div>
 
       {/* LGR-12, display-only: the trial balance covers the whole book, so any
           closed period is inside it. Informs; the store enforces. */}
       {describeClosedPeriodMarker(data.periods, '', '') !== null && (
-        <div data-ledger-closed-periods style={mutedStyle}>{describeClosedPeriodMarker(data.periods, '', '')}</div>
+        <div data-ledger-closed-periods className={ui.muted}>{describeClosedPeriodMarker(data.periods, '', '')}</div>
       )}
 
       <TruncationNotice shown={data.truncated} detail="Older entries are missing from these balances, so the totals are a subset of the book." />
@@ -176,10 +152,10 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
         <>
           {/* aria-live polite (never `alert`): this line re-renders on every
               ledger change, and an assertive region would interrupt constantly. */}
-          <div data-ledger-assertion data-ledger-balanced={assertion.ok ? 'true' : 'false'} role="status" aria-live="polite" style={noticeStyle(assertion.ok ? 'quiet' : 'alarm')}>
+          <div data-ledger-assertion data-ledger-balanced={assertion.ok ? 'true' : 'false'} role="status" aria-live="polite" className={ui.notice} data-tone={assertion.ok ? 'quiet' : 'alarm'}>
             <div>{assertion.text}</div>
             {assertion.culprits != null && (
-              <div data-ledger-culprits style={{marginTop: '0.35rem', fontWeight: 400}}>
+              <div data-ledger-culprits className={ui.noticeDetail}>
                 {assertion.culprits}
               </div>
             )}
@@ -189,7 +165,7 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
               FIRST one, and an explanation hundreds of pixels below it reads as
               a rendering bug rather than a finding. */}
           {report.unknownAccountIds.length > 0 && (
-            <div data-ledger-unknown-accounts={report.unknownAccountIds.length} role="status" aria-live="polite" style={noticeStyle('info')}>
+            <div data-ledger-unknown-accounts={report.unknownAccountIds.length} role="status" aria-live="polite" className={ui.notice} data-tone={'info'}>
               {/* Both sentences branch on the count, not just the first: one
                   deleted account has one balance, and "Their balances are" over
                   a single row reads as a rendering bug in a report whose whole
@@ -208,25 +184,25 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
             </EmptyState>
           ) : (
             <TableRegion label="Trial balance table">
-              <table style={tableStyle}>
-                <caption style={{...mutedStyle, textAlign: 'left', paddingBottom: '0.25rem'}}>
+              <table className={ui.table} data-density="compact">
+                <caption>
                   {describeTrialBalanceScope(report, {truncated: data.truncated, showZero})}
                 </caption>
                 <thead>
                   <tr>
-                    <th scope="col" style={thStyle}>
+                    <th scope="col">
                       Account
                     </th>
-                    <th scope="col" style={thStyle}>
+                    <th scope="col">
                       Type
                     </th>
-                    <th scope="col" style={numericHeadStyle}>
+                    <th scope="col" className={ui.num}>
                       Debit
                     </th>
-                    <th scope="col" style={numericHeadStyle}>
+                    <th scope="col" className={ui.num}>
                       Credit
                     </th>
-                    <th scope="col" style={numericHeadStyle}>
+                    <th scope="col" className={ui.num}>
                       Balance
                     </th>
                   </tr>
@@ -236,23 +212,14 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
                     <tr key={row.accountId} data-ledger-tb-row={row.accountId} {...(row.known ? {} : {'data-ledger-unknown-account': true})}>
                       <th
                         scope="row"
-                        style={{
-                          ...tdStyle,
-                          ...wrapStyle,
-                          fontWeight: 400,
-                          textAlign: 'left',
-                          // A deleted account is a real finding, so the row
-                          // carries a finding's weight instead of looking like
-                          // a stray id someone forgot to resolve.
-                          ...(row.known ? {} : {borderLeft: '3px solid hsl(var(--destructive))', paddingLeft: '0.35rem'}),
-                        }}
+                        data-ui-flag={row.known ? undefined : 'alarm'} style={{...wrapStyle, fontWeight: 400, textAlign: 'left'}}
                       >
                         <AccountName name={row.name} />
                       </th>
-                      <td style={{...tdStyle, ...mutedStyle}}>{row.type ?? '—'}</td>
-                      <td data-ledger-tb-debit style={numericStyle}>{row.debitMinor === 0 ? '' : formatAmount(row.debitMinor)}</td>
-                      <td data-ledger-tb-credit style={numericStyle}>{row.creditMinor === 0 ? '' : formatAmount(row.creditMinor)}</td>
-                      <td data-ledger-tb-balance {...(row.abnormal ? {'data-ledger-abnormal': true} : {})} style={numericStyle}>
+                      <td className={ui.muted}>{row.type ?? '—'}</td>
+                      <td data-ledger-tb-debit className={ui.num}>{row.debitMinor === 0 ? '' : formatAmount(row.debitMinor)}</td>
+                      <td data-ledger-tb-credit className={ui.num}>{row.creditMinor === 0 ? '' : formatAmount(row.creditMinor)}</td>
+                      <td data-ledger-tb-balance {...(row.abnormal ? {'data-ledger-abnormal': true} : {})} className={ui.num}>
                         <AbnormalMark row={row} />
                         {/* The side the balance is ACTUALLY on, always. Projecting
                             onto the account's normal side instead rendered an
@@ -268,13 +235,13 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
                 </tbody>
                 <tfoot>
                   <tr data-ledger-tb-totals>
-                    <th scope="row" colSpan={2} style={{...tdStyle, textAlign: 'left', fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
+                    <th scope="row" colSpan={2}>
                       Totals
                     </th>
-                    <td data-ledger-total-debit style={{...numericStyle, fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
+                    <td data-ledger-total-debit className={ui.num}>
                       {formatAmount(report.totalDebitMinor)}
                     </td>
-                    <td data-ledger-total-credit style={{...numericStyle, fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
+                    <td data-ledger-total-credit className={ui.num}>
                       {formatAmount(report.totalCreditMinor)}
                     </td>
                     {/* Same grammar as the column above it: the difference is a
@@ -284,7 +251,7 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
                         BALANCED case is a zero, so it needs the trailing box
                         too (see {@link SideAmount}) or the everyday state is
                         the one that breaks the column. */}
-                    <td data-ledger-difference={report.differenceMinor} style={{...numericStyle, fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
+                    <td data-ledger-difference={report.differenceMinor} className={ui.num}>
                       <span style={{display: 'inline-block', width: '1em', marginRight: '0.15rem'}} aria-hidden="true">
                         {' '}
                       </span>
@@ -297,14 +264,14 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
           )}
 
           {report.hiddenZeroCount > 0 && (
-            <div data-ledger-hidden-zero={report.hiddenZeroCount} style={mutedStyle}>
+            <div data-ledger-hidden-zero={report.hiddenZeroCount} className={ui.muted}>
               {report.hiddenZeroCount === 1 ? '1 zero-balance account hidden.' : `${report.hiddenZeroCount} zero-balance accounts hidden.`}
             </div>
           )}
           {/* The ⚠ is a mark, not a legend — so when any row carries one, say
               what it means in words rather than leaving a glyph to be guessed. */}
           {anyAbnormal && (
-            <div data-ledger-abnormal-legend style={mutedStyle}>
+            <div data-ledger-abnormal-legend className={ui.muted}>
               ⚠ marks a balance on the opposite side to the account type’s normal side (for example an overdrawn asset).
             </div>
           )}

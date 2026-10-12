@@ -1,3 +1,4 @@
+import {ui} from './ui';
 import React from 'react';
 import {describeDraftExclusion} from './reports';
 import {
@@ -18,25 +19,7 @@ import {
   type StatementSection,
 } from './statements';
 import {ShapeControls, StatementTable, parseCollapsed, serializeCollapsed, type StatementLine} from './statementShell';
-import {
-  EmptyState,
-  ReportError,
-  SetupPrompt,
-  TruncationNotice,
-  buttonStyle,
-  controlStyle,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  readBool,
-  readProps,
-  readString,
-  titleStyle,
-  useLedgerReport,
-  writeProp,
-  type BlockLike,
-  type EditorLike,
-} from './reportShell';
+import {EmptyState, ReportError, SetupPrompt, TruncationNotice, readBool, readProps, readString, useLedgerReport, writeProp, type BlockLike, type EditorLike} from './reportShell';
 import {describeClosedPeriodMarker} from './periods';
 import {todayIso} from './model';
 
@@ -156,16 +139,16 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
 
   if (data.state === 'loading') {
     return (
-      <div data-ledger-income-statement data-ledger-loading contentEditable={false} style={frameStyle}>
-        <span style={mutedStyle}>Loading income statement…</span>
+      <div data-ledger-income-statement data-ledger-loading contentEditable={false} className={ui.frame}>
+        <span className={ui.muted}>Loading income statement…</span>
       </div>
     );
   }
 
   if (data.state === 'uninitialized') {
     return (
-      <div data-ledger-income-statement data-ledger-setup contentEditable={false} style={frameStyle}>
-        <h3 style={titleStyle}>
+      <div data-ledger-income-statement data-ledger-setup contentEditable={false} className={ui.frame}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Income statement
         </h3>
         <SetupPrompt label="Set up books" readOnly={pageLocked} onDone={data.reload} />
@@ -206,28 +189,28 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
   }
 
   return (
-    <div data-ledger-income-statement contentEditable={false} style={frameStyle}>
-      <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap'}}>
-        <h3 style={{...titleStyle, lineHeight: '1.9rem'}}>
+    <div data-ledger-income-statement contentEditable={false} className={ui.frame}>
+      <div className={ui.header}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Income statement
         </h3>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>From</span>
-          <input type="date" data-ledger-period-from style={controlStyle} value={from} onChange={(e) => pinPeriod(e.target.value, to)} />
+        <label className={ui.labelled}>
+          <span className={ui.muted}>From</span>
+          <input type="date" data-ledger-period-from className={ui.field} value={from} onChange={(e) => pinPeriod(e.target.value, to)} />
         </label>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>To</span>
-          <input type="date" data-ledger-period-to style={controlStyle} value={to} onChange={(e) => pinPeriod(from, e.target.value)} />
+        <label className={ui.labelled}>
+          <span className={ui.muted}>To</span>
+          <input type="date" data-ledger-period-to className={ui.field} value={to} onChange={(e) => pinPeriod(from, e.target.value)} />
         </label>
         {!defaulted && (
-          <button type="button" data-ledger-reset-period style={buttonStyle} onClick={() => pinPeriod('', '')}>
+          <button type="button" data-ledger-reset-period className={ui.btn + ' ' + ui.muted} data-variant="link" onClick={() => pinPeriod('', '')}>
             Back to this year
           </button>
         )}
       </div>
 
       {defaulted && (
-        <div data-ledger-period-defaulted style={mutedStyle}>
+        <div data-ledger-period-defaulted className={ui.muted}>
           This year to date ({from} → {to}). Pick dates above to pin the period.
         </div>
       )}
@@ -236,17 +219,17 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
           that is not the current one is a report of another time, and it must
           not be mistaken for "now" in either direction. */}
       {!defaulted && to < today && (
-        <div data-ledger-period-backdated style={mutedStyle}>
+        <div data-ledger-period-backdated className={ui.muted}>
           {periodIsLatest ? `Your latest posted period (${from} → ${to})` : `Period ${from} → ${to}`} — ends before today ({today}).
         </div>
       )}
       {!defaulted && to > today && (
-        <div data-ledger-period-ahead style={mutedStyle}>
+        <div data-ledger-period-ahead className={ui.muted}>
           {periodIsLatest ? `Your latest posted period (${from} → ${to})` : `Period ${from} → ${to}`} — runs past today ({today}); it includes entries that have not happened yet.
         </div>
       )}
 
-      <div data-ledger-drafts-excluded={statement !== null ? statement.draftCount : 0} style={mutedStyle}>
+      <div data-ledger-drafts-excluded={statement !== null ? statement.draftCount : 0} className={ui.muted}>
         {describeDraftExclusion(statement !== null ? statement.draftCount : 0)}
         {statement !== null && statement.outsideCount > 0 && (
           <span data-ledger-outside-period>
@@ -261,10 +244,10 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
           exclusion is a disclosure the figures owe. Neither gates anything —
           the store enforces the lock. */}
       {describeClosedPeriodMarker(data.periods, from, to) !== null && (
-        <div data-ledger-closed-periods style={mutedStyle}>{describeClosedPeriodMarker(data.periods, from, to)}</div>
+        <div data-ledger-closed-periods className={ui.muted}>{describeClosedPeriodMarker(data.periods, from, to)}</div>
       )}
       {statement !== null && describeClosingExclusion(statement.closingCount) !== null && (
-        <div data-ledger-closing-excluded={statement.closingCount} style={mutedStyle}>{describeClosingExclusion(statement.closingCount)}</div>
+        <div data-ledger-closing-excluded={statement.closingCount} className={ui.muted}>{describeClosingExclusion(statement.closingCount)}</div>
       )}
 
       <TruncationNotice shown={data.truncated} detail="Older entries are missing, so revenue, expenses and the net income below are a subset of the period." />
@@ -282,7 +265,7 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
             data-ledger-profit={statement.profit ? 'true' : 'false'}
             role="status"
             aria-live="polite"
-            style={noticeStyle('quiet')}
+            className={ui.notice} data-tone={'quiet'}
           >
             {describeNetIncome(statement)}
           </div>
@@ -291,7 +274,7 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
               never `alarm`: a damaged chart is a standing caveat, and the alarm
               tone stays reserved for a book that does not balance. */}
           {incomeUnclassified !== null && (
-            <div data-ledger-income-unclassified role="status" aria-live="polite" style={noticeStyle('info')}>
+            <div data-ledger-income-unclassified role="status" aria-live="polite" className={ui.notice} data-tone={'info'}>
               {incomeUnclassified}
             </div>
           )}
@@ -304,7 +287,7 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
               {latest !== null && (latest.to > to || latest.to < from) ? (
                 <>
                   Nothing was posted to a revenue or expense account between {from} and {to} — this book’s latest posted entry is {latest.to}.{' '}
-                  <button type="button" data-ledger-show-latest style={{...buttonStyle, marginLeft: '0.25rem'}} onClick={() => pinPeriod(latest.from, latest.to)}>
+                  <button type="button" data-ledger-show-latest className={ui.btn} data-size="sm" style={{marginLeft: '0.25rem'}} onClick={() => pinPeriod(latest.from, latest.to)}>
                     Show your latest period instead — through {latest.to}
                   </button>
                 </>
@@ -334,7 +317,7 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
           )}
 
           {reconciliation !== null && (
-            <div data-ledger-reconciliation data-ledger-reconciles={reconciliation.reconciles ? 'true' : 'false'} style={mutedStyle}>
+            <div data-ledger-reconciliation data-ledger-reconciles={reconciliation.reconciles ? 'true' : 'false'} className={ui.muted}>
               {describeReconciliation(reconciliation)}
               {reconciliation.unclassifiedMinor !== 0 && (
                 <span data-ledger-reconciliation-caveat> Balances on deleted accounts sit in neither figure, so the tie is approximate until the chart of accounts is repaired.</span>
