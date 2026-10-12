@@ -466,7 +466,6 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
    *Recommend: spin out a short palette-audit task before the text-family redesign*, so
    callout tints (§5.2) and text colours change once, together.
 
-
 ## 14. Plugin UI surface
 
 Plugins use the documented `.obe-ui-*` classes and inline layout. They never use
@@ -513,7 +512,8 @@ Public tokens allowed inline:
 A root `obe-ui-frame` directly inside the custom-block host receives radius-xl
 selection and gutter alignment to its first content line: lead offset is block
 padding + 1px border + 0.75rem frame padding; lead line is small size × small leading.
-Header rows keep bottom alignment when they contain labelled controls. Nested frames
+Header rows keep bottom alignment when they contain labelled controls; link buttons
+in a header row take control height. Nested frames
 have transparent fill. Keep bespoke flex/grid/width layout inline; row/stack classes
 are optional conveniences. The complete `obe-ui-sr-only` clipping recipe includes
 negative margin, white-space and border reset as well as `clip`.

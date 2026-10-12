@@ -1,5 +1,5 @@
-import {ui} from './ui';
 import React from 'react';
+import {ui} from './ui';
 import {describeDraftExclusion} from './reports';
 import {
   CURRENT_EARNINGS_LABEL,
@@ -265,7 +265,7 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
               {latest !== null && latest > asOf ? (
                 <>
                   Nothing was posted on or before {asOf} — this book’s latest posted entry is {latest}.{' '}
-                  <button type="button" data-ledger-show-latest className={ui.btn} data-size="sm" style={{marginLeft: '0.25rem'}} onClick={() => updateAsOf(latest)}>
+                  <button type="button" data-ledger-show-latest className={ui.btn} data-size="xs" style={{marginLeft: '0.25rem'}} onClick={() => updateAsOf(latest)}>
                     Show your latest period instead — through {latest}
                   </button>
                 </>

@@ -1,5 +1,5 @@
-import {ui} from './ui';
 import React from 'react';
+import {ui} from './ui';
 import {LedgerError, api} from '@book.dev/plugin-sdk';
 import {EmptyState, ReportError, SetupPrompt, TableRegion, readString, readProps, useLedgerReport, wrapStyle, writeProp, type BlockLike, type EditorLike} from './reportShell';
 import {
@@ -53,8 +53,6 @@ import {todayIso} from './model';
 
 const PROP_START = 'ledgerPeriodStart';
 const PROP_END = 'ledgerPeriodEnd';
-
-/** The dead-look button face (the reconcile block's lesson, same treatment). */
 
 /** A stable per-block DOM id namespace (two blocks on one page must not share). */
 const blockKey = (block: BlockLike): string => {
@@ -218,9 +216,9 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
             <table className={ui.table} data-density="compact">
               <thead>
                 <tr>
-                  <th  scope="col">Period</th>
-                  <th  scope="col">Status</th>
-                  <th  scope="col">Actions</th>
+                  <th scope="col">Period</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,7 +243,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
                             focusAfterRender(`[data-ledger-period-reopen-confirm="${period.id}"]`);
                           }}
                         >
-                            Reopen…
+                          Reopen…
                         </button>
                       )}
                       {confirmingReopen === period.id && (
@@ -258,7 +256,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
                             disabled={controlsDead}
                             onClick={() => void reopen(period)}
                           >
-                              Reopen period
+                            Reopen period
                           </button>
                           <button
                             type="button"
@@ -272,7 +270,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
                               focusAfterRender(`[data-ledger-period-reopen="${period.id}"]`);
                             }}
                           >
-                              Cancel
+                            Cancel
                           </button>
                         </span>
                       )}

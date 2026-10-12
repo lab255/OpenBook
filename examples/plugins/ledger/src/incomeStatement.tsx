@@ -1,5 +1,5 @@
-import {ui} from './ui';
 import React from 'react';
+import {ui} from './ui';
 import {describeDraftExclusion} from './reports';
 import {
   buildIncomeStatement,
@@ -172,7 +172,7 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
     // report exists to produce 7–8px right of the column of 16 amounts directly
     // above it, on exactly the vertical scan a reader runs from Total expenses.
     // It also sat outside `TableRegion`, so in a narrow block the column could
-    // scroll away from underneath it. In the table it inherits `numericStyle`'s
+    // scroll away from underneath it. In the table it inherits `.obe-ui-num`'s
     // padding, the scroll container, and real `<th scope="row">`/`<td>`
     // semantics — one move, three problems.
     //
@@ -287,7 +287,7 @@ export const IncomeStatementBlock = ({block, editor, pageReadOnly}: {block: Bloc
               {latest !== null && (latest.to > to || latest.to < from) ? (
                 <>
                   Nothing was posted to a revenue or expense account between {from} and {to} — this book’s latest posted entry is {latest.to}.{' '}
-                  <button type="button" data-ledger-show-latest className={ui.btn} data-size="sm" style={{marginLeft: '0.25rem'}} onClick={() => pinPeriod(latest.from, latest.to)}>
+                  <button type="button" data-ledger-show-latest className={ui.btn} data-size="xs" style={{marginLeft: '0.25rem'}} onClick={() => pinPeriod(latest.from, latest.to)}>
                     Show your latest period instead — through {latest.to}
                   </button>
                 </>

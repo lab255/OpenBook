@@ -1,5 +1,5 @@
-import {ui} from './ui';
 import React from 'react';
+import {ui} from './ui';
 import {AccountName, SideAmount, SrOnly, TableRegion, wrapStyle} from './reportShell';
 import {directPostingsLabel, type HierarchyRow} from './statements';
 
@@ -178,7 +178,6 @@ export const StatementTable = ({
             <tr data-ledger-statement-total={line.key} className={ui.total} data-strong={line.strong || undefined} data-rule={line.rule || undefined}>
               <th
                 scope="row"
-
               >
                 {line.label}
                 {line.note !== undefined && <div className={ui.muted} style={{fontWeight: 400}}>{line.note}</div>}

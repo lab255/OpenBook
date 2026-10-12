@@ -13,6 +13,7 @@ describe('ledger public styles', () => {
     for (const [path, source] of Object.entries(sources)) {
       if (!path.endsWith('.tsx') || laterSlices.has(path.split('/').pop()!)) continue;
       expect(source, path).not.toMatch(/hsl\(var\(--|fontSize\s*:|borderRadius\s*:|fontWeight\s*:\s*5|SECONDARY_TEXT/);
+      expect(source, path).not.toMatch(/\b(frameStyle|titleStyle|mutedStyle|controlStyle|buttonStyle|disabledButtonStyle|tableStyle|thStyle|tdStyle|numericStyle|numericHeadStyle|noticeStyle)\b/);
     }
   });
 

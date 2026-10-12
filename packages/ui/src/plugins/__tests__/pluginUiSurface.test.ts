@@ -1,7 +1,5 @@
 import {describe, expect, it} from 'vitest';
-// @ts-expect-error -- node:fs is available to Vitest, not the browser package.
-import {readFileSync} from 'node:fs';
-const css = readFileSync('src/index.css', 'utf8');
+import css from '../../index.css?raw';
 import manifest from '../../../../../docs/design/design-system-manifest-2026-10.md?raw';
 import {PUBLIC_PLUGIN_UI_CLASSES} from '../uiSurface';
 
@@ -18,7 +16,7 @@ describe('public plugin UI surface', () => {
 
   it('uses theme and type tokens without hard-coded colours or rem font sizes', () => {
     expect(surface).not.toMatch(/#[\da-f]{3,8}\b|\brgba?\s*\(/i);
-    expect(surface).not.toMatch(/font-size\s*:\s*[\d.]+rem\b/);
+    expect(surface).not.toMatch(/font-size\s*:\s*[\d.]+(rem|px|em)\b/);
     expect(surface).not.toMatch(/\bopacity\s*:/);
   });
 });

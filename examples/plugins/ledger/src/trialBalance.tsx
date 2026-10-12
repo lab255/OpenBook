@@ -1,5 +1,5 @@
-import {ui} from './ui';
 import React from 'react';
+import {ui} from './ui';
 import {formatAmount} from '@book.dev/plugin-sdk';
 import {buildTrialBalance, describeDraftExclusion, describeTrialBalanceAssertion, type TrialBalance} from './reports';
 import {describeClosedPeriodMarker} from './periods';
@@ -121,7 +121,7 @@ export const TrialBalanceBlock = ({block, editor, pageReadOnly}: {block: BlockLi
 
   return (
     <div data-ledger-trial-balance contentEditable={false} className={ui.frame}>
-      <div className={ui.header}>
+      <div className={ui.row}>
         <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Trial balance
         </h3>
