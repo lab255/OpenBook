@@ -1,28 +1,7 @@
+import {ui} from './ui';
 import React from 'react';
 import {LedgerError, api} from '@book.dev/plugin-sdk';
-import {
-  EmptyState,
-  ReportError,
-  SECONDARY_TEXT,
-  SetupPrompt,
-  TableRegion,
-  buttonStyle,
-  controlStyle,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  readString,
-  readProps,
-  tableStyle,
-  tdStyle,
-  thStyle,
-  titleStyle,
-  useLedgerReport,
-  wrapStyle,
-  writeProp,
-  type BlockLike,
-  type EditorLike,
-} from './reportShell';
+import {EmptyState, ReportError, SetupPrompt, TableRegion, readString, readProps, useLedgerReport, wrapStyle, writeProp, type BlockLike, type EditorLike} from './reportShell';
 import {
   defaultCloseRange,
   describeCloseConfirm,
@@ -76,11 +55,6 @@ const PROP_START = 'ledgerPeriodStart';
 const PROP_END = 'ledgerPeriodEnd';
 
 /** The dead-look button face (the reconcile block's lesson, same treatment). */
-const buttonFace = (dead: boolean, extra: React.CSSProperties = {}): React.CSSProperties => ({
-  ...buttonStyle,
-  ...extra,
-  ...(dead ? {color: SECONDARY_TEXT, background: 'hsl(var(--muted))', cursor: 'not-allowed'} : {}),
-});
 
 /** A stable per-block DOM id namespace (two blocks on one page must not share). */
 const blockKey = (block: BlockLike): string => {
@@ -194,20 +168,20 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
   };
 
   if (data.state === 'loading') {
-    return <div style={frameStyle} data-ledger-periods><span style={mutedStyle}>Loading periods…</span></div>;
+    return <div className={ui.frame} data-ledger-periods><span className={ui.muted}>Loading periods…</span></div>;
   }
   if (data.state === 'uninitialized') {
     return (
-      <div style={frameStyle} data-ledger-periods>
-        <div style={titleStyle}>Period close</div>
+      <div className={ui.frame} data-ledger-periods>
+        <h3 className={ui.title}>Period close</h3>
         <SetupPrompt label="period close" readOnly={pageLocked} onDone={data.reload} />
       </div>
     );
   }
   if (data.state === 'error') {
     return (
-      <div style={frameStyle} data-ledger-periods>
-        <div style={titleStyle}>Period close</div>
+      <div className={ui.frame} data-ledger-periods>
+        <h3 className={ui.title}>Period close</h3>
         <ReportError kind="host" detail={data.error ?? 'unknown error'} onRetry={data.reload} />
       </div>
     );
@@ -218,108 +192,106 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
   const sorted = [...data.periods].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : a.id < b.id ? -1 : 1));
 
   return (
-    <div style={frameStyle} data-ledger-periods ref={rootRef}>
-      <div style={titleStyle}>Period close</div>
-      <div style={mutedStyle}>
+    <div className={ui.frame} data-ledger-periods ref={rootRef}>
+      <h3 className={ui.title}>Period close</h3>
+      <div className={ui.muted}>
         Closing a period sweeps revenue and expenses into retained earnings and locks the range — the server
         rejects any entry or reversal dated inside a closed period, from every surface.
       </div>
 
       {pageLocked && (
-        <div id={lockedWhyId} style={noticeStyle('quiet')} data-ledger-periods-locked>
+        <div id={lockedWhyId} className={ui.notice} data-tone={'quiet'} data-ledger-periods-locked>
           This page is read-only — closing and reopening periods is disabled here.
         </div>
       )}
       {done !== null && (
-        <div style={noticeStyle('info')} role="status" data-ledger-periods-done>{done}</div>
+        <div className={ui.notice} data-tone={'info'} role="status" data-ledger-periods-done>{done}</div>
       )}
       {actionError !== null && (
-        <div style={noticeStyle('alarm')} role="alert" data-ledger-periods-error>{actionError}</div>
+        <div className={ui.notice} data-tone={'alarm'} role="alert" data-ledger-periods-error>{actionError}</div>
       )}
 
       {sorted.length === 0
         ? <EmptyState>No period has been closed in this book yet.</EmptyState>
         : (
-          <div style={wrapStyle}>
-            <TableRegion label="Closed periods">
-              <table style={tableStyle}>
-                <thead>
-                  <tr>
-                    <th style={thStyle} scope="col">Period</th>
-                    <th style={thStyle} scope="col">Status</th>
-                    <th style={thStyle} scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((period) => (
-                    <tr key={period.id} data-ledger-period-row={period.id}>
-                      <td style={tdStyle}>{formatPeriodRange(period)}</td>
-                      <td style={tdStyle}>{describePeriodStatus(period)}</td>
-                      <td style={tdStyle}>
-                        {period.status === 'closed' && confirmingReopen !== period.id && (
+          <TableRegion label="Closed periods">
+            <table className={ui.table} data-density="compact">
+              <thead>
+                <tr>
+                  <th  scope="col">Period</th>
+                  <th  scope="col">Status</th>
+                  <th  scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((period) => (
+                  <tr key={period.id} data-ledger-period-row={period.id}>
+                    <td style={wrapStyle}>{formatPeriodRange(period)}</td>
+                    <td>{describePeriodStatus(period)}</td>
+                    <td>
+                      {period.status === 'closed' && confirmingReopen !== period.id && (
+                        <button
+                          type="button"
+                          data-ledger-period-reopen={period.id}
+                          className={ui.btn} data-size="sm"
+                          disabled={controlsDead}
+                          aria-describedby={pageLocked ? lockedWhyId : undefined}
+                          onClick={() => {
+                            setMode(`confirm-reopen:${period.id}`);
+                            setActionError(null);
+                            setDone(null);
+                            // The invoker unmounts on this commit — land on
+                            // the confirm's primary, not <body>.
+                            focusAfterRender(`[data-ledger-period-reopen-confirm="${period.id}"]`);
+                          }}
+                        >
+                            Reopen…
+                        </button>
+                      )}
+                      {confirmingReopen === period.id && (
+                        <span style={{display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap'}}>
+                          <span className={ui.muted}>{describeReopenConfirm(period)}</span>
                           <button
                             type="button"
-                            data-ledger-period-reopen={period.id}
-                            style={buttonFace(controlsDead)}
+                            data-ledger-period-reopen-confirm={period.id}
+                            className={ui.btn} data-size="sm" data-weight="strong"
                             disabled={controlsDead}
-                            aria-describedby={pageLocked ? lockedWhyId : undefined}
+                            onClick={() => void reopen(period)}
+                          >
+                              Reopen period
+                          </button>
+                          <button
+                            type="button"
+                            data-ledger-period-reopen-cancel={period.id}
+                            className={ui.btn} data-size="sm"
+                            disabled={busy}
                             onClick={() => {
-                              setMode(`confirm-reopen:${period.id}`);
-                              setActionError(null);
-                              setDone(null);
-                              // The invoker unmounts on this commit — land on
-                              // the confirm's primary, not <body>.
-                              focusAfterRender(`[data-ledger-period-reopen-confirm="${period.id}"]`);
+                              setMode('none');
+                              // Cancel unmounts itself — return to the
+                              // re-mounted invoker.
+                              focusAfterRender(`[data-ledger-period-reopen="${period.id}"]`);
                             }}
                           >
-                            Reopen…
-                          </button>
-                        )}
-                        {confirmingReopen === period.id && (
-                          <span style={{display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap'}}>
-                            <span style={mutedStyle}>{describeReopenConfirm(period)}</span>
-                            <button
-                              type="button"
-                              data-ledger-period-reopen-confirm={period.id}
-                              style={buttonFace(controlsDead, {fontWeight: 600})}
-                              disabled={controlsDead}
-                              onClick={() => void reopen(period)}
-                            >
-                              Reopen period
-                            </button>
-                            <button
-                              type="button"
-                              data-ledger-period-reopen-cancel={period.id}
-                              style={buttonFace(busy)}
-                              disabled={busy}
-                              onClick={() => {
-                                setMode('none');
-                                // Cancel unmounts itself — return to the
-                                // re-mounted invoker.
-                                focusAfterRender(`[data-ledger-period-reopen="${period.id}"]`);
-                              }}
-                            >
                               Cancel
-                            </button>
-                          </span>
-                        )}
-                        {period.status === 'reopened' && <span style={mutedStyle}>—</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableRegion>
-          </div>
+                          </button>
+                        </span>
+                      )}
+                      {period.status === 'reopened' && <span className={ui.muted}>—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableRegion>
         )}
 
       <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap'}}>
-        <label style={mutedStyle}>
+        <label className={ui.muted + ' ' + ui.row}>
           From{' '}
           <input
             type="date"
             data-ledger-period-start
-            style={controlStyle}
+            className={ui.field}
             value={effectiveStart}
             disabled={controlsDead}
             aria-describedby={pageLocked ? lockedWhyId : undefined}
@@ -329,12 +301,12 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
             }}
           />
         </label>
-        <label style={mutedStyle}>
+        <label className={ui.muted + ' ' + ui.row}>
           through{' '}
           <input
             type="date"
             data-ledger-period-end
-            style={controlStyle}
+            className={ui.field}
             value={effectiveEnd}
             disabled={controlsDead}
             aria-describedby={pageLocked ? lockedWhyId : undefined}
@@ -348,7 +320,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
           <button
             type="button"
             data-ledger-period-close
-            style={buttonFace(controlsDead)}
+            className={ui.btn}
             disabled={controlsDead}
             aria-describedby={pageLocked ? lockedWhyId : undefined}
             onClick={() => {
@@ -367,7 +339,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
       {/* Warn-not-block: the notice renders WITH the confirm step, and the
           confirm button stays enabled — the user proceeds informed. */}
       {mode === 'confirm-close' && (
-        <div style={noticeStyle('info')} data-ledger-period-close-confirm-box>
+        <div className={ui.notice} data-tone={'info'} data-ledger-period-close-confirm-box>
           <div>{describeCloseConfirm({start: effectiveStart, end: effectiveEnd})}</div>
           {openWarning !== null && (
             <div style={{marginTop: '0.35rem'}} role="status" data-ledger-period-open-recs>{openWarning}</div>
@@ -376,7 +348,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
             <button
               type="button"
               data-ledger-period-close-confirm
-              style={buttonFace(controlsDead, {fontWeight: 600})}
+              className={ui.btn} data-weight="strong"
               disabled={controlsDead}
               onClick={() => void close()}
             >
@@ -385,7 +357,7 @@ export const PeriodCloseBlock = ({block, editor, pageReadOnly}: {block: BlockLik
             <button
               type="button"
               data-ledger-period-close-cancel
-              style={buttonFace(busy)}
+              className={ui.btn}
               disabled={busy}
               onClick={() => {
                 setMode('none');

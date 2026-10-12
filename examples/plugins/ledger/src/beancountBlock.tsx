@@ -1,18 +1,7 @@
+import {ui} from './ui';
 import React from 'react';
 import {LedgerError, api} from '@book.dev/plugin-sdk';
-import {
-  EmptyState,
-  ReportError,
-  SetupPrompt,
-  buttonStyle,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  titleStyle,
-  useLedgerReport,
-  type BlockLike,
-  type EditorLike,
-} from './reportShell';
+import {EmptyState, ReportError, SetupPrompt, useLedgerReport, type BlockLike, type EditorLike} from './reportShell';
 
 /**
  * The BEANCOUNT EXPORT block (LGR-13) — "Export & verify": download the whole
@@ -163,29 +152,29 @@ export const BeancountExportBlock = ({editor, pageReadOnly}: {block: BlockLike; 
   };
 
   if (data.state === 'loading') {
-    return <div style={frameStyle} data-ledger-beancount><span style={mutedStyle}>Loading ledger…</span></div>;
+    return <div className={ui.frame} data-ledger-beancount><span className={ui.muted}>Loading ledger…</span></div>;
   }
   if (data.state === 'uninitialized') {
     return (
-      <div style={frameStyle} data-ledger-beancount>
-        <div style={titleStyle}>Beancount export</div>
+      <div className={ui.frame} data-ledger-beancount>
+        <h3 className={ui.title}>Beancount export</h3>
         <SetupPrompt label="Beancount export" readOnly={pageLocked} onDone={data.reload} />
       </div>
     );
   }
   if (data.state === 'error') {
     return (
-      <div style={frameStyle} data-ledger-beancount>
-        <div style={titleStyle}>Beancount export</div>
+      <div className={ui.frame} data-ledger-beancount>
+        <h3 className={ui.title}>Beancount export</h3>
         <ReportError kind="host" detail={data.error ?? 'unknown error'} onRetry={data.reload} />
       </div>
     );
   }
 
   return (
-    <div style={frameStyle} data-ledger-beancount ref={rootRef}>
-      <div style={titleStyle}>Beancount export</div>
-      <div style={mutedStyle}>
+    <div className={ui.frame} data-ledger-beancount ref={rootRef}>
+      <h3 className={ui.title}>Beancount export</h3>
+      <div className={ui.muted}>
         Download the whole book as a Beancount journal — a plain-text format an independent accounting
         toolchain (bean-check, Fava) can re-verify — and run the ledger&rsquo;s own integrity verifier on the
         same book, so the copy leaves with a verdict attached.
@@ -195,7 +184,7 @@ export const BeancountExportBlock = ({editor, pageReadOnly}: {block: BlockLike; 
         <button
           type="button"
           data-ledger-beancount-run
-          style={{...buttonStyle, ...(busy ? {cursor: 'wait'} : {})}}
+          className={ui.btn} aria-busy={busy}
           disabled={busy}
           onClick={() => void run()}
         >
@@ -204,20 +193,20 @@ export const BeancountExportBlock = ({editor, pageReadOnly}: {block: BlockLike; 
       </div>
 
       {actionError !== null && (
-        <div style={noticeStyle('alarm')} role="alert" data-ledger-beancount-error>{actionError}</div>
+        <div className={ui.notice} data-tone={'alarm'} role="alert" data-ledger-beancount-error>{actionError}</div>
       )}
       {exported !== null && (
-        <div style={noticeStyle('info')} role="status" data-ledger-beancount-done>{exported}</div>
+        <div className={ui.notice} data-tone={'info'} role="status" data-ledger-beancount-done>{exported}</div>
       )}
       {verify !== null && (
         <div
-          style={noticeStyle(verify.state === 'findings' ? 'alarm' : verify.state === 'unavailable' ? 'quiet' : 'info')}
+          className={ui.notice} data-tone={verify.state === 'findings' ? 'alarm' : verify.state === 'unavailable' ? 'quiet' : 'info'}
           role={verify.state === 'findings' ? 'alert' : 'status'}
           data-ledger-beancount-verify={verify.state}
         >
           <div>{verify.text}</div>
           {verify.details.length > 0 && (
-            <ul style={{margin: '0.35rem 0 0', paddingLeft: '1.2rem'}}>
+            <ul className={ui.list} style={{marginTop: '0.35rem'}}>
               {verify.details.map((line) => <li key={line}>{line}</li>)}
             </ul>
           )}
