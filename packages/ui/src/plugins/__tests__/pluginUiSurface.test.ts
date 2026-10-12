@@ -11,6 +11,7 @@ const surface = css.split('/* Plugin UI surface */')[1]?.split('/* End plugin UI
 describe('public plugin UI surface', () => {
   it('defines and documents every stable class', () => {
     expect(surface.length).toBeGreaterThan(0);
+    expect(surface).toContain('.obe-ui-field[aria-invalid=\'true\']:disabled');
     for (const name of PUBLIC_PLUGIN_UI_CLASSES) {
       expect(surface).toMatch(new RegExp(`\\.${name}(?=[\\s:{.,\\[])`));
       expect(manifest.split('## 14. Plugin UI surface')[1]).toContain(`\`${name}\``);

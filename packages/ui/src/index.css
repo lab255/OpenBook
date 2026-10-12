@@ -2469,6 +2469,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-ui-field[aria-invalid='true'] { border-color: hsl(var(--destructive)); }
 .obe-ui-field::placeholder { color: var(--obe-placeholder); }
 .obe-ui-field:disabled { border-style: dashed; border-color: hsl(var(--muted-foreground) / 0.6); background: transparent; color: hsl(var(--foreground)); cursor: not-allowed; }
+.obe-ui-field[aria-invalid='true']:disabled { border-color: hsl(var(--destructive)); }
 .obe-ui-btn, .obe-ui-file::file-selector-button { display: inline-flex; align-items: center; gap: 0.25rem; height: var(--height-control-md); padding: 0 0.75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--obe-small-size); font-weight: 400; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft); }
 .obe-ui-btn:hover:not(:disabled):not([aria-disabled='true']), .obe-ui-file:not(:disabled)::file-selector-button:hover { background: var(--obe-chrome-hover); border-color: hsl(var(--foreground) / 0.2); }
 .obe-ui-btn:focus-visible, .obe-ui-table-wrap:focus-visible, .obe-ui-check input:focus-visible, .obe-ui-file:focus-visible { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
