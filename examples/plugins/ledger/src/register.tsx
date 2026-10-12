@@ -739,9 +739,9 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
       )}
 
       {confirming !== null && (
-        <div data-ledger-correct-confirm={confirming.transactionId} role="status" aria-live="polite" className={ui.notice} data-tone="info">
+        <div data-ledger-correct-confirm={confirming.transactionId} role="status" aria-live="polite" className={`${ui.notice} ${ui.stack}`} data-tone="info">
           <div>{describeCorrectionConfirm(confirming)}</div>
-          <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap'}}>
+          <div className={ui.row}>
             {/* NOT disabled while the reversal is in flight. `runCorrection`
                 already refuses re-entry, and disabling the button the user is
                 standing on blurs them to <body> — on the ledger's single most
@@ -856,7 +856,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
               {/* `regionRef` is the WIDTH PROBE for the Balance-pin guard. */}
               <TableRegion label="Account register table" regionRef={setTableRegionEl}>
                 <table className={ui.table} data-density="compact">
-                  <caption className={ui.muted} style={{textAlign: 'left', paddingBottom: '0.25rem'}}>
+                  <caption className={ui.muted}>
                     {/* What the columns actually SHOW. "Debit-positive" is the
                       fold's internal sign convention and no signed number
                       appears on screen any more — every amount is a magnitude
@@ -891,6 +891,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                       <th scope="col" className={ui.num}>
                     Amount
                       </th>
+                      {/* Balance pins right (R3-1): the running balance is the register's job; it yields below MIN_BALANCE_PIN_WIDTH. */}
                       <th scope="col" className={cx(ui.num, pinBalance && ui.pinEnd)}>
                     Balance
                       </th>
@@ -1079,7 +1080,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                   <tfoot>
                     <tr data-ledger-register-totals>
                       <td className={ui.pinStart} />
-                      <th scope="row" colSpan={5} style={{textAlign: 'left'}}>
+                      <th scope="row" colSpan={5}>
                     Closing balance
                       </th>
                       <td className={cx(ui.muted, ui.num)}>

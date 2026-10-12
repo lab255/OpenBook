@@ -140,7 +140,7 @@ afterEach(async () => {
 });
 
 describe('reconcile deadButton public face and gate', () => {
-  it.each([true, false])('Finish uses the public button face with pageReadOnly=%s', async (pageReadOnly) => {
+  it.each([true, false])('Finish and Amend use the public button face with pageReadOnly=%s', async (pageReadOnly) => {
     const {client} = fakeLedger();
     await mountBlock(client, pageReadOnly);
     const finish = el<HTMLButtonElement>('[data-ledger-finish]');
@@ -151,6 +151,11 @@ describe('reconcile deadButton public face and gate', () => {
     expect(finish.matches(':disabled')).toBe(pageReadOnly);
     expect(finish.getAttribute('data-weight')).toBe('strong');
     expect(finish.hasAttribute('style')).toBe(false);
+    const amend = el<HTMLButtonElement>('[data-ledger-amend]');
+    expect(amend.classList.contains('obe-ui-btn')).toBe(true);
+    expect(amend.hasAttribute('data-weight')).toBe(false);
+    expect(amend.hasAttribute('style')).toBe(false);
+    expect(amend.disabled).toBe(pageReadOnly);
   });
 });
 

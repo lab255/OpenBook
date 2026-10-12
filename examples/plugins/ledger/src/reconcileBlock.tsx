@@ -44,6 +44,8 @@ import {
   type EditorLike,
 } from './reportShell';
 
+const cx = (...classes: (string | false)[]): string => classes.filter(Boolean).join(' ');
+
 /**
  * The RECONCILE block (LGR-11) — the surface that turns "the import probably
  * worked" into "these books agree with the bank, to the penny, as at this date".
@@ -667,9 +669,9 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                   that lands while this is open cannot leave a confirm offering
                   an action the server would now refuse. */}
               {mode === 'confirm-finish' && unmatchedCaveat !== null && sheet.canFinish && (
-                <div data-ledger-finish-confirm role="status" aria-live="polite" className={ui.notice} data-tone="info">
+                <div data-ledger-finish-confirm role="status" aria-live="polite" className={`${ui.notice} ${ui.stack}`} data-tone="info">
                   {unmatchedCaveat}
-                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap'}}>
+                  <div className={ui.row}>
                     <button
                       type="button"
                       data-ledger-finish-confirm-yes data-size="sm"
@@ -704,7 +706,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
               )}
 
               {mode === 'abandon' && (
-                <div data-ledger-abandon-confirm role="status" aria-live="polite" className={ui.notice} data-tone="info">
+                <div data-ledger-abandon-confirm role="status" aria-live="polite" className={`${ui.notice} ${ui.stack}`} data-tone="info">
                   {/* What abandoning DOES, in the two facts a person needs
                       before they press it: nothing is posted, and no tick is
                       undone. Both are guarantees of the store, not of this
@@ -712,7 +714,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                       read the store. */}
                   Abandon the {sheet.statementDate} statement? It stays on record as abandoned, nothing is posted to the books, and every posting keeps the
                   cleared state it has now. This account is then free for a new reconciliation — but this one cannot be resumed.
-                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap'}}>
+                  <div className={ui.row}>
                     <button
                       type="button"
                       data-ledger-abandon-confirm-yes data-size="sm"
@@ -980,6 +982,17 @@ const OutstandingItems = ({sheet, heading, headingId}: {sheet: ReconcileSheet; h
   </section>
 );
 
+/**
+ * Below this REGION width the Amount pin yields and the column scrolls again:
+ * the amount and its Dr/Cr marker stay visible at desktop widths without
+ * consuming the checklist's usable middle at narrow widths.
+ *
+ * The public pin classes now make a container query possible, but this guard
+ * stays in JS: the threshold is plugin-specific and third-party plugins cannot
+ * add CSS to the host stylesheet.
+ */
+const MIN_AMOUNT_PIN_WIDTH = 480;
+
 /** The candidate postings, with the tick that moves the difference.
  *  `readOnly` is the PAGE's lock (the caller's `pageLocked`); when set, every
  *  box is off and points at the block's stated reason (`readOnlyWhyId`). */
@@ -997,118 +1010,136 @@ const Checklist = ({
   readOnlyWhyId?: string;
   onToggle: (postingId: string, matched: boolean) => void;
   truncated: boolean;
-}) => (
-  <TableRegion label="Reconciliation checklist">
-    <table data-ledger-reconcile-table className={ui.table} data-density="compact">
-      {/* The caption must never assert completeness the truncation notice
-          above has just denied — on a partial read it says so itself, rather
-          than describing a checklist that is missing rows. */}
-      <caption className={ui.muted} style={{textAlign: 'left', paddingBottom: '0.25rem'}}>
-        Every posted entry on <AccountName name={sheet.accountName} />
-        {/* Sentence case, not caps: a screen reader announces a fully
-            capitalised phrase letter by letter in several common
-            configurations, and this is the clause that says the list is
-            incomplete — the one that most needs to be understood. */}
-        {truncated ? ' within this partial read' : ''} — tick the ones that appear on the {sheet.statementDate} statement.
-        Debits and credits are marked Dr/Cr; this account is {sheet.normalSide}-normal.
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">
-            On statement
-          </th>
-          <th scope="col">
-            Entry
-          </th>
-          <th scope="col">
-            Date
-          </th>
-          <th scope="col">
-            Description
-          </th>
-          <th scope="col">
-            Contra account
-          </th>
-          <th scope="col">
-            State
-          </th>
-          <th scope="col" className={ui.num}>
-            Amount
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sheet.rows.map((row) => {
-          const locked = isRowLocked(sheet, row);
-          // The user's own tick wins until the books confirm or refuse it.
-          const checked = row.postingId in optimistic ? optimistic[row.postingId].want : row.matched;
-          return (
-            <tr key={row.postingId} data-ledger-reconcile-row={row.postingId} data-ledger-matched={checked ? 'true' : 'false'}>
-              <td>
-                {/* Entry number, date, description AND amount — the two halves
-                    of a duplicated payment otherwise carry byte-identical
-                    names, and telling the duplicate from the original is the
-                    one distinction this whole workflow turns on. The lock
-                    reason is IN the label, not beside it: a disabled checkbox
-                    is out of the tab order, so a sibling note never reaches
-                    the people it is for. */}
-                <input
-                  type="checkbox"
-                  data-ledger-match={row.postingId}
-                  checked={checked}
-                  disabled={locked || readOnly}
-                  aria-describedby={readOnly ? readOnlyWhyId : undefined}
-                  onChange={(e) => onToggle(row.postingId, e.target.checked)}
-                  aria-label={describeRowLabel(sheet, row, readOnly)}
-                />
-              </td>
-              <td className={ui.muted} style={{fontVariantNumeric: 'tabular-nums'}}>{row.entryNo === null ? '—' : `#${row.entryNo}`}</td>
-              <td style={{whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{row.date}</td>
-              <td style={wrapStyle}>
-                {row.description === '' ? <span className={ui.muted}>(no description)</span> : row.description}
-                {row.reversed && (
-                  <span className={ui.muted} style={{marginLeft: '0.35rem'}}>
-                    (reversed)
-                    <SrOnly> — this entry was reversed; its reversing entry appears in this checklist too.</SrOnly>
-                  </span>
-                )}
-              </td>
-              <td data-ledger-contra style={wrapStyle}>
-                <AccountName name={row.contra} />
-              </td>
-              <td data-ledger-cleared-cell={row.cleared} className={ui.muted}>
-                {CLEARED_LABEL[row.cleared]}
-                {row.frozen && row.frozenStatementDate !== null && (
-                  // `nowrap`: an ISO date broken across lines as `2026-03-` /
-                  // `31` reads as two fragments, not one date.
-                  <span
-                    data-ledger-reconciled-statement={row.frozenStatementDate}
-                    style={{display: 'block', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}
-                  >
-                    {row.frozenStatementDate}
-                  </span>
-                )}
-              </td>
-              <td data-ledger-amount className={ui.num}>
-                <SideAmount minor={row.amountMinor} />
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-      <tfoot>
-        <tr data-ledger-reconcile-totals>
-          <th scope="row" colSpan={6} style={{textAlign: 'left'}}>
-            Cleared balance (ticked only)
-          </th>
-          <td data-ledger-cleared-total className={ui.num}>
-            <SideAmount minor={sheet.clearedBalanceMinor} />
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-  </TableRegion>
-);
+}) => {
+  // The table region's measured width, for the Amount-pin guard (see
+  // {@link MIN_AMOUNT_PIN_WIDTH}). A callback-ref + state pair rather than a
+  // plain ref because the region only mounts once rows render, and an effect
+  // keyed on the element is what re-arms the observer across that boundary.
+  const [tableRegionEl, setTableRegionEl] = React.useState<HTMLDivElement | null>(null);
+  const [regionWidth, setRegionWidth] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    // No observer (a bare test harness): stay pinned — the default is the
+    // desktop layout the pin was built for.
+    if (tableRegionEl === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setRegionWidth(tableRegionEl.clientWidth));
+    observer.observe(tableRegionEl);
+    setRegionWidth(tableRegionEl.clientWidth);
+    return () => observer.disconnect();
+  }, [tableRegionEl]);
+  const pinAmount = regionWidth === null || regionWidth >= MIN_AMOUNT_PIN_WIDTH;
+  return (
+    <TableRegion label="Reconciliation checklist" regionRef={setTableRegionEl}>
+      <table data-ledger-reconcile-table className={ui.table} data-density="compact">
+        {/* The caption must never assert completeness the truncation notice
+            above has just denied — on a partial read it says so itself, rather
+            than describing a checklist that is missing rows. */}
+        <caption className={ui.muted}>
+          Every posted entry on <AccountName name={sheet.accountName} />
+          {/* Sentence case, not caps: a screen reader announces a fully
+              capitalised phrase letter by letter in several common
+              configurations, and this is the clause that says the list is
+              incomplete — the one that most needs to be understood. */}
+          {truncated ? ' within this partial read' : ''} — tick the ones that appear on the {sheet.statementDate} statement.
+          Debits and credits are marked Dr/Cr; this account is {sheet.normalSide}-normal.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">
+              On statement
+            </th>
+            <th scope="col">
+              Entry
+            </th>
+            <th scope="col">
+              Date
+            </th>
+            <th scope="col">
+              Description
+            </th>
+            <th scope="col">
+              Contra account
+            </th>
+            <th scope="col">
+              State
+            </th>
+            <th scope="col" className={cx(ui.num, pinAmount && ui.pinEnd)}>
+              Amount
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sheet.rows.map((row) => {
+            const locked = isRowLocked(sheet, row);
+            // The user's own tick wins until the books confirm or refuse it.
+            const checked = row.postingId in optimistic ? optimistic[row.postingId].want : row.matched;
+            return (
+              <tr key={row.postingId} data-ledger-reconcile-row={row.postingId} data-ledger-matched={checked ? 'true' : 'false'}>
+                <td>
+                  {/* Entry number, date, description AND amount — the two halves
+                      of a duplicated payment otherwise carry byte-identical
+                      names, and telling the duplicate from the original is the
+                      one distinction this whole workflow turns on. The lock
+                      reason is IN the label, not beside it: a disabled checkbox
+                      is out of the tab order, so a sibling note never reaches
+                      the people it is for. */}
+                  <input
+                    type="checkbox"
+                    data-ledger-match={row.postingId}
+                    checked={checked}
+                    disabled={locked || readOnly}
+                    aria-describedby={readOnly ? readOnlyWhyId : undefined}
+                    onChange={(e) => onToggle(row.postingId, e.target.checked)}
+                    aria-label={describeRowLabel(sheet, row, readOnly)}
+                  />
+                </td>
+                <td className={ui.muted} style={{fontVariantNumeric: 'tabular-nums'}}>{row.entryNo === null ? '—' : `#${row.entryNo}`}</td>
+                <td style={{whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{row.date}</td>
+                <td style={wrapStyle}>
+                  {row.description === '' ? <span className={ui.muted}>(no description)</span> : row.description}
+                  {row.reversed && (
+                    <span className={ui.muted} style={{marginLeft: '0.35rem'}}>
+                      (reversed)
+                      <SrOnly> — this entry was reversed; its reversing entry appears in this checklist too.</SrOnly>
+                    </span>
+                  )}
+                </td>
+                <td data-ledger-contra style={wrapStyle}>
+                  <AccountName name={row.contra} />
+                </td>
+                <td data-ledger-cleared-cell={row.cleared} className={ui.muted}>
+                  {CLEARED_LABEL[row.cleared]}
+                  {row.frozen && row.frozenStatementDate !== null && (
+                    // `nowrap`: an ISO date broken across lines as `2026-03-` /
+                    // `31` reads as two fragments, not one date.
+                    <span
+                      data-ledger-reconciled-statement={row.frozenStatementDate}
+                      style={{display: 'block', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}
+                    >
+                      {row.frozenStatementDate}
+                    </span>
+                  )}
+                </td>
+                <td data-ledger-amount className={cx(ui.num, pinAmount && ui.pinEnd)}>
+                  <SideAmount minor={row.amountMinor} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr data-ledger-reconcile-totals>
+            <th scope="row" colSpan={6}>
+              Cleared balance (ticked only)
+            </th>
+            <td data-ledger-cleared-total className={cx(ui.num, pinAmount && ui.pinEnd)}>
+              <SideAmount minor={sheet.clearedBalanceMinor} />
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </TableRegion>
+  );
+};
 
 /**
  * Starting a reconciliation, and resuming one already in progress.
@@ -1264,7 +1295,7 @@ const StartForm = ({
       {existing.length > 0 && (
         <TableRegion label="Reconciliations on this book">
           <table data-ledger-reconcile-list className={ui.table} data-density="compact">
-            <caption className={ui.muted} style={{textAlign: 'left', paddingBottom: '0.25rem'}}>Statements already started on this book.</caption>
+            <caption className={ui.muted}>Statements already started on this book.</caption>
             <thead>
               <tr>
                 <th scope="col">
