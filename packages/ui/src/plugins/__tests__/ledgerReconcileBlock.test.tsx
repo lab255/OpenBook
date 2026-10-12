@@ -139,6 +139,21 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+describe('reconcile deadButton public face and gate', () => {
+  it.each([true, false])('Finish uses the public button face with pageReadOnly=%s', async (pageReadOnly) => {
+    const {client} = fakeLedger();
+    await mountBlock(client, pageReadOnly);
+    const finish = el<HTMLButtonElement>('[data-ledger-finish]');
+    // The same balanced sheet renders a dead and a live Finish. The helper
+    // supplies the class and gate together; CSS :disabled supplies the face.
+    expect(finish.classList.contains('obe-ui-btn')).toBe(true);
+    expect(finish.disabled).toBe(pageReadOnly);
+    expect(finish.matches(':disabled')).toBe(pageReadOnly);
+    expect(finish.getAttribute('data-weight')).toBe('strong');
+    expect(finish.hasAttribute('style')).toBe(false);
+  });
+});
+
 describe('LGR-22 — reconcile block focus management across sub-flows', () => {
   it('opening Amend moves focus INTO the form at the moment the invoker is disabled', async () => {
     const {client} = fakeLedger();

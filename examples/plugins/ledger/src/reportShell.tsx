@@ -243,9 +243,6 @@ export function useLedgerReport(): LedgerReportData {
   };
 }
 
-// Temporary compatibility for untouched 9b/9c consumers; not used by this shell.
-export * from './legacyStyles';
-
 /** Long colon-delimited account names must be allowed to break, or they set an unshrinkable min-width. */
 export const wrapStyle: React.CSSProperties = {
   overflowWrap: 'break-word',

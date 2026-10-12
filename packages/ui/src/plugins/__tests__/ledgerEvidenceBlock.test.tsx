@@ -127,6 +127,17 @@ describe('LGR-14 — register evidence badge', () => {
     const badge = el('[data-ledger-no-evidence]');
     // The badge must not borrow the destructive/alarm token: an entry without
     // a receipt is legal on an ordinary account.
+    expect(badge.classList.contains('obe-ui-muted')).toBe(true);
+    const row = badge.closest('[data-ledger-register-row]');
+    expect(row).not.toBeNull();
+    // Check the badge and each ancestor through the row: a neutral badge
+    // inside an alarm cell would still teach the reader that missing evidence
+    // is an error.
+    for (let node: Element | null = badge; node !== null; node = node.parentElement) {
+      expect(node.hasAttribute('data-tone')).toBe(false);
+      expect(node.getAttribute('data-ui-flag')).not.toBe('alarm');
+      if (node === row) break;
+    }
     expect(badge.getAttribute('style') ?? '').not.toContain('destructive');
   });
 });
