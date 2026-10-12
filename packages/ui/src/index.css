@@ -264,6 +264,7 @@
     --obe-caption-leading: 1.33;
     --obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --obe-disabled-opacity: 0.5;
+    --obe-notice-pad-x: 0.75rem;
     --obe-placeholder: hsl(var(--muted-foreground) / 0.6);
     --obe-callout-info: hsl(var(--muted));
     --obe-callout-warn: var(--obe-bg-yellow);
@@ -2446,6 +2447,75 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Block editor: reactive custom blocks (slider + formula) */
 .obe-custom { flex: 1; min-width: 0; }
+
+/* Plugin UI surface */
+.obe-ui-frame { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-lg); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--obe-small-size); line-height: var(--obe-small-leading); }
+.obe-ui-frame .obe-ui-frame { background: transparent; }
+.obe-ui-title { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
+.obe-ui-header { display: flex; align-items: flex-end; gap: 0.5rem 0.75rem; flex-wrap: wrap; }
+.obe-ui-header > .obe-ui-title { line-height: var(--height-control-md); }
+.obe-ui-muted, .obe-ui-fieldset legend, .obe-ui-table caption { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); color: hsl(var(--muted-foreground)); }
+.obe-ui-eyebrow, .obe-ui-table thead th, .obe-ui-table .obe-ui-section { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: hsl(var(--muted-foreground)); }
+.obe-ui-labelled { display: flex; flex-direction: column; gap: 0.25rem; }
+.obe-ui-field { height: var(--height-control-md); padding: 0 0.625rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--background)); color: inherit; font-size: var(--obe-small-size); font-variant-numeric: tabular-nums; min-width: 0; }
+.obe-ui-field[data-size='sm'] { height: var(--height-control-sm); }
+.obe-ui-field:focus-visible { outline: none; border-color: hsl(var(--ring)); }
+.obe-ui-field[aria-invalid='true'] { border-color: hsl(var(--destructive)); }
+.obe-ui-field::placeholder { color: var(--obe-placeholder); }
+.obe-ui-field:disabled { border-style: dashed; border-color: hsl(var(--muted-foreground) / 0.6); background: transparent; color: hsl(var(--foreground)); cursor: not-allowed; }
+.obe-ui-btn, .obe-ui-file::file-selector-button { display: inline-flex; align-items: center; gap: 0.25rem; height: var(--height-control-md); padding: 0 0.75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--obe-small-size); font-weight: 400; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft); }
+.obe-ui-btn:hover:not(:disabled):not([aria-disabled='true']), .obe-ui-file:not(:disabled)::file-selector-button:hover { background: var(--obe-chrome-hover); border-color: hsl(var(--foreground) / 0.2); }
+.obe-ui-btn:focus-visible, .obe-ui-table-wrap:focus-visible, .obe-ui-check input:focus-visible, .obe-ui-file:focus-visible { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
+.obe-ui-btn[data-variant='primary'] { border-color: hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding-inline: 1rem; font-weight: 600; }
+.obe-ui-btn[data-variant='primary']:hover:not(:disabled):not([aria-disabled='true']) { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 4%); border-color: hsl(var(--primary)); }
+.obe-ui-btn[data-variant='primary']:active:not(:disabled):not([aria-disabled='true']) { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 8%); }
+.obe-ui-btn[data-variant='ghost'] { border: 0; background: transparent; color: var(--obe-chrome-ink); }
+.obe-ui-btn[data-variant='ghost']:hover:not(:disabled):not([aria-disabled='true']) { color: var(--obe-chrome-ink-hover); }
+.obe-ui-btn[data-variant='link'] { height: auto; padding: 0; border: 0; background: none; text-decoration: underline; color: inherit; font-size: inherit; }
+.obe-ui-btn[data-size='sm'], .obe-ui-file::file-selector-button { height: var(--height-control-sm); padding-inline: 0.5rem; }
+/* stylelint-disable declaration-property-value-allowed-list -- Public compact controls and tight tables use the contracted 2px inset. */
+.obe-ui-btn[data-size='xs'] { min-height: var(--height-control-xs); height: auto; padding: 0.125rem 0.5rem; white-space: normal; text-align: left; font-size: var(--obe-caption-size); }
+.obe-ui-fieldset { display: flex; align-items: center; gap: 0.5rem; padding: 0.125rem 0.5rem 0.25rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); }
+/* stylelint-enable declaration-property-value-allowed-list */
+.obe-ui-btn[data-weight='strong'] { font-weight: 600; }
+.obe-ui-btn[aria-busy='true'] { cursor: progress; }
+/* A visible shape cue survives forced colours; reasons remain adjacent text. */
+.obe-ui-btn:is(:disabled, [aria-disabled='true']), .obe-ui-file:disabled::file-selector-button { border-width: 1px; border-style: dashed; border-color: hsl(var(--muted-foreground)); background: transparent; color: hsl(var(--muted-foreground)); cursor: not-allowed; }
+.obe-ui-check { display: inline-flex; align-items: center; gap: 0.375rem; color: hsl(var(--muted-foreground)); font-size: var(--obe-caption-size); cursor: pointer; }
+.obe-ui-check input { accent-color: hsl(var(--primary)); }
+.obe-ui-check:has(input:disabled) { cursor: default; }
+.obe-ui-file { font-size: var(--obe-caption-size); color: hsl(var(--muted-foreground)); }
+.obe-ui-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.5rem; min-height: var(--height-control-xs); border: 1px solid hsl(var(--border)); border-radius: var(--radius-sm); font-size: var(--obe-caption-size); }
+.obe-ui-notice { padding: 0.5rem var(--obe-notice-pad-x); border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: transparent; color: hsl(var(--foreground)); font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 400; }
+.obe-ui-notice[data-tone='alarm'] { border-color: hsl(var(--destructive)); background: var(--obe-callout-danger); font-weight: 600; }
+.obe-ui-notice[data-tone='info'] { background: var(--obe-callout-info); border-left: 3px solid var(--obe-chrome-ink); }
+.obe-ui-notice-detail { font-weight: 400; margin-top: 0.25rem; }
+.obe-ui-table-wrap { width: 100%; overflow-x: auto; }
+.obe-ui-table { width: 100%; border-collapse: collapse; font-size: var(--obe-small-size); line-height: var(--obe-small-leading); }
+.obe-ui-table :is(th, td) { padding: 6px 8px; vertical-align: top; text-align: left; border-bottom: 1px solid hsl(var(--border) / 0.5); }
+.obe-ui-table thead th { white-space: nowrap; border-bottom-color: hsl(var(--border)); }
+.obe-ui-table caption { text-align: left; padding-bottom: 0.25rem; }
+.obe-ui-table[data-density='compact'] :is(th, td) { padding: 0.25rem 0.5rem; }
+/* stylelint-disable-next-line declaration-property-value-allowed-list -- Public tight table density uses the contracted 2px vertical inset. */
+.obe-ui-table[data-density='tight'] :is(th, td) { padding: 0.125rem 0.375rem; font-size: var(--obe-caption-size); }
+.obe-ui-table tfoot :is(th, td), .obe-ui-total > :is(th, td) { font-weight: 600; border-bottom: 0; }
+.obe-ui-table tfoot :is(th, td), .obe-ui-total[data-rule] > :is(th, td) { border-top: 2px solid hsl(var(--border)); }
+.obe-ui-total[data-strong] > :is(th, td) { font-weight: 700; }
+.obe-ui-num, .obe-ui-table .obe-ui-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.obe-ui-table .obe-ui-section { font-weight: 600; color: hsl(var(--foreground)); padding-top: 0.5rem; }
+.obe-ui-pin-start, .obe-ui-pin-end { position: sticky; z-index: var(--z-index-raised); background: hsl(var(--card)); }
+.obe-ui-pin-start { inset-inline-start: 0; box-shadow: inset -1px 0 0 hsl(var(--border)); }
+.obe-ui-pin-end { inset-inline-end: 0; box-shadow: inset 1px 0 0 hsl(var(--border)); }
+.obe-ui-table tr[data-ui-state='located'] { background: hsl(var(--foreground) / 0.15); }
+.obe-ui-num [data-ui-mark='alarm'] { color: hsl(var(--destructive)); }
+.obe-ui-table [data-ui-flag='alarm'] { box-shadow: inset 3px 0 0 hsl(var(--destructive)); padding-left: 0.5rem; }
+.obe-ui-list { list-style: disc; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem; }
+/* stylelint-disable-next-line declaration-property-value-allowed-list -- Complete accessible clipping recipe requires a negative one-pixel margin. */
+.obe-ui-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
+.obe-ui-row { display: flex; align-items: center; gap: 0.5rem 0.75rem; flex-wrap: wrap; }
+.obe-ui-stack { display: flex; flex-direction: column; gap: 0.5rem; }
+/* End plugin UI surface */
+
 /* Inline database embed ("Link to database"): a live DatabaseView as a block. */
 .obe-dbview { margin: 0; }
 /* The slider's control surface (its config — name, min/max/step, layout — lives
