@@ -276,7 +276,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
             {drifted && (
               <div className={cn('flex flex-col gap-2 rounded-md px-3 py-2', WARN_SURFACE_CLASS)}>
                 <p className="text-xs font-medium">{t('diagnostics.drift')}</p>
-                <p className="text-xs text-muted-foreground">{t('diagnostics.driftExplain')}</p>
+                <p className="text-xs">{t('diagnostics.driftExplain')}</p>
                 {canRepair ? (
                   <div>
                     <Button size="sm" variant="outline" disabled={repair === 'busy'} onClick={() => void repairOwnership()}>
@@ -284,7 +284,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">{t('diagnostics.repairNeedsDevice')}</p>
+                  <p className="text-xs">{t('diagnostics.repairNeedsDevice')}</p>
                 )}
                 {repair === 'failed' && <p className="text-xs text-destructive">{t('diagnostics.repairFailed')}</p>}
               </div>

@@ -58,7 +58,7 @@ export function SidecarDegradedBanner({sidecar}: {sidecar: SidecarPlatform}) {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="font-medium">{t('sidecar.bannerTitle')}</p>
-          <p className="text-muted-foreground">{stateLine}{state.lastExitCode == null ? '' : ` · ${t('sidecar.exitCode', {code: state.lastExitCode})}`}</p>
+          <p>{stateLine}{state.lastExitCode == null ? '' : ` · ${t('sidecar.exitCode', {code: state.lastExitCode})}`}</p>
         </div>
         <Button size="sm" variant="outline" disabled={restarting} onClick={() => void restart()}>
           {restarting ? t('sidecar.restarting') : t('sidecar.restart')}

@@ -182,7 +182,7 @@ export function UpdateAdvisoryWarning({
 
         <div className="grid gap-2">
           <Label htmlFor={inputId}>{t('updates.advisory.ackLabel')}</Label>
-          <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
+          <p id={`${inputId}-hint`} className="text-xs text-foreground/80">
             {t('updates.advisory.ackPrompt', {phrase})}
           </p>
           <Input
@@ -198,7 +198,7 @@ export function UpdateAdvisoryWarning({
         {installMessage && (
           <p
             role={installMessage.tone === 'error' ? 'alert' : 'status'}
-            className={cn('text-sm', installMessage.tone === 'error' ? 'text-destructive' : 'text-muted-foreground')}
+            className={cn('text-sm', installMessage.tone === 'error' ? 'text-destructive' : 'text-foreground/80')}
           >
             {installMessage.text}
           </p>
