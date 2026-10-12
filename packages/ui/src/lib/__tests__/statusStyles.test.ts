@@ -43,13 +43,25 @@ describe('app status palette recipes', () => {
   });
 
   for (const scheme of DATA_COLOR_SCHEMES) {
-    it(`${scheme} status inks meet AA on white and light muted`, () => {
+    it(`${scheme} status inks meet AA on light and dark surfaces`, () => {
       // hsl(40 9% 96%) converted without rounding to 8-bit RGB.
       const muted = luminance([0.9636, 0.9612, 0.9564]);
+      // hsl(40 14% 97.5%) converted without rounding to 8-bit RGB.
+      const sheet1 = luminance([0.9785, 0.9761666666666667, 0.9715]);
+      // hsl(0 0% 13%), hsl(0 0% 16.5%), and hsl(0 0% 18.5%).
+      const darkSurfaces = [
+        luminance([0.13, 0.13, 0.13]),
+        luminance([0.165, 0.165, 0.165]),
+        luminance([0.185, 0.185, 0.185]),
+      ];
       for (const token of ['green', 'yellow', 'red'] as const) {
         const ink = hexLuminance(DATA_PALETTE[scheme][token].chip.light.fg);
-        for (const surface of [1, muted]) {
+        for (const surface of [1, muted, sheet1]) {
           expect((surface + 0.05) / (ink + 0.05), `${scheme}/${token}`).toBeGreaterThanOrEqual(4.5);
+        }
+        const darkInk = hexLuminance(DATA_PALETTE[scheme][token].chip.dark.fg);
+        for (const surface of darkSurfaces) {
+          expect((darkInk + 0.05) / (surface + 0.05), `${scheme}/${token}/dark`).toBeGreaterThanOrEqual(4.5);
         }
       }
     });
