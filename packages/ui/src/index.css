@@ -937,7 +937,8 @@ tr[data-row-anchor][data-selected] > td {
 }
 .obe-root > .obe-row:first-child { --obe-row-space-above: 0px; }
 .obe-row:is([data-block-type='callout'], [data-block-type='code'], [data-block-type='image'], [data-block-type='htmlArtifact'], [data-block-type='group'], [data-block-type='tabs'], [data-block-type='accordion']),
-.obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit) {
+.obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit),
+.obe-row:has(> .obe-blockbody > .obe-custom > .obe-ui-frame) {
   --obe-select-radius: var(--radius-xl);
 }
 .obe-row:is([data-block-type='group'], [data-block-type='tabs'], [data-block-type='accordion']) {
@@ -947,6 +948,10 @@ tr[data-row-anchor][data-selected] > td {
 .obe-row:has(> .obe-blockbody > .obe-custom > .obe-kit) {
   --obe-lead-offset: var(--obe-block-pad-y);
   --obe-lead-line: calc(var(--obe-caption-size) * var(--obe-caption-leading));
+}
+.obe-row:has(> .obe-blockbody > .obe-custom > .obe-ui-frame) {
+  --obe-lead-offset: calc(var(--obe-block-pad-y) + 1px + 0.75rem);
+  --obe-lead-line: calc(var(--obe-small-size) * var(--obe-small-leading));
 }
 .obe-row[data-block-type='callout'] {
   --obe-lead-offset: calc(var(--obe-block-pad-y) + 1rem);
