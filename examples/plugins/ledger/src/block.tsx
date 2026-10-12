@@ -768,7 +768,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
                 tabIndex={-1}
                 aria-label={`Remove row ${i + 1} (or press Alt+Backspace in the row)`}
                 title="Remove row — or Alt+Backspace in the row"
-                className={ui.btn} data-variant="ghost" style={{width: 'var(--height-control-md)', padding: 0, visibility: rows.length > 2 ? 'visible' : 'hidden'}}
+                className={ui.btn} data-variant="ghost" style={{width: 'var(--height-control-md)', padding: 0, justifyContent: 'center', visibility: rows.length > 2 ? 'visible' : 'hidden'}}
                 aria-describedby={pageLocked ? lockedWhyId : undefined}
                 disabled={locked || rows.length <= 2}
                 onClick={() => removeRow(i)}
@@ -795,7 +795,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
           >
             <span aria-hidden="true">📎</span>
             {item.filename}
-            <button
+            {!pageLocked && <button
               type="button"
               data-ledger-evidence-detach={item.sha256}
               aria-label={`Detach ${item.filename}`}
@@ -806,7 +806,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
               onClick={() => void detachEvidence(item.sha256)}
             >
               ×
-            </button>
+            </button>}
           </span>
         ))}
         {evidence.length === 0 && (

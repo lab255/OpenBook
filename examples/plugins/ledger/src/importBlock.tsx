@@ -652,8 +652,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
       className={ui.frame}
     >
       <div className={ui.header}>
-        <span>🏦</span>
-        <h3 className={ui.title}>Import a bank statement</h3>
+        <h3 className={ui.title}><span aria-hidden="true">🏦 </span>Import a bank statement</h3>
         <input
           data-import-file
           type="file"
@@ -661,7 +660,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           aria-label="Bank statement CSV"
           disabled={locked}
           aria-describedby={pageLocked ? lockedWhyId : undefined}
-          className={ui.file}
+          className={ui.file} style={{alignSelf: 'center'}}
           onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
         />
         {fileName !== '' && <span className={ui.muted}>{fileName}</span>}
