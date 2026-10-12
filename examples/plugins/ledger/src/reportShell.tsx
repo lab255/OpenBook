@@ -1,3 +1,4 @@
+import {ui} from './ui';
 import React from 'react';
 import {api, LEDGER_MAX_TRANSACTION_LIMIT} from '@book.dev/plugin-sdk';
 import {formatWithSide, type ReportAccount, type ReportTransaction} from './reports';
@@ -11,12 +12,9 @@ import {setUpBooks} from './setup';
  * controls through, and the style tokens that keep them looking like one
  * report family.
  *
- * THEMING: every colour is a host CSS variable (`--border`, `--card`,
- * `--foreground`, `--muted-foreground`, `--destructive`), so the blocks follow
- * the app's light/dark theme instead of pinning their own palette. Every
- * control is a NATIVE element (`select`, `input`, `button`), so keyboard
- * reachability and the visible focus ring come from the platform rather than
- * from a re-implementation that forgets one of them.
+ * THEMING: every colour comes from the public `.obe-ui-*` classes, which read
+ * host tokens. Controls remain native elements for keyboard access; the public
+ * surface supplies hover, focus and disabled states.
  */
 
 // ── Block props (CRDT) ────────────────────────────────────────────────────────
@@ -245,227 +243,16 @@ export function useLedgerReport(): LedgerReportData {
   };
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-export const frameStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.5rem',
-  padding: '0.75rem',
-  border: '1px solid hsl(var(--border))',
-  borderRadius: 8,
-  background: 'hsl(var(--card))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-};
-
-export const titleStyle: React.CSSProperties = {
-  fontSize: '0.95rem',
-  fontWeight: 600,
-};
-
-/**
- * Secondary text colour for the reports.
- *
- * DS-1 lands `--muted-foreground` at the fixed 43.2% light / 59.1% dark values,
- * clearing AA across the host's audited canvas family. Reports retain this
- * stronger translucent `--foreground` for their additional opening-balance wash:
- * these are column headers, account types, cleared states, and the balance that
- * seeds every running balance below it. It measures 5.33:1 light / 5.71:1 dark
- * on the base report surface while still reading as secondary, and is defined
- * once here so the whole report family moves together.
- */
-export const SECONDARY_TEXT = 'hsl(var(--foreground) / 0.72)';
-
-export const mutedStyle: React.CSSProperties = {
-  fontSize: '0.75rem',
-  color: SECONDARY_TEXT,
-};
-
-export const controlStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: 'hsl(var(--border))',
-  borderRadius: 6,
-  padding: '0.3rem 0.5rem',
-  background: 'hsl(var(--background))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-};
-
-/**
- * LONGHAND border properties, not the `border` shorthand: the same element
- * swaps between this and {@link disabledButtonStyle} as a row's state changes,
- * and React warns (and can leave a stale edge behind) when a shorthand and a
- * longhand for the same box alternate across rerenders.
- */
-export const buttonStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: 'hsl(var(--border))',
-  borderRadius: 6,
-  padding: '0.3rem 0.75rem',
-  background: 'hsl(var(--card))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-  cursor: 'pointer',
-};
-
-/**
- * A button that is OFF, and looks it.
- *
- * `disabled` alone is not a visual state: the platform's default dimming is a
- * few percent of alpha on a bordered button, and a previous task shipped a
- * disabled control pixel-identical to its enabled twin. So the off state changes
- * SHAPE (a dashed border) as well as weight, which survives a forced-colours
- * mode and does not rely on the reader distinguishing two greys.
- *
- * The dash is drawn in {@link SECONDARY_TEXT}, NOT `--border`. That was the
- * whole mechanism failing quietly: `--border` measures ~1.24:1 against the card,
- * which is below any perceptual threshold, so a "shape" cue nobody could see
- * collapsed straight back into the two-greys problem it was meant to avoid —
- * and a test asserting `border-style: dashed` passed on an invisible border.
- * `SECONDARY_TEXT` measures 5.33:1 light / 5.71:1 dark and matches the label, so
- * the button reads as one deliberately-drawn off state.
- *
- * The reason is never carried by this style — it is rendered as text beside the
- * control (or once above the table for a block-wide reason), because `disabled`
- * also removes the button from the tab order and a `title` would be a
- * mouse-only explanation.
- */
-export const disabledButtonStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'dashed',
-  borderColor: SECONDARY_TEXT,
-  borderRadius: 6,
-  padding: '0.3rem 0.75rem',
-  background: 'transparent',
-  color: SECONDARY_TEXT,
-  fontSize: '0.85rem',
-  cursor: 'not-allowed',
-};
-
-export const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '0.85rem',
-};
-
-/**
- * Wrapper for every report table. A register in a narrow column can want more
- * width than it has (hierarchical account names are long and unbreakable), and
- * a table that overflows its block CLIPS the rightmost column — which here is
- * the running balance, the one number the report exists to show. Scrolling the
- * table inside its own box keeps every column reachable and stops the page
- * itself from scrolling sideways.
- */
-export const tableScrollStyle: React.CSSProperties = {
-  width: '100%',
-  overflowX: 'auto',
-};
+// Temporary compatibility for untouched 9b/9c consumers; not used by this shell.
+export * from './legacyStyles';
 
 /** Long colon-delimited account names must be allowed to break, or they set an unshrinkable min-width. */
 export const wrapStyle: React.CSSProperties = {
   overflowWrap: 'break-word',
 };
 
-export const thStyle: React.CSSProperties = {
-  fontSize: '0.7rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: SECONDARY_TEXT,
-  fontWeight: 500,
-  textAlign: 'left',
-  padding: '0.25rem 0.5rem',
-  borderBottom: '1px solid hsl(var(--border))',
-  whiteSpace: 'nowrap',
-};
-
-export const tdStyle: React.CSSProperties = {
-  padding: '0.25rem 0.5rem',
-  borderBottom: '1px solid hsl(var(--border) / 0.5)',
-  verticalAlign: 'top',
-};
-
-/** Numeric cells are columns of digits, not proportional text. */
-export const numericStyle: React.CSSProperties = {
-  ...tdStyle,
-  textAlign: 'right',
-  fontVariantNumeric: 'tabular-nums',
-  whiteSpace: 'nowrap',
-};
-
-export const numericHeadStyle: React.CSSProperties = {
-  ...thStyle,
-  textAlign: 'right',
-};
-
-/**
- * Notice surfaces, in THREE severities — the distinction is load-bearing, not
- * decorative.
- *
- * `alarm` is reserved for two things only: the books not balancing, and a report
- * that could not be computed. A standing condition that is merely a caveat —
- * truncation on a large book, postings on a deleted account — renders as `info`,
- * because a red 600-weight box that is permanently on screen for every big book
- * teaches the reader to ignore red, and then the one message that matters
- * arrives into an interface that has already been desensitised to it.
- *
- * The alarm colour carries on the BORDER and a soft fill; the sentence itself
- * uses `--foreground`, the only token guaranteed to clear 4.5:1 on the card in
- * both themes (`--destructive` is a fill/border token and measures ~4.4:1 as
- * body text).
- *
- * `info` also carries a LEADING RULE. Its fill measures 1.09:1 against the card
- * and it shares `--border` with `quiet` at 1.19:1, so a "Partial read" caveat
- * and an "In balance ✓" reassurance would otherwise stack at identical visual
- * weight — the reader cannot tell a qualification from a confirmation. The rule
- * is the same device the deleted-account row already uses, one step down in
- * colour: a caveat is not an alarm.
- */
-export const noticeStyle = (tone: 'alarm' | 'info' | 'quiet'): React.CSSProperties => {
-  const edge = tone === 'alarm' ? 'hsl(var(--destructive))' : 'hsl(var(--border))';
-  return {
-    padding: '0.4rem 0.6rem',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderStyle: 'solid',
-    borderColor: edge,
-    background: tone === 'alarm' ? 'hsl(var(--destructive) / 0.1)' : tone === 'info' ? 'hsl(var(--muted))' : 'transparent',
-    color: 'hsl(var(--foreground))',
-    fontSize: '0.85rem',
-    fontWeight: tone === 'alarm' ? 600 : 400,
-    // The leading rule is set as LONGHANDS, never a `borderLeft` shorthand
-    // beside `borderWidth`/`borderColor`. A notice whose tone CHANGES between
-    // renders (the LGR-11 difference readout flips quiet ⇄ info on every tick)
-    // makes React remove the shorthand while the longhands remain, which it
-    // warns about and which leaves the edge in an indeterminate state.
-    borderLeftWidth: tone === 'info' ? 3 : 1,
-    borderLeftColor: tone === 'info' ? 'hsl(var(--foreground) / 0.35)' : edge,
-  };
-};
-
-/**
- * Text for screen readers only. The reports carry a few marks that are visually
- * obvious but semantically silent — the abnormal-balance ⚠, the reversed-entry
- * note — and `title` is not the answer: NVDA does not announce it on a
- * non-interactive cell by default, and it is unreachable by keyboard entirely.
- * The mark stays visual; this carries the same meaning as real text.
- */
-export const srOnlyStyle: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  borderWidth: 0,
-};
-
 /** Visually hidden text carrying a mark's meaning to assistive technology. */
-export const SrOnly = ({children}: {children: React.ReactNode}) => <span style={srOnlyStyle}>{children}</span>;
+export const SrOnly = ({children}: {children: React.ReactNode}) => <span className={ui.srOnly}>{children}</span>;
 
 /**
  * An amount in the reports' one notation: the magnitude, and the SIDE it is
@@ -508,13 +295,13 @@ export const SetupPrompt = ({label, readOnly, onDone}: {label: string; readOnly:
   // buttons the same `aria-describedby` target.
   const whyId = React.useId();
   return (
-    <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-      <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
+    <div className={ui.stack}>
+      <div className={ui.row}>
         <span>📒 The books are not set up yet — there is nothing to report on.</span>
         <button
           type="button"
           data-ledger-setup-button
-          style={readOnly ? disabledButtonStyle : buttonStyle}
+          className={ui.btn}
           disabled={readOnly || busy}
           aria-describedby={readOnly ? whyId : undefined}
           onClick={() => {
@@ -530,13 +317,13 @@ export const SetupPrompt = ({label, readOnly, onDone}: {label: string; readOnly:
           {busy ? 'Setting up…' : label}
         </button>
         {readOnly && (
-          <span id={whyId} data-ledger-setup-why="read-only" style={mutedStyle}>
+          <span id={whyId} data-ledger-setup-why="read-only" className={ui.muted}>
             This page is read-only, so the books cannot be set up from it.
           </span>
         )}
       </div>
       {error !== null && (
-        <div data-ledger-error role="status" aria-live="polite" style={noticeStyle('alarm')}>
+        <div data-ledger-error role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
           {error}
         </div>
       )}
@@ -569,7 +356,7 @@ export const AccountName = ({name}: {name: string}) => (
  * the least legible thing on it.
  */
 export const EmptyState = ({children}: {children: React.ReactNode}) => (
-  <div data-ledger-empty role="status" aria-live="polite" style={noticeStyle('quiet')}>
+  <div data-ledger-empty role="status" aria-live="polite" className={ui.notice} data-tone={'quiet'}>
     {children}
   </div>
 );
@@ -585,7 +372,7 @@ export const EmptyState = ({children}: {children: React.ReactNode}) => (
  */
 export const TruncationNotice = ({shown, detail}: {shown: boolean; detail: string}) =>
   shown ? (
-    <div data-ledger-truncated role="status" aria-live="polite" style={noticeStyle('info')}>
+    <div data-ledger-truncated role="status" aria-live="polite" className={ui.notice} data-tone={'info'}>
       Partial read — only the {REPORT_TX_LIMIT} most recently ENTERED transactions were loaded (newest first by entry time, not by date). {detail}
     </div>
   ) : null;
@@ -599,18 +386,18 @@ export const TruncationNotice = ({shown, detail}: {shown: boolean; detail: strin
  * so offering a Retry there is a dead end dressed as a way out.
  */
 export const ReportError = ({kind, detail, onRetry}: {kind: 'host' | 'fold'; detail: string; onRetry: () => void}) => (
-  <div data-ledger-error={kind} role="status" aria-live="polite" style={noticeStyle('alarm')}>
+  <div data-ledger-error={kind} role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
     <div>
       {kind === 'host'
         ? 'This report could not be loaded.'
         : 'This report could not be computed — an entry stores an amount outside the range the ledger can total. The book has a damaged entry.'}
       {kind === 'host' && (
-        <button type="button" data-ledger-retry style={{...buttonStyle, marginLeft: '0.5rem', fontWeight: 400}} onClick={onRetry}>
+        <button type="button" data-ledger-retry className={ui.btn} data-size="sm" style={{marginLeft: '0.5rem'}} onClick={onRetry}>
           Retry
         </button>
       )}
     </div>
-    <div style={{...mutedStyle, fontWeight: 400, marginTop: '0.25rem'}}>{detail}</div>
+    <div className={ui.noticeDetail + ' ' + ui.muted}>{detail}</div>
   </div>
 );
 
@@ -627,7 +414,7 @@ export const ReportError = ({kind, detail, onRetry}: {kind: 'host' | 'fold'; det
  * column has to know when the region is too narrow to afford it.
  */
 export const TableRegion = ({label, children, regionRef}: {label: string; children: React.ReactNode; regionRef?: React.Ref<HTMLDivElement>}) => (
-  <div ref={regionRef} tabIndex={0} role="region" aria-label={label} style={tableScrollStyle}>
+  <div ref={regionRef} tabIndex={0} role="region" aria-label={label} className={ui.tableWrap}>
     {children}
   </div>
 );
