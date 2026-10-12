@@ -4062,4 +4062,3 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 [data-form-input] .ob-date-empty:required:invalid:not(:focus)::-webkit-calendar-picker-indicator {
   opacity: 1;
 }
-
