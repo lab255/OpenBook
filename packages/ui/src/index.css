@@ -3452,8 +3452,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12));
 }
 .obe-kit-light-ok { background: var(--data-status-ok, #9fdf9f); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-ok, #9fdf9f) 25%, transparent); }
-.obe-kit-light-warn { background: var(--data-status-warn, #dac495); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-warn, #dac495) 25%, transparent); }
-.obe-kit-light-bad { background: var(--data-status-bad, #deaea6); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #deaea6) 25%, transparent); }
+.obe-kit-light-warn { background: var(--data-status-warn, #e0ce86); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-warn, #e0ce86) 25%, transparent); }
+.obe-kit-light-bad { background: var(--data-status-bad, #dc9896); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #dc9896) 25%, transparent); }
 .obe-kit-status-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-status-value {
   font-family: var(--obe-font-mono);

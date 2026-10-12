@@ -133,8 +133,8 @@ describe('reactive export from a block document', () => {
     expect(html).toContain('.kitlight[data-status=ok] .kit-light-dot { background: #9fdf9f;');
     expect(html).toContain('0 0 0 3px rgba(159,223,159,0.25)');
     expect(html).toContain('inset 0 0 0 1px rgba(0,0,0,0.12)');
-    expect(html).toContain('.kitlight[data-status=warn] .kit-light-dot { background: #dac495;'); // yellow
-    expect(html).toContain('.kitlight[data-status=bad] .kit-light-dot { background: #deaea6;'); // red
+    expect(html).toContain('.kitlight[data-status=warn] .kit-light-dot { background: #e0ce86;'); // yellow
+    expect(html).toContain('.kitlight[data-status=bad] .kit-light-dot { background: #dc9896;'); // red
     // The drawn kit bar (series 0) uses the canonical blue-first SERIES_ORDER fill.
     expect(html).toContain('fill="#a9ccdf"');
   });

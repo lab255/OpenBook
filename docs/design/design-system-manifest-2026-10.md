@@ -280,6 +280,7 @@ emphasis an author placed on prose or a block, it reads `--obe-*`. Never cross:
 chips never use `obe-bg-*`; prose never reads `--data-*`. Single-value meters and
 controls (progress fill, switch on, slider track) are **neither** — they use `--primary`.
 Default primary pair: light `207 75% 44%` / `0 0% 100%` (4.60:1); dark `207 78% 62%` / `207 50% 12%` (6.29:1). Primary buttons and the timeline today marker use this pair directly.
+Pastel light data fills: red `#dc9896` (near-red hue 1.7°) and yellow `#e0ce86` (48°) separate the 3px calendar rails from green `#9fdf9f` and blue `#a9ccdf`. These canonical fills also flow to swatches, charts and status lamps; dark fills and chip pairs stay unchanged.
 Shared hue *names* stay aligned (one mental model), values do not.
 
 ---
