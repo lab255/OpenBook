@@ -54,6 +54,14 @@ plus two host modules: `react` and `@book.dev/plugin-sdk`. Other bare
 imports are refused — bundle what you need into the zip. Types are stripped
 at load time (no typechecking); develop against your own `tsc`.
 
+## Styling
+
+Style blocks with the public `.obe-ui-*` classes and inline layout.
+Start with an `obe-ui-frame` root and `contentEditable={false}`; the host supplies
+control states, type and theme colours. Plugins cannot import host CSS or helpers.
+See the [plugin design-system guide](docs/plugins/design-system.md) for the class
+reference, public tokens, accessible states and worked ledger examples.
+
 ## Data access: databases & assets
 
 Plugins get a **typed, read-only** view of library databases and the binary
