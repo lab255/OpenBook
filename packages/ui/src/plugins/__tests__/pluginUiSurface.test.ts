@@ -1,8 +1,11 @@
+// @vitest-environment node
 import {describe, expect, it} from 'vitest';
-import css from '../../index.css?raw';
+// @ts-expect-error -- node:fs is available to Vitest, not the browser package.
+import {readFileSync} from 'node:fs';
 import manifest from '../../../../../docs/design/design-system-manifest-2026-10.md?raw';
 import {PUBLIC_PLUGIN_UI_CLASSES} from '../uiSurface';
 
+const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8');
 const surface = css.split('/* Plugin UI surface */')[1]?.split('/* End plugin UI surface */')[0] ?? '';
 
 describe('public plugin UI surface', () => {
