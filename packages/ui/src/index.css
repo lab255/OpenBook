@@ -2477,6 +2477,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-ui-btn[data-variant='ghost'] { border: 0; background: transparent; color: var(--obe-chrome-ink); }
 .obe-ui-btn[data-variant='ghost']:hover:not(:disabled):not([aria-disabled='true']) { color: var(--obe-chrome-ink-hover); }
 .obe-ui-btn[data-variant='link'] { height: auto; padding: 0; border: 0; background: none; text-decoration: underline; color: inherit; font-size: inherit; }
+.obe-ui-btn[data-variant='link'][aria-expanded] { color: var(--obe-chrome-ink); }
+.obe-ui-btn.obe-ui-muted { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); color: hsl(var(--muted-foreground)); }
 .obe-ui-btn[data-size='sm'], .obe-ui-file::file-selector-button { height: var(--height-control-sm); padding-inline: 0.5rem; }
 /* stylelint-disable declaration-property-value-allowed-list -- Public compact controls and tight tables use the contracted 2px inset. */
 .obe-ui-btn[data-size='xs'] { min-height: var(--height-control-xs); height: auto; padding: 0.125rem 0.5rem; white-space: normal; text-align: left; font-size: var(--obe-caption-size); }
@@ -2507,13 +2509,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-ui-table tfoot :is(th, td), .obe-ui-total[data-rule] > :is(th, td) { border-top: 2px solid hsl(var(--border)); }
 .obe-ui-total[data-strong] > :is(th, td) { font-weight: 700; }
 .obe-ui-num, .obe-ui-table .obe-ui-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.obe-ui-table .obe-ui-section { font-weight: 600; color: hsl(var(--foreground)); padding-top: 0.5rem; }
+.obe-ui-table :is(th, td).obe-ui-section { font-weight: 600; color: hsl(var(--foreground)); padding-top: 0.5rem; }
 .obe-ui-pin-start, .obe-ui-pin-end { position: sticky; z-index: var(--z-index-raised); background: hsl(var(--card)); }
 .obe-ui-pin-start { inset-inline-start: 0; box-shadow: inset -1px 0 0 hsl(var(--border)); }
 .obe-ui-pin-end { inset-inline-end: 0; box-shadow: inset 1px 0 0 hsl(var(--border)); }
 .obe-ui-table tr[data-ui-state='located'] { background: hsl(var(--foreground) / 0.15); }
 .obe-ui-num [data-ui-mark='alarm'] { color: hsl(var(--destructive)); }
-.obe-ui-table [data-ui-flag='alarm'] { box-shadow: inset 3px 0 0 hsl(var(--destructive)); padding-left: 0.5rem; }
+.obe-ui-table :is(th, td)[data-ui-flag='alarm'] { box-shadow: inset 3px 0 0 hsl(var(--destructive)); padding-left: 0.5rem; }
 .obe-ui-list { list-style: disc; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem; }
 /* stylelint-disable-next-line declaration-property-value-allowed-list -- Complete accessible clipping recipe requires a negative one-pixel margin. */
 .obe-ui-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0; }
