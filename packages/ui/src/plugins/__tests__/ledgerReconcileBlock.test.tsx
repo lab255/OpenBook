@@ -139,6 +139,26 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+describe('reconcile deadButton public face and gate', () => {
+  it.each([true, false])('Finish and Amend use the public button face with pageReadOnly=%s', async (pageReadOnly) => {
+    const {client} = fakeLedger();
+    await mountBlock(client, pageReadOnly);
+    const finish = el<HTMLButtonElement>('[data-ledger-finish]');
+    // The same balanced sheet renders a dead and a live Finish. The helper
+    // supplies the class and gate together; CSS :disabled supplies the face.
+    expect(finish.classList.contains('obe-ui-btn')).toBe(true);
+    expect(finish.disabled).toBe(pageReadOnly);
+    expect(finish.matches(':disabled')).toBe(pageReadOnly);
+    expect(finish.getAttribute('data-weight')).toBe('strong');
+    expect(finish.hasAttribute('style')).toBe(false);
+    const amend = el<HTMLButtonElement>('[data-ledger-amend]');
+    expect(amend.classList.contains('obe-ui-btn')).toBe(true);
+    expect(amend.hasAttribute('data-weight')).toBe(false);
+    expect(amend.hasAttribute('style')).toBe(false);
+    expect(amend.disabled).toBe(pageReadOnly);
+  });
+});
+
 describe('LGR-22 — reconcile block focus management across sub-flows', () => {
   it('opening Amend moves focus INTO the form at the moment the invoker is disabled', async () => {
     const {client} = fakeLedger();

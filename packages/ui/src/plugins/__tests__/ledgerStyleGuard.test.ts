@@ -4,16 +4,17 @@ import {PUBLIC_PLUGIN_UI_CLASSES} from '../uiSurface';
 const sources = import.meta.glob('../../../../../examples/plugins/ledger/src/*.{ts,tsx}', {
   query: '?raw', import: 'default', eager: true,
 }) as Record<string, string>;
-// Slice 9c removes the remaining entries as it migrates its files.
-const laterSlices = new Set(['register.tsx', 'reconcileBlock.tsx']);
+// All ledger surfaces have migrated; no file may retain a legacy recipe.
+const laterSlices = new Set<string>();
 
 describe('ledger public styles', () => {
   it('keeps migrated TSX free of private chrome recipes', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(0);
     for (const [path, source] of Object.entries(sources)) {
-      if (!path.endsWith('.tsx') || laterSlices.has(path.split('/').pop()!)) continue;
+      if (laterSlices.has(path.split('/').pop()!)) continue;
+      expect(source, path).not.toMatch(/\b(legacyStyles|SECONDARY_TEXT|frameStyle|titleStyle|mutedStyle|controlStyle|buttonStyle|disabledButtonStyle|tableStyle|thStyle|tdStyle|numericStyle|numericHeadStyle|noticeStyle)\b/);
+      if (!path.endsWith('.tsx')) continue;
       expect(source, path).not.toMatch(/hsl\(var\(--|fontSize\s*:|borderRadius\s*:|fontWeight\s*:\s*5|SECONDARY_TEXT/);
-      expect(source, path).not.toMatch(/\b(frameStyle|titleStyle|mutedStyle|controlStyle|buttonStyle|disabledButtonStyle|tableStyle|thStyle|tdStyle|numericStyle|numericHeadStyle|noticeStyle)\b/);
     }
   });
 

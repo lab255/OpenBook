@@ -123,6 +123,17 @@ test('the canonical reconciliation: 3 months with 2 missing entries and 1 duplic
   // ── The checklist ─────────────────────────────────────────────────────────
   const rows = page.locator('[data-ledger-reconcile-row]');
   await expect(rows).toHaveCount(BOOKED.length);
+  // Amount, including its Dr/Cr marker, pins at desktop width and yields at
+  // 420px just like the register's Balance column. All three row groups agree.
+  const amountCells = page.locator('[data-ledger-reconcile-table] thead th').last()
+    .or(rows.locator('[data-ledger-amount]'))
+    .or(page.locator('[data-ledger-cleared-total]'));
+  for (const cell of await amountCells.all()) await expect(cell).toHaveCSS('position', 'sticky');
+  const desktopViewport = page.viewportSize()!;
+  await page.setViewportSize({width: 420, height: 900});
+  for (const cell of await amountCells.all()) await expect(cell).toHaveCSS('position', 'static');
+  await page.setViewportSize(desktopViewport);
+  for (const cell of await amountCells.all()) await expect(cell).toHaveCSS('position', 'sticky');
   const difference = page.locator('[data-ledger-difference]');
   const finish = page.locator('[data-ledger-finish]');
   // The live region is polite, never an alert: this line changes on every tick.

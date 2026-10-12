@@ -1,4 +1,6 @@
 import React from 'react';
+import {ui} from './ui';
+
 import {api, formatAmount, getPageIdForDoc, LedgerError} from '@book.dev/plugin-sdk';
 import {
   ALL_CLEARED_STATES,
@@ -32,20 +34,8 @@ import {
   SrOnly,
   TableRegion,
   TruncationNotice,
-  buttonStyle,
-  controlStyle,
-  disabledButtonStyle,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  numericHeadStyle,
-  numericStyle,
   readProps,
   readString,
-  tableStyle,
-  tdStyle,
-  thStyle,
-  titleStyle,
   useLedgerReport,
   wrapStyle,
   writeProp,
@@ -55,6 +45,8 @@ import {
 } from './reportShell';
 import {JournalEntryBlock} from './block';
 import {describeClosedPeriodMarker} from './periods';
+
+const cx = (...classes: (string | false)[]): string => classes.filter(Boolean).join(' ');
 
 /**
  * The ACCOUNT REGISTER block (LGR-8) — one account's postings in date order
@@ -208,40 +200,6 @@ interface OriginalLike {
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
- * The Correct column PINS to the left edge of the scrolling table.
- *
- * Moving it to column one made the action visible at the block's default width,
- * and pushed the money out: Amount and Balance fell off the right of a register
- * whose whole job is to show a running balance. A register you must scroll to
- * read the balance of is a worse default than one you must scroll to act on, so
- * the column stops competing for width — it stays put while the numbers keep
- * theirs. The background is opaque (`--card`, the block's own) so rows do not
- * show through as they pass underneath, and the inset rule is the pinned edge.
- */
-const stickyCellStyle: React.CSSProperties = {
-  position: 'sticky',
-  left: 0,
-  zIndex: 1,
-  background: 'hsl(var(--card))',
-  boxShadow: 'inset -1px 0 0 hsl(var(--border))',
-};
-
-/**
- * …and Balance PINS to the right edge, symmetrically (R3-1). Pinning Correct
- * bought its visibility by pushing the money out: at the block's default width
- * the running balance — the one number the register exists to show — was the
- * column that clipped. Same mechanism as column one: opaque `--card` so rows do
- * not show through as they pass underneath, inset rule on the pinned edge.
- */
-const stickyRightCellStyle: React.CSSProperties = {
-  position: 'sticky',
-  right: 0,
-  zIndex: 1,
-  background: 'hsl(var(--card))',
-  boxShadow: 'inset 1px 0 0 hsl(var(--border))',
-};
-
-/**
  * Below this REGION width the Balance pin yields and the column scrolls again
  * (R3-1 follow-up, LGR-23 F6): two pinned edges stop being an answer once the
  * region is narrower than what the pins consume — the right-pinned Balance,
@@ -251,9 +209,9 @@ const stickyRightCellStyle: React.CSSProperties = {
  * pinned columns' combined claim (~220px) plus at least that much again of
  * scrollable middle, so a pin never eats more than half the region.
  *
- * A measured guard rather than a container query because the block's styling
- * is inline host-token styles throughout — there is no stylesheet for a
- * container rule to live in.
+ * The public pin classes now make a container query possible, but this guard
+ * stays in JS: the threshold is plugin-specific and third-party plugins cannot
+ * add CSS to the host stylesheet.
  */
 const MIN_BALANCE_PIN_WIDTH = 480;
 
@@ -304,7 +262,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
     setRegionWidth(tableRegionEl.clientWidth);
     return () => observer.disconnect();
   }, [tableRegionEl]);
-  const balancePinStyle = regionWidth === null || regionWidth >= MIN_BALANCE_PIN_WIDTH ? stickyRightCellStyle : undefined;
+  const pinBalance = regionWidth === null || regionWidth >= MIN_BALANCE_PIN_WIDTH;
   // ── Evidence-required toggle (LGR-14) ───────────────────────────────────────
   // The register is the account-scoped surface, so the account's policy lives
   // in its header. The toggle WRITES THE BOOKS (unlike the view filters beside
@@ -589,16 +547,16 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
 
   if (data.state === 'loading') {
     return (
-      <div data-ledger-register data-ledger-loading contentEditable={false} style={frameStyle}>
-        <span style={mutedStyle}>Loading account register…</span>
+      <div data-ledger-register data-ledger-loading contentEditable={false} className={ui.frame}>
+        <span className={ui.muted}>Loading account register…</span>
       </div>
     );
   }
 
   if (data.state === 'uninitialized') {
     return (
-      <div data-ledger-register data-ledger-setup contentEditable={false} style={frameStyle}>
-        <h3 style={titleStyle}>
+      <div data-ledger-register data-ledger-setup contentEditable={false} className={ui.frame}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Account register
         </h3>
         <SetupPrompt label="Set up books" readOnly={pageLocked} onDone={data.reload} />
@@ -615,14 +573,14 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
   const blockBlocker: CorrectionBlocker | null = pageLocked ? 'read-only' : correctionOpen ? 'correction-open' : null;
 
   return (
-    <div data-ledger-register contentEditable={false} style={frameStyle}>
-      <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap'}}>
-        <h3 style={{...titleStyle, lineHeight: '1.9rem'}}>
+    <div data-ledger-register contentEditable={false} className={ui.frame}>
+      <div className={ui.header}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Account register
         </h3>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>Account</span>
-          <select data-ledger-register-account style={{...controlStyle, minWidth: '12rem'}} value={accountId} onChange={(e) => update(PROP_ACCOUNT, e.target.value, setAccountId)}>
+        <label className={ui.labelled}>
+          <span className={ui.muted}>Account</span>
+          <select data-ledger-register-account className={ui.field} style={{minWidth: '12rem'}} value={accountId} onChange={(e) => update(PROP_ACCOUNT, e.target.value, setAccountId)}>
             <option value="">Select account…</option>
             {sortedAccounts.map((account) => (
               <option key={account.id} value={account.id}>
@@ -631,21 +589,21 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
             ))}
           </select>
         </label>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>From</span>
-          <input type="date" data-ledger-from style={controlStyle} value={from} onChange={(e) => update(PROP_FROM, e.target.value, setFrom)} />
+        <label className={ui.labelled}>
+          <span className={ui.muted}>From</span>
+          <input type="date" data-ledger-from className={ui.field} value={from} onChange={(e) => update(PROP_FROM, e.target.value, setFrom)} />
         </label>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>To</span>
-          <input type="date" data-ledger-to style={controlStyle} value={to} onChange={(e) => update(PROP_TO, e.target.value, setTo)} />
+        <label className={ui.labelled}>
+          <span className={ui.muted}>To</span>
+          <input type="date" data-ledger-to className={ui.field} value={to} onChange={(e) => update(PROP_TO, e.target.value, setTo)} />
         </label>
-        <fieldset style={{border: '1px solid hsl(var(--border))', borderRadius: 6, padding: '0.15rem 0.5rem 0.35rem', display: 'flex', gap: '0.6rem', alignItems: 'center'}}>
-          <legend style={mutedStyle}>Cleared state</legend>
+        <fieldset className={ui.fieldset}>
+          <legend className={ui.muted}>Cleared state</legend>
           {ALL_CLEARED_STATES.map((state) => {
             const on = cleared.includes(state);
             const last = on && cleared.length === 1;
             return (
-              <label key={state} style={{...mutedStyle, display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: last ? 'default' : 'pointer'}}>
+              <label key={state} className={ui.check}>
                 <input type="checkbox" data-ledger-cleared={state} checked={on} disabled={last} onChange={(e) => toggleCleared(state, e.target.checked)} />
                 {CLEARED_LABEL[state]}
               </label>
@@ -655,12 +613,12 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
               `disabled` drops the last box out of the tab order, so a keyboard
               user would otherwise watch a control silently disappear with the
               explanation living in a mouse-only tooltip. */}
-          <span data-ledger-cleared-hint style={{...mutedStyle, fontStyle: 'italic'}}>
+          <span data-ledger-cleared-hint className={ui.muted} style={{fontStyle: 'italic'}}>
             At least one state must be shown.
           </span>
         </fieldset>
         {filtered && (
-          <button type="button" data-ledger-clear-filters style={buttonStyle} onClick={clearFilters}>
+          <button type="button" data-ledger-clear-filters className={ui.btn} onClick={clearFilters}>
             Clear filters
           </button>
         )}
@@ -671,8 +629,8 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
           lock it is dead with the reason beside it; the store enforces the
           gate either way — this toggle only decides whether it applies. */}
       {accountId !== '' && data.state === 'ready' && data.accounts.some((a) => a.id === accountId) && (
-        <div data-ledger-evidence-required-toggle style={{display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap'}}>
-          <label style={{...mutedStyle, display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: pageLocked || evidenceToggleBusy ? 'default' : 'pointer'}}>
+        <div data-ledger-evidence-required-toggle className={ui.row}>
+          <label className={ui.check}>
             <input
               type="checkbox"
               data-ledger-evidence-required
@@ -698,21 +656,21 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
             />
             Evidence required to post into this account
           </label>
-          {evidenceToggleBusy && <span style={mutedStyle}>Saving…</span>}
+          {evidenceToggleBusy && <span className={ui.muted}>Saving…</span>}
           {pageLocked && (
-            <span id={evidenceToggleWhyId} data-ledger-evidence-required-why="read-only" style={mutedStyle}>
+            <span id={evidenceToggleWhyId} data-ledger-evidence-required-why="read-only" className={ui.muted}>
               This page is read-only, so the account’s evidence policy cannot be changed from it.
             </span>
           )}
           {evidenceToggleError !== null && (
-            <span data-ledger-evidence-required-error role="status" aria-live="polite" style={{...mutedStyle, fontWeight: 600}}>
+            <span data-ledger-evidence-required-error role="status" aria-live="polite" className={ui.muted} style={{fontWeight: 600}}>
               {evidenceToggleError}
             </span>
           )}
         </div>
       )}
 
-      <div data-ledger-drafts-excluded={register !== null ? register.draftCount : 0} style={mutedStyle}>
+      <div data-ledger-drafts-excluded={register !== null ? register.draftCount : 0} className={ui.muted}>
         {describeDraftExclusion(register !== null ? register.draftCount : 0)}
       </div>
 
@@ -723,16 +681,16 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
           prohibition with no next step is what LGR-4 shipped and LGR-6 is here
           to finish — except on a read-only page, where instructing the reader to
           use a control they cannot press would be worse than saying nothing. */}
-      <div data-ledger-immutable style={mutedStyle}>{describeImmutability(pageLocked)}</div>
+      <div data-ledger-immutable className={ui.muted}>{describeImmutability(pageLocked)}</div>
 
       {done !== null && (
-        <div data-ledger-correction-done role="status" aria-live="polite" style={noticeStyle('quiet')}>
+        <div data-ledger-correction-done role="status" aria-live="polite" className={ui.notice} data-tone="quiet">
           {describeCorrectionDone(done.originalEntryNo, done.reversalEntryNo, done.correctedEntryNo)}{' '}
           <button
             type="button"
             ref={dismissRef}
-            data-ledger-correction-dismiss
-            style={{...buttonStyle, marginLeft: '0.25rem', fontWeight: 400}}
+            data-ledger-correction-dismiss data-size="sm"
+            className={ui.btn} style={{marginLeft: '0.25rem'}}
             onClick={() => {
               setDone(null);
               returnFocus();
@@ -758,18 +716,18 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
           data-ledger-correct-error={actionError.code ?? 'error'}
           role="status"
           aria-live="polite"
-          style={noticeStyle('info')}
+          className={ui.notice} data-tone="info"
         >
           <span data-ledger-correct-error-lead style={{fontWeight: 600}}>{actionError.lead}</span> — {actionError.detail}
           {actionError.code !== null && (
-            <span style={{...mutedStyle, marginLeft: '0.4rem'}} title={`Ledger error code: ${actionError.code}`}>
+            <span className={ui.muted} style={{marginLeft: '0.4rem'}} title={`Ledger error code: ${actionError.code}`}>
               ({actionError.code})
             </span>
           )}
           <button
             type="button"
-            data-ledger-correct-error-dismiss
-            style={{...buttonStyle, marginLeft: '0.5rem'}}
+            data-ledger-correct-error-dismiss data-size="sm"
+            className={ui.btn} style={{marginLeft: '0.5rem'}}
             onClick={() => {
               setActionError(null);
               returnFocus();
@@ -781,21 +739,21 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
       )}
 
       {confirming !== null && (
-        <div data-ledger-correct-confirm={confirming.transactionId} role="status" aria-live="polite" style={noticeStyle('info')}>
+        <div data-ledger-correct-confirm={confirming.transactionId} role="status" aria-live="polite" className={`${ui.notice} ${ui.stack}`} data-tone="info">
           <div>{describeCorrectionConfirm(confirming)}</div>
-          <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap'}}>
+          <div className={ui.row}>
             {/* NOT disabled while the reversal is in flight. `runCorrection`
                 already refuses re-entry, and disabling the button the user is
                 standing on blurs them to <body> — on the ledger's single most
                 consequential control, every single time. The label carries the
                 state instead, with `aria-busy` for anyone not reading it. */}
-            <button type="button" ref={confirmRef} data-ledger-correct-go aria-busy={busy} style={buttonStyle} onClick={() => runCorrection(confirming)}>
+            <button type="button" ref={confirmRef} data-ledger-correct-go data-size="sm" aria-busy={busy} className={ui.btn} onClick={() => runCorrection(confirming)}>
               {busy ? 'Posting the reversal…' : 'Post the reversal'}
             </button>
             {/* Cancel IS disabled in flight — the reversal cannot be called back,
                 so the control would be a lie. The reason is the live label
                 immediately to its left, not a tooltip. */}
-            <button type="button" data-ledger-correct-cancel style={busy ? disabledButtonStyle : buttonStyle} disabled={busy} onClick={() => setConfirming(null)}>
+            <button type="button" data-ledger-correct-cancel data-size="sm" className={ui.btn} disabled={busy} onClick={() => setConfirming(null)}>
               Cancel
             </button>
           </div>
@@ -807,7 +765,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
           ref={panelRef}
           tabIndex={-1}
           data-ledger-correction={correction.originalId}
-          style={{border: '1px solid hsl(var(--border))', borderRadius: 8, padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}
+          className={ui.frame}
         >
           <div style={{display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap'}}>
             <div data-ledger-correction-head role="status" aria-live="polite" style={{flex: '1 1 20rem'}}>
@@ -818,12 +776,12 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                 bottom of the panel it was below the whole journal form, so the
                 one person who needed it — someone bailing out — never scrolled
                 far enough to read it. */}
-            <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap'}}>
+            <div className={ui.row}>
               <button
                 type="button"
                 data-ledger-correction-close
                 aria-describedby={closeWhyId}
-                style={buttonStyle}
+                className={ui.btn}
                 onClick={() => {
                   forgetCorrection();
                   // Bailing out is BY CONSTRUCTION always post-reversal, so this
@@ -836,7 +794,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
               >
                 Close
               </button>
-              <span id={closeWhyId} data-ledger-correction-close-why style={{...mutedStyle, maxWidth: '14rem'}}>
+              <span id={closeWhyId} data-ledger-correction-close-why className={ui.muted} style={{maxWidth: '14rem'}}>
                 Closing leaves the copy as an unposted draft — out of every report until you post it.
               </span>
             </div>
@@ -876,7 +834,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
               ) : (
                 <>
                   No postings match this filter — {register.filteredOutCount} on this account are outside it.{' '}
-                  <button type="button" data-ledger-clear-filters-inline style={{...buttonStyle, marginLeft: '0.25rem'}} onClick={clearFilters}>
+                  <button type="button" data-ledger-clear-filters-inline data-size="sm" className={ui.btn} style={{marginLeft: '0.25rem'}} onClick={clearFilters}>
                     Clear filters
                   </button>
                 </>
@@ -891,14 +849,14 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                   journal form away from the controls it was about. Every disabled
                   button points here by `aria-describedby`. */}
               {blockBlocker !== null && (
-                <div id={blockReasonId} data-ledger-correct-why={blockBlocker} style={mutedStyle}>
+                <div id={blockReasonId} data-ledger-correct-why={blockBlocker} className={ui.muted}>
                   {describeCorrectionBlocker(blockBlocker, null)}
                 </div>
               )}
               {/* `regionRef` is the WIDTH PROBE for the Balance-pin guard. */}
               <TableRegion label="Account register table" regionRef={setTableRegionEl}>
-                <table style={tableStyle}>
-                  <caption style={{...mutedStyle, textAlign: 'left', paddingBottom: '0.25rem'}}>
+                <table className={ui.table} data-density="compact">
+                  <caption className={ui.muted}>
                     {/* What the columns actually SHOW. "Debit-positive" is the
                       fold's internal sign convention and no signed number
                       appears on screen any more — every amount is a magnitude
@@ -912,39 +870,40 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                         widened the rows it fell off the scroll entirely. The one
                         control this feature exists to ship cannot be the one
                         thing you have to scroll to find. */}
-                      <th scope="col" style={{...thStyle, ...stickyCellStyle}}>
+                      <th scope="col" className={ui.pinStart}>
                     Correct
                       </th>
-                      <th scope="col" style={thStyle}>
+                      <th scope="col">
                     Entry
                       </th>
-                      <th scope="col" style={thStyle}>
+                      <th scope="col">
                     Date
                       </th>
-                      <th scope="col" style={thStyle}>
+                      <th scope="col">
                     Description
                       </th>
-                      <th scope="col" style={thStyle}>
+                      <th scope="col">
                     Contra account
                       </th>
-                      <th scope="col" style={thStyle}>
+                      <th scope="col">
                     Cleared
                       </th>
-                      <th scope="col" style={numericHeadStyle}>
+                      <th scope="col" className={ui.num}>
                     Amount
                       </th>
-                      <th scope="col" style={{...numericHeadStyle, ...balancePinStyle}}>
+                      {/* Balance pins right (R3-1): the running balance is the register's job; it yields below MIN_BALANCE_PIN_WIDTH. */}
+                      <th scope="col" className={cx(ui.num, pinBalance && ui.pinEnd)}>
                     Balance
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr data-ledger-opening>
-                      <td style={{...tdStyle, ...stickyCellStyle}} />
-                      <th scope="row" colSpan={6} style={{...tdStyle, ...mutedStyle, textAlign: 'left', fontWeight: 400}}>
+                      <td className={ui.pinStart} />
+                      <th scope="row" colSpan={6} className={ui.muted} style={{textAlign: 'left', fontWeight: 400}}>
                     Opening balance{register.filter.from !== null ? ` before ${register.filter.from}` : ''}
                       </th>
-                      <td data-ledger-opening-balance style={{...numericStyle, ...mutedStyle, ...balancePinStyle}}>
+                      <td data-ledger-opening-balance className={cx(ui.muted, ui.num, pinBalance && ui.pinEnd)}>
                         <SideAmount minor={register.openingMinor} />
                       </td>
                     </tr>
@@ -970,27 +929,27 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                           data-ledger-register-row={row.postingId}
                           {...(row.reversed ? {'data-ledger-reversed': true} : {})}
                           {...(highlight === row.postingId ? {'data-ledger-highlight': 'true'} : {})}
-                          // A cue at 1.13:1 is not a cue; at 0.15 it reads, and it
-                          // CLEARS when the link it followed loses focus, so the
-                          // register never sits in a tinted state nobody can explain.
-                          style={highlight === row.postingId ? {background: 'hsl(var(--foreground) / 0.15)'} : undefined}
+                          // The located cue CLEARS when the link it followed loses
+                          // focus, so the register never sits in a tinted state nobody
+                          // can explain.
+                          data-ui-state={highlight === row.postingId ? 'located' : undefined}
                         >
                           {/* The button stays on ONE line and the column takes the
                             width it needs — the table scrolls inside its own
                             region, and a three-line button turned every row of
                             the register into a paragraph. The REASON wraps,
                             bounded, because it is a sentence. */}
-                          <td style={{...tdStyle, ...stickyCellStyle, whiteSpace: 'nowrap'}}>
+                          <td className={ui.pinStart} style={{whiteSpace: 'nowrap'}}>
                             {blocker === null ? (
                               <button
                                 type="button"
-                                data-ledger-correct={row.transactionId}
+                                data-ledger-correct={row.transactionId} data-size="sm"
                                 // The visible text is a prefix of the accessible
                                 // name (WCAG 2.5.3): the rest only DISAMBIGUATES
                                 // the twenty identical buttons a screen-reader user
                                 // would otherwise hear in a row.
                                 aria-label={`Correct this entry — ${nameEntry(row.entryNo)}`}
-                                style={buttonStyle}
+                                className={ui.btn}
                                 ref={(el) => {
                                   correctRefs.current.set(row.transactionId, el);
                                 }}
@@ -1000,7 +959,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                               </button>
                             ) : (
                               <>
-                                <button type="button" data-ledger-correct-off={blocker} style={disabledButtonStyle} disabled aria-describedby={reasonId}>
+                                <button type="button" data-ledger-correct-off={blocker} data-size="sm" className={ui.btn} disabled aria-describedby={reasonId}>
                                 Correct
                                 </button>
                                 {/* No `minWidth`: the correction column is pinned,
@@ -1011,7 +970,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                                   <div
                                     id={reasonId}
                                     data-ledger-correct-why={rowReason}
-                                    style={{...mutedStyle, ...wrapStyle, marginTop: '0.2rem', whiteSpace: 'normal', maxWidth: '12rem'}}
+                                    className={ui.muted} style={{...wrapStyle, marginTop: '0.2rem', whiteSpace: 'normal', maxWidth: '12rem'}}
                                   >
                                     {describeCorrectionBlocker(rowReason, counterpart)}
                                   </div>
@@ -1019,12 +978,12 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                               </>
                             )}
                           </td>
-                          <td style={{...tdStyle, ...mutedStyle, fontVariantNumeric: 'tabular-nums'}}>{row.entryNo === null ? '—' : `#${row.entryNo}`}</td>
-                          <td style={{...tdStyle, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{row.date}</td>
-                          <td style={{...tdStyle, ...wrapStyle}}>
-                            {row.description === '' ? <span style={mutedStyle}>(no description)</span> : row.description}
+                          <td className={ui.muted} style={{fontVariantNumeric: 'tabular-nums'}}>{row.entryNo === null ? '—' : `#${row.entryNo}`}</td>
+                          <td style={{whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{row.date}</td>
+                          <td style={wrapStyle}>
+                            {row.description === '' ? <span className={ui.muted}>(no description)</span> : row.description}
                             {row.reversed && (
-                              <span style={{...mutedStyle, marginLeft: '0.35rem'}}>
+                              <span className={ui.muted} style={{marginLeft: '0.35rem'}}>
                             (reversed)
                                 <SrOnly> — this entry was reversed; its reversing entry appears in this register too.</SrOnly>
                               </span>
@@ -1036,12 +995,12 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                                 an alarm. With receipts, the count says the
                                 entry can answer for itself. */}
                             {row.evidenceCount === 0 ? (
-                              <span data-ledger-no-evidence style={{...mutedStyle, marginLeft: '0.35rem', whiteSpace: 'nowrap'}}>
+                              <span data-ledger-no-evidence className={ui.muted} style={{marginLeft: '0.35rem', whiteSpace: 'nowrap'}}>
                             · no evidence
                                 <SrOnly> — no receipt or supporting file was recorded when this entry was posted.</SrOnly>
                               </span>
                             ) : (
-                              <span data-ledger-evidence-count={row.evidenceCount} style={{...mutedStyle, marginLeft: '0.35rem', whiteSpace: 'nowrap'}}>
+                              <span data-ledger-evidence-count={row.evidenceCount} className={ui.muted} style={{marginLeft: '0.35rem', whiteSpace: 'nowrap'}}>
                                 <span aria-hidden="true">📎 {row.evidenceCount}</span>
                                 <SrOnly>{` — ${row.evidenceCount} evidence ${row.evidenceCount === 1 ? 'file was' : 'files were'} recorded when this entry was posted.`}</SrOnly>
                               </span>
@@ -1059,12 +1018,12 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                                     ref={(el) => {
                                       counterpartRefs.current.set(row.postingId, el);
                                     }}
-                                    data-ledger-counterpart-link={jump}
+                                    data-ledger-counterpart-link={jump} data-size="xs"
                                     // Allowed to WRAP. As `nowrap` it set an
                                     // unshrinkable ~140px floor under the
                                     // description column, and the running balance
                                     // paid for it by falling off the right edge.
-                                    style={{...buttonStyle, ...mutedStyle, padding: '0.1rem 0.4rem', cursor: 'pointer', textAlign: 'left'}}
+                                    className={cx(ui.btn, ui.muted)}
                                     onClick={() => jumpToCounterpart(jump)}
                                     onBlur={() => setHighlight((current) => (current === row.postingId ? null : current))}
                                   >
@@ -1078,13 +1037,13 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                                     {describeCounterpart(counterpart)}
                                   </button>
                                 ) : (
-                                  <span style={mutedStyle}>{describeCounterpart(counterpart)}</span>
+                                  <span className={ui.muted}>{describeCounterpart(counterpart)}</span>
                                 )}
                               </div>
                             )}
                           </td>
-                          <td data-ledger-contra style={{...tdStyle, ...wrapStyle}}><AccountName name={row.contra} /></td>
-                          <td data-ledger-cleared-cell={row.cleared} style={{...tdStyle, ...mutedStyle}}>
+                          <td data-ledger-contra style={wrapStyle}><AccountName name={row.contra} /></td>
+                          <td data-ledger-cleared-cell={row.cleared} className={ui.muted}>
                             {CLEARED_LABEL[row.cleared]}
                             {/* A reconciled posting is frozen against a SPECIFIC
                                 statement (LGR-11). Naming it is what turns "you
@@ -1112,22 +1071,22 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
                               </span>
                             )}
                           </td>
-                          <td data-ledger-amount style={numericStyle}><SideAmount minor={row.amountMinor} /></td>
-                          <td data-ledger-running style={{...numericStyle, ...balancePinStyle}}><SideAmount minor={row.runningMinor} /></td>
+                          <td data-ledger-amount className={ui.num}><SideAmount minor={row.amountMinor} /></td>
+                          <td data-ledger-running className={cx(ui.num, pinBalance && ui.pinEnd)}><SideAmount minor={row.runningMinor} /></td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot>
                     <tr data-ledger-register-totals>
-                      <td style={{...tdStyle, ...stickyCellStyle, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}} />
-                      <th scope="row" colSpan={5} style={{...tdStyle, textAlign: 'left', fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
+                      <td className={ui.pinStart} />
+                      <th scope="row" colSpan={5}>
                     Closing balance
                       </th>
-                      <td style={{...numericStyle, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none', ...mutedStyle}}>
+                      <td className={cx(ui.muted, ui.num)}>
                         {formatAmount(register.totalDebitMinor)} Dr / {formatAmount(register.totalCreditMinor)} Cr
                       </td>
-                      <td data-ledger-closing style={{...numericStyle, fontWeight: 600, ...balancePinStyle, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
+                      <td data-ledger-closing className={cx(ui.num, pinBalance && ui.pinEnd)}>
                         <SideAmount minor={register.closingMinor} />
                       </td>
                     </tr>
@@ -1138,7 +1097,7 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
           )}
 
           {register.exists && (
-            <div data-ledger-register-summary style={mutedStyle}>
+            <div data-ledger-register-summary className={ui.muted}>
               {describeRegisterSummary(register)} · {describeRegisterFilter(register)}
             </div>
           )}
@@ -1147,13 +1106,13 @@ export const AccountRegisterBlock = ({block, editor, pageReadOnly}: {block: Bloc
               why a correction dated there will be refused. Informs; the store
               enforces the lock either way. */}
           {describeClosedPeriodMarker(data.periods, from, to) !== null && (
-            <div data-ledger-closed-periods style={mutedStyle}>{describeClosedPeriodMarker(data.periods, from, to)}</div>
+            <div data-ledger-closed-periods className={ui.muted}>{describeClosedPeriodMarker(data.periods, from, to)}</div>
           )}
 
           {/* A filtered closing balance is NOT the account's balance. Say so,
               with the real figure, rather than letting the two be confused. */}
           {register.exists && !registerMatchesAccountBalance(register) && (
-            <div data-ledger-filtered-balance role="status" aria-live="polite" style={noticeStyle('quiet')}>
+            <div data-ledger-filtered-balance role="status" aria-live="polite" className={ui.notice} data-tone="quiet">
               Filtered view — this account’s {data.truncated ? 'posted balance ACROSS THE PARTIAL READ ABOVE' : 'full posted balance'} is{' '}
               {formatWithSide(register.accountBalanceMinor)}
               {data.truncated ? ' (not the trial-balance figure — the read is truncated).' : ' (the trial-balance figure).'}

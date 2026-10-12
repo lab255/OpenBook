@@ -1,4 +1,5 @@
 import React from 'react';
+import {ui} from './ui';
 import {api} from '@book.dev/plugin-sdk';
 import {CLEARED_LABEL, describeDraftExclusion, normalSideFor, type NormalSide} from './reports';
 import {
@@ -34,26 +35,16 @@ import {
   SrOnly,
   TableRegion,
   TruncationNotice,
-  buttonStyle,
-  controlStyle,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  numericHeadStyle,
-  numericStyle,
   readProps,
   readString,
-  SECONDARY_TEXT,
-  tableStyle,
-  tdStyle,
-  thStyle,
-  titleStyle,
   useLedgerReport,
   wrapStyle,
   writeProp,
   type BlockLike,
   type EditorLike,
 } from './reportShell';
+
+const cx = (...classes: (string | false)[]): string => classes.filter(Boolean).join(' ');
 
 /**
  * The RECONCILE block (LGR-11) — the surface that turns "the import probably
@@ -122,33 +113,14 @@ const dropKey = (map: Record<string, OptimisticTick>, key: string): Record<strin
 type Mode = 'none' | 'amend' | 'abandon' | 'confirm-finish';
 
 /**
- * A button face that LOOKS dead when it is dead.
- *
- * `buttonStyle` sets colour and background inline, which beats the UA's
- * `:disabled` rule entirely — measured on the Finish button, the dead and the
- * live control were pixel-identical down to the label's darkest pixel, so the
- * gate read as live and a click did nothing. That fix then sat on Finish ALONE
- * while every button added since (Amend, Abandon, Save, both confirms') shipped
- * the same defect on plain `buttonStyle` — the exact one-fact-two-places drift
- * this helper ends. Still legible when dead (5.14:1 light / 5.37:1 dark):
- * disabled is not a reason to be unreadable.
+ * The face AND the gate, from one answer. Spread `{...deadButton(x)}` so
+ * every disableable button uses the public class and its CSS :disabled face.
+ * The gate alone selects the dashed, muted off face; strong is only emphasis.
  */
-const buttonFace = (dead: boolean, extra: React.CSSProperties = {}): React.CSSProperties => ({
-  ...buttonStyle,
-  ...extra,
-  ...(dead ? {color: SECONDARY_TEXT, background: 'hsl(var(--muted))', cursor: 'not-allowed'} : {}),
-});
-
-/**
- * The face AND the gate, from one answer. `style={buttonFace(X)}` beside
- * `disabled={X}` was the same fact written twice on every button in this file —
- * one edited copy away from a dead face on a live control, which is the exact
- * drift {@link buttonFace} exists to end. Spread the result:
- * `{...deadButton(x)}`.
- */
-const deadButton = (dead: boolean, extra: React.CSSProperties = {}): {style: React.CSSProperties; disabled: boolean} => ({
-  style: buttonFace(dead, extra),
+const deadButton = (dead: boolean, strong = false) => ({
+  className: ui.btn,
   disabled: dead,
+  ...(strong ? {'data-weight': 'strong'} : {}),
 });
 
 /**
@@ -484,16 +456,16 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
 
   if (data.state === 'loading') {
     return (
-      <div data-ledger-reconcile data-ledger-loading contentEditable={false} style={frameStyle}>
-        <span style={mutedStyle}>Loading reconciliation…</span>
+      <div data-ledger-reconcile data-ledger-loading contentEditable={false} className={ui.frame}>
+        <span className={ui.muted}>Loading reconciliation…</span>
       </div>
     );
   }
 
   if (data.state === 'uninitialized') {
     return (
-      <div data-ledger-reconcile data-ledger-setup contentEditable={false} style={frameStyle}>
-        <h3 style={titleStyle}>
+      <div data-ledger-reconcile data-ledger-setup contentEditable={false} className={ui.frame}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">🧾 </span>Reconcile
         </h3>
         <SetupPrompt label="Set up books" readOnly={pageLocked} onDone={data.reload} />
@@ -502,13 +474,13 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
   }
 
   return (
-    <div data-ledger-reconcile data-ledger-reconcile-status={sheet !== null ? sheet.status : 'none'} contentEditable={false} style={frameStyle}>
-      <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap'}}>
-        <h3 style={{...titleStyle, lineHeight: '1.9rem'}}>
+    <div data-ledger-reconcile data-ledger-reconcile-status={sheet !== null ? sheet.status : 'none'} contentEditable={false} className={ui.frame}>
+      <div className={ui.header}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">🧾 </span>Reconcile
         </h3>
         {sheet !== null && (
-          <span data-ledger-reconcile-heading style={mutedStyle}>
+          <span data-ledger-reconcile-heading className={ui.muted}>
             <AccountName name={sheet.accountName} /> · statement {sheet.statementDate} · {RECONCILIATION_STATUS_LABEL[sheet.status]}
           </span>
         )}
@@ -520,18 +492,18 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
       {/* A failed host call is a real failure and says so — but it is not the
           books being broken, so it never wears the alarm tone reserved for that. */}
       {action.error !== null && (
-        <div data-ledger-action-error role="status" aria-live="polite" style={noticeStyle('info')}>
+        <div data-ledger-action-error role="status" aria-live="polite" className={ui.notice} data-tone="info">
           {action.error}
         </div>
       )}
 
       {stranded && (
-        <div data-ledger-reconcile-stranded role="status" aria-live="polite" style={noticeStyle('info')}>
+        <div data-ledger-reconcile-stranded role="status" aria-live="polite" className={ui.notice} data-tone="info">
           The reconciliation this block was working on is no longer in this library.{' '}
           <button
             type="button"
             data-ledger-reconcile-forget
-            style={{...buttonStyle, marginLeft: '0.25rem'}}
+            className={ui.btn} data-size="sm" style={{marginLeft: '0.25rem'}}
             onClick={() => update(PROP_RECONCILIATION, '', setReconciliationId)}
           >
             Start a new one
@@ -577,7 +549,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                   on every tick — ~40 words a time — buries the number that did
                   change under the paragraph that did not. */}
               {gap !== null && (
-                <div data-ledger-gap style={mutedStyle}>
+                <div data-ledger-gap className={ui.muted}>
                   {gap}
                   {culprit !== null && <span data-ledger-single-culprit> {culprit}</span>}
                 </div>
@@ -588,7 +560,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                   on the canonical fixture it is the duplicate. `info`: a caveat,
                   not a broken book. */}
               {unmatchedCaveat !== null && (
-                <div data-ledger-unmatched-caveat={sheet.unmatchedCount} role="status" aria-live="polite" style={noticeStyle('info')}>
+                <div data-ledger-unmatched-caveat={sheet.unmatchedCount} role="status" aria-live="polite" className={ui.notice} data-tone="info">
                   {unmatchedCaveat}
                 </div>
               )}
@@ -598,17 +570,17 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                   points here by `aria-describedby`. Said in its own line, not
                   per control: it is one fact, identical on all of them. */}
               {pageLocked && (
-                <div id={lockedWhyId} data-ledger-reconcile-why="read-only" style={mutedStyle}>
+                <div id={lockedWhyId} data-ledger-reconcile-why="read-only" className={ui.muted}>
                   This page is read-only, so nothing on this statement can be changed from it.
                 </div>
               )}
-              <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center'}}>
+              <div className={ui.row}>
                 {sheet.status === 'open' && (
                   <button
                     type="button"
                     data-ledger-finish
                     ref={finishButtonRef}
-                    {...deadButton(finishDead, {fontWeight: 600})}
+                    {...deadButton(finishDead, true)}
                     aria-describedby={
                       [finishReason !== null ? finishHintId : null, pageLocked ? lockedWhyId : null].filter((id) => id !== null).join(' ') || undefined
                     }
@@ -667,7 +639,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                     sitting past an unrelated button is unreachable by keyboard
                     and never announced. */}
                 {finishReason !== null && (
-                  <span id={finishHintId} data-ledger-finish-hint style={mutedStyle}>
+                  <span id={finishHintId} data-ledger-finish-hint className={ui.muted}>
                     {finishReason.rule}
                     {/* The live figure is inside the described element, so the
                         accessible description carries it — but it is not
@@ -697,19 +669,19 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                   that lands while this is open cannot leave a confirm offering
                   an action the server would now refuse. */}
               {mode === 'confirm-finish' && unmatchedCaveat !== null && sheet.canFinish && (
-                <div data-ledger-finish-confirm role="status" aria-live="polite" style={noticeStyle('info')}>
+                <div data-ledger-finish-confirm role="status" aria-live="polite" className={`${ui.notice} ${ui.stack}`} data-tone="info">
                   {unmatchedCaveat}
-                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap'}}>
+                  <div className={ui.row}>
                     <button
                       type="button"
-                      data-ledger-finish-confirm-yes
+                      data-ledger-finish-confirm-yes data-size="sm"
                       ref={finishYesRef}
-                      {...deadButton(action.busy, {fontWeight: 600})}
+                      {...deadButton(action.busy, true)}
                       onClick={commitFinish}
                     >
                       {action.busy ? 'Working…' : 'Finish anyway'}
                     </button>
-                    <button type="button" data-ledger-finish-confirm-no {...deadButton(action.busy)} onClick={cancelFinishConfirm}>
+                    <button type="button" data-ledger-finish-confirm-no data-size="sm" {...deadButton(action.busy)} onClick={cancelFinishConfirm}>
                       Go back and check
                     </button>
                   </div>
@@ -734,7 +706,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
               )}
 
               {mode === 'abandon' && (
-                <div data-ledger-abandon-confirm role="status" aria-live="polite" style={noticeStyle('info')}>
+                <div data-ledger-abandon-confirm role="status" aria-live="polite" className={`${ui.notice} ${ui.stack}`} data-tone="info">
                   {/* What abandoning DOES, in the two facts a person needs
                       before they press it: nothing is posted, and no tick is
                       undone. Both are guarantees of the store, not of this
@@ -742,29 +714,29 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                       read the store. */}
                   Abandon the {sheet.statementDate} statement? It stays on record as abandoned, nothing is posted to the books, and every posting keeps the
                   cleared state it has now. This account is then free for a new reconciliation — but this one cannot be resumed.
-                  <div style={{display: 'flex', gap: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap'}}>
+                  <div className={ui.row}>
                     <button
                       type="button"
-                      data-ledger-abandon-confirm-yes
+                      data-ledger-abandon-confirm-yes data-size="sm"
                       ref={abandonYesRef}
-                      {...deadButton(action.busy, {fontWeight: 600})}
+                      {...deadButton(action.busy, true)}
                       onClick={abandon}
                     >
                       {action.busy ? 'Working…' : 'Abandon this statement'}
                     </button>
-                    <button type="button" data-ledger-abandon-confirm-no {...deadButton(action.busy)} onClick={cancelAbandon}>
+                    <button type="button" data-ledger-abandon-confirm-no data-size="sm" {...deadButton(action.busy)} onClick={cancelAbandon}>
                       Keep working on it
                     </button>
                   </div>
                 </div>
               )}
 
-              <div data-ledger-drafts-excluded={sheet.draftCount} style={mutedStyle}>
+              <div data-ledger-drafts-excluded={sheet.draftCount} className={ui.muted}>
                 {describeDraftExclusion(sheet.draftCount)}
               </div>
 
               {frozenElsewhere !== null && (
-                <div data-ledger-frozen-elsewhere={sheet.frozenElsewhereCount} role="status" aria-live="polite" style={noticeStyle('info')}>
+                <div data-ledger-frozen-elsewhere={sheet.frozenElsewhereCount} role="status" aria-live="polite" className={ui.notice} data-tone="info">
                   {frozenElsewhere}
                 </div>
               )}
@@ -775,7 +747,7 @@ export const ReconcileBlock = ({block, editor, pageReadOnly}: {block: BlockLike;
                 <Checklist sheet={sheet} optimistic={optimistic} readOnly={pageLocked} readOnlyWhyId={lockedWhyId} onToggle={toggle} truncated={data.truncated} />
               )}
 
-              <div data-ledger-reconcile-summary style={mutedStyle}>
+              <div data-ledger-reconcile-summary className={ui.muted}>
                 {describeReconcileSummary(sheet)}
               </div>
 
@@ -824,16 +796,14 @@ const Arithmetic = ({sheet}: {sheet: ReconcileSheet}) => {
    *    digit advance within a face and weight, not across them.
    */
   const figure: React.CSSProperties = {
-    margin: 0,
     textAlign: 'right',
     fontVariantNumeric: 'tabular-nums',
-    fontSize: '0.85rem',
     fontWeight: 600,
-    paddingRight: 'calc(0.6rem + 1px + 1.33em)',
+    paddingRight: 'calc(var(--obe-notice-pad-x) + 1px + 1.33em)',
   };
   return (
-    <dl data-ledger-arithmetic style={{display: 'grid', gridTemplateColumns: 'auto max-content', gap: '0.15rem 0.75rem', margin: 0, justifyContent: 'start'}}>
-      <dt style={{...mutedStyle, alignSelf: 'center'}}>Statement balance</dt>
+    <dl data-ledger-arithmetic style={{display: 'grid', gridTemplateColumns: 'auto max-content', gap: '0.15rem 0.75rem', justifyContent: 'start'}}>
+      <dt className={ui.muted} style={{alignSelf: 'center'}}>Statement balance</dt>
       {/* The data attribute marks exactly the FIGURE; the screen-reader note is
           its sibling, so a selector for the number never picks up the prose.
           Both figures carry the note — it was on the statement balance only,
@@ -843,13 +813,13 @@ const Arithmetic = ({sheet}: {sheet: ReconcileSheet}) => {
         <span data-ledger-statement-balance>{formatOnNormalSide(sheet.statementBalanceMinor, sheet.normalSide)}</span>
         <SrOnly> on the {sheet.normalSide} side, this account’s normal side.</SrOnly>
       </dd>
-      <dt style={{...mutedStyle, alignSelf: 'center'}}>Cleared balance</dt>
+      <dt className={ui.muted} style={{alignSelf: 'center'}}>Cleared balance</dt>
       <dd style={figure}>
         <span data-ledger-cleared-balance>{formatOnNormalSide(sheet.clearedBalanceMinor, sheet.normalSide)}</span>
         <SrOnly> on the {sheet.normalSide} side, this account’s normal side.</SrOnly>
       </dd>
-      <dt style={{...mutedStyle, fontWeight: 600, alignSelf: 'center'}}>Difference</dt>
-      <dd style={{margin: 0}}>
+      <dt className={ui.muted} style={{fontWeight: 600, alignSelf: 'center'}}>Difference</dt>
+      <dd>
         {/* The live region is the FIGURE and its one sentence — nothing else.
             Wrapping the guidance paragraph in here too meant ~55 words
             re-announced on every tick, so an eleven-row checklist queued some
@@ -860,9 +830,9 @@ const Arithmetic = ({sheet}: {sheet: ReconcileSheet}) => {
           data-ledger-balanced={sheet.balanced ? 'true' : 'false'}
           role="status"
           aria-live="polite"
-          style={{...noticeStyle(sheet.balanced ? 'quiet' : 'info'), fontVariantNumeric: 'tabular-nums', textAlign: 'right'}}
+          className={ui.notice} data-tone={sheet.balanced ? 'quiet' : 'info'} style={{fontVariantNumeric: 'tabular-nums', textAlign: 'right'}}
         >
-          <div data-ledger-difference-amount style={{fontSize: '0.85rem', fontWeight: 600}}>
+          <div data-ledger-difference-amount style={{fontWeight: 600}}>
             <SideAmount minor={sheet.differenceMinor} />
           </div>
           <div data-ledger-difference-text style={{fontWeight: 400, marginTop: '0.15rem', textAlign: 'left'}}>
@@ -926,38 +896,38 @@ const AmendForm = ({
   const dateProblem = date === '';
   const balanceProblem = !dateProblem && !balance.ok;
   return (
-    <div data-ledger-amend-form style={{...noticeStyle('quiet'), display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+    <div data-ledger-amend-form className={`${ui.notice} ${ui.stack}`} data-tone="quiet">
       {/* Says what this changes and — the part that matters — what it does not.
           Someone reaching for this has already ticked rows, and the fear that
           stops them using it is losing that work. */}
-      <div style={mutedStyle}>Correct what the statement says. Your ticks are kept and nothing is posted to the books; only the difference is recalculated.</div>
-      <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap'}}>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>Statement date</span>
+      <div className={ui.muted}>Correct what the statement says. Your ticks are kept and nothing is posted to the books; only the difference is recalculated.</div>
+      <div className={ui.header}>
+        <label className={ui.labelled}>
+          <span className={ui.muted}>Statement date</span>
           <input
             type="date"
             data-ledger-amend-date
             ref={dateRef}
             aria-describedby={dateProblem ? problemId : undefined}
-            style={controlStyle}
+            className={ui.field}
             value={date}
             onChange={(e) => onDate(e.target.value)}
           />
         </label>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>{describeBalanceLabel(normalSide)}</span>
+        <label className={ui.labelled}>
+          <span className={ui.muted}>{describeBalanceLabel(normalSide)}</span>
           <input
             type="text"
             inputMode="decimal"
             data-ledger-amend-balance
             aria-describedby={balanceProblem ? problemId : balance.ok && balanceText.trim() !== '' ? echoId : undefined}
-            style={{...controlStyle, minWidth: '9rem', textAlign: 'right'}}
+            className={ui.field} style={{minWidth: '9rem', textAlign: 'right'}}
             placeholder="0.00"
             value={balanceText}
             onChange={(e) => onBalance(e.target.value)}
           />
           {balance.ok && balanceText.trim() !== '' && (
-            <span id={echoId} data-ledger-amend-echo style={{...mutedStyle, maxWidth: '18rem'}}>
+            <span id={echoId} data-ledger-amend-echo className={ui.muted} style={{maxWidth: '18rem'}}>
               {describeBalanceEcho(balance.minor, normalSide)}
             </span>
           )}
@@ -966,7 +936,7 @@ const AmendForm = ({
           type="button"
           data-ledger-amend-save
           ref={saveRef}
-          {...deadButton(problem !== null || busy, {fontWeight: 600})}
+          {...deadButton(problem !== null || busy, true)}
           onClick={onSave}
         >
           {busy ? 'Saving…' : 'Save statement'}
@@ -976,7 +946,7 @@ const AmendForm = ({
         </button>
       </div>
       {problem !== null && (
-        <div id={problemId} data-ledger-amend-hint role="status" aria-live="polite" style={mutedStyle}>
+        <div id={problemId} data-ledger-amend-hint role="status" aria-live="polite" className={ui.muted}>
           {problem}
         </div>
       )}
@@ -994,23 +964,34 @@ const AmendForm = ({
  * `!row.matched` filter would eventually allow.
  */
 const OutstandingItems = ({sheet, heading, headingId}: {sheet: ReconcileSheet; heading: string; headingId: string}) => (
-  <section data-ledger-outstanding={sheet.unmatchedCount} aria-labelledby={headingId} style={{...noticeStyle('info'), display: 'flex', flexDirection: 'column', gap: '0.35rem'}}>
-    <h4 id={headingId} data-ledger-outstanding-heading style={{...titleStyle, fontSize: '0.85rem', margin: 0}}>
+  <section data-ledger-outstanding={sheet.unmatchedCount} aria-labelledby={headingId} className={`${ui.notice} ${ui.stack}`} data-tone="info">
+    <h4 id={headingId} data-ledger-outstanding-heading className={ui.title}>
       {heading}
     </h4>
-    <div style={mutedStyle}>{describeOutstandingIntro(sheet)}</div>
-    <ul data-ledger-outstanding-list style={{margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
+    <div className={ui.muted}>{describeOutstandingIntro(sheet)}</div>
+    <ul data-ledger-outstanding-list className={ui.list}>
       {sheet.rows.filter(isOutstanding).map((row: ReconcileRow) => (
         <li key={row.postingId} data-ledger-outstanding-row={row.postingId}>
           <span style={{fontVariantNumeric: 'tabular-nums'}}>{row.date}</span>
-          {row.entryNo !== null && <span style={{...mutedStyle, marginLeft: '0.35rem'}}>#{row.entryNo}</span>}{' '}
-          {row.description.trim() === '' ? <span style={mutedStyle}>(no description)</span> : row.description} —{' '}
+          {row.entryNo !== null && <span className={ui.muted} style={{marginLeft: '0.35rem'}}>#{row.entryNo}</span>}{' '}
+          {row.description.trim() === '' ? <span className={ui.muted}>(no description)</span> : row.description} —{' '}
           <SideAmount minor={row.amountMinor} />
         </li>
       ))}
     </ul>
   </section>
 );
+
+/**
+ * Below this REGION width the Amount pin yields and the column scrolls again:
+ * the amount and its Dr/Cr marker stay visible at desktop widths without
+ * consuming the checklist's usable middle at narrow widths.
+ *
+ * The public pin classes now make a container query possible, but this guard
+ * stays in JS: the threshold is plugin-specific and third-party plugins cannot
+ * add CSS to the host stylesheet.
+ */
+const MIN_AMOUNT_PIN_WIDTH = 480;
 
 /** The candidate postings, with the tick that moves the difference.
  *  `readOnly` is the PAGE's lock (the caller's `pageLocked`); when set, every
@@ -1029,118 +1010,136 @@ const Checklist = ({
   readOnlyWhyId?: string;
   onToggle: (postingId: string, matched: boolean) => void;
   truncated: boolean;
-}) => (
-  <TableRegion label="Reconciliation checklist">
-    <table data-ledger-reconcile-table style={tableStyle}>
-      {/* The caption must never assert completeness the truncation notice
-          above has just denied — on a partial read it says so itself, rather
-          than describing a checklist that is missing rows. */}
-      <caption style={{...mutedStyle, textAlign: 'left', paddingBottom: '0.25rem'}}>
-        Every posted entry on <AccountName name={sheet.accountName} />
-        {/* Sentence case, not caps: a screen reader announces a fully
-            capitalised phrase letter by letter in several common
-            configurations, and this is the clause that says the list is
-            incomplete — the one that most needs to be understood. */}
-        {truncated ? ' within this partial read' : ''} — tick the ones that appear on the {sheet.statementDate} statement.
-        Debits and credits are marked Dr/Cr; this account is {sheet.normalSide}-normal.
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col" style={thStyle}>
-            On statement
-          </th>
-          <th scope="col" style={thStyle}>
-            Entry
-          </th>
-          <th scope="col" style={thStyle}>
-            Date
-          </th>
-          <th scope="col" style={thStyle}>
-            Description
-          </th>
-          <th scope="col" style={thStyle}>
-            Contra account
-          </th>
-          <th scope="col" style={thStyle}>
-            State
-          </th>
-          <th scope="col" style={numericHeadStyle}>
-            Amount
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {sheet.rows.map((row) => {
-          const locked = isRowLocked(sheet, row);
-          // The user's own tick wins until the books confirm or refuse it.
-          const checked = row.postingId in optimistic ? optimistic[row.postingId].want : row.matched;
-          return (
-            <tr key={row.postingId} data-ledger-reconcile-row={row.postingId} data-ledger-matched={checked ? 'true' : 'false'}>
-              <td style={tdStyle}>
-                {/* Entry number, date, description AND amount — the two halves
-                    of a duplicated payment otherwise carry byte-identical
-                    names, and telling the duplicate from the original is the
-                    one distinction this whole workflow turns on. The lock
-                    reason is IN the label, not beside it: a disabled checkbox
-                    is out of the tab order, so a sibling note never reaches
-                    the people it is for. */}
-                <input
-                  type="checkbox"
-                  data-ledger-match={row.postingId}
-                  checked={checked}
-                  disabled={locked || readOnly}
-                  aria-describedby={readOnly ? readOnlyWhyId : undefined}
-                  onChange={(e) => onToggle(row.postingId, e.target.checked)}
-                  aria-label={describeRowLabel(sheet, row, readOnly)}
-                />
-              </td>
-              <td style={{...tdStyle, ...mutedStyle, fontVariantNumeric: 'tabular-nums'}}>{row.entryNo === null ? '—' : `#${row.entryNo}`}</td>
-              <td style={{...tdStyle, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{row.date}</td>
-              <td style={{...tdStyle, ...wrapStyle}}>
-                {row.description === '' ? <span style={mutedStyle}>(no description)</span> : row.description}
-                {row.reversed && (
-                  <span style={{...mutedStyle, marginLeft: '0.35rem'}}>
-                    (reversed)
-                    <SrOnly> — this entry was reversed; its reversing entry appears in this checklist too.</SrOnly>
-                  </span>
-                )}
-              </td>
-              <td data-ledger-contra style={{...tdStyle, ...wrapStyle}}>
-                <AccountName name={row.contra} />
-              </td>
-              <td data-ledger-cleared-cell={row.cleared} style={{...tdStyle, ...mutedStyle}}>
-                {CLEARED_LABEL[row.cleared]}
-                {row.frozen && row.frozenStatementDate !== null && (
-                  // `nowrap`: an ISO date broken across lines as `2026-03-` /
-                  // `31` reads as two fragments, not one date.
-                  <span
-                    data-ledger-reconciled-statement={row.frozenStatementDate}
-                    style={{display: 'block', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}
-                  >
-                    {row.frozenStatementDate}
-                  </span>
-                )}
-              </td>
-              <td data-ledger-amount style={numericStyle}>
-                <SideAmount minor={row.amountMinor} />
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-      <tfoot>
-        <tr data-ledger-reconcile-totals>
-          <th scope="row" colSpan={6} style={{...tdStyle, textAlign: 'left', fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
-            Cleared balance (ticked only)
-          </th>
-          <td data-ledger-cleared-total style={{...numericStyle, fontWeight: 600, borderTop: '2px solid hsl(var(--border))', borderBottom: 'none'}}>
-            <SideAmount minor={sheet.clearedBalanceMinor} />
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-  </TableRegion>
-);
+}) => {
+  // The table region's measured width, for the Amount-pin guard (see
+  // {@link MIN_AMOUNT_PIN_WIDTH}). A callback-ref + state pair rather than a
+  // plain ref because the region only mounts once rows render, and an effect
+  // keyed on the element is what re-arms the observer across that boundary.
+  const [tableRegionEl, setTableRegionEl] = React.useState<HTMLDivElement | null>(null);
+  const [regionWidth, setRegionWidth] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    // No observer (a bare test harness): stay pinned — the default is the
+    // desktop layout the pin was built for.
+    if (tableRegionEl === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setRegionWidth(tableRegionEl.clientWidth));
+    observer.observe(tableRegionEl);
+    setRegionWidth(tableRegionEl.clientWidth);
+    return () => observer.disconnect();
+  }, [tableRegionEl]);
+  const pinAmount = regionWidth === null || regionWidth >= MIN_AMOUNT_PIN_WIDTH;
+  return (
+    <TableRegion label="Reconciliation checklist" regionRef={setTableRegionEl}>
+      <table data-ledger-reconcile-table className={ui.table} data-density="compact">
+        {/* The caption must never assert completeness the truncation notice
+            above has just denied — on a partial read it says so itself, rather
+            than describing a checklist that is missing rows. */}
+        <caption className={ui.muted}>
+          Every posted entry on <AccountName name={sheet.accountName} />
+          {/* Sentence case, not caps: a screen reader announces a fully
+              capitalised phrase letter by letter in several common
+              configurations, and this is the clause that says the list is
+              incomplete — the one that most needs to be understood. */}
+          {truncated ? ' within this partial read' : ''} — tick the ones that appear on the {sheet.statementDate} statement.
+          Debits and credits are marked Dr/Cr; this account is {sheet.normalSide}-normal.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">
+              On statement
+            </th>
+            <th scope="col">
+              Entry
+            </th>
+            <th scope="col">
+              Date
+            </th>
+            <th scope="col">
+              Description
+            </th>
+            <th scope="col">
+              Contra account
+            </th>
+            <th scope="col">
+              State
+            </th>
+            <th scope="col" className={cx(ui.num, pinAmount && ui.pinEnd)}>
+              Amount
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sheet.rows.map((row) => {
+            const locked = isRowLocked(sheet, row);
+            // The user's own tick wins until the books confirm or refuse it.
+            const checked = row.postingId in optimistic ? optimistic[row.postingId].want : row.matched;
+            return (
+              <tr key={row.postingId} data-ledger-reconcile-row={row.postingId} data-ledger-matched={checked ? 'true' : 'false'}>
+                <td>
+                  {/* Entry number, date, description AND amount — the two halves
+                      of a duplicated payment otherwise carry byte-identical
+                      names, and telling the duplicate from the original is the
+                      one distinction this whole workflow turns on. The lock
+                      reason is IN the label, not beside it: a disabled checkbox
+                      is out of the tab order, so a sibling note never reaches
+                      the people it is for. */}
+                  <input
+                    type="checkbox"
+                    data-ledger-match={row.postingId}
+                    checked={checked}
+                    disabled={locked || readOnly}
+                    aria-describedby={readOnly ? readOnlyWhyId : undefined}
+                    onChange={(e) => onToggle(row.postingId, e.target.checked)}
+                    aria-label={describeRowLabel(sheet, row, readOnly)}
+                  />
+                </td>
+                <td className={ui.muted} style={{fontVariantNumeric: 'tabular-nums'}}>{row.entryNo === null ? '—' : `#${row.entryNo}`}</td>
+                <td style={{whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{row.date}</td>
+                <td style={wrapStyle}>
+                  {row.description === '' ? <span className={ui.muted}>(no description)</span> : row.description}
+                  {row.reversed && (
+                    <span className={ui.muted} style={{marginLeft: '0.35rem'}}>
+                      (reversed)
+                      <SrOnly> — this entry was reversed; its reversing entry appears in this checklist too.</SrOnly>
+                    </span>
+                  )}
+                </td>
+                <td data-ledger-contra style={wrapStyle}>
+                  <AccountName name={row.contra} />
+                </td>
+                <td data-ledger-cleared-cell={row.cleared} className={ui.muted}>
+                  {CLEARED_LABEL[row.cleared]}
+                  {row.frozen && row.frozenStatementDate !== null && (
+                    // `nowrap`: an ISO date broken across lines as `2026-03-` /
+                    // `31` reads as two fragments, not one date.
+                    <span
+                      data-ledger-reconciled-statement={row.frozenStatementDate}
+                      style={{display: 'block', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}
+                    >
+                      {row.frozenStatementDate}
+                    </span>
+                  )}
+                </td>
+                <td data-ledger-amount className={cx(ui.num, pinAmount && ui.pinEnd)}>
+                  <SideAmount minor={row.amountMinor} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr data-ledger-reconcile-totals>
+            <th scope="row" colSpan={6}>
+              Cleared balance (ticked only)
+            </th>
+            <td data-ledger-cleared-total className={cx(ui.num, pinAmount && ui.pinEnd)}>
+              <SideAmount minor={sheet.clearedBalanceMinor} />
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </TableRegion>
+  );
+};
 
 /**
  * Starting a reconciliation, and resuming one already in progress.
@@ -1205,12 +1204,12 @@ const StartForm = ({
           F1), not just the button: live pickers and a live balance box over a
           dead Start invite work whose only exit is refusal. Each dead control
           points at the stated reason below. */}
-      <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.5rem', flexWrap: 'wrap'}}>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>Account</span>
+      <div className={ui.header}>
+        <label className={ui.labelled}>
+          <span className={ui.muted}>Account</span>
           <select
             data-ledger-reconcile-account
-            style={{...controlStyle, minWidth: '12rem'}}
+            className={ui.field} style={{minWidth: '12rem'}}
             value={accountId}
             disabled={readOnly}
             aria-describedby={readOnly ? lockedWhyId : undefined}
@@ -1224,19 +1223,19 @@ const StartForm = ({
             ))}
           </select>
         </label>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>Statement date</span>
+        <label className={ui.labelled}>
+          <span className={ui.muted}>Statement date</span>
           <input
             type="date"
             data-ledger-statement-date
-            style={controlStyle}
+            className={ui.field}
             value={statementDate}
             disabled={readOnly}
             aria-describedby={readOnly ? lockedWhyId : undefined}
             onChange={(e) => onDate(e.target.value)}
           />
         </label>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
+        <label className={ui.labelled}>
           {/* THE LABEL IS THE INSTRUCTION. "Closing balance (credit-normal
               account)" stated a true fact about the account and left the reader
               to derive what to type from it — backwards, at the one moment on
@@ -1244,13 +1243,13 @@ const StartForm = ({
               twice the balance. It now says what to type; the hint below is the
               LIVE echo of what the typed number was taken to mean, which is a
               different thing and not a second copy of this one. */}
-          <span style={mutedStyle}>{describeBalanceLabel(normalSide)}</span>
+          <span className={ui.muted}>{describeBalanceLabel(normalSide)}</span>
           <input
             type="text"
             inputMode="decimal"
             data-ledger-statement-balance-input
             aria-describedby={readOnly ? lockedWhyId : balance.ok && balanceText.trim() !== '' ? balanceHintId : undefined}
-            style={{...controlStyle, minWidth: '9rem', textAlign: 'right'}}
+            className={ui.field} style={{minWidth: '9rem', textAlign: 'right'}}
             placeholder="0.00"
             value={balanceText}
             disabled={readOnly}
@@ -1260,14 +1259,13 @@ const StartForm = ({
               intent that does not exist on a locked page, so it is dropped
               rather than left announcing a reading nobody can act on. */}
           {!readOnly && balance.ok && balanceText.trim() !== '' && (
-            <span id={balanceHintId} data-ledger-balance-hint style={{...mutedStyle, maxWidth: '18rem'}}>
+            <span id={balanceHintId} data-ledger-balance-hint className={ui.muted} style={{maxWidth: '18rem'}}>
               <strong data-ledger-balance-echo>{describeBalanceEcho(balance.minor, normalSide)}</strong>
             </span>
           )}
         </label>
         {/* Through {@link deadButton} like every other disableable button in
-            this file — plain `buttonStyle` was the one face left that rendered
-            the dead state pixel-identical to the live one. */}
+            this file — the public CSS :disabled face follows the same gate. */}
         <button
           type="button"
           data-ledger-reconcile-start
@@ -1283,12 +1281,12 @@ const StartForm = ({
           and it outranks the checklist of missing inputs — which is a list of
           instructions ("Pick the account…") a viewer cannot follow. */}
       {readOnly ? (
-        <div id={lockedWhyId} data-ledger-reconcile-why="read-only" style={mutedStyle}>
+        <div id={lockedWhyId} data-ledger-reconcile-why="read-only" className={ui.muted}>
           This page is read-only, so a reconciliation cannot be started from it.
         </div>
       ) : (
         problem !== null && (
-          <div data-ledger-start-hint role="status" aria-live="polite" style={noticeStyle('quiet')}>
+          <div data-ledger-start-hint role="status" aria-live="polite" className={ui.notice} data-tone="quiet">
             {problem}
           </div>
         )
@@ -1296,20 +1294,20 @@ const StartForm = ({
 
       {existing.length > 0 && (
         <TableRegion label="Reconciliations on this book">
-          <table data-ledger-reconcile-list style={tableStyle}>
-            <caption style={{...mutedStyle, textAlign: 'left', paddingBottom: '0.25rem'}}>Statements already started on this book.</caption>
+          <table data-ledger-reconcile-list className={ui.table} data-density="compact">
+            <caption className={ui.muted}>Statements already started on this book.</caption>
             <thead>
               <tr>
-                <th scope="col" style={thStyle}>
+                <th scope="col">
                   Account
                 </th>
-                <th scope="col" style={thStyle}>
+                <th scope="col">
                   Statement
                 </th>
-                <th scope="col" style={thStyle}>
+                <th scope="col">
                   Status
                 </th>
-                <th scope="col" style={thStyle}>
+                <th scope="col">
                   <SrOnly>Open</SrOnly>
                 </th>
               </tr>
@@ -1317,13 +1315,13 @@ const StartForm = ({
             <tbody>
               {existing.map((r) => (
                 <tr key={r.id} data-ledger-reconcile-list-row={r.id}>
-                  <td style={{...tdStyle, ...wrapStyle}}>
+                  <td style={wrapStyle}>
                     <AccountName name={accountNameFor(r.accountId)} />
                   </td>
-                  <td style={{...tdStyle, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{r.statementDate}</td>
-                  <td style={{...tdStyle, ...mutedStyle}}>{RECONCILIATION_STATUS_LABEL[r.status]}</td>
-                  <td style={tdStyle}>
-                    <button type="button" data-ledger-reconcile-resume={r.id} style={buttonStyle} onClick={() => onResume(r.id)}>
+                  <td style={{whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums'}}>{r.statementDate}</td>
+                  <td className={ui.muted}>{RECONCILIATION_STATUS_LABEL[r.status]}</td>
+                  <td>
+                    <button type="button" data-ledger-reconcile-resume={r.id} data-size="sm" className={ui.btn} onClick={() => onResume(r.id)}>
                       {r.status === 'open' ? 'Resume' : 'View'}
                     </button>
                   </td>
