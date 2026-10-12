@@ -1,4 +1,5 @@
 import React from 'react';
+import {ui} from './ui';
 import {api, formatAmount, LedgerError} from '@book.dev/plugin-sdk';
 import {
   buildConfirmPatchFor,
@@ -103,85 +104,6 @@ const STORAGE_RULES = 'importRules';
  * duplicate entries. A paged read belongs with the reporting task.
  */
 const DEDUP_WINDOW = 1000;
-
-// ── Styles (host CSS vars only — the block inherits the app's theme) ──────────
-
-const cellStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: 'hsl(var(--border))',
-  borderRadius: 6,
-  padding: '0.3rem 0.5rem',
-  background: 'hsl(var(--background))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-  fontVariantNumeric: 'tabular-nums',
-  minWidth: 0,
-  width: '100%',
-};
-
-const buttonStyle: React.CSSProperties = {
-  border: '1px solid hsl(var(--border))',
-  borderRadius: 6,
-  padding: '0.3rem 0.75rem',
-  background: 'hsl(var(--card))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-  cursor: 'pointer',
-};
-
-/**
- * Secondary text that still READS. DS-1 lands `--muted-foreground` at the fixed
- * 43.2% light / 59.1% dark values and clears the host canvas-family audit. This
- * local alpha of `--foreground` remains the stronger plugin treatment for the
- * import verdict's compound row/button surfaces: it measures 5.37:1 while
- * staying visibly secondary, the disabled button label measures 5.14:1, and the
- * status cell uses `--foreground` outright at 12.91:1. It follows the host theme
- * and keeps the entire dedup verdict readable.
- */
-const SECONDARY_TEXT = 'hsl(var(--foreground) / 0.72)';
-
-const headerStyle: React.CSSProperties = {
-  fontSize: '0.7rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: SECONDARY_TEXT,
-};
-
-/** Visually hidden, still announced — the design system is unreachable from a
- *  plugin (LGR-17), so the pattern is inlined. */
-const SR_ONLY: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  borderWidth: 0,
-};
-
-/**
- * A button that LOOKS disabled when it is. Both button surfaces in this block
- * go through here: a disabled control rendered identically to an enabled one,
- * pointer cursor included, is a control the user presses and presses again.
- */
-const buttonStyleFor = (disabled: boolean): React.CSSProperties =>
-  disabled
-    ? {...buttonStyle, background: 'hsl(var(--muted))', color: SECONDARY_TEXT, cursor: 'not-allowed'}
-    : buttonStyle;
-
-const noticeStyle = (tone: 'alarm' | 'quiet'): React.CSSProperties => ({
-  padding: '0.4rem 0.6rem',
-  borderRadius: 6,
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: tone === 'alarm' ? 'hsl(var(--destructive))' : 'hsl(var(--border))',
-  background: tone === 'alarm' ? 'hsl(var(--destructive) / 0.1)' : 'transparent',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-});
 
 // ── Plugin-scoped storage (per browser profile; the LEDGER stays the truth) ──
 
@@ -631,7 +553,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
 
   if (ledgerReady === null) {
     return (
-      <div data-ledger-import data-import-loading role="status" aria-live="polite" contentEditable={false} style={{padding: '0.75rem', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: '0.85rem', color: SECONDARY_TEXT}}>
+      <div data-ledger-import data-import-loading role="status" aria-live="polite" contentEditable={false} className={ui.frame}>
         Loading ledger…
       </div>
     );
@@ -639,7 +561,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
 
   if (ledgerReady === false) {
     return (
-      <div data-ledger-import data-import-setup contentEditable={false} style={{padding: '0.75rem', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: '0.85rem'}}>
+      <div data-ledger-import data-import-setup contentEditable={false} className={ui.frame}>
         🏦 The books are not set up yet — run “Ledger: set up books” first.
       </div>
     );
@@ -678,19 +600,20 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           also in the preview above; with NO statement open — the path this
           panel exists to serve — a months-old draft otherwise offers a payee
           and an amount and nothing to reconcile against. */}
-      <span data-import-draft-date style={{fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem', color: SECONDARY_TEXT}}>
-        <span style={SR_ONLY}>Date </span>
+      <span data-import-draft-date className={ui.muted} style={{fontVariantNumeric: 'tabular-nums'}}>
+        <span className={ui.srOnly}>Date </span>
         {pending.row.date ?? '—'}
       </span>
       <span>{pending.row.description}</span>
-      <span style={{textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem'}}>
-        <span style={SR_ONLY}>Amount </span>
+      <span className={ui.num}>
+        <span className={ui.srOnly}>Amount </span>
         {money(pending.row.amountMinor ?? 0)}
       </span>
       <select
         data-import-category={handle}
+        data-size="sm"
         aria-label={`Category for ${pending.row.description}`}
-        style={cellStyle}
+        className={ui.field}
         value={pending.categoryAccountId}
         disabled={locked || pending.confirmed}
         onChange={(e) => markDraft(pending.draftId, {categoryAccountId: e.target.value})}
@@ -707,7 +630,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
       <button
         type="button"
         data-import-confirm={handle}
-        style={buttonStyleFor(locked || pending.confirmed || pending.categoryAccountId === '')}
+        className={ui.btn} data-size="sm"
         disabled={locked || pending.confirmed || pending.categoryAccountId === ''}
         aria-describedby={pageLocked ? lockedWhyId : undefined}
         onClick={() => void confirm(pending.draftId)}
@@ -715,7 +638,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
         {pending.confirmed ? 'Saved ✓' : 'Save'}
       </button>
       {pending.error !== null && (
-        <div data-import-draft-error role="status" aria-live="polite" style={{...noticeStyle('alarm'), gridColumn: '1 / -1'}}>
+        <div data-import-draft-error role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'} style={{gridColumn: '1 / -1'}}>
           {pending.error}
         </div>
       )}
@@ -726,11 +649,10 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
     <div
       data-ledger-import
       contentEditable={false}
-      style={{display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0.75rem', border: '1px solid hsl(var(--border))', borderRadius: 8, background: 'hsl(var(--card))'}}
+      className={ui.frame}
     >
-      <div style={{display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap'}}>
-        <span style={{fontSize: '0.95rem'}}>🏦</span>
-        <strong style={{fontSize: '0.9rem'}}>Import a bank statement</strong>
+      <div className={ui.header}>
+        <h3 className={ui.title}><span aria-hidden="true">🏦 </span>Import a bank statement</h3>
         <input
           data-import-file
           type="file"
@@ -738,10 +660,10 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           aria-label="Bank statement CSV"
           disabled={locked}
           aria-describedby={pageLocked ? lockedWhyId : undefined}
-          style={{fontSize: '0.8rem'}}
+          className={ui.file} style={{alignSelf: 'center'}}
           onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
         />
-        {fileName !== '' && <span style={{fontSize: '0.8rem', color: SECONDARY_TEXT}}>{fileName}</span>}
+        {fileName !== '' && <span className={ui.muted}>{fileName}</span>}
       </div>
 
       {/* The DOCUMENT's lock, stated once (LGR-23) — every disabled control in
@@ -749,13 +671,13 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           control and the Save buttons simply sat grey with no stated cause on
           exactly the page where nothing can explain itself by being pressed. */}
       {pageLocked && (
-        <div id={lockedWhyId} data-import-why="read-only" style={{fontSize: '0.8rem', color: SECONDARY_TEXT}}>
+        <div id={lockedWhyId} data-import-why="read-only" className={ui.muted}>
           This page is read-only, so nothing can be imported from it.
         </div>
       )}
 
       {error && (
-        <div data-import-error role="status" aria-live="polite" style={noticeStyle('alarm')}>
+        <div data-import-error role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
           {error}
         </div>
       )}
@@ -775,13 +697,13 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
               window, already-imported, already-drafted) are plain text: they
               change in lockstep with the summary, and a pile of regions firing
               on one commit is noise, not information. */}
-          <div data-import-detected role="status" aria-live="polite" style={noticeStyle('quiet')}>
+          <div data-import-detected role="status" aria-live="polite" className={ui.notice} data-tone={'quiet'}>
             {reusedMapping && <strong data-import-saved-mapping>Saved mapping reused. </strong>}
             {notes.map((note, i) =>
               note.severity === 'ask' ? (
                 // A coin flip must not look like a certainty. Loud surface, and
                 // a ⚠ lead-in so colour is not carrying the severity alone.
-                <div key={i} data-import-note-ask style={{...noticeStyle('alarm'), marginTop: '0.3rem'}}>
+                <div key={i} data-import-note-ask className={ui.notice} data-tone={'alarm'} style={{marginTop: '0.3rem'}}>
                   ⚠ {note.text}
                 </div>
               ) : (
@@ -791,9 +713,9 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           </div>
 
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(11rem, 1fr))', gap: '0.5rem'}}>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>This statement is</span>
-              <select data-import-source-account style={cellStyle} value={profile.accountId} disabled={locked} onChange={(e) => setSourceAccount(e.target.value)}>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>This statement is</span>
+              <select data-import-source-account className={ui.field} value={profile.accountId} disabled={locked} onChange={(e) => setSourceAccount(e.target.value)}>
                 <option value="">Select the bank account…</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -802,41 +724,41 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
                 ))}
               </select>
             </label>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>Date column</span>
-              <select data-import-map-date style={cellStyle} value={profile.mapping.date} disabled={locked} onChange={(e) => patchProfile({mapping: {...profile.mapping, date: Number(e.target.value)}})}>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>Date column</span>
+              <select data-import-map-date className={ui.field} value={profile.mapping.date} disabled={locked} onChange={(e) => patchProfile({mapping: {...profile.mapping, date: Number(e.target.value)}})}>
                 <option value={-1}>Not mapped</option>
                 {columnOptions}
               </select>
             </label>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>Amount column</span>
-              <select data-import-map-amount style={cellStyle} value={profile.mapping.amount} disabled={locked} onChange={(e) => patchProfile({mapping: {...profile.mapping, amount: Number(e.target.value)}})}>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>Amount column</span>
+              <select data-import-map-amount className={ui.field} value={profile.mapping.amount} disabled={locked} onChange={(e) => patchProfile({mapping: {...profile.mapping, amount: Number(e.target.value)}})}>
                 <option value={-1}>Not mapped</option>
                 {columnOptions}
               </select>
             </label>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>Description column</span>
-              <select data-import-map-description style={cellStyle} value={profile.mapping.description} disabled={locked} onChange={(e) => patchProfile({mapping: {...profile.mapping, description: Number(e.target.value)}})}>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>Description column</span>
+              <select data-import-map-description className={ui.field} value={profile.mapping.description} disabled={locked} onChange={(e) => patchProfile({mapping: {...profile.mapping, description: Number(e.target.value)}})}>
                 <option value={-1}>Not mapped</option>
                 {columnOptions}
               </select>
             </label>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>Date format</span>
-              <select data-import-dateformat style={cellStyle} value={profile.dateFormat} disabled={locked} onChange={(e) => patchProfile({dateFormat: e.target.value as DateFormat})}>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>Date format</span>
+              <select data-import-dateformat className={ui.field} value={profile.dateFormat} disabled={locked} onChange={(e) => patchProfile({dateFormat: e.target.value as DateFormat})}>
                 <option value="iso">YYYY-MM-DD</option>
                 <option value="mdy">MM/DD/YYYY</option>
                 <option value="dmy">DD/MM/YYYY</option>
                 <option value="dmy-dot">DD.MM.YYYY</option>
               </select>
             </label>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>Amounts are in</span>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>Amounts are in</span>
               <select
                 data-import-denomination
-                style={cellStyle}
+                className={ui.field}
                 value={profile.denomination ?? ''}
                 disabled={locked}
                 onChange={(e) => patchProfile({denomination: e.target.value === '' ? null : (e.target.value as Denomination)})}
@@ -846,9 +768,9 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
                 <option value="minor">Cents (1234 = 12.34)</option>
               </select>
             </label>
-            <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
-              <span style={headerStyle}>Money out is</span>
-              <select data-import-sign style={cellStyle} value={profile.sign} disabled={locked} onChange={(e) => patchProfile({sign: e.target.value as SignConvention})}>
+            <label className={ui.labelled}>
+              <span className={ui.eyebrow}>Money out is</span>
+              <select data-import-sign className={ui.field} value={profile.sign} disabled={locked} onChange={(e) => patchProfile({sign: e.target.value as SignConvention})}>
                 <option value="outflow-negative">Negative in this file</option>
                 <option value="outflow-positive">Positive in this file</option>
               </select>
@@ -856,7 +778,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           </div>
 
           {profile.denomination === null && (
-            <div data-import-scale-blocked role="status" aria-live="polite" style={noticeStyle('alarm')}>
+            <div data-import-scale-blocked role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
               Choose whether the amount column is in dollars or cents. Nothing is imported until you do — guessing wrong is
               a hundredfold error that still balances.
             </div>
@@ -870,17 +792,15 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
             {/* Once drafts exist, a bare "0 new · 4 already drafted" sits
                 directly above four drafts this block just made and reads as a
                 contradiction. Say WHEN it is true of. */}
-            <span data-import-summary role="status" aria-live="polite" style={{fontSize: '0.85rem', fontVariantNumeric: 'tabular-nums'}}>
+            <span data-import-summary role="status" aria-live="polite" style={{fontVariantNumeric: 'tabular-nums'}}>
               {drafts.length > 0 ? `After this import: ${describeImport(prepared)}` : describeImport(prepared)}
             </span>
             <button
               type="button"
               data-import-run
-              style={
-                canRun
-                  ? {...buttonStyle, marginLeft: 'auto', background: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))'}
-                  : {...buttonStyleFor(true), marginLeft: 'auto'}
-              }
+              className={ui.btn}
+              data-variant="primary"
+              style={{marginLeft: 'auto'}}
               disabled={!canRun}
               aria-describedby={pageLocked ? lockedWhyId : undefined}
               onClick={() => void run()}
@@ -900,21 +820,21 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
               pressing it. The scale block already does this; the account is the
               other thing only they know. */}
           {profile.accountId === '' && (
-            <div data-import-account-blocked role="status" aria-live="polite" style={noticeStyle('alarm')}>
+            <div data-import-account-blocked role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
               Choose which bank account this statement is, above. Nothing can be imported until you do — the account is
               what every row’s bank side posts to.
             </div>
           )}
 
           {dedupStale && (
-            <div data-import-dedup-stale role="status" aria-live="polite" style={noticeStyle('alarm')}>
+            <div data-import-dedup-stale role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
               The duplicate check could not be refreshed, so what is already on the books is unknown. Importing now could
               write the same rows twice — reload the page and try again.
             </div>
           )}
 
           {dedupSaturated && (
-            <div data-import-dedup-window style={noticeStyle('quiet')}>
+            <div data-import-dedup-window className={ui.notice} data-tone={'quiet'}>
               This account already has {DEDUP_WINDOW} or more entries, which is as far back as the duplicate check can see.
               Anything older than that will not be recognised as already imported — check the oldest rows by hand. Unfinished
               drafts are read separately, so they are still listed here.
@@ -922,13 +842,13 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           )}
 
           {prepared.counts.duplicate > 0 && drafts.length === 0 && (
-            <div data-import-dedup-warning style={noticeStyle('quiet')}>
+            <div data-import-dedup-warning className={ui.notice} data-tone={'quiet'}>
               {prepared.counts.duplicate} row{prepared.counts.duplicate === 1 ? ' is' : 's are'} already on the books and will be skipped.
             </div>
           )}
 
           {prepared.counts['duplicate-draft'] > 0 && drafts.length === 0 && (
-            <div data-import-draft-warning style={noticeStyle('quiet')}>
+            <div data-import-draft-warning className={ui.notice} data-tone={'quiet'}>
               {prepared.counts['duplicate-draft']} row{prepared.counts['duplicate-draft'] === 1 ? '' : 's'} already ha
               {prepared.counts['duplicate-draft'] === 1 ? 's an' : 've'} unfinished draft
               {prepared.counts['duplicate-draft'] === 1 ? '' : 's'} — finish or delete them before re-importing.
@@ -943,38 +863,38 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
             tabIndex={0}
             role="region"
             aria-label="Statement preview"
-            style={{maxHeight: '18rem', overflowY: 'auto', overflowX: 'auto'}}
+            className={ui.tableWrap} style={{maxHeight: '18rem', overflowY: 'auto'}}
           >
-            <table style={{width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem'}}>
-              <caption style={SR_ONLY}>
+            <table className={ui.table} data-density="tight">
+              <caption className={ui.srOnly}>
                 Every row of the statement, with what will happen to it. Rows needing attention are listed first.
               </caption>
               <thead>
                 <tr>
-                  <th scope="col" style={{...headerStyle, textAlign: 'left', padding: '0.15rem 0.35rem'}}>Date</th>
-                  <th scope="col" style={{...headerStyle, textAlign: 'left', padding: '0.15rem 0.35rem'}}>Description</th>
-                  <th scope="col" style={{...headerStyle, textAlign: 'right', padding: '0.15rem 0.35rem'}}>In the file</th>
-                  <th scope="col" style={{...headerStyle, textAlign: 'right', padding: '0.15rem 0.35rem'}}>Amount</th>
-                  <th scope="col" style={{...headerStyle, textAlign: 'left', padding: '0.15rem 0.35rem'}}>Status</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Description</th>
+                  <th scope="col" className={ui.num}>In the file</th>
+                  <th scope="col" className={ui.num}>Amount</th>
+                  <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {previewed.map((row) => (
                   <tr key={row.line} data-import-row={row.line} data-import-status={row.status}>
-                    <td style={{padding: '0.15rem 0.35rem', fontVariantNumeric: 'tabular-nums'}}>{row.date ?? '—'}</td>
-                    <td style={{padding: '0.15rem 0.35rem'}}>{row.description}</td>
+                    <td style={{fontVariantNumeric: 'tabular-nums'}}>{row.date ?? '—'}</td>
+                    <td>{row.description}</td>
                     {/* The RAW cell beside the parsed value: `450` next to
                         `$4.50` is the cheapest possible check on the money
                         scale, and a 100x error is invisible without it. */}
-                    <td data-import-row-raw style={{padding: '0.15rem 0.35rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: SECONDARY_TEXT}}>
+                    <td data-import-row-raw className={`${ui.num} ${ui.muted}`}>
                       {row.rawAmount === '' ? '—' : row.rawAmount}
                     </td>
-                    <td style={{padding: '0.15rem 0.35rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums'}}>
+                    <td className={ui.num}>
                       {row.amountMinor === null ? '—' : money(row.amountMinor)}
                     </td>
                     {/* Full-contrast whatever the verdict: this cell carries the
                         entire dedup answer. */}
-                    <td style={{padding: '0.15rem 0.35rem', color: 'hsl(var(--foreground))'}}>
+                    <td>
                       {ROW_STATUS_LABEL[row.status]}
                       {row.problem !== null && row.status !== 'duplicate' && (
                         <span data-import-row-problem={row.status}> — {row.problem}</span>
@@ -985,7 +905,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
               </tbody>
             </table>
             {prepared.rows.length > previewed.length && (
-              <div data-import-preview-limit style={{fontSize: '0.75rem', color: SECONDARY_TEXT, padding: '0.25rem'}}>
+              <div data-import-preview-limit className={ui.muted} style={{padding: '0.25rem'}}>
                 {describePreviewLimit(prepared, previewed.length)}
               </div>
             )}
@@ -995,7 +915,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
 
       {drafts.length > 0 && profile && (
         <div style={{display: 'flex', flexDirection: 'column', gap: '0.4rem'}}>
-          <div data-import-created={drafts.length} role="status" aria-live="polite" style={noticeStyle('quiet')}>
+          <div data-import-created={drafts.length} role="status" aria-live="polite" className={ui.notice} data-tone={'quiet'}>
             {drafts.length} draft{drafts.length === 1 ? '' : 's'} created with the bank side filled in. Choose what each one was for —
             the choice is remembered for next month.
           </div>
@@ -1012,7 +932,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
           already handled. */}
       {strandedShown.length > 0 && (
         <div style={{display: 'flex', flexDirection: 'column', gap: '0.4rem'}}>
-          <div data-import-stranded={strandedShown.length} role="status" aria-live="polite" style={noticeStyle('quiet')}>
+          <div data-import-stranded={strandedShown.length} role="status" aria-live="polite" className={ui.notice} data-tone={'quiet'}>
             {strandedShown.length} earlier draft{strandedShown.length === 1 ? '' : 's'} on {strandedAccountLabel} {strandedShown.length === 1 ? 'is' : 'are'} still
             waiting for a category. {strandedShown.length === 1 ? 'It is' : 'They are'} not in the register or the trial balance until
             {strandedShown.length === 1 ? ' it' : ' they'} balance{strandedShown.length === 1 ? 's' : ''}.
@@ -1027,7 +947,7 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
               read-only page it is dropped — the lock notice above already
               states the reason, without telling the reader to press anything. */}
           {error === null && !pageLocked && (
-            <div data-import-hint style={{fontSize: '0.8rem', color: SECONDARY_TEXT}}>
+            <div data-import-hint className={ui.muted}>
               Upload the CSV your bank exports. Nothing is written until you have seen what was detected and pressed the button,
               and re-importing the same file creates nothing — for as far back as the duplicate check can see, which is this
               account’s last {DEDUP_WINDOW} entries.
@@ -1037,11 +957,11 @@ export const BankImportBlock = ({block, editor, pageReadOnly}: {block: BlockLike
               open file, so a user who had deleted last month's export was back
               in the original condition — drafts on the books that no surface
               would show them. Picking the account is enough. */}
-          <label style={{display: 'flex', flexDirection: 'column', gap: '0.25rem', maxWidth: '18rem'}}>
-            <span style={headerStyle}>Unfinished drafts on</span>
+          <label className={ui.labelled} style={{maxWidth: '18rem'}}>
+            <span className={ui.eyebrow}>Unfinished drafts on</span>
             <select
               data-import-drafts-account
-              style={cellStyle}
+              className={ui.field}
               value={draftsAccountId}
               disabled={locked}
               onChange={(e) => setDraftsAccount(e.target.value)}

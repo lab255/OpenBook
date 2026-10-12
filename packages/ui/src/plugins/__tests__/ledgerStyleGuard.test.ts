@@ -4,8 +4,8 @@ import {PUBLIC_PLUGIN_UI_CLASSES} from '../uiSurface';
 const sources = import.meta.glob('../../../../../examples/plugins/ledger/src/*.{ts,tsx}', {
   query: '?raw', import: 'default', eager: true,
 }) as Record<string, string>;
-// Slice 9b/9c owners remove these entries as they migrate their files.
-const laterSlices = new Set(['block.tsx', 'importBlock.tsx', 'register.tsx', 'reconcileBlock.tsx']);
+// Slice 9c removes the remaining entries as it migrates its files.
+const laterSlices = new Set(['register.tsx', 'reconcileBlock.tsx']);
 
 describe('ledger public styles', () => {
   it('keeps migrated TSX free of private chrome recipes', () => {

@@ -14,10 +14,7 @@ import {
   type PostingInput,
 } from './model';
 import {setUpBooks} from './setup';
-// The shared OFF-state face (LGR-6): dashed, secondary-text border, out of the
-// two-indistinguishable-greys trap. Imported rather than re-drawn so the
-// journal block's read-only presentation cannot drift from the register's.
-import {disabledButtonStyle} from './reportShell';
+import {ui} from './ui';
 
 /**
  * The journal entry block — the ONLY human write surface for the books.
@@ -92,63 +89,6 @@ const PROP_DESC = 'ledgerDescription';
 const PROP_DATE = 'ledgerDate';
 const PROP_DRAFT = 'ledgerDraftId';
 const SYNC_DELAY_MS = 350;
-
-// Longhand border properties (not the `border` shorthand): the invalid-cell
-// state overrides `borderColor` alone, and React warns when a shorthand and a
-// longhand for the same box are mixed across rerenders.
-const cellStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: 'hsl(var(--border))',
-  borderRadius: 6,
-  padding: '0.3rem 0.5rem',
-  background: 'hsl(var(--background))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-  // Amounts read as columns of digits, not proportional text.
-  fontVariantNumeric: 'tabular-nums',
-  minWidth: 0,
-  width: '100%',
-};
-
-// LONGHAND border properties (not the `border` shorthand): the same element
-// swaps between this and the dashed {@link disabledButtonStyle} when the page
-// lock changes, and React warns (and can leave a stale edge) when a shorthand
-// and a longhand for the same box alternate across rerenders.
-const buttonStyle: React.CSSProperties = {
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: 'hsl(var(--border))',
-  borderRadius: 6,
-  padding: '0.3rem 0.75rem',
-  background: 'hsl(var(--card))',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-  cursor: 'pointer',
-};
-
-const headerStyle: React.CSSProperties = {
-  fontSize: '0.7rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  color: 'hsl(var(--muted-foreground))',
-};
-
-// Notice surfaces. The alarm colour carries on the BORDER and a soft fill;
-// the sentence itself uses --foreground, the only token guaranteed to clear
-// 4.5:1 on the card in both themes (--destructive is a fill/border token and
-// measures ~4.4:1 as body text).
-const noticeStyle = (tone: 'alarm' | 'quiet'): React.CSSProperties => ({
-  padding: '0.4rem 0.6rem',
-  borderRadius: 6,
-  borderWidth: 1,
-  borderStyle: 'solid',
-  borderColor: tone === 'alarm' ? 'hsl(var(--destructive))' : 'hsl(var(--border))',
-  background: tone === 'alarm' ? 'hsl(var(--destructive) / 0.1)' : 'transparent',
-  color: 'hsl(var(--foreground))',
-  fontSize: '0.85rem',
-  fontWeight: tone === 'alarm' ? 600 : 400,
-});
 
 function readProps(block: BlockLike): PropsMap | undefined {
   return block.get('props') as PropsMap | undefined;
@@ -678,7 +618,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
 
   if (ledgerState === 'loading') {
     return (
-      <div data-ledger-journal data-ledger-loading contentEditable={false} style={{padding: '0.75rem', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: '0.85rem', color: 'hsl(var(--muted-foreground))'}}>
+      <div data-ledger-journal data-ledger-loading contentEditable={false} className={ui.frame}>
         Loading ledger…
       </div>
     );
@@ -686,12 +626,12 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
 
   if (ledgerState === 'uninitialized') {
     return (
-      <div data-ledger-journal data-ledger-setup contentEditable={false} style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: '0.85rem'}}>
+      <div data-ledger-journal data-ledger-setup contentEditable={false} className={ui.frame}>
         <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
           <span>📒 The books are not set up yet.</span>
           <button
             type="button"
-            style={pageLocked ? disabledButtonStyle : buttonStyle}
+            className={ui.btn}
             disabled={pageLocked || busy}
             aria-describedby={pageLocked ? lockedWhyId : undefined}
             data-ledger-setup-button
@@ -700,15 +640,15 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
             {busy ? 'Setting up…' : 'Set up books'}
           </button>
           {pageLocked && (
-            <span id={lockedWhyId} data-ledger-setup-why="read-only" style={{fontSize: '0.75rem', color: 'hsl(var(--foreground) / 0.72)'}}>
+            <span id={lockedWhyId} data-ledger-setup-why="read-only" className={ui.muted}>
               This page is read-only, so the books cannot be set up from it.
             </span>
           )}
         </div>
         {error && (
-          <div data-ledger-error={errorCode ?? 'error'} role="status" aria-live="polite" style={noticeStyle('alarm')}>
+          <div data-ledger-error={errorCode ?? 'error'} role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
             {error}
-            {errorCode && <span style={{marginLeft: '0.4rem', fontWeight: 400, color: 'hsl(var(--muted-foreground))'}} title={`Ledger error code: ${errorCode}`}>({errorCode})</span>}
+            {errorCode && <span className={ui.muted} style={{marginLeft: '0.4rem', fontWeight: 400}} title={`Ledger error code: ${errorCode}`}>({errorCode})</span>}
           </div>
         )}
       </div>
@@ -723,14 +663,14 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
       ref={containerRef}
       contentEditable={false}
       onKeyDown={onKeyDown}
-      style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.75rem', border: '1px solid hsl(var(--border))', borderRadius: 8, background: 'hsl(var(--card))'}}
+      className={ui.frame}
     >
       <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.5rem'}}>
-        <span style={{fontSize: '0.95rem', lineHeight: '1.7rem'}}>📒</span>
+        <span style={{lineHeight: 'var(--height-control-md)'}}>📒</span>
         <input
           data-ledger-description
           aria-label="Entry description"
-          style={{...cellStyle, fontWeight: 600}}
+          className={ui.field} style={{fontWeight: 600, flex: 1}}
           placeholder="Journal entry description"
           value={description}
           disabled={locked}
@@ -738,15 +678,15 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
         />
         {/* Visible caption in the grid's header voice: every column below has
             one, and a native date input can carry no placeholder. */}
-        <div style={{display: 'flex', flexDirection: 'column', gap: '0.35rem', flexShrink: 0}}>
-          <span style={headerStyle}>Date</span>
+        <div className={ui.labelled} style={{flexShrink: 0}}>
+          <span className={ui.eyebrow}>Date</span>
           <input
             data-ledger-date
             aria-label="Entry date"
             type="date"
             // Wide enough for the full localized date + the picker affordance;
             // the native control clips its own text otherwise.
-            style={{...cellStyle, width: 'auto', minWidth: '9.5rem'}}
+            className={ui.field} style={{width: 'auto', minWidth: '9.5rem'}}
             value={date}
             disabled={locked}
             onChange={(e) => edit({date: e.target.value})}
@@ -755,10 +695,10 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: 'minmax(10rem, 2fr) 1fr 1fr minmax(8rem, 1.5fr) auto', gap: '0.35rem', alignItems: 'center'}}>
-        <span style={headerStyle}>Account</span>
-        <span style={{...headerStyle, textAlign: 'right', paddingRight: '0.5rem'}}>Debit</span>
-        <span style={{...headerStyle, textAlign: 'right', paddingRight: '0.5rem'}}>Credit</span>
-        <span style={{...headerStyle, paddingLeft: '0.5rem'}}>Memo</span>
+        <span className={ui.eyebrow}>Account</span>
+        <span className={ui.eyebrow} style={{textAlign: 'right', paddingRight: '0.5rem'}}>Debit</span>
+        <span className={ui.eyebrow} style={{textAlign: 'right', paddingRight: '0.5rem'}}>Credit</span>
+        <span className={ui.eyebrow} style={{paddingLeft: '0.5rem'}}>Memo</span>
         <span />
         {rows.map((row, i) => {
           const rowStatus = status.rows[i];
@@ -771,7 +711,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
                 data-ledger-account
                 data-ledger-row={i}
                 aria-label={`Row ${i + 1} account`}
-                style={cellStyle}
+                className={ui.field} style={{width: '100%'}}
                 value={row.accountId}
                 disabled={locked}
                 onChange={(e) => setCell(i, {accountId: e.target.value})}
@@ -790,7 +730,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
                 aria-invalid={badDebit ? true : undefined}
                 inputMode="decimal"
                 placeholder="0.00"
-                style={{...cellStyle, textAlign: 'right', ...(badDebit ? {borderColor: 'hsl(var(--destructive))'} : {})}}
+                className={ui.field} style={{width: '100%', textAlign: 'right'}}
                 value={row.debit}
                 disabled={locked}
                 onChange={(e) => setCell(i, {debit: e.target.value})}
@@ -803,7 +743,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
                 aria-invalid={badCredit ? true : undefined}
                 inputMode="decimal"
                 placeholder="0.00"
-                style={{...cellStyle, textAlign: 'right', ...(badCredit ? {borderColor: 'hsl(var(--destructive))'} : {})}}
+                className={ui.field} style={{width: '100%', textAlign: 'right'}}
                 value={row.credit}
                 disabled={locked}
                 onChange={(e) => setCell(i, {credit: e.target.value})}
@@ -814,7 +754,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
                 data-ledger-row={i}
                 aria-label={`Row ${i + 1} memo`}
                 placeholder="Memo"
-                style={cellStyle}
+                className={ui.field} style={{width: '100%'}}
                 value={row.memo}
                 disabled={locked}
                 onChange={(e) => setCell(i, {memo: e.target.value})}
@@ -828,7 +768,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
                 tabIndex={-1}
                 aria-label={`Remove row ${i + 1} (or press Alt+Backspace in the row)`}
                 title="Remove row — or Alt+Backspace in the row"
-                style={{...(pageLocked ? disabledButtonStyle : buttonStyle), padding: '0.3rem 0.5rem', visibility: rows.length > 2 ? 'visible' : 'hidden'}}
+                className={ui.btn} data-variant="ghost" style={{width: 'var(--height-control-md)', padding: 0, justifyContent: 'center', visibility: rows.length > 2 ? 'visible' : 'hidden'}}
                 aria-describedby={pageLocked ? lockedWhyId : undefined}
                 disabled={locked || rows.length <= 2}
                 onClick={() => removeRow(i)}
@@ -845,32 +785,32 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
           the moment a selected account makes evidence mandatory — the
           affordance must not contradict the gate under it. */}
       <div data-ledger-evidence style={{display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap'}}>
-        <span style={headerStyle}>Evidence</span>
+        <span className={ui.eyebrow}>Evidence</span>
         {evidence.map((item) => (
           <span
             key={item.sha256}
             data-ledger-evidence-item={item.sha256}
             title={`${item.filename} — ${item.size} bytes, SHA-256 ${item.sha256}`}
-            style={{display: 'inline-flex', alignItems: 'center', gap: '0.3rem', border: '1px solid hsl(var(--border))', borderRadius: 6, padding: '0.15rem 0.45rem', fontSize: '0.8rem'}}
+            className={ui.chip}
           >
             <span aria-hidden="true">📎</span>
             {item.filename}
-            <button
+            {!pageLocked && <button
               type="button"
               data-ledger-evidence-detach={item.sha256}
               aria-label={`Detach ${item.filename}`}
               title={`Detach ${item.filename}`}
-              style={{...(pageLocked ? disabledButtonStyle : buttonStyle), padding: '0 0.35rem', fontSize: '0.8rem'}}
+              className={ui.btn} data-variant="ghost" data-size="xs"
               disabled={locked || evidenceBusy}
               aria-describedby={pageLocked ? lockedWhyId : undefined}
               onClick={() => void detachEvidence(item.sha256)}
             >
               ×
-            </button>
+            </button>}
           </span>
         ))}
         {evidence.length === 0 && (
-          <span data-ledger-evidence-none style={{fontSize: '0.8rem', color: 'hsl(var(--muted-foreground))'}}>
+          <span data-ledger-evidence-none className={ui.muted}>
             None attached{evidenceRequiredNames.length === 0 ? ' (optional)' : ''}.
           </span>
         )}
@@ -893,7 +833,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
             data-ledger-evidence-attach
             aria-disabled={locked || evidenceBusy ? true : undefined}
             aria-describedby={pageLocked ? lockedWhyId : undefined}
-            style={{...(pageLocked ? disabledButtonStyle : buttonStyle), ...(locked || evidenceBusy ? {cursor: 'not-allowed'} : {})}}
+            className={ui.btn}
             onKeyDown={(e) => {
               if ((e.key === 'Enter' || e.key === ' ') && !(locked || evidenceBusy)) {
                 e.preventDefault();
@@ -914,7 +854,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
         <button
           type="button"
           data-ledger-add-row
-          style={pageLocked ? disabledButtonStyle : buttonStyle}
+          className={ui.btn}
           disabled={locked}
           aria-describedby={pageLocked ? lockedWhyId : undefined}
           onClick={addRow}
@@ -924,7 +864,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
         <span
           data-ledger-sum
           data-ledger-balanced={status.balanced ? 'true' : 'false'}
-          style={{fontSize: '0.8rem', color: 'hsl(var(--foreground))', marginLeft: 'auto', fontVariantNumeric: 'tabular-nums'}}
+          style={{marginLeft: 'auto', fontVariantNumeric: 'tabular-nums'}}
         >
           {describeTotals(status)}
         </span>
@@ -932,18 +872,8 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
           type="button"
           data-ledger-post
           {...(evidenceBlocked && !pageLocked ? {'data-ledger-post-off': 'evidence-required'} : {})}
-          // The page lock outranks the Σ-gate's own colouring: on a read-only
-          // page Post wears the same dashed off face as every other dead
-          // control, whatever the totals say — the reader cannot post a
-          // balanced entry any more than an unbalanced one. The LGR-14
-          // evidence gate wears the same face: a balanced entry into an
-          // evidence-required account is just as unpostable until a receipt is
-          // attached, and the reason sits beside the button (aria-describedby).
-          style={
-            pageLocked || (evidenceBlocked && status.canPost)
-              ? disabledButtonStyle
-              : {...buttonStyle, background: status.canPost ? 'hsl(var(--primary))' : 'hsl(var(--muted))', color: status.canPost ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))', cursor: status.canPost ? 'pointer' : 'not-allowed'}
-          }
+          className={ui.btn}
+          data-variant="primary"
           disabled={!status.canPost || busy || pageLocked || evidenceBlocked}
           aria-describedby={pageLocked ? lockedWhyId : evidenceBlocked ? evidenceWhyId : undefined}
           onClick={() => void post()}
@@ -957,7 +887,7 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
           under the page lock (the lock sentence covers every control) and
           while the entry has its own problems to report first. */}
       {evidenceBlocked && !pageLocked && status.canPost && (
-        <div id={evidenceWhyId} data-ledger-evidence-required-why role="status" aria-live="polite" style={noticeStyle('quiet')}>
+        <div id={evidenceWhyId} data-ledger-evidence-required-why role="status" aria-live="polite" className={ui.notice} data-tone={'quiet'}>
           {evidenceRequiredNames.join(', ')} requires evidence — attach a receipt above before posting.
         </div>
       )}
@@ -971,12 +901,12 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
           first-run hint is dropped entirely: instructing a reader to enter
           debits into cells they cannot type in is worse than saying nothing. */}
       {pageLocked && (
-        <div id={lockedWhyId} data-ledger-journal-why="read-only" style={{fontSize: '0.8rem', color: 'hsl(var(--foreground) / 0.72)'}}>
+        <div id={lockedWhyId} data-ledger-journal-why="read-only" className={ui.muted}>
           This page is read-only, so no entry can be posted from it.
         </div>
       )}
       {untouched && !pageLocked && (
-        <div data-ledger-hint style={{fontSize: '0.8rem', color: 'hsl(var(--muted-foreground))'}}>
+        <div data-ledger-hint className={ui.muted}>
           Enter what moved and where: debits on the left, credits on the right. Post unlocks when they balance. Enter adds a row, Alt+Backspace removes one.
         </div>
       )}
@@ -986,23 +916,23 @@ export const JournalEntryBlock = ({block, editor, pageReadOnly, uploadPageId}: {
           {...(imbalance ? {'data-ledger-imbalance': true} : {})}
           role="status"
           aria-live="polite"
-          style={noticeStyle(imbalance ? 'alarm' : 'quiet')}
+          className={ui.notice} data-tone={imbalance ? 'alarm' : 'quiet'}
         >
           {problem}
         </div>
       )}
       {error && (
-        <div data-ledger-error={errorCode ?? 'error'} role="status" aria-live="polite" style={noticeStyle('alarm')}>
+        <div data-ledger-error={errorCode ?? 'error'} role="status" aria-live="polite" className={ui.notice} data-tone={'alarm'}>
           {error}
           {errorCode && (
-            <span style={{marginLeft: '0.4rem', fontWeight: 400, color: 'hsl(var(--muted-foreground))'}} title={`Ledger error code: ${errorCode}`}>
+            <span className={ui.muted} style={{marginLeft: '0.4rem', fontWeight: 400}} title={`Ledger error code: ${errorCode}`}>
               ({errorCode})
             </span>
           )}
         </div>
       )}
       {postedNo !== null && (
-        <div data-ledger-posted={postedNo} role="status" aria-live="polite" style={noticeStyle('quiet')}>
+        <div data-ledger-posted={postedNo} role="status" aria-live="polite" className={ui.notice} data-tone={'quiet'}>
           Posted as entry #{postedNo}. Fresh draft ready.
         </div>
       )}
