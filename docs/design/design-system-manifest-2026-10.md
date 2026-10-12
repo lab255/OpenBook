@@ -300,7 +300,8 @@ Shared hue *names* stay aligned (one mental model), values do not.
 | `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#e0eefa`), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49`) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
 | `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (3.81 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
 | `--obe-drag-dim` | `0.4` | table `0.45` :2116; block rows none |
-| `--obe-disabled-opacity` | `0.5` — one rule: `.obe-kit :is(button, input, select, textarea, [role='switch']):disabled`, `.obe-kit-card`, `.obe-kit-searchtrigger`; never on read-only/present pages | card `0.55`, search trigger `0.6`; app `disabled:opacity-50` |
+| `--obe-notice-pad-x` | `0.75rem` — public plugin notice horizontal padding; also aligns adjacent arithmetic | new |
+| `--obe-disabled-opacity` | `0.5` — one rule: `.obe-kit :is(button, input, select, textarea, [role='switch']):disabled`, `.obe-kit-card`, `.obe-kit-searchtrigger`; never on read-only/present pages. Plugin UI surface exception: `.obe-ui-btn`/`.obe-ui-field` off face is a dashed border in `--muted-foreground`, never opacity. It must stay visible on read-only pages, which the kit rule exempts; field values retain `--foreground`. | card `0.55`, search trigger `0.6`; app `disabled:opacity-50` |
 | `--obe-focus-ring` / `--obe-focus-offset` | `2px solid hsl(var(--ring))` / `2px` | offset `1px` :2450 vs `2px` :2108, :3949 |
 
 ### 8.2 Gutter geometry — one rule replaces the per-type offsets
@@ -464,3 +465,55 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
 3. **Editor-palette contrast + export drift (F3)** are recorded, not fixed, here.
    *Recommend: spin out a short palette-audit task before the text-family redesign*, so
    callout tints (§5.2) and text colours change once, together.
+
+## 14. Plugin UI surface
+
+Plugins use the documented `.obe-ui-*` classes and inline layout. They never use
+`.obe-kit-*`, other host-internal classes, Tailwind utilities, or host TypeScript
+helpers. The zip loader does not accept CSS, and Tailwind does not scan zip source.
+This is a CSS contract; no SDK export or API version bump is required. Class renames
+are breaking changes, guarded by `PUBLIC_PLUGIN_UI_CLASSES` and host tests.
+
+Public classes (the host-only `PUBLIC_PLUGIN_UI_CLASSES` list is authoritative):
+
+- `obe-ui-frame`, `obe-ui-title`, `obe-ui-header`, `obe-ui-muted`, `obe-ui-eyebrow`
+- `obe-ui-labelled`, `obe-ui-field`, `obe-ui-btn`, `obe-ui-check`, `obe-ui-fieldset`, `obe-ui-file`
+- `obe-ui-chip`, `obe-ui-notice`, `obe-ui-notice-detail`
+- `obe-ui-table-wrap`, `obe-ui-table`, `obe-ui-num`, `obe-ui-total`, `obe-ui-section`
+- `obe-ui-pin-start`, `obe-ui-pin-end`, `obe-ui-list`, `obe-ui-sr-only`, `obe-ui-row`, `obe-ui-stack`
+
+Variants use attributes: buttons support `data-variant="primary|ghost|link"`,
+`data-size="sm|xs"`, `data-weight="strong"`, and `aria-busy`; fields support
+`data-size="sm"` and `aria-invalid`. Native disabled controls and `aria-disabled`
+buttons receive the visible dashed off face, including primary, ghost and link
+buttons. Keep an explanatory reason beside disabled controls and connect it with
+`aria-describedby`. Notices support `data-tone="alarm|info|quiet"` (quiet by default);
+reserve alarm for broken or uncomputable results. Detail text resets alarm weight.
+
+Tables default to 6/8px cell padding; `data-density="compact"` uses 4/8px and
+`data-density="tight"` uses 2/6px with caption type. Totals in `tfoot` receive a
+2px top rule; other summary rows use `obe-ui-total` with `data-rule` for the rule
+and `data-strong` for stronger weight. Numeric cells use `obe-ui-num`; a glyph flag
+inside one may use `data-ui-mark="alarm"`. Table cells support `data-ui-flag="alarm"`
+for an inset leading rule, and rows support `data-ui-state="located"` for a jump target.
+Scroll regions use `obe-ui-table-wrap` with `tabIndex=0`, `role="region"`, and a label.
+
+Public tokens allowed inline:
+
+- Theme: `--foreground`, `--muted-foreground`, `--border`, `--card`, `--background`,
+  `--primary`, `--destructive`, read as `hsl(var(--token))`.
+- Type: `--obe-small-size`, `--obe-caption-size`, `--obe-font-mono`.
+- Focus: `--obe-focus-ring`. Radii: `--radius-sm`, `--radius-md`, `--radius-lg`.
+- Notice alignment: `--obe-notice-pad-x`.
+- Data only: `--data-<token>-chip-bg`, `--data-<token>-chip-fg`,
+  `--data-status-ok`, `--data-status-warn`, `--data-status-bad`. These encode data,
+  never decorative emphasis. Do not hard-code colours: they lack dark values.
+
+A root `obe-ui-frame` directly inside the custom-block host receives radius-xl
+selection and gutter alignment to its first content line: lead offset is block
+padding + 1px border + 0.75rem frame padding; lead line is small size × small leading.
+Header rows keep bottom alignment when they contain labelled controls; link buttons
+in a header row take control height. Nested frames
+have transparent fill. Keep bespoke flex/grid/width layout inline; row/stack classes
+are optional conveniences. The complete `obe-ui-sr-only` clipping recipe includes
+negative margin, white-space and border reset as well as `clip`.

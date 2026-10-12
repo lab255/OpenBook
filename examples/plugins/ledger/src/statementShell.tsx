@@ -1,5 +1,6 @@
 import React from 'react';
-import {AccountName, SideAmount, SrOnly, TableRegion, mutedStyle, numericHeadStyle, numericStyle, tableStyle, tdStyle, thStyle} from './reportShell';
+import {ui} from './ui';
+import {AccountName, SideAmount, SrOnly, TableRegion, wrapStyle} from './reportShell';
 import {directPostingsLabel, type HierarchyRow} from './statements';
 
 /**
@@ -9,8 +10,7 @@ import {directPostingsLabel, type HierarchyRow} from './statements';
  * A sibling of `./reportShell` rather than more of it — the shell holds what
  * EVERY ledger report needs (the live-data hook, the notice tones, the money
  * notation), and this holds the one structure only the statements have: a
- * section of colon-hierarchy rows with subtotals. Both files' styles come from
- * the shell, so the four report blocks still look like one family.
+ * section of colon-hierarchy rows with subtotals. Both files use the public plugin UI surface, so the four report blocks still look like one family.
  *
  * NO ARITHMETIC lives here. Every amount is handed in already folded by
  * `./statements`; this file only decides indentation and which rows are on
@@ -59,29 +59,7 @@ export type StatementLine =
   | {kind: 'section'; key: string; title: string; rows: readonly HierarchyRow[]; emptyText: string}
   | {kind: 'line'; key: string; label: string; minor: number; note?: string; strong?: boolean; rule?: boolean};
 
-const sectionHeadStyle: React.CSSProperties = {
-  ...tdStyle,
-  textAlign: 'left',
-  fontWeight: 600,
-  fontSize: '0.8rem',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  paddingTop: '0.6rem',
-};
 
-const toggleStyle: React.CSSProperties = {
-  display: 'inline-block',
-  width: '1.1em',
-  marginRight: '0.15rem',
-  padding: 0,
-  border: 'none',
-  background: 'transparent',
-  color: 'inherit',
-  font: 'inherit',
-  lineHeight: 1,
-  textAlign: 'left',
-  cursor: 'pointer',
-};
 
 /**
  * The disclosure control on a parent row.
@@ -95,14 +73,14 @@ const toggleStyle: React.CSSProperties = {
  */
 const Twisty = ({row, onToggle}: {row: HierarchyRow; onToggle: (path: string) => void}) =>
   row.hasChildren ? (
-    <button type="button" data-ledger-toggle={row.path} aria-expanded={!row.collapsed} style={toggleStyle} onClick={() => onToggle(row.path)}>
+    <button type="button" data-ledger-toggle={row.path} aria-expanded={!row.collapsed} className={ui.btn} data-variant="link" style={{display: 'inline-block', width: '1.1em', textDecoration: 'none', marginRight: '0.125rem'}} onClick={() => onToggle(row.path)}>
       <span aria-hidden="true">{row.collapsed ? '▸' : '▾'}</span>
       <SrOnly>
         {row.collapsed ? 'Expand' : 'Collapse'} {row.path} ({row.accountCount === 1 ? '1 account' : `${row.accountCount} accounts`})
       </SrOnly>
     </button>
   ) : (
-    <span aria-hidden="true" style={{...toggleStyle, cursor: 'default'}} />
+    <span aria-hidden="true" style={{display: 'inline-block', width: '1.1em'}} />
   );
 
 /**
@@ -126,25 +104,19 @@ const HierarchyLine = ({row, onToggle}: {row: HierarchyRow; onToggle: (path: str
       // dropped, and leaving it here made screen-reader users the only readers
       // still getting it — the mirror image of the defect that removed it.
       aria-label={row.kind === 'direct' ? directPostingsLabel(row.path) : row.label}
-      style={{
-        ...tdStyle,
-        overflowWrap: 'break-word',
-        textAlign: 'left',
-        fontWeight: row.hasChildren ? 600 : 400,
-        paddingLeft: `${0.5 + row.depth * 1.1}rem`,
-      }}
+      style={{...wrapStyle, textAlign: 'left', fontWeight: row.hasChildren ? 600 : 400, paddingLeft: `${0.5 + row.depth * 1.1}rem`}}
     >
       <Twisty row={row} onToggle={onToggle} />
       {/* The direct row's label is already the explanation (see
           `directPostingsLabel`), so there is no gloss left to hide in SrOnly. */}
-      {row.kind === 'direct' ? <span style={mutedStyle}>{row.label}</span> : <AccountName name={row.label} />}
+      {row.kind === 'direct' ? <span className={ui.muted}>{row.label}</span> : <AccountName name={row.label} />}
       {row.collapsed && (
-        <span style={{...mutedStyle, marginLeft: '0.4rem'}}>
+        <span className={ui.muted} style={{marginLeft: '0.4rem'}}>
           ({row.accountCount === 1 ? '1 account' : `${row.accountCount} accounts`})
         </span>
       )}
     </th>
-    <td data-ledger-statement-amount style={{...numericStyle, fontWeight: row.hasChildren ? 600 : 400}}>
+    <td data-ledger-statement-amount className={ui.num} style={{fontWeight: row.hasChildren ? 600 : 400}}>
       <SideAmount minor={row.minor} />
     </td>
   </tr>
@@ -167,14 +139,14 @@ export const StatementTable = ({
   onToggle: (path: string) => void;
 }) => (
   <TableRegion label={label}>
-    <table style={tableStyle}>
-      <caption style={{...mutedStyle, textAlign: 'left', paddingBottom: '0.25rem'}}>{caption}</caption>
+    <table className={ui.table} data-density="compact">
+      <caption>{caption}</caption>
       <thead>
         <tr>
-          <th scope="col" style={thStyle}>
+          <th scope="col">
             Account
           </th>
-          <th scope="col" style={numericHeadStyle}>
+          <th scope="col" className={ui.num}>
             Amount
           </th>
         </tr>
@@ -187,13 +159,13 @@ export const StatementTable = ({
         line.kind === 'section' ? (
           <tbody key={`section:${line.key}`} data-ledger-section={line.key}>
             <tr>
-              <th scope="rowgroup" colSpan={2} style={sectionHeadStyle}>
+              <th scope="rowgroup" colSpan={2} className={ui.section}>
                 {line.title}
               </th>
             </tr>
             {line.rows.length === 0 ? (
               <tr>
-                <td colSpan={2} style={{...tdStyle, ...mutedStyle}}>
+                <td colSpan={2} className={ui.muted}>
                   {line.emptyText}
                 </td>
               </tr>
@@ -203,26 +175,16 @@ export const StatementTable = ({
           </tbody>
         ) : (
           <tbody key={`line:${line.key}`}>
-            <tr data-ledger-statement-total={line.key}>
+            <tr data-ledger-statement-total={line.key} className={ui.total} data-strong={line.strong || undefined} data-rule={line.rule || undefined}>
               <th
                 scope="row"
-                style={{
-                  ...tdStyle,
-                  textAlign: 'left',
-                  fontWeight: line.strong === true ? 700 : 600,
-                  ...(line.rule === true ? {borderTop: '2px solid hsl(var(--border))'} : {}),
-                }}
               >
                 {line.label}
-                {line.note !== undefined && <div style={{...mutedStyle, fontWeight: 400}}>{line.note}</div>}
+                {line.note !== undefined && <div className={ui.muted} style={{fontWeight: 400}}>{line.note}</div>}
               </th>
               <td
                 data-ledger-statement-amount
-                style={{
-                  ...numericStyle,
-                  fontWeight: line.strong === true ? 700 : 600,
-                  ...(line.rule === true ? {borderTop: '2px solid hsl(var(--border))'} : {}),
-                }}
+                className={ui.num}
               >
                 <SideAmount minor={line.minor} />
               </td>
@@ -234,16 +196,6 @@ export const StatementTable = ({
   </TableRegion>
 );
 
-const linkButtonStyle: React.CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  padding: 0,
-  font: 'inherit',
-  fontSize: '0.75rem',
-  color: 'hsl(var(--foreground))',
-  textDecoration: 'underline',
-  cursor: 'pointer',
-};
 
 /**
  * The shape/scope controls both statements carry: roll the hierarchy up or list
@@ -267,17 +219,17 @@ export const ShapeControls = ({
   onExpandAll: () => void;
   parentCount: number;
 }) => (
-  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap'}}>
-    <label style={{...mutedStyle, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer'}}>
+  <div className={ui.row}>
+    <label className={ui.check}>
       <input type="checkbox" data-ledger-rolled checked={rolled} onChange={(e) => onRolled(e.target.checked)} />
       Roll up sub-accounts
     </label>
     {rolled && parentCount > 0 && (
       <>
-        <button type="button" data-ledger-collapse-all style={linkButtonStyle} onClick={onCollapseAll}>
+        <button type="button" data-ledger-collapse-all className={ui.btn + ' ' + ui.muted} data-variant="link" onClick={onCollapseAll}>
           Collapse all
         </button>
-        <button type="button" data-ledger-expand-all style={linkButtonStyle} onClick={onExpandAll}>
+        <button type="button" data-ledger-expand-all className={ui.btn + ' ' + ui.muted} data-variant="link" onClick={onExpandAll}>
           Expand all
         </button>
       </>
