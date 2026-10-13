@@ -667,11 +667,11 @@ export const TextBlockView: React.FC<{
     if (e.key === 'Tab' && !isCode) {
       e.preventDefault();
       const caret = readSelection(el)?.start ?? 0;
-      if (nestInToggle(editor.doc, id, e.shiftKey)) {
+      const indent = blockProp<number>(block, 'indent') ?? 0;
+      if (!(e.shiftKey && indent > 0) && nestInToggle(editor.doc, id, e.shiftKey)) {
         editor.requestCaret({blockId: id, offset: caret});
         return;
       }
-      const indent = blockProp<number>(block, 'indent') ?? 0;
       const next = e.shiftKey ? Math.max(0, indent - 1) : Math.min(4, indent + 1);
       if (next !== indent) {
         apply(() => setBlockProp(block, 'indent', next === 0 ? undefined : next));

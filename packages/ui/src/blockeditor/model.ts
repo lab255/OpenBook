@@ -462,11 +462,18 @@ export function nestInToggle(doc: Y.Doc, id: string, outdent = false): boolean {
     if (!owner || blockType(owner) !== 'togglelist') return false;
     const parent = findBlock(doc, blockId(owner))!;
     const grandparent = parentBlockOf(doc, parent.parent);
-    moveBlocks(doc, [id], grandparent ? blockId(grandparent) : null, parent.index + 1);
+    moveBlocks(doc, found.parent.toArray().slice(found.index).map(blockId), grandparent ? blockId(grandparent) : null, parent.index + 1);
     return true;
   }
   const previous = found.index > 0 ? found.parent.get(found.index - 1) : null;
   if (!previous || blockType(previous) !== 'togglelist') return false;
+  let depth = 1; // The preceding toggle becomes the immediate parent.
+  let ancestor = owner;
+  while (ancestor) {
+    if (blockType(ancestor) === 'togglelist') depth += 1;
+    ancestor = parentBlockOf(doc, findBlock(doc, blockId(ancestor))!.parent);
+  }
+  if (depth > 4) return false;
   doc.transact(() => {
     setBlockProp(previous, 'collapsed', false);
     moveBlocks(doc, [id], blockId(previous), blockChildren(previous)!.length);
@@ -525,6 +532,10 @@ export function mergeWithPrevious(doc: Y.Doc, id: string): {id: string; offset: 
     const prevText = blockText(prev);
     const text = blockText(found.block);
     if (!prevText || !text) return;
+    if (blockType(prev) === 'togglelist' && !blockProp(prev, 'collapsed') && blockChildren(prev)?.length) {
+      if (nestInToggle(doc, id)) result = {id, offset: 0};
+      return;
+    }
     const offset = prevText.length;
     const delta = text.toDelta() as {insert: string; attributes?: InlineAttrs}[];
     let at = offset;
@@ -538,6 +549,15 @@ export function mergeWithPrevious(doc: Y.Doc, id: string): {id: string; offset: 
   return result;
 }
 
+/** Lift a toggle's children into its containing array, preserving order. */
+function unwrapToggleChildren(block: BlockMap): void {
+  const parent = block.parent as Y.Array<BlockMap>;
+  const index = parent.toArray().indexOf(block);
+  const children = blockChildren(block);
+  if (children?.length) parent.insert(index + 1, children.toArray().map(child => cloneBlock(child)));
+  block.delete('children');
+}
+
 /** Change a block's type in place (keeps text); optional props patch. */
 export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record<string, unknown>): void {
   doc.transact(() => {
@@ -545,9 +565,7 @@ export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record
     if (!found) return;
     // Unwrap the summary without losing its nested content.
     if (blockType(found.block) === 'togglelist' && type !== 'togglelist') {
-      const children = blockChildren(found.block);
-      if (children?.length) found.parent.insert(found.index + 1, children.toArray().map(child => cloneBlock(child)));
-      found.block.delete('children');
+      unwrapToggleChildren(found.block);
     }
     found.block.set('type', type);
     if (CONTAINER_BLOCKS.has(type) && !blockChildren(found.block)) found.block.set('children', new Y.Array<BlockMap>());
@@ -571,6 +589,7 @@ export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record
  */
 export function patchBlock(block: BlockMap, patch: {type?: string; props?: Record<string, unknown>}): void {
   if (patch.type) {
+    if (blockType(block) === 'togglelist' && patch.type !== 'togglelist') unwrapToggleChildren(block);
     block.set('type', patch.type);
     if (CONTAINER_BLOCKS.has(patch.type) && !blockChildren(block)) block.set('children', new Y.Array<BlockMap>());
     if (TEXT_BLOCKS.has(patch.type as BlockType) && !blockText(block)) block.set('text', new Y.Text());
