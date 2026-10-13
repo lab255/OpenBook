@@ -385,6 +385,9 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     case 'list':
       html.push(listToHtml(toListItems(d.items), d.style === 'ordered', ctx));
       break;
+    case 'togglelist':
+      html.push(`<details class="obe-x-togglelist"${d.open === false ? '' : ' open'}><summary>${inlineToHtml(parseInline(str(d.text)), ctx)}</summary>${renderBlocks(Array.isArray(d.children) ? d.children as ExportBlock[] : [], ctx)}</details>`);
+      break;
     case 'quote':
       html.push(`<blockquote>${inlineToHtml(parseInline(str(d.text)), ctx)}</blockquote>`);
       break;

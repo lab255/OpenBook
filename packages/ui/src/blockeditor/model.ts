@@ -2575,6 +2575,14 @@ export function htmlToBlocks(html: string, opts: HtmlToBlocksOptions = {}): NewB
     case 'ol':
       pushListItems(node, 'number');
       return;
+    case 'details': {
+      const body = node.cloneNode(true) as HTMLElement;
+      const summary = body.querySelector(':scope > summary');
+      const text = htmlToRuns(summary?.innerHTML ?? '');
+      summary?.remove();
+      out.push({type: 'togglelist', text, props: {collapsed: !node.hasAttribute('open')}, children: htmlToBlocks(body.innerHTML, opts)});
+      return;
+    }
     case 'blockquote':
       out.push({type: 'quote', text: htmlToRuns(node.innerHTML)});
       emitImagesIn(node);
