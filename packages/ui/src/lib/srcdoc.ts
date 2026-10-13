@@ -117,9 +117,16 @@ export const EXPORT_ARTIFACT_CSP =
  * string in the export pipeline — that helper's contract is QUOTED attributes
  * only).
  */
-export function wrapSandboxDocument(html: string, opts: {csp?: string} = {}): string {
+export function wrapSandboxDocument(html: string, opts: {csp?: string; defaultLightBackground?: boolean} = {}): string {
   const csp = opts.csp
     ? `<meta http-equiv="Content-Security-Policy" content="${escapeSrcdocAttribute(opts.csp)}">`
     : '';
-  return `<!doctype html><meta charset="utf-8">${csp}${html}`;
+  // Deliberately conservative: background mentions anywhere (including scripts,
+  // child styles and comments) opt out. External stylesheets may also own the
+  // document background. Avoid parsing/re-serializing arbitrary artifact HTML.
+  const ownsBackground = /background|bgcolor|<link\b[^>]*\bstylesheet\b|@import\b/i.test(html);
+  const defaults = opts.defaultLightBackground && !ownsBackground
+    ? '<style>:root { color-scheme: light; } body { background-color: white; }</style>'
+    : '';
+  return `<!doctype html><meta charset="utf-8">${csp}${defaults}${html}`;
 }
