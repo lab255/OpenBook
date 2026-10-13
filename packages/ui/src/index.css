@@ -329,7 +329,7 @@
     --obe-code-num: hsl(28 80% 38%);
     --obe-code-lit: hsl(210 72% 42%);
 
-    /* Board column washes stay quieter on dark surfaces. */
+    /* Board column washes: light 50% / dark 35%. */
     --data-column-tint: 50%;
 
     /* Warm, refined light palette */
