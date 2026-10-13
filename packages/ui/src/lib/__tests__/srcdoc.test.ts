@@ -110,6 +110,17 @@ describe('wrapSandboxDocument', () => {
     expect(wrapSandboxDocument(html, {defaultLightBackground: true})).toBe(wrapSandboxDocument(html));
   });
 
+  it('does not inject defaults when the artifact declares a color scheme', () => {
+    const html = '<meta name="color-scheme" content="light dark"><p>Hello</p>';
+    expect(wrapSandboxDocument(html, {defaultLightBackground: true})).toBe(`<!doctype html><meta charset="utf-8">${html}`);
+  });
+
+  it('preserves the pre-change wrap when body text merely mentions background', () => {
+    const html = '<body><p>Some background information</p></body>';
+    const csp = '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;">';
+    expect(wrapSandboxDocument(html, {csp: 'default-src \'none\'', defaultLightBackground: true})).toBe(`<!doctype html><meta charset="utf-8">${csp}${html}`);
+  });
+
   it('places default styles after CSP and before the original content', () => {
     const wrapped = wrapSandboxDocument('<p>Hello</p>', {csp: 'default-src \'none\'', defaultLightBackground: true});
     expect(wrapped.indexOf('Content-Security-Policy')).toBeLessThan(wrapped.indexOf('<style>'));

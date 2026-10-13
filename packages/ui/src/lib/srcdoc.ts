@@ -124,7 +124,7 @@ export function wrapSandboxDocument(html: string, opts: {csp?: string; defaultLi
   // Deliberately conservative: background mentions anywhere (including scripts,
   // child styles and comments) opt out. External stylesheets may also own the
   // document background. Avoid parsing/re-serializing arbitrary artifact HTML.
-  const ownsBackground = /background|bgcolor|<link\b[^>]*\bstylesheet\b|@import\b/i.test(html);
+  const ownsBackground = /background|bgcolor|color-scheme|<link\b[^>]*\bstylesheet\b|@import\b/i.test(html);
   const defaults = opts.defaultLightBackground && !ownsBackground
     ? '<style>:root { color-scheme: light; } body { background-color: white; }</style>'
     : '';
