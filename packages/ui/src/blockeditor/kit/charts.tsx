@@ -640,7 +640,7 @@ const Kpi: React.FC<PlotGeometry & {value: unknown; labels: string[]; palette: s
         </text>
       )}
       <Mark datum={{key: 'kpi', label: caption || 'Value', value: kpi.value}} at={{x: w / 2, y: y(pct !== null ? 108 : 128)}}>
-        <text className="obe-chart-kpi-value" x={w / 2} y={y(pct !== null ? 128 : 148)}>
+        <text className="obe-chart-kpi-value" x={w / 2} y={y(pct !== null ? 128 : 148)} style={{fontSize: 60 * Math.min(1, h / H, (w - 32) / (fmtChartValue(kpi.value).length * 0.6 * 60))}}>
           {fmtChartValue(kpi.value)}
         </text>
       </Mark>

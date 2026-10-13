@@ -292,6 +292,22 @@ it('funnel labels use per-stage readable ink without a CSS fill override', () =>
 
 
 describe('kit pixel geometry', () => {
+  it('shrinks a long KPI value at w=240/h=150 and keeps its top below the caption baseline', () => {
+    const args: ChartRenderArgs = {
+      value: {value: 12345678.9, target: 20000000}, labels: ['Revenue'], palette: PALETTE, width: 240, height: 150,
+    };
+    const {container} = render(<svg>{getChartKind('kpi')!.render(args)}</svg>);
+    const value = container.querySelector<SVGTextElement>('.obe-chart-kpi-value')!;
+    const caption = container.querySelector<SVGTextElement>('.obe-chart-kpi-caption')!;
+    const fontSize = Number.parseFloat(value.style.fontSize);
+    expect(value.textContent!.length).toBeGreaterThanOrEqual(9);
+    expect(fontSize).toBeGreaterThan(0);
+    expect(fontSize).toBeLessThan(60);
+    // A full em above the baseline conservatively bounds the digit tops.
+    const valueTop = Number(value.getAttribute('y')) - fontSize;
+    expect(Number(caption.getAttribute('y'))).toBeLessThan(valueTop);
+  });
+
   it('keeps the KPI value below its caption at 320px width', async () => {
     let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};
     vi.stubGlobal('ResizeObserver', class {
