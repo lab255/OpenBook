@@ -67,7 +67,7 @@ const CATALOGUE_LITERAL = [
   {type: 'heading', category: 'core', nature: 'text', props: {level: 'number'}, hint: '{level:1|2|3}'},
   {type: 'list', category: 'core', nature: 'text', props: {kind: 'string'}, hint: '{kind:"bullet"|"number"} — one block per item'},
   {type: 'todo', category: 'core', nature: 'text', props: {checked: 'boolean'}, hint: '{checked?}'},
-  {type: 'togglelist', category: 'core', nature: 'container', richText: true, props: {collapsed: 'boolean'}, hint: 'rich text summary in text; nested children; {collapsed?}'},
+  {type: 'togglelist', category: 'core', nature: 'container', richText: true, props: {collapsed: 'boolean'}, hint: 'rich text summary in text; nested children; {collapsed?: default false = open}'},
   {type: 'quote', category: 'core', nature: 'text'},
   {type: 'callout', category: 'core', nature: 'text', props: {variant: 'string'}, hint: '{variant:"info"|"warn"|"success"}'},
   {type: 'code', category: 'core', nature: 'text', props: {language: 'string', live: 'boolean', name: 'string', collapsed: 'boolean', wrap: 'boolean'}, hint: '{language?,live?,name?,collapsed?,wrap?}'},

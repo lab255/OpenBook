@@ -522,7 +522,7 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
       break;
     case 'togglelist': {
       const body = blocksToMarkdown(b.children ?? [], opts);
-      out.push(textMd(b.text) + (body ? '\n' + body.split('\n').map(line => `  ${line}`).join('\n') : ''));
+      out.push(textMd(b.text) + (body ? '\n' + body.split('\n').map(line => line ? `  ${line}` : '').join('\n') : ''));
       break;
     }
     case 'quote':

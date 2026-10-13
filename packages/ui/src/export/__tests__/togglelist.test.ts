@@ -36,7 +36,7 @@ describe('togglelist exports', () => {
 
   it('exports the summary and recursively indented children in both Markdown paths', () => {
     const {blocks, snapshot} = exportsFor(true);
-    const expected = '**\\<Summary\\>**\n  Body\n  \n  Nested\n    Deep\n\nOutside';
+    const expected = '**\\<Summary\\>**\n  Body\n\n  Nested\n    Deep\n\nOutside';
     expect(blocksToMarkdown(blocks)).toBe(expected.split('\\').join(''));
     expect(toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot}))).toBe('# T\n\n' + expected + '\n');
   });

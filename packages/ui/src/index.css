@@ -2416,6 +2416,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-cnt-add:focus-visible,
 .obe-tab:focus-visible,
 .obe-acc-toggle:focus-visible,
+.obe-togglelist-marker:focus-visible,
+.obe-togglelist-hint:focus-visible,
 .obe-gutter-btn:focus-visible,
 .obe-tb-btn:focus-visible,
 .obe-range-toolbar-button:focus-visible,
@@ -3883,7 +3885,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   cursor: pointer;
 }
-.obe-acc-toggle:focus-visible { outline-offset: calc(-1 * var(--obe-focus-offset, 2px)); }
+.obe-acc-toggle:focus-visible,
+.obe-togglelist-marker:focus-visible { outline-offset: calc(-1 * var(--obe-focus-offset, 2px)); }
 .obe-tab:focus-visible { outline-offset: 0; }
 .obe-acc-chevron { transition: transform var(--motion-base) var(--ease-out-soft); }
 .obe-acc-toggle[aria-expanded="true"] .obe-acc-chevron { transform: rotate(90deg); }
