@@ -2,6 +2,7 @@ import React, {useLayoutEffect, useRef, useState} from 'react';
 import {AppWindow, Columns2, Copy, ExternalLink, Pencil, Unlink} from 'lucide-react';
 import * as Y from 'yjs';
 import {
+  blockChildren,
   blockId,
   nestInToggle,
   blockProp,
@@ -993,6 +994,7 @@ function mergeNext(editor: BlockEditorController, id: string, nextId: string): b
   const here = findBlock(editor.doc, id);
   const next = findBlock(editor.doc, nextId);
   if (!here || !next || here.parent !== next.parent || next.index !== here.index + 1) return false;
+  if (blockChildren(next.block)?.length) return false;
   const target = blockText(here.block);
   const source = blockText(next.block);
   if (!target || !source) return false;

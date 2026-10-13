@@ -15,6 +15,18 @@ function input(el: HTMLElement, inputType: string, data: string | null = null) {
 function focus(el: HTMLElement, offset = 0) {act(() => {el.focus(); writeSelection(el, offset);});}
 
 describe('togglelist', () => {
+  it('B1: forward Delete preserves the next toggle and its children', () => {
+    const doc = createDoc([{id: 'p', type: 'paragraph', text: 'Before'},
+      {id: 't', type: 'togglelist', text: 'Summary', children: [{id: 'c', type: 'paragraph', text: 'Child'}]}]);
+    const before = docToJSON(doc);
+    const {container} = render(<BlockEditor doc={doc} />);
+    const paragraph = container.querySelector<HTMLElement>('[data-block-text="p"]')!;
+    focus(paragraph, 6);
+    input(paragraph, 'deleteContentForward');
+    expect(docToJSON(doc)).toEqual(before);
+    expect(blockPlainText(findBlock(doc, 'c')!.block)).toBe('Child');
+  });
+
   it('edits the summary, adds a child from the empty hint and persists collapse across reload', () => {
     const doc = createDoc([{id: 't', type: 'togglelist'}]);
     const {container, unmount} = render(<BlockEditor doc={doc} />);
