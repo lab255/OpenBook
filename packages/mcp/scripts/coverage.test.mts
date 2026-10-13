@@ -151,7 +151,7 @@ function targetBlock(info: BlockTypeInfo, marker: string): WireBlock {
     if (info.props?.runs) props.runs = [];
   }
   const block: WireBlock = {type: info.type, props};
-  if (info.nature === 'text') block.text = 'created';
+  if (info.nature === 'text' || info.richText === true) block.text = 'created';
   if (info.nature === 'container') {
     if (info.type === 'table') block.children = [{type: 'row', children: [{type: 'cell', text: 'cell'}]}];
     else if (info.type === 'columns') block.children = [{type: 'column', props: {span: 12}, children: [{type: 'paragraph', text: 'child'}]}];
@@ -180,7 +180,7 @@ function matrix(pluginTypes: string[]): string {
   const rows = BLOCK_TYPE_CATALOGUE.map((info) => {
     const mark = (applicable = true): string => applicable ? '✅' : '➖';
     const kit = info.kitValue ? (EXEMPT[info.type] ? `exempt: ${EXEMPT[info.type]}` : '✅') : '➖';
-    return `| ${info.type} | ${mark()} | ${mark()} | ${mark(info.nature === 'text')} | ${mark()} | ${kit} | ➖ |`;
+    return `| ${info.type} | ${mark()} | ${mark()} | ${mark(info.nature === 'text' || info.richText === true)} | ${mark()} | ${kit} | ➖ |`;
   });
   rows.push(...pluginTypes.map((type) => `| ${type} | ✅ | ✅ | ➖ | ✅ | ➖ | ✅ |`));
   return [
@@ -245,7 +245,7 @@ async function main(): Promise<void> {
           assert.ok(isError(bad) && resultText(bad).includes(`"${declared[0]}"`), `invalid ${declared[0]} was not a typed error naming the prop: ${resultText(bad)}`);
         }
       });
-      if (info.nature === 'text') await run(info.type, 'text', async () => {
+      if (info.nature === 'text' || info.richText === true) await run(info.type, 'text', async () => {
         await callOk('update_block', {pageId: page.id, blockId: target.id, text: `updated ${info.type}`});
         const updated = await findTarget(marker);
         assert.ok(JSON.stringify(updated.text).includes(`updated ${info.type}`));
