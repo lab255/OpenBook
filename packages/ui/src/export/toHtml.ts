@@ -1369,7 +1369,7 @@ ${statusLightCss(scheme)}
 .kit-prog-track { height: 8px; border-radius: 9999px; background: rgba(127,127,127,.18); overflow: hidden; }
 .kit-prog-fill { height: 100%; border-radius: 9999px; background: ${KIT_EXPORT_PRIMARY}; transition: width 180ms cubic-bezier(0.32,0.72,0,1); }
 .slider input[type=range] { vertical-align: middle; width: 60%; }
-.expr code { color: #4f46e5; }
+.expr code { color: inherit; }
 /* Long stringified readouts (arrays from live code) must wrap, not blow the
    page to tens of thousands of px wide (which also degrades the PDF slice). */
 .reactive code { overflow-wrap: anywhere; }
@@ -1469,7 +1469,7 @@ nav.toc { margin: 8px 0; padding: 8px 12px; border-left: 3px solid rgba(127,127,
 nav.toc ul { list-style: none; padding-left: 0; margin: 0; }
 nav.toc a { text-decoration: none; opacity: .85; }
 nav.toc a:hover { opacity: 1; text-decoration: underline; }
-a.button { display: inline-block; background: #4f46e5; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+a.button { display: inline-block; background: ${KIT_EXPORT_PRIMARY}; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
 a.button:hover { filter: brightness(1.08); }
 .button.is-empty { background: rgba(127,127,127,.3); }
 hr.divider[data-style=dashed] { border-top-style: dashed; }

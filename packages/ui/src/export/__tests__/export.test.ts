@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {DATA_PALETTE, type PageSnapshot} from '@book.dev/sdk';
-import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../../blockeditor/colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../../blockeditor/colors';
 import {blocksToMarkdown, projectBlocksForExport} from '../../blockeditor/exportBlocks';
 import type {BlockJSON} from '../../blockeditor/model';
 import {buildDocumentModel, parseInline, runsToText} from '../documentModel';
@@ -417,5 +417,16 @@ describe('authored callout appearance', () => {
       expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
       expect(new DOMParser().parseFromString(html, 'text/html').querySelector('.callout img')).toBeNull();
     }
+  });
+});
+
+
+describe('kit export ink', () => {
+  it('uses export primary for buttons and inherited foreground for expression text', () => {
+    const html = toHtml(snapshot([]), 'T', '');
+    expect(html).toContain(`a.button { display: inline-block; background: ${KIT_EXPORT_PRIMARY};`);
+    expect(html).toContain('.expr code { color: inherit; }');
+    const styles = new DOMParser().parseFromString(html, 'text/html').querySelector('style')!.textContent!;
+    expect(styles).not.toContain('#4f46e5');
   });
 });
