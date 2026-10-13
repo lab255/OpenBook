@@ -8,6 +8,7 @@ import {
   insertBlock,
   makeBlock,
   mergeWithPrevious,
+  nestInToggle,
   moveBlock,
   removeBlock,
   rootBlocks,
@@ -178,6 +179,10 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
         const type = blockType(found.block);
         if (type !== 'paragraph' && type !== 'cell' && type !== 'code' && TEXT_BLOCKS.has(type)) {
           turnInto(doc, blockId, 'paragraph');
+          requestCaret({blockId, offset: 0});
+          return;
+        }
+        if (found.index === 0 && nestInToggle(doc, blockId, true)) {
           requestCaret({blockId, offset: 0});
           return;
         }

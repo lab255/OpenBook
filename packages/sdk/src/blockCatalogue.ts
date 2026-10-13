@@ -47,6 +47,8 @@ export interface BlockTypeInfo {
    *  the module note. */
   readonly category: 'core' | 'kit';
   readonly nature: BlockNature;
+  /** Container with an editable rich-text summary. */
+  readonly richText?: boolean;
   /** For child-only types: the ONE container this type must sit directly
    *  inside (column→columns, row→table, cell→row, tab→tabs,
    *  accordionsection→accordion). */
@@ -65,6 +67,7 @@ const CATALOGUE_LITERAL = [
   {type: 'heading', category: 'core', nature: 'text', props: {level: 'number'}, hint: '{level:1|2|3}'},
   {type: 'list', category: 'core', nature: 'text', props: {kind: 'string'}, hint: '{kind:"bullet"|"number"} — one block per item'},
   {type: 'todo', category: 'core', nature: 'text', props: {checked: 'boolean'}, hint: '{checked?}'},
+  {type: 'togglelist', category: 'core', nature: 'container', richText: true, props: {collapsed: 'boolean'}, hint: 'rich text summary in text; nested children; {collapsed?}'},
   {type: 'quote', category: 'core', nature: 'text'},
   {type: 'callout', category: 'core', nature: 'text', props: {variant: 'string'}, hint: '{variant:"info"|"warn"|"success"}'},
   {type: 'code', category: 'core', nature: 'text', props: {language: 'string', live: 'boolean', name: 'string', collapsed: 'boolean', wrap: 'boolean'}, hint: '{language?,live?,name?,collapsed?,wrap?}'},
@@ -142,7 +145,7 @@ export const CONTAINER_BLOCK_TYPES: ReadonlySet<string> = new Set(
 
 /** Core types that carry editable rich text. */
 export const TEXT_BLOCK_TYPES: ReadonlySet<CoreBlockType> = new Set(
-  BLOCK_TYPE_CATALOGUE.filter((e) => e.nature === 'text').map((e) => e.type as CoreBlockType),
+  BLOCK_TYPE_CATALOGUE.filter((e) => e.nature === 'text' || e.richText).map((e) => e.type as CoreBlockType),
 );
 
 /** Child-only types → the one container each must sit directly inside. */
@@ -388,6 +391,7 @@ export function blockCatalogueText(plugins?: readonly PluginBlockSource[], types
   const wanted = types ? new Set(types) : null;
   const blocks = BLOCK_TYPE_CATALOGUE.filter((e) => !wanted || wanted.has(e.type)).map((e) => ({
     type: e.type, category: e.category, nature: e.nature,
+    ...(e.richText ? {richText: true} : {}),
     ...(e.parent ? {parent: e.parent} : {}), ...(e.kitValue ? {kitValue: true} : {}),
     description: e.hint ?? `${e.type} ${e.nature} block.`,
     propsSchema: BLOCK_PROP_JSON_SCHEMAS[e.type as keyof typeof BLOCK_PROP_JSON_SCHEMAS] as BlockPropsJsonSchema,

@@ -3,6 +3,7 @@ import {AppWindow, Columns2, Copy, ExternalLink, Pencil, Unlink} from 'lucide-re
 import * as Y from 'yjs';
 import {
   blockId,
+  nestInToggle,
   blockProp,
   blockText,
   blockType,
@@ -206,8 +207,7 @@ export const TextBlockView: React.FC<{
       '[]': {type: 'todo'},
       '[ ]': {type: 'todo'},
       '[x]': {type: 'todo', props: {checked: true}},
-      // DSX-10 will move > to the toggle block; keep quote compatibility for now.
-      '>': {type: 'quote'},
+      '>': {type: 'togglelist', props: {collapsed: false}},
       '"': {type: 'quote'},
     };
     const hit = map[prefix] ?? (/^\d+\.$/.test(prefix) ? {type: 'list' as const, props: {kind: 'number'}} : undefined);
@@ -665,6 +665,11 @@ export const TextBlockView: React.FC<{
     }
     if (e.key === 'Tab' && !isCode) {
       e.preventDefault();
+      const caret = readSelection(el)?.start ?? 0;
+      if (nestInToggle(editor.doc, id, e.shiftKey)) {
+        editor.requestCaret({blockId: id, offset: caret});
+        return;
+      }
       const indent = blockProp<number>(block, 'indent') ?? 0;
       const next = e.shiftKey ? Math.max(0, indent - 1) : Math.min(4, indent + 1);
       if (next !== indent) {
@@ -747,7 +752,7 @@ export const TextBlockView: React.FC<{
 
   const focusOnlyHint = ['list', 'todo', 'quote', 'callout', 'notes'].includes(type);
   const placeholder = focusOnlyHint && editor.focusedId !== id ? undefined
-    : type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : (PLACEHOLDERS[type] ?? '');
+    : type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : ((type === 'togglelist' ? t('blockEditor.togglelistSummary') : PLACEHOLDERS[type]) ?? '');
 
   // A brand-new page is a single empty paragraph: show the "/" hint without
   // waiting for focus, so an empty document teaches its own entry point (the

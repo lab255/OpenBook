@@ -453,6 +453,27 @@ export function moveBlocks(doc: Y.Doc, ids: Iterable<string>, targetParentId: st
   }, 'local');
 }
 
+/** Tab into a preceding toggle; Shift+Tab (or first-child Backspace) out. */
+export function nestInToggle(doc: Y.Doc, id: string, outdent = false): boolean {
+  const found = findBlock(doc, id);
+  if (!found) return false;
+  const owner = parentBlockOf(doc, found.parent);
+  if (outdent) {
+    if (!owner || blockType(owner) !== 'togglelist') return false;
+    const parent = findBlock(doc, blockId(owner))!;
+    const grandparent = parentBlockOf(doc, parent.parent);
+    moveBlocks(doc, [id], grandparent ? blockId(grandparent) : null, parent.index + 1);
+    return true;
+  }
+  const previous = found.index > 0 ? found.parent.get(found.index - 1) : null;
+  if (!previous || blockType(previous) !== 'togglelist') return false;
+  doc.transact(() => {
+    setBlockProp(previous, 'collapsed', false);
+    moveBlocks(doc, [id], blockId(previous), blockChildren(previous)!.length);
+  }, 'local');
+  return true;
+}
+
 /** Split a text block at `offset`: the tail (text + attrs) becomes a new block below. */
 export function splitBlock(doc: Y.Doc, id: string, offset: number, newType?: BlockType): string | null {
   let newId: string | null = null;
@@ -481,7 +502,12 @@ export function splitBlock(doc: Y.Doc, id: string, offset: number, newType?: Blo
         ? {kind: blockProp<string>(found.block, 'kind') ?? 'bullet'}
         : undefined;
     newId = shortId('b'); // settled up front — detached Y.Maps can't be read
-    found.parent.insert(found.index + 1, [makeBlock({id: newId, type: continuation, text: tail, props})]);
+    const next = makeBlock({id: newId, type: continuation, text: tail, props});
+    if (type === 'togglelist' && !blockProp(found.block, 'collapsed')) {
+      blockChildren(found.block)!.insert(0, [next]);
+    } else {
+      found.parent.insert(found.index + 1, [next]);
+    }
   }, 'local');
   return newId;
 }
@@ -517,7 +543,14 @@ export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record
   doc.transact(() => {
     const found = findBlock(doc, id);
     if (!found) return;
+    // Unwrap the summary without losing its nested content.
+    if (blockType(found.block) === 'togglelist' && type !== 'togglelist') {
+      const children = blockChildren(found.block);
+      if (children?.length) found.parent.insert(found.index + 1, children.toArray().map(child => cloneBlock(child)));
+      found.block.delete('children');
+    }
     found.block.set('type', type);
+    if (CONTAINER_BLOCKS.has(type) && !blockChildren(found.block)) found.block.set('children', new Y.Array<BlockMap>());
     if (TEXT_BLOCKS.has(type) && !blockText(found.block)) found.block.set('text', new Y.Text());
     if (props) for (const [k, v] of Object.entries(props)) setBlockProp(found.block, k, v);
   }, 'local');
@@ -539,6 +572,7 @@ export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record
 export function patchBlock(block: BlockMap, patch: {type?: string; props?: Record<string, unknown>}): void {
   if (patch.type) {
     block.set('type', patch.type);
+    if (CONTAINER_BLOCKS.has(patch.type) && !blockChildren(block)) block.set('children', new Y.Array<BlockMap>());
     if (TEXT_BLOCKS.has(patch.type as BlockType) && !blockText(block)) block.set('text', new Y.Text());
   }
   if (patch.props) for (const [k, v] of Object.entries(patch.props)) setBlockProp(block, k, v === null ? undefined : v);
@@ -2688,9 +2722,8 @@ export function migrateLegacyBlocks(blocks: LegacyBlock[], ctx: MigrationContext
     case 'toc':
       break; // derived from headings — nothing to migrate
     case 'accordion': {
-      // No toggle block (yet): keep both halves readable.
-      if (d.title) out.push({type: 'heading', text: htmlToRuns(String(d.title)), props: {level: 3}});
-      if (d.content) out.push({type: 'paragraph', text: htmlToRuns(String(d.content))});
+      out.push({type: 'togglelist', text: htmlToRuns(String(d.title ?? '')), props: {collapsed: d.open === false},
+        children: d.content ? [{type: 'paragraph', text: htmlToRuns(String(d.content))}] : []});
       break;
     }
     case 'button': {

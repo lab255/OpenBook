@@ -5,7 +5,7 @@
  * placeholders are interpolated by `t(key, {var})`.
  */
 export const en = {
-  blockEditor: {resizeColumn: 'Resize column {column}', accordionItem: 'Item {number}', accordionAddLabel: 'Item', accordionAdd: 'Add item', accordionItemLabel: 'Item label'},
+  blockEditor: {togglelistToggle: 'Expand or collapse toggle list', togglelistEmpty: 'Empty toggle. Click to add content.', togglelistSummary: 'Toggle', resizeColumn: 'Resize column {column}', accordionItem: 'Item {number}', accordionAddLabel: 'Item', accordionAdd: 'Add item', accordionItemLabel: 'Item label'},
   common: {
     cancel: 'Cancel',
     close: 'Close',
@@ -1323,6 +1323,7 @@ export const en = {
     bullet: {label: 'Bulleted list', hint: 'Simple list'},
     number: {label: 'Numbered list', hint: 'Ordered list'},
     todo: {label: 'To-do', hint: 'Checkbox item'},
+    togglelist: {label: 'Toggle list', hint: 'Show or hide nested blocks'},
     quote: {label: 'Quote', hint: 'Pull quote'},
     callout: {label: 'Callout', hint: 'Highlighted note'},
     code: {label: 'Code', hint: 'Monospaced block'},

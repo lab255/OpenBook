@@ -4066,3 +4066,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .dark .ob-db-today {
   background-color: hsl(var(--primary));
 }
+
+/* Toggle-list disclosure: only the chevron animates; children mount instantly. */
+.obe-togglelist-row { display: flex; align-items: flex-start; }
+.obe-togglelist-row > .obe-text { flex: 1; min-width: 0; }
+.obe-togglelist-marker { width: 24px; flex: 0 0 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
+.obe-togglelist-marker:hover { background: hsl(var(--muted)); }
+.obe-togglelist-chevron { width: 16px; height: 16px; transition: transform var(--motion-base) var(--ease-out-soft); }
+.obe-togglelist-marker[aria-expanded="true"] .obe-togglelist-chevron { transform: rotate(90deg); }
+.obe-togglelist-children { margin-left: 24px; }
+.obe-togglelist-hint { color: hsl(var(--muted-foreground)); padding: var(--obe-block-pad-y) 0; text-align: left; }

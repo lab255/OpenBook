@@ -1,7 +1,7 @@
 import type {PartialMessages} from './en';
 
 export const ja: PartialMessages = {
-  blockEditor: {resizeColumn: '列 {column} の幅を変更', accordionItem: '項目 {number}', accordionAddLabel: '項目', accordionAdd: '項目を追加', accordionItemLabel: '項目のラベル'},
+  blockEditor: {togglelistToggle: 'トグルリストを開閉', togglelistEmpty: '空のトグル。クリックして内容を追加。', togglelistSummary: 'トグル', resizeColumn: '列 {column} の幅を変更', accordionItem: '項目 {number}', accordionAddLabel: '項目', accordionAdd: '項目を追加', accordionItemLabel: '項目のラベル'},
   navigation: {
     loadError: {
       title: 'このライブラリに接続できません',
@@ -866,6 +866,7 @@ export const ja: PartialMessages = {
     bullet: {label: '箇条書き', hint: 'シンプルなリスト'},
     number: {label: '番号付きリスト', hint: '順序付きリスト'},
     todo: {label: 'To-do', hint: 'チェックボックス項目'},
+    togglelist: {label: 'トグルリスト', hint: '入れ子のブロックを表示・非表示'},
     quote: {label: '引用', hint: '強調引用'},
     callout: {label: 'コールアウト', hint: '強調メモ'},
     code: {label: 'コード', hint: '等幅ブロック'},
