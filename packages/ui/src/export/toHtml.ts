@@ -1448,6 +1448,7 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .callout[data-variant=success] { background: hsl(140 55% 45% / 0.13); }
 .callout[data-variant=danger] { background: hsl(0 72% 55% / 0.12); }
 .callout:has(.callout__icon)::before { content: none; }
+.callout__icon:empty { display: none; }
 .callout__icon { flex: none; }
 .callout[data-bg=gray] { background: hsl(0 0% 50% / 0.1); }
 .callout[data-bg=brown] { background: hsl(25 45% 50% / 0.13); }

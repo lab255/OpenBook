@@ -1,4 +1,5 @@
 import {describe, it, expect} from 'vitest';
+import pdfSource from '../toPdf.ts?raw';
 import {DATA_PALETTE, type PageSnapshot} from '@book.dev/sdk';
 import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../../blockeditor/colors';
 import {blocksToMarkdown, projectBlocksForExport} from '../../blockeditor/exportBlocks';
@@ -403,6 +404,7 @@ describe('authored callout appearance', () => {
     expect(callout?.getAttribute('data-variant')).toBe('danger');
     expect(callout?.querySelector('.callout__icon')?.textContent).toBe('');
     expect(html).toContain('.callout:has(.callout__icon)::before { content: none; }');
+    expect(html).toContain('.callout__icon:empty { display: none; }');
   });
 
   it.each(['🌱', 'lucide:Star', '<img src=x onerror=alert(1)>'])('round-trips icon %s and bg through projection', (icon) => {
@@ -428,5 +430,8 @@ describe('kit export ink', () => {
     expect(html).toContain('.expr code { color: inherit; }');
     const styles = new DOMParser().parseFromString(html, 'text/html').querySelector('style')!.textContent!;
     expect(styles).not.toContain('#4f46e5');
+    expect(styles).not.toContain('#6366f1');
+    expect(pdfSource).not.toContain('#4f46e5');
+    expect(pdfSource).not.toContain('#6366f1');
   });
 });

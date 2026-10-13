@@ -292,6 +292,26 @@ it('funnel labels use per-stage readable ink without a CSS fill override', () =>
 
 
 describe('kit pixel geometry', () => {
+  it('keeps the KPI value below its caption at 320px width', async () => {
+    let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: typeof resize) { resize = callback; }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    });
+    try {
+      const {container, unmount, doc} = await renderChart({kind: 'kpi', source: '{value: 50, target: 100}', labels: 'Revenue'});
+      act(() => resize([{contentRect: {width: 320}}]));
+      const value = container.querySelector('.obe-chart-kpi-value')!;
+      const caption = container.querySelector('.obe-chart-kpi-caption')!;
+      expect(Number(value.getAttribute('y'))).toBeGreaterThanOrEqual(Number(caption.getAttribute('y')) + 40);
+      unmount();
+      doc.destroy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each([...KINDS, {kind: 'kpi', props: {source: '{value: 50, target: 100}', labels: 'Revenue'}}])(
     '$kind follows content width, including marks, labels and legends', async ({kind, props}) => {
       let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};

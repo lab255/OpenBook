@@ -1338,8 +1338,9 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
     observer.observe(node);
     return () => observer.disconnect();
   }, [responsive]);
-  const viewW = responsive ? measuredWidth ?? fallbackW : fallbackW;
-  const viewH = responsive && measuredWidth !== null ? Math.min(H, Math.round(viewW * H / W)) : fallbackH;
+  useEffect(() => { setActive(null); setMenu(null); }, [measuredWidth]);
+  const viewW = responsive ? Math.max(240, measuredWidth ?? fallbackW) : fallbackW;
+  const viewH = responsive && measuredWidth !== null ? Math.max(150, Math.min(H, Math.round(viewW * H / W))) : fallbackH;
 
   // `active` drives the tooltip + highlight from hover OR keyboard focus; `menu`
   // is the open context-menu target (null = closed). Both key off the datum so
