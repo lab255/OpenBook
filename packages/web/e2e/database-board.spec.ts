@@ -36,7 +36,7 @@ test('board column footer: configurable calculation', {tag: ['@database']}, asyn
   await expect(header).toHaveCSS('height', '20px');
   await expect(header.getByText('Done', {exact: true})).toHaveCSS('border-radius', '4px');
   const column = header.locator('..');
-  await expect(column).toHaveAttribute('style', /color-mix\(in srgb, var\(--data-green-chip-bg, #[0-9a-f]+\) 50%, transparent\)/);
+  await expect(column).toHaveAttribute('style', /color-mix\(in srgb, var\(--data-green-chip-bg, #[0-9a-f]+\) var\(--data-column-tint\), transparent\)/);
   const dt = await page.evaluateHandle(() => new DataTransfer());
   await header.dispatchEvent('dragstart', {dataTransfer: dt});
   await column.dispatchEvent('dragover', {dataTransfer: dt});
