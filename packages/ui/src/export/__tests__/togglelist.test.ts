@@ -19,6 +19,13 @@ function exportsFor(collapsed: boolean) {
 }
 
 describe('togglelist exports', () => {
+  it('D1: static HTML includes toggle hierarchy and summary cursor rules', () => {
+    const {snapshot} = exportsFor(false);
+    const html = toHtml(snapshot, 'T', '');
+    expect(html).toContain('.obe-x-togglelist > :not(summary){margin-left:24px}');
+    expect(html).toContain('.obe-x-togglelist > summary{cursor:pointer}');
+  });
+
   it.each([true, false])('exports native nested details and summary (collapsed=%s)', collapsed => {
     const {blocks, snapshot} = exportsFor(collapsed);
     for (const html of [blocksToHtml(blocks), toHtml(snapshot, 'T', '')]) {

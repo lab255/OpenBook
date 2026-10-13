@@ -1962,6 +1962,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   padding-top: var(--obe-block-pad-y);
 }
 /* Exported groups (static HTML). */
+.obe-x-togglelist > :not(summary){margin-left:24px}
+.obe-x-togglelist > summary{cursor:pointer}
 .obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: var(--radius-lg); padding: var(--obe-block-pad-y) var(--obe-cnt-inset); margin: 0.75rem 0; }
 .dark .obe-x-group, .dark .obe-x-section { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
 .obe-x-group-name { margin: 0 0 0.25rem; font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); letter-spacing: 0.04em; color: var(--obe-x-muted, hsl(40 3% 43.2%)); }
@@ -4073,9 +4075,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Toggle-list disclosure: only the chevron animates; children mount instantly. */
 .obe-togglelist-row { display: flex; align-items: flex-start; }
 .obe-togglelist-row > .obe-text { flex: 1; min-width: 0; }
-.obe-togglelist-marker { width: 24px; flex: 0 0 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
-.obe-togglelist-marker:hover { background: hsl(var(--muted)); }
+.obe-togglelist-marker { cursor: pointer; width: var(--obe-indent-step); flex: 0 0 var(--obe-indent-step); height: var(--obe-indent-step); display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
+.obe-togglelist-marker:hover { background: var(--hover); }
 .obe-togglelist-chevron { width: 16px; height: 16px; transition: transform var(--motion-base) var(--ease-out-soft); }
 .obe-togglelist-marker[aria-expanded="true"] .obe-togglelist-chevron { transform: rotate(90deg); }
-.obe-togglelist-children { margin-left: 24px; }
-.obe-togglelist-hint { color: hsl(var(--muted-foreground)); padding: var(--obe-block-pad-y) 0; text-align: left; }
+.obe-togglelist-children { margin-left: var(--obe-indent-step); }
+.obe-togglelist-hint { cursor: pointer; color: var(--obe-placeholder); padding: var(--obe-block-pad-y) 0; text-align: left; }
