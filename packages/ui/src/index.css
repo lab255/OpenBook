@@ -360,7 +360,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 40 8% 90%;
     --input: 40 8% 87%;
-    --ring: 207 75% 49%;
+    --ring: 207 75% 44%;
     --scrim: 20 14% 12% / 0.35;
     /* Refined-minimal: softer 8px corners cascade to every rounded-{sm,md,lg}. */
     --radius: 0.5rem;
@@ -376,7 +376,7 @@
     --sheet-veil: 0 0% 0%;
     /* The neutral desk (book cover) behind the page sheets (manifest §2.5). */
     --desk: 40 11% 93.5%;
-    --brand: 207 76% 47%;
+    --brand: 207 75% 44%;
     --brand-foreground: 0 0% 100%;
     --brand-subtle: 207 86% 95%;
     /* Hairline resting elevation for notebook sheets: close contact only, with
