@@ -1,3 +1,13 @@
+## 3.23.0 (2026-10-12)
+
+### 🚀 Features
+
+- **ui:** public plugin UI surface + ledger read-only family on the design system (DSX-9a) ([#406](https://github.com/lab255/OpenBook/pull/406))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.22.1 (2026-10-11)
 
 ### 🩹 Fixes

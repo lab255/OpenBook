@@ -80,6 +80,10 @@ function listToMd(items: ListItem[], ordered: boolean, depth = 0): string {
 
 function blockToMd(block: DocBlock): string {
   switch (block.type) {
+  case 'togglelist': {
+    const body = block.children.map(blockToMd).filter(Boolean).join('\n\n');
+    return inlineToMd(block.runs) + (body ? '\n' + body.split('\n').map(line => line ? `  ${line}` : '').join('\n') : '');
+  }
   case 'header':
     return `${'#'.repeat(block.level)} ${inlineToMd(block.runs)}`;
   case 'paragraph':

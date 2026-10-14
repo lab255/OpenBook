@@ -193,6 +193,8 @@ describe('htmlArtifact — view renders through the sandboxed renderer', () => {
     expect(frame.getAttribute('sandbox')).toBe(SANDBOX_FLAGS);
     expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin');
     expect(frame.getAttribute('srcdoc')).toContain('<h1 id="inner">artifact!</h1>');
+    expect(frame.getAttribute('srcdoc')).toContain('color-scheme: light;');
+    expect(frame.getAttribute('srcdoc')).toContain('background-color: white;');
     // Authoring chrome present in an editable context.
     expect(container.querySelector('input.obe-artifact-title')).toBeTruthy();
     expect(container.querySelector('.obe-artifact-resize')).toBeTruthy();
@@ -205,6 +207,9 @@ describe('htmlArtifact — view renders through the sandboxed renderer', () => {
     const {container} = render(<BlockEditor doc={doc} pageId="page-1" readOnly />);
 
     await waitFor(() => expect(container.querySelector('.obe-artifact iframe')).toBeTruthy());
+    const srcdoc = container.querySelector('.obe-artifact iframe')?.getAttribute('srcdoc');
+    expect(srcdoc).toContain('color-scheme: light;');
+    expect(srcdoc).toContain('background-color: white;');
     expect(container.querySelector('input.obe-artifact-title')).toBeNull();
     expect(container.querySelector('.obe-artifact-resize')).toBeNull();
     expect(container.querySelector('.obe-artifact input[type=file]')).toBeNull();

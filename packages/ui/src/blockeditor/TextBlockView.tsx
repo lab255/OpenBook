@@ -2,7 +2,9 @@ import React, {useLayoutEffect, useRef, useState} from 'react';
 import {AppWindow, Columns2, Copy, ExternalLink, Pencil, Unlink} from 'lucide-react';
 import * as Y from 'yjs';
 import {
+  blockChildren,
   blockId,
+  nestInToggle,
   blockProp,
   blockText,
   blockType,
@@ -206,8 +208,7 @@ export const TextBlockView: React.FC<{
       '[]': {type: 'todo'},
       '[ ]': {type: 'todo'},
       '[x]': {type: 'todo', props: {checked: true}},
-      // DSX-10 will move > to the toggle block; keep quote compatibility for now.
-      '>': {type: 'quote'},
+      '>': {type: 'togglelist', props: {collapsed: false}},
       '"': {type: 'quote'},
     };
     const hit = map[prefix] ?? (/^\d+\.$/.test(prefix) ? {type: 'list' as const, props: {kind: 'number'}} : undefined);
@@ -665,7 +666,12 @@ export const TextBlockView: React.FC<{
     }
     if (e.key === 'Tab' && !isCode) {
       e.preventDefault();
+      const caret = readSelection(el)?.start ?? 0;
       const indent = blockProp<number>(block, 'indent') ?? 0;
+      if (!(e.shiftKey && indent > 0) && nestInToggle(editor.doc, id, e.shiftKey)) {
+        editor.requestCaret({blockId: id, offset: caret});
+        return;
+      }
       const next = e.shiftKey ? Math.max(0, indent - 1) : Math.min(4, indent + 1);
       if (next !== indent) {
         apply(() => setBlockProp(block, 'indent', next === 0 ? undefined : next));
@@ -747,7 +753,7 @@ export const TextBlockView: React.FC<{
 
   const focusOnlyHint = ['list', 'todo', 'quote', 'callout', 'notes'].includes(type);
   const placeholder = focusOnlyHint && editor.focusedId !== id ? undefined
-    : type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : (PLACEHOLDERS[type] ?? '');
+    : type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : ((type === 'togglelist' ? t('blockEditor.togglelistSummary') : PLACEHOLDERS[type]) ?? '');
 
   // A brand-new page is a single empty paragraph: show the "/" hint without
   // waiting for focus, so an empty document teaches its own entry point (the
@@ -988,6 +994,7 @@ function mergeNext(editor: BlockEditorController, id: string, nextId: string): b
   const here = findBlock(editor.doc, id);
   const next = findBlock(editor.doc, nextId);
   if (!here || !next || here.parent !== next.parent || next.index !== here.index + 1) return false;
+  if (blockChildren(next.block)?.length) return false;
   const target = blockText(here.block);
   const source = blockText(next.block);
   if (!target || !source) return false;

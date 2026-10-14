@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {readableTextColor} from '@/lib/presence';
 import {describe, it, expect, afterEach, beforeAll, vi} from 'vitest';
-import {render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
+import {act, render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
 import {createDoc, rootBlocks, type BlockMap} from '../../model';
 import type {BlockEditorController} from '../../useBlockEditor';
 import {CHART_BLOCKS, getChartKind, fmtChartValue, KitChartPlot, type ChartRenderArgs} from '../charts';
@@ -288,4 +288,101 @@ it('funnel labels use per-stage readable ink without a CSS fill override', () =>
   const rule = css.match(/\.obe-chart-funnel-label\s*\{([^}]+)\}/)?.[1];
   expect(rule).toBeTruthy();
   expect(rule).not.toMatch(/\bfill\s*:/);
+});
+
+
+describe('kit pixel geometry', () => {
+  it('shrinks a long KPI value at w=240/h=150 and keeps its top below the caption baseline', () => {
+    const args: ChartRenderArgs = {
+      value: {value: 12345678.9, target: 20000000}, labels: ['Revenue'], palette: PALETTE, width: 240, height: 150,
+    };
+    const {container} = render(<svg>{getChartKind('kpi')!.render(args)}</svg>);
+    const value = container.querySelector<SVGTextElement>('.obe-chart-kpi-value')!;
+    const caption = container.querySelector<SVGTextElement>('.obe-chart-kpi-caption')!;
+    const fontSize = Number.parseFloat(value.style.fontSize);
+    expect(value.textContent!.length).toBeGreaterThanOrEqual(9);
+    expect(fontSize).toBeGreaterThan(0);
+    expect(fontSize).toBeLessThan(60);
+    // A full em above the baseline conservatively bounds the digit tops.
+    const valueTop = Number(value.getAttribute('y')) - fontSize;
+    expect(Number(caption.getAttribute('y'))).toBeLessThan(valueTop);
+  });
+
+  it('keeps the KPI value below its caption at 320px width', async () => {
+    let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: typeof resize) { resize = callback; }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    });
+    try {
+      const {container, unmount, doc} = await renderChart({kind: 'kpi', source: '{value: 50, target: 100}', labels: 'Revenue'});
+      act(() => resize([{contentRect: {width: 320}}]));
+      const value = container.querySelector('.obe-chart-kpi-value')!;
+      const caption = container.querySelector('.obe-chart-kpi-caption')!;
+      expect(Number(value.getAttribute('y'))).toBeGreaterThanOrEqual(Number(caption.getAttribute('y')) + 40);
+      unmount();
+      doc.destroy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each([...KINDS, {kind: 'kpi', props: {source: '{value: 50, target: 100}', labels: 'Revenue'}}])(
+    '$kind follows content width, including marks, labels and legends', async ({kind, props}) => {
+      let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};
+      const disconnect = vi.fn();
+      vi.stubGlobal('ResizeObserver', class {
+        constructor(callback: typeof resize) { resize = callback; }
+        observe = vi.fn();
+        disconnect = disconnect;
+      });
+      try {
+        const {container, unmount, doc} = await renderChart({kind, ...props});
+        const svg = container.querySelector('svg.obe-chart-svg')!;
+        expect(svg.getAttribute('viewBox')).toBe('0 0 640 240');
+        for (const [width, height] of [[1200, 240], [400, 150]]) {
+          act(() => resize([{contentRect: {width}}]));
+          expect(svg.getAttribute('viewBox')).toBe(`0 0 ${width} ${height}`);
+          expect(marks(container).length).toBeGreaterThan(0);
+          // All numeric marks and label anchors must stay inside the measured box.
+          for (const node of svg.querySelectorAll('rect, circle, text')) {
+            for (const [attr, limit] of [['x', width], ['cx', width], ['y', height], ['cy', height]] as const) {
+              if (node.hasAttribute(attr)) {
+                const value = Number(node.getAttribute(attr));
+                expect(value).toBeGreaterThanOrEqual(0);
+                expect(value).toBeLessThanOrEqual(limit);
+              }
+            }
+          }
+          const grid = svg.querySelector('.obe-chart-grid line');
+          if (['line', 'area', 'bar', 'scatter', 'combo'].includes(kind)) {
+            expect(grid?.getAttribute('x1')).toBe('40');
+            expect(grid?.getAttribute('x2')).toBe(String(width - 28));
+          }
+          const xLabel = svg.querySelector('.obe-chart-xlabels text');
+          if (xLabel) expect(xLabel.getAttribute('y')).toBe(String(height - (kind === 'heatmap' ? 7 : 8)));
+          if (['pie', 'donut'].includes(kind)) {
+            expect(svg.querySelector('.obe-chart-legend > g')?.getAttribute('transform'))
+              .toBe(`translate(${height + 24}, 28)`);
+            expect(svg.querySelector('path')?.getAttribute('d')).toContain(String(height / 2));
+          }
+          if (kind === 'kpi') expect(svg.querySelector('.obe-chart-kpi-value')?.getAttribute('x')).toBe(String(width / 2));
+          if (['line', 'area'].includes(kind)) {
+            const dots = svg.querySelectorAll('.obe-chart-dot');
+            expect(dots[0].getAttribute('cx')).toBe('40');
+            expect(dots[dots.length - 1].getAttribute('cx')).toBe(String(width - 28));
+          }
+          if (kind === 'combo') expect(svg.querySelector('.obe-chart-legend > g')?.getAttribute('transform')).toBe(`translate(${width - 118}, 16)`);
+        }
+        act(() => resize([{contentRect: {width: 0}}]));
+        expect(svg.getAttribute('viewBox')).toBe('0 0 400 150');
+        unmount();
+        expect(disconnect).toHaveBeenCalled();
+        doc.destroy();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    },
+  );
 });

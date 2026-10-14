@@ -1,6 +1,7 @@
 import {describe, it, expect} from 'vitest';
+import pdfSource from '../toPdf.ts?raw';
 import {DATA_PALETTE, type PageSnapshot} from '@book.dev/sdk';
-import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../../blockeditor/colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../../blockeditor/colors';
 import {blocksToMarkdown, projectBlocksForExport} from '../../blockeditor/exportBlocks';
 import type {BlockJSON} from '../../blockeditor/model';
 import {buildDocumentModel, parseInline, runsToText} from '../documentModel';
@@ -396,6 +397,16 @@ describe('toSlideDeck', () => {
 });
 
 describe('authored callout appearance', () => {
+  it.each(['lucide:Star', 'lucide:Unknown'])('suppresses the danger fallback for authored %s', (icon) => {
+    const blocks: BlockJSON[] = [{id: 'c', type: 'callout', props: {variant: 'danger', icon}}];
+    const html = toHtml(snapshot(projectBlocksForExport(blocks).blocks), 'T', '');
+    const callout = new DOMParser().parseFromString(html, 'text/html').querySelector('.callout');
+    expect(callout?.getAttribute('data-variant')).toBe('danger');
+    expect(callout?.querySelector('.callout__icon')?.textContent).toBe('');
+    expect(html).toContain('.callout:has(.callout__icon)::before { content: none; }');
+    expect(html).toContain('.callout__icon:empty { display: none; }');
+  });
+
   it.each(['🌱', 'lucide:Star', '<img src=x onerror=alert(1)>'])('round-trips icon %s and bg through projection', (icon) => {
     const blocks: BlockJSON[] = [{id: 'c', type: 'callout', props: {variant: 'warn', icon, bg: 'purple'}}];
     const projected = projectBlocksForExport(blocks).blocks;
@@ -403,10 +414,24 @@ describe('authored callout appearance', () => {
     const html = toHtml(snapshot(projected), 'T', '');
     expect(html).toContain('data-bg="purple"');
     if (icon === '🌱') expect(html).toContain('<span class="callout__icon">🌱</span>');
-    if (icon.startsWith('lucide:')) expect(html).not.toContain('<span class="callout__icon">');
+    if (icon.startsWith('lucide:')) expect(html).toContain('<span class="callout__icon"></span>');
     if (icon.startsWith('<')) {
       expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
       expect(new DOMParser().parseFromString(html, 'text/html').querySelector('.callout img')).toBeNull();
     }
+  });
+});
+
+
+describe('kit export ink', () => {
+  it('uses export primary for buttons and inherited foreground for expression text', () => {
+    const html = toHtml(snapshot([]), 'T', '');
+    expect(html).toContain(`a.button { display: inline-block; background: ${KIT_EXPORT_PRIMARY};`);
+    expect(html).toContain('.expr code { color: inherit; }');
+    const styles = new DOMParser().parseFromString(html, 'text/html').querySelector('style')!.textContent!;
+    expect(styles).not.toContain('#4f46e5');
+    expect(styles).not.toContain('#6366f1');
+    expect(pdfSource).not.toContain('#4f46e5');
+    expect(pdfSource).not.toContain('#6366f1');
   });
 });
