@@ -440,8 +440,10 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     }
     case 'callout': {
       const icon = str(d.icon);
-      const customIcon = icon && !icon.startsWith('lucide:')
-        ? `<span class="callout__icon">${escapeHtml(icon)}</span>` : '';
+      // Reserve authored Lucide icons instead of showing the wrong variant glyph.
+      // The hydrated viewer renders the SVG; static output stays dependency-light.
+      const customIcon = icon
+        ? `<span class="callout__icon">${escapeHtml(pageIconToText(icon))}</span>` : '';
       html.push(
         `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"${d.bg ? ` data-bg="${escapeHtml(str(d.bg))}"` : ''}>${customIcon}<div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
       );
@@ -1367,7 +1369,7 @@ ${statusLightCss(scheme)}
 .kit-prog-track { height: 8px; border-radius: 9999px; background: rgba(127,127,127,.18); overflow: hidden; }
 .kit-prog-fill { height: 100%; border-radius: 9999px; background: ${KIT_EXPORT_PRIMARY}; transition: width 180ms cubic-bezier(0.32,0.72,0,1); }
 .slider input[type=range] { vertical-align: middle; width: 60%; }
-.expr code { color: #4f46e5; }
+.expr code { color: inherit; }
 /* Long stringified readouts (arrays from live code) must wrap, not blow the
    page to tens of thousands of px wide (which also degrades the PDF slice). */
 .reactive code { overflow-wrap: anywhere; }
@@ -1446,6 +1448,7 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .callout[data-variant=success] { background: hsl(140 55% 45% / 0.13); }
 .callout[data-variant=danger] { background: hsl(0 72% 55% / 0.12); }
 .callout:has(.callout__icon)::before { content: none; }
+.callout__icon:empty { display: none; }
 .callout__icon { flex: none; }
 .callout[data-bg=gray] { background: hsl(0 0% 50% / 0.1); }
 .callout[data-bg=brown] { background: hsl(25 45% 50% / 0.13); }
@@ -1467,7 +1470,7 @@ nav.toc { margin: 8px 0; padding: 8px 12px; border-left: 3px solid rgba(127,127,
 nav.toc ul { list-style: none; padding-left: 0; margin: 0; }
 nav.toc a { text-decoration: none; opacity: .85; }
 nav.toc a:hover { opacity: 1; text-decoration: underline; }
-a.button { display: inline-block; background: #4f46e5; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+a.button { display: inline-block; background: ${KIT_EXPORT_PRIMARY}; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
 a.button:hover { filter: brightness(1.08); }
 .button.is-empty { background: rgba(127,127,127,.3); }
 hr.divider[data-style=dashed] { border-top-style: dashed; }

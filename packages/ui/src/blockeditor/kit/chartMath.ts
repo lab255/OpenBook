@@ -89,11 +89,11 @@ export function extent(values: number[]): Extent {
 export const scale = (v: number, d: Extent, r0: number, r1: number): number => r0 + ((v - d.min) / (d.max - d.min)) * (r1 - r0);
 
 /** Polyline points attribute for one series across the plot area. */
-export function linePoints(values: number[], d: Extent, w: number, h: number, pad: number): string {
+export function linePoints(values: number[], d: Extent, w: number, h: number, pad: number, padLeft = pad): string {
   const n = values.length;
   return values
     .map((v, i) => {
-      const x = n === 1 ? w / 2 : pad + (i / (n - 1)) * (w - pad * 2);
+      const x = n === 1 ? (padLeft + w - pad) / 2 : padLeft + (i / (n - 1)) * (w - padLeft - pad);
       const y = scale(v, d, h - pad, pad);
       return `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`;
     })

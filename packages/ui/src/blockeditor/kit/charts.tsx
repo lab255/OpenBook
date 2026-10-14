@@ -53,6 +53,8 @@ const W = 640;
 const H = 240;
 const PAD = 28;
 
+interface PlotGeometry {w?: number; h?: number; padL?: number}
+
 const setProp = (editor: BlockEditorController, block: BlockMap, key: string, value: unknown): void =>
   editor.doc.transact(() => setBlockProp(block, key, value), 'local');
 
@@ -156,7 +158,7 @@ const Grid: React.FC<{d: ReturnType<typeof extent>; w?: number; h?: number; padL
 /** Compact top-right legend for named multi-series data. `glyph` picks the
  *  swatch per series (default a square) — line/area/combo pass `'line'` for
  *  their line series so the legend glyph matches the mark it stands for. */
-const SeriesLegend: React.FC<{series: Array<{name: string}>; palette: string[]; glyph?: (index: number) => 'bar' | 'line'}> = ({series, palette, glyph}) => {
+const SeriesLegend: React.FC<PlotGeometry & {series: Array<{name: string}>; palette: string[]; glyph?: (index: number) => 'bar' | 'line'}> = ({series, palette, glyph, w = W}) => {
   const named = series.filter((s) => s.name);
   if (named.length < 2) return null;
   return (
@@ -164,7 +166,7 @@ const SeriesLegend: React.FC<{series: Array<{name: string}>; palette: string[]; 
       {named.map((s, i) => {
         const color = palette[i % palette.length];
         return (
-          <g key={s.name} transform={`translate(${W - PAD - 90}, ${16 + i * 18})`}>
+          <g key={s.name} transform={`translate(${w - PAD - 90}, ${16 + i * 18})`}>
             {glyph?.(i) === 'line' ? (
               <line className="obe-chart-legend-line" x1={0} y1={5} x2={12} y2={5} stroke={color} strokeWidth={2} strokeLinecap="round" />
             ) : (
@@ -195,17 +197,17 @@ const XLabels: React.FC<{labels: string[]; n: number; w?: number; h?: number; pa
   );
 };
 
-const LineArea: React.FC<{value: unknown; area: boolean; labels: string[]; palette: string[]}> = ({value, area, labels, palette}) => {
+const LineArea: React.FC<PlotGeometry & {value: unknown; area: boolean; labels: string[]; palette: string[]}> = ({value, area, labels, palette, w = W, h = H, padL = PAD}) => {
   const series = toSeries(value);
   if (series.length === 0) return null;
   const d = extent(series.flatMap((s) => s.values));
   const multi = series.length > 1;
   return (
     <>
-      <Grid d={d} />
+      <Grid d={d} w={w} h={h} padL={padL} />
       {series.map((s, i) => {
-        const pts = linePoints(s.values, d, W, H, PAD);
-        const base = scale(Math.max(d.min, 0), d, H - PAD, PAD);
+        const pts = linePoints(s.values, d, w, h, PAD, padL);
+        const base = scale(Math.max(d.min, 0), d, h - PAD, PAD);
         const coords = pts.split(' ');
         const first = coords[0]?.split(',')[0];
         const last = coords[coords.length - 1]?.split(',')[0];
@@ -215,8 +217,8 @@ const LineArea: React.FC<{value: unknown; area: boolean; labels: string[]; palet
             {area && <polygon points={`${first},${base} ${pts} ${last},${base}`} fill={palette[i % palette.length]} opacity={0.15} />}
             <polyline points={pts} fill="none" stroke={palette[i % palette.length]} strokeWidth={2} strokeLinejoin="round" />
             {s.values.map((v, j) => {
-              const x = n === 1 ? W / 2 : PAD + (j / (n - 1)) * (W - PAD * 2);
-              const y = scale(v, d, H - PAD, PAD);
+              const x = n === 1 ? (padL + w - PAD) / 2 : padL + (j / (n - 1)) * (w - padL - PAD);
+              const y = scale(v, d, h - PAD, PAD);
               const lbl = labels[j] ?? `#${j + 1}`;
               return (
                 <Mark key={j} datum={{key: `p-${i}-${j}`, label: multi && s.name ? `${s.name} · ${lbl}` : lbl, value: v}} at={{x, y}}>
@@ -227,27 +229,27 @@ const LineArea: React.FC<{value: unknown; area: boolean; labels: string[]; palet
           </g>
         );
       })}
-      <SeriesLegend series={series} palette={palette} glyph={() => 'line'} />
-      <XLabels labels={labels} n={Math.max(...series.map((s) => s.values.length))} />
+      <SeriesLegend w={w} series={series} palette={palette} glyph={() => 'line'} />
+      <XLabels w={w} h={h} padL={padL} labels={labels} n={Math.max(...series.map((s) => s.values.length))} />
     </>
   );
 };
 
-const Bars: React.FC<{value: unknown; labels: string[]; palette: string[]}> = ({value, labels, palette}) => {
+const Bars: React.FC<PlotGeometry & {value: unknown; labels: string[]; palette: string[]}> = ({value, labels, palette, w = W, h = H, padL = PAD}) => {
   const series = toSeries(value);
   if (series.length === 0) return null;
   const d = extent(series.flatMap((s) => s.values));
   const n = Math.max(...series.map((s) => s.values.length));
-  const groupW = (W - PAD * 2) / n;
+  const groupW = (w - padL - PAD) / n;
   const barW = Math.max((groupW * 0.7) / series.length, 2);
-  const zero = scale(Math.max(d.min, 0), d, H - PAD, PAD);
+  const zero = scale(Math.max(d.min, 0), d, h - PAD, PAD);
   return (
     <>
-      <Grid d={d} />
+      <Grid d={d} w={w} h={h} padL={padL} />
       {series.map((s, si) =>
         s.values.map((v, i) => {
-          const y = scale(v, d, H - PAD, PAD);
-          const x = PAD + i * groupW + groupW * 0.15 + si * barW;
+          const y = scale(v, d, h - PAD, PAD);
+          const x = padL + i * groupW + groupW * 0.15 + si * barW;
           const lbl = labels[i] ?? `#${i + 1}`;
           return (
             <Mark
@@ -268,7 +270,7 @@ const Bars: React.FC<{value: unknown; labels: string[]; palette: string[]}> = ({
             const budget = Math.max(3, Math.floor(groupW / 6));
             const shown = ellipsize(l, budget);
             return (
-              <text key={i} x={PAD + i * groupW + groupW / 2} y={H - 8}>
+              <text key={i} x={padL + i * groupW + groupW / 2} y={h - 8}>
                 {shown}
                 {shown !== l && <title>{l}</title>}
               </text>
@@ -276,16 +278,17 @@ const Bars: React.FC<{value: unknown; labels: string[]; palette: string[]}> = ({
           })}
         </g>
       )}
-      <SeriesLegend series={series} palette={palette} />
+      <SeriesLegend w={w} series={series} palette={palette} />
     </>
   );
 };
 
-const PieDonut: React.FC<{value: unknown; labels: string[]; donut: boolean; palette: string[]}> = ({value, labels, donut, palette}) => {
+const PieDonut: React.FC<PlotGeometry & {value: unknown; labels: string[]; donut: boolean; palette: string[]}> = ({value, labels, donut, palette, w = W, h = H}) => {
   const slices = toLabelled(value, labels).filter((s) => s.value > 0);
   if (slices.length === 0) return null;
-  const r = H / 2 - 16;
-  const arcs = pieArcs(slices.map((s) => s.value), H / 2, H / 2, r, donut ? r * 0.55 : 0);
+  const size = Math.min(h, w * 0.5);
+  const r = Math.max(1, size / 2 - 16);
+  const arcs = pieArcs(slices.map((s) => s.value), size / 2, h / 2, r, donut ? r * 0.55 : 0);
   return (
     <>
       {arcs.map((a, i) => (
@@ -295,7 +298,7 @@ const PieDonut: React.FC<{value: unknown; labels: string[]; donut: boolean; pale
       ))}
       <g className="obe-chart-legend">
         {slices.map((s, i) => (
-          <g key={i} transform={`translate(${H + 24}, ${28 + i * 20})`}>
+          <g key={i} transform={`translate(${size + 24}, ${28 + i * 20})`}>
             <rect width={10} height={10} rx={2} fill={palette[i % palette.length]} />
             <text x={16} y={9}>
               {s.label} · {Math.round((arcs[i]?.fraction ?? 0) * 100)}%
@@ -307,17 +310,17 @@ const PieDonut: React.FC<{value: unknown; labels: string[]; donut: boolean; pale
   );
 };
 
-const Scatter: React.FC<{value: unknown; palette: string[]}> = ({value, palette}) => {
+const Scatter: React.FC<PlotGeometry & {value: unknown; palette: string[]}> = ({value, palette, w = W, h = H, padL = PAD}) => {
   const pts = toPoints(value);
   if (pts.length === 0) return null;
   const dx = extent(pts.map((p) => p.x));
   const dy = extent(pts.map((p) => p.y));
   return (
     <>
-      <Grid d={dy} />
+      <Grid d={dy} w={w} h={h} padL={padL} />
       {pts.map((p, i) => {
-        const cx = scale(p.x, dx, PAD, W - PAD);
-        const cy = scale(p.y, dy, H - PAD, PAD);
+        const cx = scale(p.x, dx, padL, w - PAD);
+        const cy = scale(p.y, dy, h - PAD, PAD);
         return (
           <Mark key={i} datum={{key: `pt-${i}`, label: `(${fmtChartValue(p.x)}, ${fmtChartValue(p.y)})`, value: p.y}} at={{x: cx, y: cy}}>
             <circle cx={cx} cy={cy} r={4} fill={palette[0]} opacity={0.75} />
@@ -328,18 +331,18 @@ const Scatter: React.FC<{value: unknown; palette: string[]}> = ({value, palette}
   );
 };
 
-const Funnel: React.FC<{value: unknown; labels: string[]; palette: string[]}> = ({value, labels, palette}) => {
+const Funnel: React.FC<PlotGeometry & {value: unknown; labels: string[]; palette: string[]}> = ({value, labels, palette, w = W, h = H, padL = PAD}) => {
   const stages = toLabelled(value, labels);
   if (stages.length === 0) return null;
-  const rows = funnelRows(stages.map((s) => s.value), W - PAD * 2, H - PAD);
+  const rows = funnelRows(stages.map((s) => s.value), w - padL - PAD, h - PAD);
   return (
     <>
       {rows.map((r, i) => (
         <g key={i}>
-          <Mark datum={{key: `row-${i}`, label: stages[i].label, value: stages[i].value}} at={{x: W / 2, y: 12 + r.y + r.height / 2}}>
-            <rect x={PAD + r.x} y={12 + r.y} width={r.width} height={r.height} rx={4} fill={palette[i % palette.length]} opacity={0.85} />
+          <Mark datum={{key: `row-${i}`, label: stages[i].label, value: stages[i].value}} at={{x: (padL + w - PAD) / 2, y: 12 + r.y + r.height / 2}}>
+            <rect x={padL + r.x} y={12 + r.y} width={r.width} height={r.height} rx={4} fill={palette[i % palette.length]} opacity={0.85} />
           </Mark>
-          <text fill={readableTextColor(palette[i % palette.length])} className="obe-chart-funnel-label" x={W / 2} y={12 + r.y + r.height / 2 + 4}>
+          <text fill={readableTextColor(palette[i % palette.length])} className="obe-chart-funnel-label" x={(padL + w - PAD) / 2} y={12 + r.y + r.height / 2 + 4}>
             {stages[i].label} · {stages[i].value}
           </text>
         </g>
@@ -616,7 +619,7 @@ const targetPct = (value: number, target?: number): number | null =>
  * rendered as SVG so it rides the same in-editor + export chart pipeline. The
  * figure is a {@link Mark}, so it gains the shared hover tooltip + keyboard focus.
  */
-const Kpi: React.FC<{value: unknown; labels: string[]; palette: string[]}> = ({value, labels, palette}) => {
+const Kpi: React.FC<PlotGeometry & {value: unknown; labels: string[]; palette: string[]}> = ({value, labels, palette, w = W, h = H}) => {
   const kpi = toKpi(value);
   if (!kpi) return null;
   // The caption names the single figure — meaningful only when there's exactly
@@ -625,24 +628,25 @@ const Kpi: React.FC<{value: unknown; labels: string[]; palette: string[]}> = ({v
   // total; there the chart's own title carries the name (leave the SVG caption off).
   const caption = labels.length === 1 ? labels[0] : '';
   const pct = targetPct(kpi.value, kpi.target);
-  const barW = W * 0.5;
-  const barX = (W - barW) / 2;
-  const barY = 190;
+  const barW = w * 0.5;
+  const barX = (w - barW) / 2;
+  const y = (base: number): number => base * h / H;
+  const barY = y(190);
   return (
     <>
       {caption && (
-        <text className="obe-chart-kpi-caption" x={W / 2} y={58}>
+        <text className="obe-chart-kpi-caption" x={w / 2} y={y(58)}>
           {caption}
         </text>
       )}
-      <Mark datum={{key: 'kpi', label: caption || 'Value', value: kpi.value}} at={{x: W / 2, y: pct !== null ? 108 : 128}}>
-        <text className="obe-chart-kpi-value" x={W / 2} y={pct !== null ? 128 : 148}>
+      <Mark datum={{key: 'kpi', label: caption || 'Value', value: kpi.value}} at={{x: w / 2, y: y(pct !== null ? 108 : 128)}}>
+        <text className="obe-chart-kpi-value" x={w / 2} y={y(pct !== null ? 128 : 148)} style={{fontSize: 60 * Math.min(1, h / H, (w - 32) / (fmtChartValue(kpi.value).length * 0.6 * 60))}}>
           {fmtChartValue(kpi.value)}
         </text>
       </Mark>
       {pct !== null && (
         <>
-          <text className="obe-chart-kpi-sub" x={W / 2} y={170}>
+          <text className="obe-chart-kpi-sub" x={w / 2} y={y(170)}>
             {`${pct}% of ${fmtChartValue(kpi.target!)}`}
           </text>
           <rect className="obe-chart-kpi-track" x={barX} y={barY} width={barW} height={8} rx={4} />
@@ -696,18 +700,18 @@ const HEAT_LABEL_INK_THRESHOLD = 0.6;
  * series a row) or the matrix channel; every cell is a {@link Mark} for
  * hover/tooltip, with a legible in-cell number when it fits.
  */
-const Heatmap: React.FC<{value: unknown; labels: string[]; palette: string[]; matrix?: ChartMatrixInput}> = ({value, labels, palette, matrix}) => {
+const Heatmap: React.FC<PlotGeometry & {value: unknown; labels: string[]; palette: string[]; matrix?: ChartMatrixInput}> = ({value, labels, palette, matrix, w = W, h = H, padL = PAD}) => {
   const {rows, cols, cells} = toGrid(value, labels, matrix);
   const flat = gridValues({rows, cols, cells});
   if (rows.length === 0 || cols.length === 0 || flat.length === 0) return null;
   const min = Math.min(...flat);
   const max = Math.max(...flat);
   const showRowLabels = rows.some((r) => r !== '');
-  const gutter = showRowLabels ? 64 : PAD;
+  const gutter = showRowLabels ? Math.max(64, padL) : padL;
   const gridX = gutter;
   const gridY = 14;
-  const gridW = W - gutter - PAD;
-  const gridH = H - gridY - 22; // 22px for column labels
+  const gridW = w - gutter - PAD;
+  const gridH = h - gridY - 22; // 22px for column labels
   const cw = gridW / cols.length;
   const ch = gridH / rows.length;
   const base = palette[0];
@@ -749,7 +753,7 @@ const Heatmap: React.FC<{value: unknown; labels: string[]; palette: string[]; ma
         )}
       <g className="obe-chart-xlabels">
         {cols.map((colLabel, c) => (
-          <text key={`cl-${c}`} x={gridX + c * cw + cw / 2} y={H - 7}>
+          <text key={`cl-${c}`} x={gridX + c * cw + cw / 2} y={h - 7}>
             {colLabel}
           </text>
         ))}
@@ -766,23 +770,23 @@ const comboLabel = (name: string, col: string): string => (name ? `${name} · ${
  * flat multi-series value (or the matrix channel); bars + line points are each a
  * {@link Mark}. A single series degrades to a plain bar chart.
  */
-const Combo: React.FC<{value: unknown; labels: string[]; palette: string[]; matrix?: ChartMatrixInput}> = ({value, labels, palette, matrix}) => {
+const Combo: React.FC<PlotGeometry & {value: unknown; labels: string[]; palette: string[]; matrix?: ChartMatrixInput}> = ({value, labels, palette, matrix, w = W, h = H, padL = PAD}) => {
   const {rows, cols, cells} = toGrid(value, labels, matrix);
   const flat = gridValues({rows, cols, cells});
   if (rows.length === 0 || cols.length === 0 || flat.length === 0) return null;
   const d = extent(flat);
   const n = cols.length;
-  const groupW = (W - PAD * 2) / n;
-  const zero = scale(Math.max(d.min, 0), d, H - PAD, PAD);
+  const groupW = (w - padL - PAD) / n;
+  const zero = scale(Math.max(d.min, 0), d, h - PAD, PAD);
   const barW = Math.max(groupW * 0.5, 2);
-  const px = (c: number): number => PAD + c * groupW + groupW / 2;
+  const px = (c: number): number => padL + c * groupW + groupW / 2;
   return (
     <>
-      <Grid d={d} />
+      <Grid d={d} w={w} h={h} padL={padL} />
       {cells[0].map((v, c) => {
         if (typeof v !== 'number') return null;
-        const y = scale(v, d, H - PAD, PAD);
-        const x = PAD + c * groupW + (groupW - barW) / 2;
+        const y = scale(v, d, h - PAD, PAD);
+        const x = padL + c * groupW + (groupW - barW) / 2;
         return (
           <Mark key={`bar-${c}`} datum={{key: `cb-0-${c}`, label: comboLabel(rows[0], cols[c]), value: v}} at={{x: x + barW / 2, y: Math.min(y, zero)}}>
             <rect x={x} y={Math.min(y, zero)} width={barW} height={Math.max(Math.abs(zero - y), 1)} rx={2} fill={palette[0]} />
@@ -793,7 +797,7 @@ const Combo: React.FC<{value: unknown; labels: string[]; palette: string[]; matr
         const r = li + 1;
         const color = palette[r % palette.length];
         const pts = cells[r]
-          .map((v, c) => (typeof v === 'number' ? `${px(c)},${scale(v, d, H - PAD, PAD)}` : null))
+          .map((v, c) => (typeof v === 'number' ? `${px(c)},${scale(v, d, h - PAD, PAD)}` : null))
           .filter(Boolean)
           .join(' ');
         return (
@@ -801,8 +805,8 @@ const Combo: React.FC<{value: unknown; labels: string[]; palette: string[]; matr
             <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
             {cells[r].map((v, c) =>
               typeof v === 'number' ? (
-                <Mark key={`ln-${r}-${c}`} datum={{key: `cb-${r}-${c}`, label: comboLabel(rowName, cols[c]), value: v}} at={{x: px(c), y: scale(v, d, H - PAD, PAD)}}>
-                  <circle className="obe-chart-dot" cx={px(c)} cy={scale(v, d, H - PAD, PAD)} r={5} fill={color} />
+                <Mark key={`ln-${r}-${c}`} datum={{key: `cb-${r}-${c}`, label: comboLabel(rowName, cols[c]), value: v}} at={{x: px(c), y: scale(v, d, h - PAD, PAD)}}>
+                  <circle className="obe-chart-dot" cx={px(c)} cy={scale(v, d, h - PAD, PAD)} r={5} fill={color} />
                 </Mark>
               ) : null,
             )}
@@ -811,12 +815,12 @@ const Combo: React.FC<{value: unknown; labels: string[]; palette: string[]; matr
       })}
       <g className="obe-chart-xlabels">
         {cols.map((l, c) => (
-          <text key={c} x={px(c)} y={H - 8}>
+          <text key={c} x={px(c)} y={h - 8}>
             {l}
           </text>
         ))}
       </g>
-      <SeriesLegend series={rows.map((name) => ({name}))} palette={palette} glyph={(i) => (i === 0 ? 'bar' : 'line')} />
+      <SeriesLegend w={w} series={rows.map((name) => ({name}))} palette={palette} glyph={(i) => (i === 0 ? 'bar' : 'line')} />
     </>
   );
 };
@@ -923,40 +927,40 @@ const hasPlottable = (value: unknown, labels: string[]): boolean =>
 registerChartKind({
   kind: 'line',
   label: 'line',
-  render: ({value, labels, palette}) => <LineArea value={value} area={false} labels={labels} palette={palette} />,
+  render: ({value, labels, palette, width, height, padLeft}) => <LineArea w={width} h={height} padL={padLeft} value={value} area={false} labels={labels} palette={palette} />,
 });
 registerChartKind({
   kind: 'area',
   label: 'area',
-  render: ({value, labels, palette}) => <LineArea value={value} area labels={labels} palette={palette} />,
+  render: ({value, labels, palette, width, height, padLeft}) => <LineArea w={width} h={height} padL={padLeft} value={value} area labels={labels} palette={palette} />,
 });
 registerChartKind({
   kind: 'bar',
   label: 'bar',
   render: ({value, labels, palette, matrix, width, height, padLeft}) =>
-    matrix ? <MatrixBars matrix={matrix} palette={palette} w={width} h={height} padL={padLeft} /> : <Bars value={value} labels={labels} palette={palette} />,
+    matrix ? <MatrixBars matrix={matrix} palette={palette} w={width} h={height} padL={padLeft} /> : <Bars w={width} h={height} padL={padLeft} value={value} labels={labels} palette={palette} />,
 });
 registerChartKind({
   kind: 'pie',
   label: 'pie',
-  render: ({value, labels, palette, matrix, height, active}) =>
-    matrix ? <MatrixPie matrix={matrix} palette={palette} size={height ?? H} active={active} /> : <PieDonut value={value} labels={labels} donut={false} palette={palette} />,
+  render: ({value, labels, palette, matrix, height, active, width, padLeft}) =>
+    matrix ? <MatrixPie matrix={matrix} palette={palette} size={height ?? H} active={active} /> : <PieDonut w={width} h={height} padL={padLeft} value={value} labels={labels} donut={false} palette={palette} />,
 });
 registerChartKind({
   kind: 'donut',
   label: 'donut',
-  render: ({value, labels, palette}) => <PieDonut value={value} labels={labels} donut palette={palette} />,
+  render: ({value, labels, palette, width, height, padLeft}) => <PieDonut w={width} h={height} padL={padLeft} value={value} labels={labels} donut palette={palette} />,
 });
 registerChartKind({
   kind: 'scatter',
   label: 'scatter',
   hasData: () => true,
-  render: ({value, palette}) => <Scatter value={value} palette={palette} />,
+  render: ({value, palette, width, height, padLeft}) => <Scatter w={width} h={height} padL={padLeft} value={value} palette={palette} />,
 });
 registerChartKind({
   kind: 'funnel',
   label: 'funnel',
-  render: ({value, labels, palette}) => <Funnel value={value} labels={labels} palette={palette} />,
+  render: ({value, labels, palette, width, height, padLeft}) => <Funnel w={width} h={height} padL={padLeft} value={value} labels={labels} palette={palette} />,
 });
 // DASH-5 kinds — register-only; they appear in the Kind selector + Change-kind
 // menu (both derive from the registry) with no dispatch edit.
@@ -964,17 +968,17 @@ registerChartKind({
   kind: 'kpi',
   label: 'KPI',
   hasData: (value) => toKpi(value) !== null,
-  render: ({value, labels, palette}) => <Kpi value={value} labels={labels} palette={palette} />,
+  render: ({value, labels, palette, width, height, padLeft}) => <Kpi w={width} h={height} padL={padLeft} value={value} labels={labels} palette={palette} />,
 });
 registerChartKind({
   kind: 'heatmap',
   label: 'heatmap',
-  render: ({value, labels, palette, matrix}) => <Heatmap value={value} labels={labels} palette={palette} matrix={matrix} />,
+  render: ({value, labels, palette, matrix, width, height, padLeft}) => <Heatmap w={width} h={height} padL={padLeft} value={value} labels={labels} palette={palette} matrix={matrix} />,
 });
 registerChartKind({
   kind: 'combo',
   label: 'combo',
-  render: ({value, labels, palette, matrix}) => <Combo value={value} labels={labels} palette={palette} matrix={matrix} />,
+  render: ({value, labels, palette, matrix, width, height, padLeft}) => <Combo w={width} h={height} padL={padLeft} value={value} labels={labels} palette={palette} matrix={matrix} />,
 });
 
 /** Kind strings of the currently-registered kinds (re-exported by the kit). */
@@ -1276,6 +1280,8 @@ export interface KitChartPlotProps {
   palette: string[];
   /** The svg's accessible name (`role="group"`). DB pie passes `Sunburst chart`/`Pie chart`. */
   ariaLabel: string;
+  /** Measure the SVG content width for 1:1 pixel geometry (kit blocks). */
+  responsive?: boolean;
   /** viewBox width/height. Default 640×240 (the wide plot); the DB pie passes a square box. */
   viewW?: number;
   viewH?: number;
@@ -1307,8 +1313,9 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
   labels = [],
   palette,
   ariaLabel,
-  viewW = W,
-  viewH = H,
+  viewW: fallbackW = W,
+  viewH: fallbackH = H,
+  responsive = false,
   padLeft = PAD,
   frameless = false,
   message,
@@ -1320,6 +1327,21 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
   highlightKey = null,
   onActiveChange,
 }) => {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const node = svgRef.current;
+    if (!responsive || !node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setMeasuredWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [responsive]);
+  useEffect(() => { setActive(null); setMenu(null); }, [measuredWidth]);
+  const viewW = responsive ? Math.max(240, measuredWidth ?? fallbackW) : fallbackW;
+  const viewH = responsive && measuredWidth !== null ? Math.max(150, Math.min(H, Math.round(viewW * H / W))) : fallbackH;
+
   // `active` drives the tooltip + highlight from hover OR keyboard focus; `menu`
   // is the open context-menu target (null = closed). Both key off the datum so
   // identity survives re-render. When the menu closes we return focus to its mark.
@@ -1427,7 +1449,7 @@ export const KitChartPlot: React.FC<KitChartPlotProps> = ({
           children now, and an img is an ARIA leaf that would hide them (and
           their `label: value` names) from assistive tech. A labelled group
           keeps the chart's accessible name while exposing every mark. */}
-      <svg viewBox={`0 0 ${viewW} ${viewH}`} role="group" aria-label={ariaLabel} className={cn('obe-chart-svg', frameless && 'obe-chart-svg-bare')}>
+      <svg ref={svgRef} viewBox={`0 0 ${viewW} ${viewH}`} role="group" aria-label={ariaLabel} className={cn('obe-chart-svg', frameless && 'obe-chart-svg-bare')}>
         <ChartInteractionContext.Provider value={interactions}>{body}</ChartInteractionContext.Provider>
       </svg>
       {/* The floating tooltip is the in-doc idiom. In DB-view mode ('action'/
@@ -1548,6 +1570,8 @@ const ChartBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       hideEmptyHeaderWhenLocked rootProps={{'data-chart-kind': kind}}
       control={
         <KitChartPlot
+          responsive
+          padLeft={40}
           kind={kind}
           value={value}
           labels={effectiveLabels}
