@@ -280,6 +280,7 @@ emphasis an author placed on prose or a block, it reads `--obe-*`. Never cross:
 chips never use `obe-bg-*`; prose never reads `--data-*`. Single-value meters and
 controls (progress fill, switch on, slider track, rating stars in database cells and public forms) are **neither** — they use `--primary`.
 Default primary pair: light `207 75% 44%` / `0 0% 100%` (4.60:1); dark `207 78% 62%` / `207 50% 12%` (6.29:1). Primary buttons and the timeline today marker use this pair directly.
+Default light `--ring` and `--brand` also use `207 75% 44%`, mirrored in `themes.ts` so appearance application preserves the match. Focus geometry stays unchanged; the ring needs no lighter variant. Dark values remain `207 78% 62%` for primary/ring and `207 70% 57%` for brand. Static exported buttons already use DSX-13's `KIT_EXPORT_PRIMARY` `#1c79c4` with white ink (4.5837:1 after hex rounding).
 Pastel light data fills: red `#dc9896` (near-red hue 1.7°) and yellow `#e0ce86` (48°) separate the 3px calendar rails from green `#9fdf9f` and blue `#a9ccdf`. These canonical fills also flow to swatches, charts and status lamps; dark fills and chip pairs stay unchanged.
 Shared hue *names* stay aligned (one mental model), values do not.
 
@@ -299,7 +300,7 @@ Shared hue *names* stay aligned (one mental model), values do not.
 | `--obe-chrome-ink-hover` | `hsl(var(--foreground))` | same |
 | `--obe-chrome-hover` | `var(--hover)` | `hsl(var(--accent))` :1090 (two competing recipes today) |
 | `--obe-chrome-active` | `var(--hover-strong)` | — (menu-open state had none) |
-| `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#e0eefa`), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49`) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
+| `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#dfecf7` over white), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49` over the dark page) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
 | `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (4.60 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
 | `--obe-drag-dim` | `0.4` | table `0.45` :2116; block rows none |
 | `--obe-notice-pad-x` | `0.75rem` — public plugin notice horizontal padding; also aligns adjacent arithmetic | new |
