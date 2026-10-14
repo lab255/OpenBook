@@ -96,10 +96,10 @@ describe('reactive export from a block document', () => {
     expect(html).toContain('<span data-val>86</span>'); // best
     expect(html).toContain('data-status="ok"'); // status light colour
     expect(html).toContain('width:72%'); // progress fill
-    expect(html).toContain('.kit-pill.kit-on { background: #1f86db; border-color: #1f86db;');
-    expect(html).toContain('accent-color: #1f86db');
-    expect(html).toContain('background: rgba(31,134,219,0.08); border-color: #1f86db');
-    expect(html).toContain('border-radius: 9999px; background: #1f86db; transition: width 180ms cubic-bezier(0.32,0.72,0,1)');
+    expect(html).toContain('.kit-pill.kit-on { background: #1c79c4; border-color: #1c79c4;');
+    expect(html).toContain('accent-color: #1c79c4');
+    expect(html).toContain('background: rgba(28,121,196,0.08); border-color: #1c79c4');
+    expect(html).toContain('border-radius: 9999px; background: #1c79c4; transition: width 180ms cubic-bezier(0.32,0.72,0,1)');
     // Only static styles: the bundled viewer also carries the out-of-scope data palette.
     const staticCss = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
     expect(staticCss).toBeTruthy();
@@ -133,8 +133,8 @@ describe('reactive export from a block document', () => {
     expect(html).toContain('.kitlight[data-status=ok] .kit-light-dot { background: #9fdf9f;');
     expect(html).toContain('0 0 0 3px rgba(159,223,159,0.25)');
     expect(html).toContain('inset 0 0 0 1px rgba(0,0,0,0.12)');
-    expect(html).toContain('.kitlight[data-status=warn] .kit-light-dot { background: #dac495;'); // yellow
-    expect(html).toContain('.kitlight[data-status=bad] .kit-light-dot { background: #deaea6;'); // red
+    expect(html).toContain('.kitlight[data-status=warn] .kit-light-dot { background: #e0ce86;'); // yellow
+    expect(html).toContain('.kitlight[data-status=bad] .kit-light-dot { background: #dc9896;'); // red
     // The drawn kit bar (series 0) uses the canonical blue-first SERIES_ORDER fill.
     expect(html).toContain('fill="#a9ccdf"');
   });

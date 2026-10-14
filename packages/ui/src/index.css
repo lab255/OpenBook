@@ -329,6 +329,9 @@
     --obe-code-num: hsl(28 80% 38%);
     --obe-code-lit: hsl(210 72% 42%);
 
+    /* Board column washes: light 50% / dark 35%. */
+    --data-column-tint: 50%;
+
     /* Warm, refined light palette */
     --background: 0 0% 100%;
     --foreground: 34 9% 19%;
@@ -336,7 +339,7 @@
     --card-foreground: 34 9% 19%;
     --popover: 0 0% 100%;
     --popover-foreground: 34 9% 19%;
-    --primary: 207 75% 49%;
+    --primary: 207 75% 44%;
     --primary-foreground: 0 0% 100%;
     --secondary: 40 9% 96%;
     --secondary-foreground: 34 9% 19%;
@@ -416,6 +419,7 @@
   }
 
   .dark {
+    --data-column-tint: 35%;
     --obe-chart-ink-on-pale: #233246;
     --obe-select-wash: hsl(var(--ring) / 0.2);
     --obe-fg-gray: hsl(0 0% 66%);
@@ -3455,8 +3459,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12));
 }
 .obe-kit-light-ok { background: var(--data-status-ok, #9fdf9f); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-ok, #9fdf9f) 25%, transparent); }
-.obe-kit-light-warn { background: var(--data-status-warn, #dac495); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-warn, #dac495) 25%, transparent); }
-.obe-kit-light-bad { background: var(--data-status-bad, #deaea6); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #deaea6) 25%, transparent); }
+.obe-kit-light-warn { background: var(--data-status-warn, #e0ce86); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-warn, #e0ce86) 25%, transparent); }
+.obe-kit-light-bad { background: var(--data-status-bad, #dc9896); box-shadow: inset 0 0 0 1px var(--data-stroke, rgba(0,0,0,0.12)), 0 0 0 3px color-mix(in srgb, var(--data-status-bad, #dc9896) 25%, transparent); }
 .obe-kit-status-label { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-kit-status-value {
   font-family: var(--obe-font-mono);

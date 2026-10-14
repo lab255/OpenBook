@@ -144,7 +144,7 @@ const PublicField: React.FC<{
             onClick={() => onChange(current === rating ? undefined : rating)}
             aria-label={t('database.publicForm.rating', {rating})}
             aria-pressed={rating <= current}
-            className={cn('text-2xl transition-colors', rating <= current ? 'text-[var(--obe-fg-yellow)]' : 'text-muted-foreground/30')}
+            className={cn('text-2xl transition-colors', rating <= current ? 'text-primary' : 'text-muted-foreground/30')}
           >
             ★
           </button>

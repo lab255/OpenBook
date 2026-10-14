@@ -26,7 +26,7 @@ call. Matching it is not a goal in itself; each row states our own reason.
 | # | Rule |
 |---|---|
 | G1 | **Export parity.** Core block visuals stay plain CSS in `index.css` (comment at :932-935). Every token a core block reads is a CSS custom property declared in the plain `:root` / `.dark` layer (:215-350). `@theme` may *alias* a token for Tailwind utilities; core block CSS never depends on a Tailwind-generated variable or utility. Nothing here prescribes Tailwind for core block visuals. |
-| G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). Kit inputs: `KIT_EXPORT_PRIMARY` = `#1f86db` (light `--primary` `207 75% 49%`, `colors.ts`, equality-tested in `colors.test.ts`). |
+| G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). Kit inputs: `KIT_EXPORT_PRIMARY` = `#1c79c4` (light `--primary` `207 75% 44%`, `colors.ts`, equality-tested in `colors.test.ts`). |
 | G3 | **Token namespaces.** Editor/content tokens: `--obe-*`. Motion durations: `--motion-*`. Easings: existing `--ease-*`. Radius: existing `--radius-*` (+ one new step). z-index: existing `--z-index-*`. No other new prefixes. |
 | G4 | **Mode pairs.** Any colour token that is not derived from a theme variable (`--foreground`, `--muted`, `--ring`, …) declares both a `:root` and a `.dark` value. A literal colour with no dark value is a defect. |
 | G5 | **Sequencing.** A foundation change lands first (declare tokens §1-§5, global retunes §2.4, lint guards §10 at `warn`); family tasks then migrate their own selectors. Guards flip to `error` when their baseline reaches zero. |
@@ -273,12 +273,14 @@ The scale (:131-145) is complete; this section only governs use.
 | Source | `blockeditor/colors.ts` (`COLOR_TOKENS`, 9) + `--obe-fg/bg/hl-*` | `sdk/src/dataColors.ts` (12 tokens × pastel/vivid/muted) + `lib/dataColorVars.ts` (`--data-*`) |
 | Meaning | **Authored emphasis** stored in the document | **Encodes data**: category, series, status |
 | Chosen by | The author (persisted per block/run) | The viewer's appearance preference |
-| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers; board column tint = chip-bg at 50% via color-mix; app status inks, status chips/badges, status dots, diff marks (added/changed/removed), identity monograms + dataflow kind chips (via `DATA_CHIP_CLASS` / `STATUS_*_CLASS`) |
+| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers; board column tint = chip-bg via color-mix at `--data-column-tint` (50% light / 35% dark), including collapsed strips; app status inks, status chips/badges, status dots, diff marks (added/changed/removed), identity monograms + dataflow kind chips (via `DATA_CHIP_CLASS` / `STATUS_*_CLASS`) |
 
 **Rule:** if the colour carries meaning *about data*, it reads `--data-*`; if it is
 emphasis an author placed on prose or a block, it reads `--obe-*`. Never cross:
 chips never use `obe-bg-*`; prose never reads `--data-*`. Single-value meters and
-controls (progress fill, switch on, slider track) are **neither** — they use `--primary`.
+controls (progress fill, switch on, slider track, rating stars in database cells and public forms) are **neither** — they use `--primary`.
+Default primary pair: light `207 75% 44%` / `0 0% 100%` (4.60:1); dark `207 78% 62%` / `207 50% 12%` (6.29:1). Primary buttons and the timeline today marker use this pair directly.
+Pastel light data fills: red `#dc9896` (near-red hue 1.7°) and yellow `#e0ce86` (48°) separate the 3px calendar rails from green `#9fdf9f` and blue `#a9ccdf`. These canonical fills also flow to swatches, charts and status lamps; dark fills and chip pairs stay unchanged.
 Shared hue *names* stay aligned (one mental model), values do not.
 
 ---
@@ -298,7 +300,7 @@ Shared hue *names* stay aligned (one mental model), values do not.
 | `--obe-chrome-hover` | `var(--hover)` | `hsl(var(--accent))` :1090 (two competing recipes today) |
 | `--obe-chrome-active` | `var(--hover-strong)` | — (menu-open state had none) |
 | `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#e0eefa`), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49`) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
-| `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (3.81 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
+| `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (4.60 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
 | `--obe-drag-dim` | `0.4` | table `0.45` :2116; block rows none |
 | `--obe-notice-pad-x` | `0.75rem` — public plugin notice horizontal padding; also aligns adjacent arithmetic | new |
 | `--obe-disabled-opacity` | `0.5` — one rule: `.obe-kit :is(button, input, select, textarea, [role='switch']):disabled`, `.obe-kit-card`, `.obe-kit-searchtrigger`; never on read-only/present pages. Plugin UI surface exception: `.obe-ui-btn`/`.obe-ui-field` off face is a dashed border in `--muted-foreground`, never opacity. It must stay visible on read-only pages, which the kit rule exempts; field values retain `--foreground`. | card `0.55`, search trigger `0.6`; app `disabled:opacity-50` |
