@@ -453,6 +453,34 @@ export function moveBlocks(doc: Y.Doc, ids: Iterable<string>, targetParentId: st
   }, 'local');
 }
 
+/** Tab into a preceding toggle; Shift+Tab (or first-child Backspace) out. */
+export function nestInToggle(doc: Y.Doc, id: string, outdent = false): boolean {
+  const found = findBlock(doc, id);
+  if (!found) return false;
+  const owner = parentBlockOf(doc, found.parent);
+  if (outdent) {
+    if (!owner || blockType(owner) !== 'togglelist') return false;
+    const parent = findBlock(doc, blockId(owner))!;
+    const grandparent = parentBlockOf(doc, parent.parent);
+    moveBlocks(doc, found.parent.toArray().slice(found.index).map(blockId), grandparent ? blockId(grandparent) : null, parent.index + 1);
+    return true;
+  }
+  const previous = found.index > 0 ? found.parent.get(found.index - 1) : null;
+  if (!previous || blockType(previous) !== 'togglelist') return false;
+  let depth = 1; // The preceding toggle becomes the immediate parent.
+  let ancestor = owner;
+  while (ancestor) {
+    if (blockType(ancestor) === 'togglelist') depth += 1;
+    ancestor = parentBlockOf(doc, findBlock(doc, blockId(ancestor))!.parent);
+  }
+  if (depth > 4) return false;
+  doc.transact(() => {
+    setBlockProp(previous, 'collapsed', false);
+    moveBlocks(doc, [id], blockId(previous), blockChildren(previous)!.length);
+  }, 'local');
+  return true;
+}
+
 /** Split a text block at `offset`: the tail (text + attrs) becomes a new block below. */
 export function splitBlock(doc: Y.Doc, id: string, offset: number, newType?: BlockType): string | null {
   let newId: string | null = null;
@@ -481,7 +509,12 @@ export function splitBlock(doc: Y.Doc, id: string, offset: number, newType?: Blo
         ? {kind: blockProp<string>(found.block, 'kind') ?? 'bullet'}
         : undefined;
     newId = shortId('b'); // settled up front — detached Y.Maps can't be read
-    found.parent.insert(found.index + 1, [makeBlock({id: newId, type: continuation, text: tail, props})]);
+    const next = makeBlock({id: newId, type: continuation, text: tail, props});
+    if (type === 'togglelist' && !blockProp(found.block, 'collapsed')) {
+      blockChildren(found.block)!.insert(0, [next]);
+    } else {
+      found.parent.insert(found.index + 1, [next]);
+    }
   }, 'local');
   return newId;
 }
@@ -499,6 +532,10 @@ export function mergeWithPrevious(doc: Y.Doc, id: string): {id: string; offset: 
     const prevText = blockText(prev);
     const text = blockText(found.block);
     if (!prevText || !text) return;
+    if (blockType(prev) === 'togglelist' && !blockProp(prev, 'collapsed') && blockChildren(prev)?.length) {
+      if (nestInToggle(doc, id)) result = {id, offset: 0};
+      return;
+    }
     const offset = prevText.length;
     const delta = text.toDelta() as {insert: string; attributes?: InlineAttrs}[];
     let at = offset;
@@ -512,12 +549,26 @@ export function mergeWithPrevious(doc: Y.Doc, id: string): {id: string; offset: 
   return result;
 }
 
+/** Lift a toggle's children into its containing array, preserving order. */
+function unwrapToggleChildren(block: BlockMap): void {
+  const parent = block.parent as Y.Array<BlockMap>;
+  const index = parent.toArray().indexOf(block);
+  const children = blockChildren(block);
+  if (children?.length) parent.insert(index + 1, children.toArray().map(child => cloneBlock(child)));
+  block.delete('children');
+}
+
 /** Change a block's type in place (keeps text); optional props patch. */
 export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record<string, unknown>): void {
   doc.transact(() => {
     const found = findBlock(doc, id);
     if (!found) return;
+    // Unwrap the summary without losing its nested content.
+    if (blockType(found.block) === 'togglelist' && type !== 'togglelist') {
+      unwrapToggleChildren(found.block);
+    }
     found.block.set('type', type);
+    if (CONTAINER_BLOCKS.has(type) && !blockChildren(found.block)) found.block.set('children', new Y.Array<BlockMap>());
     if (TEXT_BLOCKS.has(type) && !blockText(found.block)) found.block.set('text', new Y.Text());
     if (props) for (const [k, v] of Object.entries(props)) setBlockProp(found.block, k, v);
   }, 'local');
@@ -538,7 +589,9 @@ export function turnInto(doc: Y.Doc, id: string, type: BlockType, props?: Record
  */
 export function patchBlock(block: BlockMap, patch: {type?: string; props?: Record<string, unknown>}): void {
   if (patch.type) {
+    if (blockType(block) === 'togglelist' && patch.type !== 'togglelist') unwrapToggleChildren(block);
     block.set('type', patch.type);
+    if (CONTAINER_BLOCKS.has(patch.type) && !blockChildren(block)) block.set('children', new Y.Array<BlockMap>());
     if (TEXT_BLOCKS.has(patch.type as BlockType) && !blockText(block)) block.set('text', new Y.Text());
   }
   if (patch.props) for (const [k, v] of Object.entries(patch.props)) setBlockProp(block, k, v === null ? undefined : v);
@@ -2541,6 +2594,14 @@ export function htmlToBlocks(html: string, opts: HtmlToBlocksOptions = {}): NewB
     case 'ol':
       pushListItems(node, 'number');
       return;
+    case 'details': {
+      const body = node.cloneNode(true) as HTMLElement;
+      const summary = body.querySelector(':scope > summary');
+      const text = htmlToRuns(summary?.innerHTML ?? '');
+      summary?.remove();
+      out.push({type: 'togglelist', text, props: {collapsed: !node.hasAttribute('open')}, children: htmlToBlocks(body.innerHTML, opts)});
+      return;
+    }
     case 'blockquote':
       out.push({type: 'quote', text: htmlToRuns(node.innerHTML)});
       emitImagesIn(node);
@@ -2688,9 +2749,8 @@ export function migrateLegacyBlocks(blocks: LegacyBlock[], ctx: MigrationContext
     case 'toc':
       break; // derived from headings — nothing to migrate
     case 'accordion': {
-      // No toggle block (yet): keep both halves readable.
-      if (d.title) out.push({type: 'heading', text: htmlToRuns(String(d.title)), props: {level: 3}});
-      if (d.content) out.push({type: 'paragraph', text: htmlToRuns(String(d.content))});
+      out.push({type: 'togglelist', text: htmlToRuns(String(d.title ?? '')), props: {collapsed: d.open === false},
+        children: d.content ? [{type: 'paragraph', text: htmlToRuns(String(d.content))}] : []});
       break;
     }
     case 'button': {

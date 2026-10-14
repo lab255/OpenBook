@@ -1,3 +1,4 @@
+import {shortId} from '@book.dev/sdk';
 import React, {useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {
   ArrowDown,
@@ -1819,6 +1820,7 @@ const TURN_OPTIONS: Array<{label: string; type: BlockType; props?: Record<string
   {label: 'Bulleted list', type: 'list', props: {kind: 'bullet'}},
   {label: 'Numbered list', type: 'list', props: {kind: 'number'}},
   {label: 'To-do', type: 'todo'},
+  {label: 'Toggle list', type: 'togglelist'},
   {label: 'Quote', type: 'quote'},
   {label: 'Callout', type: 'callout', props: {variant: 'info'}},
   {label: 'Code', type: 'code'},
@@ -2194,6 +2196,36 @@ const GroupView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   );
 };
 
+/** Rich-text disclosure: reader navigation stays live in the hydrated viewer. */
+const ToggleListView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) => {
+  const {editor, ui} = shared;
+  const collapsed = Boolean(blockProp(block, 'collapsed'));
+  const children = blockChildren(block)!;
+  const addChild = (): void => {
+    const id = shortId('b');
+    editor.doc.transact(() => children.insert(0, [makeBlock({id, type: 'paragraph'})]), 'local');
+    editor.requestCaret({blockId: id, offset: 0});
+  };
+  return (
+    <div className="obe-togglelist">
+      <div className="obe-togglelist-row">
+        <button type="button" className="obe-togglelist-marker" aria-label={t('blockEditor.togglelistToggle')}
+          aria-expanded={!collapsed} contentEditable={false}
+          onClick={() => editor.doc.transact(() => setBlockProp(block, 'collapsed', !collapsed), 'local')}>
+          <ChevronRight className="obe-togglelist-chevron" aria-hidden />
+        </button>
+        <TextBlockView block={block} editor={editor} ui={ui} />
+      </div>
+      {!collapsed && <div className="obe-togglelist-children">
+        <BlockList list={children} {...shared} depth={shared.depth + 1} container="togglelist" />
+        {children.length === 0 && !editor.readOnly && <button type="button" className="obe-togglelist-hint" onClick={addChild}>
+          {t('blockEditor.togglelistEmpty')}
+        </button>}
+      </div>}
+    </div>
+  );
+};
+
 // ── Tabs & Accordion (interactive-kit containers) ─────────────────────────────
 
 /** A small completion chip a tab/section shows: ✓ when complete, else N/M.
@@ -2482,6 +2514,9 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
 
   case 'table':
     return <TableView block={block} {...shared} />;
+
+  case 'togglelist':
+    return <ToggleListView block={block} {...shared} editor={textEditor} />;
 
   case 'todo': {
     const checked = blockProp<boolean>(block, 'checked') ?? false;

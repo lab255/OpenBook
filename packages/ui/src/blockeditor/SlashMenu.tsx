@@ -34,6 +34,7 @@ import {
   PanelTop,
   Puzzle,
   Quote,
+  ChevronRight,
   Search,
   Sigma,
   SlidersHorizontal,
@@ -111,7 +112,7 @@ interface SlashItem {
 // custom blocks key by block type; everything else falls back per group.
 const ID_ICONS: Record<string, IconComp> = {
   text: Type, h1: Heading1, h2: Heading2, h3: Heading3, chart: BarChart3,
-  bullet: List, number: ListOrdered, todo: ListTodo, quote: Quote,
+  bullet: List, number: ListOrdered, todo: ListTodo, quote: Quote, togglelist: ChevronRight,
   callout: Info, code: Code2, livecode: Sigma, divider: Minus, image: ImageIcon, notes: Mic,
   htmlartifact: AppWindow,
   table: Table, cols2: Columns2, cols3: Columns3, cols4: Columns3, group: Boxes,
@@ -236,6 +237,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   {id: 'bullet', label: 'Bulleted list', hint: 'Simple list', keywords: 'bullet list ul', group: 'basic', apply: turn('list', {kind: 'bullet'})},
   {id: 'number', label: 'Numbered list', hint: 'Ordered list', keywords: 'number ordered list ol', group: 'basic', apply: turn('list', {kind: 'number'})},
   {id: 'todo', label: 'To-do', hint: 'Checkbox item', keywords: 'todo check task', group: 'basic', apply: turn('todo')},
+  {id: 'togglelist', label: 'Toggle list', hint: 'Show or hide nested blocks', keywords: 'togglelist toggle collapse disclosure fold children', group: 'basic', apply: turn('togglelist', {collapsed: false})},
   {id: 'quote', label: 'Quote', hint: 'Pull quote', keywords: 'quote blockquote', group: 'basic', apply: turn('quote')},
   {id: 'callout', label: 'Callout', hint: 'Highlighted note', keywords: 'callout note info', group: 'basic', apply: turn('callout', {variant: 'info'})},
   {id: 'code', label: 'Code', hint: 'Monospaced block', keywords: 'code snippet', group: 'basic', apply: turn('code')},

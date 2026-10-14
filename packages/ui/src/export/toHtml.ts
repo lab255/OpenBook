@@ -385,6 +385,9 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     case 'list':
       html.push(listToHtml(toListItems(d.items), d.style === 'ordered', ctx));
       break;
+    case 'togglelist':
+      html.push(`<details class="obe-x-togglelist"${d.open === false ? '' : ' open'}><summary>${inlineToHtml(parseInline(str(d.text)), ctx)}</summary>${renderBlocks(Array.isArray(d.children) ? d.children as ExportBlock[] : [], ctx)}</details>`);
+      break;
     case 'quote':
       html.push(`<blockquote>${inlineToHtml(parseInline(str(d.text)), ctx)}</blockquote>`);
       break;
@@ -1333,6 +1336,8 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .cols > .col > :first-child { margin-top: 0; }
 @media (max-width: 640px) { .cols { flex-direction: column; gap: 28px; } .cols > .col { width: 100%; } }
 /* Container mirrors guarded against editor tokens by containerParity.test.ts. */
+.obe-x-togglelist > :not(summary){margin-left:24px}
+.obe-x-togglelist > summary{cursor:pointer}
 .obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: 8px; padding: 4px 24px; margin: 12px 0; }
 .obe-x-group-name { font-size: 12px; line-height: 1.33; letter-spacing: 0.04em; color: var(--obe-x-muted, hsl(40 3% 43.2%)); margin: 0 0 4px; }
 .obe-x-section > summary { cursor: pointer; min-height: 32px; font-size: 14px; font-weight: 600; }
