@@ -5,13 +5,13 @@ const tabs = ['summary', 'notes', 'transcript'] as const;
 type MeetingTab = typeof tabs[number];
 
 /** Keep every pane mounted: hiding Notes must preserve its CRDT editor state. */
-export function MeetingTabs({status, hasSummary, summary, notes, transcript}: {
-  status: string; hasSummary: boolean; summary: ReactNode; notes: ReactNode; transcript: ReactNode;
+export function MeetingTabs({status, attention, hasSummary, summary, notes, transcript}: {
+  status: string; attention: boolean; hasSummary: boolean; summary: ReactNode; notes: ReactNode; transcript: ReactNode;
 }) {
   const id = useId();
   const [selected, select] = useState<MeetingTab | null>(null);
-  const active = selected ?? (['requesting', 'recording', 'paused', 'processing'].includes(status)
-    ? 'transcript' : hasSummary ? 'summary' : 'notes');
+  const live = ['requesting', 'recording', 'paused', 'processing'].includes(status);
+  const active = selected ?? (live || attention ? 'transcript' : hasSummary ? 'summary' : 'notes');
   const panes = {summary, notes, transcript};
   return <div className="obe-meeting-tabs">
     <div className="obe-meeting-tabs-strip" role="tablist" aria-label={t('meetingBlock.tabs')}>
@@ -30,7 +30,7 @@ export function MeetingTabs({status, hasSummary, summary, notes, transcript}: {
         }}>{t(`meetingBlock.${tab}`)}</button>)}
     </div>
     {tabs.map((tab) => <div key={tab} role="tabpanel" id={`${id}-${tab}-panel`}
-      aria-labelledby={`${id}-${tab}-tab`} hidden={active !== tab} tabIndex={0}>
+      aria-labelledby={`${id}-${tab}-tab`} hidden={active !== tab} tabIndex={0} onFocus={() => select((s) => s ?? tab)}>
       {panes[tab]}
     </div>)}
   </div>;

@@ -17,7 +17,7 @@ function DraftNote() {
 
 describe('meeting tabs', () => {
   it('preserves mounted pane state and DOM identity across keyboard and pointer switches', () => {
-    render(<MeetingTabs status="idle" hasSummary={false} summary="Recap" notes={<DraftNote />} transcript="Words" />);
+    render(<MeetingTabs attention={false} status="idle" hasSummary={false} summary="Recap" notes={<DraftNote />} transcript="Words" />);
     const note = screen.getByRole('textbox') as HTMLInputElement;
     fireEvent.change(note, {target: {value: 'Unsaved draft'}});
     fireEvent.click(screen.getByRole('tab', {name: 'Summary'}));
@@ -49,17 +49,30 @@ describe('meeting tabs', () => {
     ['idle', false, 'Notes'], ['done', true, 'Summary'], ['recording', true, 'Transcript'],
     ['paused', false, 'Transcript'], ['processing', true, 'Transcript'],
   ] as const)('defaults %s with summary=%s to %s', (status, hasSummary, tab) => {
-    render(<MeetingTabs status={status} hasSummary={hasSummary} summary="Recap" notes="Agenda" transcript="Words" />);
+    render(<MeetingTabs attention={false} status={status} hasSummary={hasSummary} summary="Recap" notes="Agenda" transcript="Words" />);
     expect(screen.getByRole('tab', {name: tab}).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('defaults to Transcript when attention is required', () => {
+    render(<MeetingTabs attention status="done" hasSummary summary="Recap" notes="Agenda" transcript="Words" />);
+    expect(screen.getByRole('tab', {name: 'Transcript'}).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('keeps Notes selected after focus when a summary arrives', () => {
+    const panes = {attention: false, status: 'idle', summary: 'Recap', notes: <DraftNote />, transcript: 'Words'};
+    const view = render(<MeetingTabs {...panes} hasSummary={false} />);
+    fireEvent.focus(screen.getByRole('textbox'));
+    view.rerender(<MeetingTabs {...panes} hasSummary />);
+    expect(screen.getByRole('tab', {name: 'Notes'}).getAttribute('aria-selected')).toBe('true');
   });
 
   it('follows lifecycle defaults until a user chooses a pane', () => {
     const panes = {summary: 'Recap', notes: 'Agenda', transcript: 'Words', hasSummary: false};
-    const view = render(<MeetingTabs {...panes} status="idle" />);
-    view.rerender(<MeetingTabs {...panes} status="recording" />);
+    const view = render(<MeetingTabs attention={false} {...panes} status="idle" />);
+    view.rerender(<MeetingTabs attention={false} {...panes} status="recording" />);
     expect(screen.getByRole('tab', {name: 'Transcript'}).getAttribute('aria-selected')).toBe('true');
     fireEvent.click(screen.getByRole('tab', {name: 'Notes'}));
-    view.rerender(<MeetingTabs {...panes} status="processing" />);
+    view.rerender(<MeetingTabs attention={false} {...panes} status="processing" />);
     expect(screen.getByRole('tab', {name: 'Notes'}).getAttribute('aria-selected')).toBe('true');
   });
 });

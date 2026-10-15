@@ -253,7 +253,6 @@ describe('meeting asynchronous boundaries', () => {
     transcribeAsset.mockRejectedValueOnce(new Error('400'));
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
-    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
     expect(screen.getByRole('alert').textContent).toContain('Settings → AI');
     expect(screen.getByText('Not transcribed')).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Retry transcription'})); await flush(); });
@@ -300,7 +299,6 @@ describe('MEET-5 review regressions', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
     expect(session.mode).toBe('done'); expect(session.unsaved).toBe(true); expect(putAsset).not.toHaveBeenCalled();
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
     expect(screen.getByRole('link', {name: 'Save audio copy'})).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Retry upload'})); await flush(); });
     expect(session.unsaved).toBe(true); expect(session.mode).toBe('done');

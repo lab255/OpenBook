@@ -48,7 +48,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
     {exportError && <p role="alert">{t('meetingBlock.exportAudioFailed')}</p>}
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}
-    <MeetingTabs status={status} hasSummary={!!blockProp<string>(block, 'summary')?.trim()}
+    <MeetingTabs status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={!!blockProp<string>(block, 'summary')?.trim()}
       transcript={<MeetingTranscript saved={saved} completed={completed} transcript={transcript} session={session} readOnly={readOnly} canTranscribe={canTranscribe} />}
       summary={<MeetingSummary block={block} editor={editor} readOnly={readOnly} status={status} transcript={transcript} />}
       notes={<section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}><h4>{t('meetingBlock.notes')}</h4>{children}
