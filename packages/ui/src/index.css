@@ -3914,8 +3914,6 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-meeting-elapsed { font-variant-numeric: tabular-nums; }
 .obe-meeting button:disabled { opacity: 0.5; cursor: default; }
 .obe-meeting button:not(.obe-tab):focus-visible, .obe-meeting a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.obe-meeting-chunks { display: grid; gap: 12px; margin-block: 12px; }
-.obe-meeting-chunks li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .obe-meeting audio { max-width: 100%; }
 .obe-meeting-transcript { user-select: text; white-space: pre-wrap; }
 .obe-meeting time { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
@@ -3934,3 +3932,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-meeting-tabs-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 12px; }
 .obe-meeting-tabs [role="tabpanel"][hidden] { display: none; }
 .obe-meeting-tabs .obe-meeting-notes { border-top: 0; margin-top: 0; padding-top: 0; }
+
+.obe-meeting-player input[type="range"] { flex: 1; accent-color: hsl(var(--primary)); }
+.obe-meeting-markers { display: flex; }
+.obe-meeting-marker { position: relative; min-width: 0; }
+.obe-meeting .obe-meeting-marker-button { color: hsl(var(--muted-foreground)); width: 100%; }
+.obe-meeting-chunk-detail { position: absolute; z-index: var(--z-index-menu); background: hsl(var(--popover)); color: hsl(var(--popover-foreground)); border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); padding: 8px; min-width: max-content; }
+
+.obe-meeting .obe-meeting-marker-button[data-attention="true"] { color: hsl(var(--destructive)); }

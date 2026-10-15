@@ -178,6 +178,7 @@ describe('meeting UI and exports', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
     expect(screen.getByText(/Transcription requires a connected/)).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+    fireEvent.click(screen.getByRole('button', {name: '0:00 · Not transcribed'}));
     expect((screen.getByRole('button', {name: 'Retry transcription'}) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
     expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
