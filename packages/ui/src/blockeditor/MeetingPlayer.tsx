@@ -36,8 +36,8 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
 }) {
   const pending = session.chunks.filter((chunk) => chunk.blob);
   const entries = [
-    ...withMeetingAudioOffsets(saved).map((audio) => ({audio, id: chunkKey(audio), blob: undefined as Blob | undefined})),
-    ...pending.map((chunk) => ({audio: chunk.audio, id: chunk.id, blob: chunk.blob})),
+    ...withMeetingAudioOffsets(saved).map((audio, index) => ({audio, id: chunkKey(saved[index]), originalKey: chunkKey(saved[index]), blob: undefined as Blob | undefined})),
+    ...pending.map((chunk) => ({audio: chunk.audio, id: chunk.id, originalKey: chunkKey(chunk.audio), blob: chunk.blob})),
   ].sort((a, b) => (a.audio.startedAtMs ?? 0) - (b.audio.startedAtMs ?? 0));
   const chunks = withMeetingAudioOffsets(entries.map((entry) => entry.audio));
   const total = meetingAudioDuration(chunks);
@@ -85,8 +85,8 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
     <div className="obe-meeting-markers">
       {entries.map((entry, index) => {
         const audio = chunks[index];
-        const progress = session.chunks.find((chunk) => chunkKey(chunk.audio) === chunkKey(audio));
-        const done = completed.includes(chunkKey(audio));
+        const progress = session.chunks.find((chunk) => chunkKey(chunk.audio) === chunkKey(audio) || chunkKey(chunk.audio) === entry.originalKey);
+        const done = completed.includes(chunkKey(audio)) || completed.includes(entry.originalKey);
         const status = t(`meetingBlock.${entry.blob ? progress?.phase === 'uploadFailed' ? 'uploadFailed' : 'uploading' : done ? 'transcribed' : progress?.phase === 'transcribing' ? 'transcribing' : 'untranscribed'}`);
         const open = detail === entry.id || !!entry.blob || !!progress?.error;
         return <div className="obe-meeting-marker" key={entry.id} style={{flexGrow: audio.durationMs || 1}}>

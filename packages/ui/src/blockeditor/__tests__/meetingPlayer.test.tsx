@@ -54,6 +54,11 @@ describe('unified meeting playback', () => {
     fireEvent.click(screen.getByRole('button', {name: 'Play'}));
     expect(play).toHaveBeenCalled();
   });
+  it('preserves persisted completion keys for legacy chunks without offsets', () => {
+    render(<MeetingPlayer saved={saved} completed={['0:first', '0:second']} session={session} readOnly={false} canTranscribe />);
+    fireEvent.click(screen.getByRole('button', {name: '0:45 · Transcribed'}));
+    expect(screen.queryByRole('button', {name: 'Retry transcription'})).toBeNull();
+  });
   it('surfaces playback rejection and releases object URLs on unmount', async () => {
     const view = await mount(true);
     play.mockRejectedValueOnce(new Error('blocked'));
