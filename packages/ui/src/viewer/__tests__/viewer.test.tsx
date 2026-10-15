@@ -1,4 +1,4 @@
-import {describe, it, expect, afterEach} from 'vitest';
+import {describe, it, expect, afterEach, vi} from 'vitest';
 import {act} from 'react';
 import {render, cleanup, fireEvent, screen, waitFor} from '@testing-library/react';
 import {createDoc, encodeSnapshot} from '../../blockeditor/model';
@@ -169,6 +169,37 @@ describe('viewer', () => {
 
     act(() => handle.unmount());
     container.remove();
+  });
+
+  it('hydrates meeting audio from island assets with one immutable playback timeline', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const doc = createDoc([{type: 'meeting', props: {audioChunks: [
+      {assetId: 'one', durationMs: 45000}, {assetId: 'two', durationMs: 5000},
+    ]}}]);
+    const island = {...makeIsland(), data: {editor: 'blocks', blockdoc: encodeSnapshot(doc)}};
+    const before = JSON.stringify(island);
+    const container = document.createElement('div'); document.body.appendChild(container);
+    let handle!: ViewerHandle;
+    try {
+      act(() => { handle = mount(container, island, {assets: {
+        one: {mime: 'audio/webm', encoding: 'base64', data: 'AQ=='},
+        two: {mime: 'audio/webm', encoding: 'base64', data: 'Ag=='},
+      }}); });
+      fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+      await waitFor(() => expect(container.querySelectorAll('audio[src]')).toHaveLength(2));
+      expect(screen.getAllByRole('slider')).toHaveLength(1);
+      expect(screen.getByText('0:00 / 0:50')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', {name: '0:45 · Not transcribed'}));
+      expect(screen.queryByRole('button', {name: 'Retry transcription'})).toBeNull();
+      fireEvent.change(screen.getByRole('slider'), {target: {value: '46000'}});
+      fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+      expect(play.mock.instances[play.mock.instances.length - 1]).toBe(container.querySelectorAll('audio')[1]);
+      expect(container.querySelectorAll('audio')[1].currentTime).toBe(1);
+      expect(JSON.stringify(island)).toBe(before);
+    } finally {
+      act(() => handle?.unmount()); container.remove(); play.mockRestore(); pause.mockRestore();
+    }
   });
 
   it('mount() renders into a bare container and unmount() releases it', () => {
