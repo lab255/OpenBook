@@ -61,13 +61,13 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
     if (response.url().endsWith('/api/ai/transcribe') && response.ok()) transcriptions.push(response.url());
   });
   await meeting.getByRole('button', {name: 'Record', exact: true}).click();
-  await expect(meeting.locator('header')).toContainText('Recording');
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
   // Pause closes a genuine standalone chunk without sleeping for the 45s
   // rollover. Resume proves transcript growth while the session is still live.
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
   await expect(transcript).toHaveCount(1);
   await expect(transcript.first()).toContainText(/Mock transcription \([1-9]\d* bytes\)/);
-  await expect(meeting.locator('header')).toContainText('Paused');
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Paused');
   const firstText = await transcript.first().innerText();
   const singleDownload = page.waitForEvent('download');
   await meeting.getByRole('button', {name: 'Export audio', exact: true}).click();
@@ -76,7 +76,7 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   const singleBytes = await downloadBytes(single);
 
   await meeting.getByRole('button', {name: 'Resume', exact: true}).click();
-  await expect(meeting.locator('header')).toContainText('Recording');
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
   await expect(transcript).toHaveCount(2);
   await expect(transcript.first()).toHaveText(firstText);
@@ -84,15 +84,17 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   expect(transcriptions).toHaveLength(2);
   await expect(meeting.locator('audio')).toHaveCount(2);
   await meeting.getByRole('button', {name: 'Stop', exact: true}).click();
-  await expect(meeting.locator('header')).toContainText('Done');
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Done');
 
   await expect(meeting.locator('.obe-meeting-summary')).toHaveCount(0);
+  await meeting.getByRole('tab', {name: 'Summary', exact: true}).click();
   const generation = page.waitForResponse((response) => response.url().includes('/api/ai/generate') && response.ok());
   await meeting.getByRole('button', {name: 'Generate summary', exact: true}).click();
   expect((await generation).headers()['content-type']).toContain('text/event-stream');
   await expect(meeting.getByRole('button', {name: 'Regenerate summary'})).toBeVisible();
   const summary = await meeting.locator('.obe-meeting-summary').innerText();
   expect(summary).toContain('Mock response to:');
+  await meeting.getByRole('tab', {name: 'Notes', exact: true}).click();
   const note = 'Ellis will send the meeting follow-up.';
   await meeting.locator('.obe-meeting-notes .obe-text').fill(note);
   const pageId = new URL(page.url()).searchParams.get('page');

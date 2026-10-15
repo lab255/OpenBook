@@ -63,6 +63,22 @@ describe('viewer', () => {
     expect(JSON.stringify(island)).toBe(sourceBefore);
   });
 
+  it('keeps meeting tabs usable with frozen notes and recording controls', () => {
+    const doc = createDoc([{type: 'meeting', props: {summary: 'Recap', transcript: [{startMs: 0, endMs: 1000, text: 'Discussion'}]}, children: [{type: 'paragraph', text: 'Agenda'}]}]);
+    const island = {...makeIsland(), data: {editor: 'blocks', blockdoc: encodeSnapshot(doc)}};
+    const {container} = render(<ViewerApp source={island} />);
+    expect(screen.getByRole('tabpanel').textContent).toContain('Recap');
+    fireEvent.click(screen.getByRole('tab', {name: 'Notes'}));
+    expect(screen.getByRole('tabpanel').textContent).toContain('Agenda');
+    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+    expect(screen.getByRole('tabpanel').textContent).toContain('Discussion');
+    expect(container.querySelector('[contenteditable="true"]')).toBeNull();
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', {name: 'Add note'})).toBeNull();
+    fireEvent.click(screen.getByRole('tab', {name: 'Summary'}));
+    expect((screen.getByRole('button', {name: 'Regenerate summary'}) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('renders a space bundle with page navigation', () => {
     const bundle: LibraryBundleJson = {
       pages: [

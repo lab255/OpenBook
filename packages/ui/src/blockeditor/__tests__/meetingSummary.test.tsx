@@ -18,6 +18,7 @@ function harness(props = {}) {
   const block = rootBlocks(doc).get(0);
   const editor = {doc, readOnly: false} as BlockEditorController;
   const view = render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+  fireEvent.click(screen.getByRole('tab', {name: t('meetingBlock.summary')}));
   return {doc, block, ...view};
 }
 function install(ready = true) {
