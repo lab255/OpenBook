@@ -78,6 +78,7 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
 
   await meeting.getByRole('button', {name: 'Resume', exact: true}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
+  await expect(meeting.locator('.obe-meeting-elapsed')).toHaveText('0:04');
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
   await expect(transcript).toHaveCount(2);
   await expect(transcript.first()).toHaveText(firstText);
