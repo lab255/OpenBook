@@ -48,7 +48,6 @@ export function MeetingSummary({block, editor, readOnly, status, transcript}: {
   };
   if (!hasTranscript && !summary) return null;
   return <section aria-label={t('meetingBlock.summary')}>
-    <h4>{t('meetingBlock.summary')}</h4>
     {hasTranscript && <>
       {status === 'done' && !summary && stream === null && <p>{t('meetingBlock.summaryOffer')}</p>}
       <button type="button" disabled={stream === null && (readOnly || !available)} onClick={() => stream !== null ? pending.current?.abort() : void generate()}>

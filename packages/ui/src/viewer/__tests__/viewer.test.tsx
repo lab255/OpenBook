@@ -74,9 +74,14 @@ describe('viewer', () => {
     expect(screen.getByRole('tabpanel').textContent).toContain('Discussion');
     expect(container.querySelector('[contenteditable="true"]')).toBeNull();
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.queryByRole('button', {name: 'Add note'})).toBeNull();
     fireEvent.click(screen.getByRole('tab', {name: 'Summary'}));
     expect((screen.getByRole('button', {name: 'Regenerate summary'}) as HTMLButtonElement).disabled).toBe(true);
+    cleanup();
+    const emptyDoc = createDoc([{type: 'meeting', children: []}]);
+    const emptyIsland = {...makeIsland(), data: {editor: 'blocks', blockdoc: encodeSnapshot(emptyDoc)}};
+    const emptyView = render(<ViewerApp source={emptyIsland} />);
+    fireEvent.click(screen.getByRole('tab', {name: 'Notes'}));
+    expect(emptyView.container.querySelector('.obe-meeting-notes button')).toBeNull();
   });
 
   it('renders a space bundle with page navigation', () => {

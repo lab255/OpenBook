@@ -3903,14 +3903,17 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Meeting recorder: native playback, copyable transcript and ordinary note rows. */
 .obe-meeting { border: 1px solid hsl(var(--border)); border-radius: var(--radius-lg); padding: 16px; }
 .obe-meeting header, .obe-meeting-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.obe-meeting header { justify-content: space-between; }
+.obe-meeting-header { justify-content: flex-start; }
+.obe-meeting-header .obe-meeting-controls { margin: 0 0 0 auto; }
+.obe-meeting-header > p { flex-basis: 100%; order: 1; margin: 0; }
+.obe-kit-meeting > .obe-meeting { flex: 1 1 100%; min-width: 0; }
 .obe-meeting button:not(.obe-tab) { border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; background: hsl(var(--background)); color: hsl(var(--foreground)); transition: background-color var(--motion-fast) var(--ease-out-soft); }
-.obe-meeting button:hover:not(:disabled) { background: var(--hover); }
-.obe-meeting button:active { transition: none; }
+.obe-meeting button:not(.obe-tab):hover:not(:disabled) { background: var(--hover); }
+.obe-meeting button:not(.obe-tab):active { transition: none; }
 .obe-meeting-elapsed, .obe-meeting-lock { color: hsl(var(--muted-foreground)); font-size: var(--obe-small-size); }
 .obe-meeting-elapsed { font-variant-numeric: tabular-nums; }
 .obe-meeting button:disabled { opacity: 0.5; cursor: default; }
-.obe-meeting button:focus-visible, .obe-meeting a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.obe-meeting button:not(.obe-tab):focus-visible, .obe-meeting a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .obe-meeting-chunks { display: grid; gap: 12px; margin-block: 12px; }
 .obe-meeting-chunks li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .obe-meeting audio { max-width: 100%; }
@@ -3930,3 +3933,4 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* Reuse the container-family tab buttons within the meeting frame. */
 .obe-meeting-tabs-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-block: 12px; }
 .obe-meeting-tabs [role="tabpanel"][hidden] { display: none; }
+.obe-meeting-tabs .obe-meeting-notes { border-top: 0; margin-top: 0; padding-top: 0; }

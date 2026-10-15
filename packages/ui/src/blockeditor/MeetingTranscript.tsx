@@ -47,7 +47,6 @@ export function MeetingTranscript({saved, completed, transcript, session, readOn
       </li>)}
     </ol>
     <section className="obe-meeting-transcript" aria-label={t('meetingBlock.transcript')}>
-      <h4>{t('meetingBlock.transcript')}</h4>
       {transcript.map((segment, index) => <p key={index}><time>{meetingTime(segment.startMs)}</time> {segment.text}</p>)}
     </section>
   </>;

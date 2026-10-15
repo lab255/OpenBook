@@ -26,7 +26,7 @@ export function MeetingHeader({session, status, elapsed, readOnly, pageReadOnly,
         </button>
         <button type="button" disabled={readOnly || !session.active} onClick={() => session.stop()}>{t('meetingBlock.stop')}</button>
       </div>
-      <div className="obe-meeting-management">{management}</div>
+      {management && <div className="obe-meeting-management">{management}</div>}
     </header>
   );
 }

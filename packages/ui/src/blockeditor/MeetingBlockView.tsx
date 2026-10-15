@@ -38,20 +38,20 @@ export function MeetingBlockView({block, editor, pageReadOnly, children}: Custom
   const status = session.active ? session.mode : blockProp<string>(block, 'status') ?? 'idle';
   const canTranscribe = useSyncExternalStore(subscribeAssetBridge, assetBridge.canTranscribe, assetBridge.canTranscribe);
   const control = <section className="obe-meeting" aria-label={t('meetingBlock.label')}>
-    <MeetingHeader session={session} status={status} elapsed={elapsed} readOnly={readOnly} pageReadOnly={pageReadOnly} locked={locked} />
-    {saved.length > 0 && <button type="button" disabled={exporting} aria-busy={exporting} onClick={async () => {
-      setExporting(true); setExportError(false);
-      try { await exportMeetingAudio(saved, blockProp<string>(block, 'title') || t('meetingBlock.label')); }
-      catch { setExportError(true); }
-      finally { setExporting(false); }
-    }}>{t('meetingBlock.exportAudio')}</button>}
+    <MeetingHeader session={session} status={status} elapsed={elapsed} readOnly={readOnly} pageReadOnly={pageReadOnly} locked={locked}
+      management={saved.length > 0 && <button type="button" disabled={exporting} aria-busy={exporting} onClick={async () => {
+        setExporting(true); setExportError(false);
+        try { await exportMeetingAudio(saved, blockProp<string>(block, 'title') || t('meetingBlock.label')); }
+        catch { setExportError(true); }
+        finally { setExporting(false); }
+      }}>{t('meetingBlock.exportAudio')}</button>} />
     {exportError && <p role="alert">{t('meetingBlock.exportAudioFailed')}</p>}
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}
     <MeetingTabs status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={!!blockProp<string>(block, 'summary')?.trim()}
       transcript={<MeetingTranscript saved={saved} completed={completed} transcript={transcript} session={session} readOnly={readOnly} canTranscribe={canTranscribe} />}
       summary={<MeetingSummary block={block} editor={editor} readOnly={readOnly} status={status} transcript={transcript} />}
-      notes={<section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}><h4>{t('meetingBlock.notes')}</h4>{children}
+      notes={<section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}>{children}
         {!readOnly && !blockChildren(block)?.length && <button type="button" onClick={() => editor.doc.transact(() => {
           const notes = blockChildren(block);
           if (notes) insertBlock(editor.doc, notes, 0, {type: 'paragraph'});
