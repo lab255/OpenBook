@@ -1108,6 +1108,7 @@ export const en = {
     noDatabases: 'No databases found',
   },
   meetingBlock: {
+    tabs: 'Meeting sections',
     exportAudio: 'Export audio',
     exportAudioFailed: 'Audio could not be exported. Check access and try again.',
     summary: 'Summary',
