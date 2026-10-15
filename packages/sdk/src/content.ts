@@ -160,7 +160,7 @@ export interface AppendBlock {
   /**
    * Nested children — the document model is ONE recursive shape, so a container
    * block (`columns`/`column`, `table`/`row`/`cell`, `group`, `tabs`/`tab`,
-   * `accordion`/`accordionsection`) carries its contents here, to any depth. The
+   * `accordion`/`accordionsection`, `meeting`/`meetingsummary`) carries its contents here, to any depth. The
    * projection below preserves them verbatim; the editor's `coerceNewBlock` /
    * `makeBlock` build the real CRDT containers when the page opens. Dropping this
    * field (as the pre-API-1 flat projection did) silently discards every nested

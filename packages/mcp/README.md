@@ -93,7 +93,7 @@ Call `list_block_types` for the machine-readable source of truth: every entry ha
 | `tooltipcard` | `term:string`, `tip:string` |
 | `dbview` | `pageId:string` |
 | `dbform` | `databaseId:string`, `viewId:string` |
-| `meeting` | `status:"idle"/"recording"/"processing"/"done"`, `audioChunks:[{assetId:string,durationMs:number,startedAtMs?:number}]`, `transcript:[{startMs:number,endMs:number,text:string}]`, `transcriptionCompleted?:string[]` (completed chunk keys: a nonnegative number, a colon, then a nonempty asset ID; absent means empty, `null` removes), `summary:string`, `startedAt:number`, `title:string`; container children are manual notes; [representation contract](../../docs/meeting-block.md) |
+| `meeting` | `status:"idle"/"recording"/"processing"/"done"`, `audioChunks:[{assetId:string,durationMs:number,startedAtMs?:number}]`, `transcript:[{startMs:number,endMs:number,text:string}]`, `transcriptionCompleted?:string[]` (completed chunk keys: a nonnegative number, a colon, then a nonempty asset ID; absent means empty, `null` removes), `summary:string`, `startedAt:number`, `title:string`; direct children are manual notes plus an optional first `meetingsummary` container; `summary` is a legacy fallback; [representation contract](../../docs/meeting-block.md) |
 | `form` | `formId:string`, `submissionKey:string`, `enabled:boolean`, `databaseId:string`, `schema:object`, `label:string`, `description:string` |
 
 Shared input/frame props are `name`, `label`, and `description` strings plus `compact` and `interactive` booleans. A structured option's `value` defaults to a slug of its `label`; `selected` contains those string values.
@@ -205,3 +205,7 @@ The integration test (`scripts/e2e.mts`) boots an embedded-PGlite OpenBook serve
 
 - Tool implementations share the SDK's content helpers (`snapshotText`, `textSnapshot`, `appendTextToSnapshot`) with the in-app agent harness, so both surfaces read and write pages by the same rules.
 - Results are plain text formatted for models (`- [id] title: snippet` lines); errors return `isError: true` with a human-readable reason rather than throwing.
+
+| Child-only type | Parent |
+| --- | --- |
+| `meetingsummary` | `meeting`; no props, first child, at most one with id `<meetingId>:summary`; contains editable summary blocks |
