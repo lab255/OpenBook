@@ -1,3 +1,20 @@
+## 3.24.0 (2026-10-15)
+
+### 🚀 Features
+
+- **ui:** togglelist block — disclosure lists with reference shortcut parity (DSX-10) ([#412](https://github.com/lab255/OpenBook/pull/412))
+
+### 🩹 Fixes
+
+- **ui:** export polish — Lucide callout slots, responsive kit charts, design-system export ink (DSX-11 + DSX-6e) ([#413](https://github.com/lab255/OpenBook/pull/413))
+- **ui:** default unstyled HTML artifacts to a light document in dark mode (DSX-12) ([#411](https://github.com/lab255/OpenBook/pull/411))
+- **ui:** palette pass — primary contrast at the token source, chip-tint balance, rail hues, primary rating stars (DSX-13) ([#410](https://github.com/lab255/OpenBook/pull/410))
+- **ui:** converge light ring/brand on primary + blue-straggler sweep; export AA documented (DSX-14 + DSX-15) ([#414](https://github.com/lab255/OpenBook/pull/414))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.23.0 (2026-10-12)
 
 ### 🚀 Features
