@@ -46,6 +46,7 @@
 | tooltipcard | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | dbview | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | dbform | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
+| meetingsummary | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | meeting | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | form | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | openbook.ledger/journal-entry | ✅ | ✅ | ➖ | ✅ | ➖ | ✅ |
