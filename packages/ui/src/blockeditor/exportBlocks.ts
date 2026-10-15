@@ -13,11 +13,17 @@ import {AUDIO_DATA_URI_RE, withMeetingAudioOffsets} from './meetingAudio';
 import type {MeetingAudio} from './meetingRecorder';
 
 /** Meeting text remains readable even when audio assets cannot be resolved. */
+function meetingContent(b: BlockJSON): BlockJSON[] {
+  const children = b.children ?? [];
+  const summary = children.find((child) => child.type === 'meetingsummary');
+  return [...(summary?.children ?? []), ...children.filter((child) => child.type !== 'meetingsummary')];
+}
+
 function meetingParagraphs(b: BlockJSON): string[] {
   const p = b.props ?? {};
   const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
   return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
-    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(p.summary ? String(p.summary).split('\n').filter(Boolean) : [])];
+    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(!b.children?.some((child) => child.type === 'meetingsummary') && p.summary ? String(p.summary).split('\n').filter(Boolean) : [])];
 }
 
 function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions, format: 'html' | 'markdown' = 'html'): string[] {
@@ -423,8 +429,12 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
       parts.push(`<p>${databaseFormHtml(databaseFormReference(b.props), opts.originPageUrl)}</p>`);
       i += 1;
       break;
+    case 'meetingsummary':
+      parts.push(blocksToHtml(b.children ?? [], opts));
+      i += 1;
+      break;
     case 'meeting':
-      parts.push(`<section>${meetingParagraphs(b).map((line) => `<p>${escapeHtml(line)}</p>`).join('')}${meetingAudioLinks(b, opts).map((link) => `<p>${link}</p>`).join('')}${blocksToHtml(b.children ?? [], opts)}</section>`);
+      parts.push(`<section>${meetingParagraphs(b).map((line) => `<p>${escapeHtml(line)}</p>`).join('')}${meetingAudioLinks(b, opts).map((link) => `<p>${link}</p>`).join('')}${blocksToHtml(meetingContent(b), opts)}</section>`);
       i += 1;
       break;
     case 'form':
@@ -601,8 +611,11 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
         : `**📋 ${escapeMd(t('slash.custom.dbform.label'))}**`);
       break;
     }
+    case 'meetingsummary':
+      out.push(blocksToMarkdown(b.children ?? [], opts));
+      break;
     case 'meeting':
-      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), ...meetingAudioLinks(b, opts, 'markdown'), blocksToMarkdown(b.children ?? [], opts));
+      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), ...meetingAudioLinks(b, opts, 'markdown'), blocksToMarkdown(meetingContent(b), opts));
       break;
     case 'form':
       out.push(formToMarkdown(formSchemaFromProps(b.props)));
@@ -1128,10 +1141,15 @@ export function projectBlocksForExport(
         i += 1;
         break;
       }
+      case 'meetingsummary': {
+        emit(b.children ?? [], sink);
+        i += 1;
+        break;
+      }
       case 'meeting': {
         for (const line of meetingParagraphs(b)) sink.push({type: 'paragraph', data: {text: textHtml([{t: line}])}});
         for (const link of meetingAudioLinks(b, opts)) sink.push({type: 'paragraph', data: {text: link}});
-        emit(b.children ?? [], sink);
+        emit(meetingContent(b), sink);
         i += 1;
         break;
       }

@@ -18,6 +18,7 @@ import type {BlockEditorController} from './useBlockEditor';
 export interface CustomBlockProps {
   /** Editor-owned nested rows for container renderers. */
   children?: React.ReactNode;
+  summaryChildren?: React.ReactNode;
   block: BlockMap;
   editor: BlockEditorController;
   /**

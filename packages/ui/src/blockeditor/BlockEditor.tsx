@@ -1,3 +1,4 @@
+import {meetingSummaryContainer} from './meetingSummaryBlocks';
 import React, {useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {
   ArrowDown,
@@ -1549,9 +1550,9 @@ export interface RowShared {
   container: BlockType | null;
 }
 
-const BlockList: React.FC<RowShared & {list: Y.Array<BlockMap>}> = ({list, ...shared}) => (
+const BlockList: React.FC<RowShared & {list: Y.Array<BlockMap>; skipSummary?: boolean}> = ({list, skipSummary, ...shared}) => (
   <>
-    {list.map((block) => (
+    {list.toArray().filter((block) => !skipSummary || String(blockType(block)) !== 'meetingsummary').map((block) => (
       <BlockRow key={blockId(block)} block={block} {...shared} />
     ))}
   </>
@@ -2585,9 +2586,11 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
               stays live for a reader; `pageReadOnly` is the document's real
               lock, which that override must not hide from a block that offers
               to write somewhere else. See {@link CustomBlockProps.pageReadOnly}. */}
-          <Custom block={block} editor={kitEditor} pageReadOnly={editor.readOnly}>
-            {custom.type === 'meeting' && blockChildren(block) &&
-              <BlockList list={blockChildren(block)!} {...shared} editor={textEditor} depth={shared.depth + 1} container="group" />}
+          <Custom block={block} editor={kitEditor} pageReadOnly={editor.readOnly}
+            summaryChildren={custom.type === 'meeting' && meetingSummaryContainer(block) &&
+              <BlockList list={blockChildren(meetingSummaryContainer(block)!)!} {...shared} editor={textEditor} depth={shared.depth + 1} container="group" />}>
+            {(custom.type === 'meeting' || custom.type === 'meetingsummary') && blockChildren(block) &&
+              <BlockList skipSummary={custom.type === 'meeting'} list={blockChildren(block)!} {...shared} editor={textEditor} depth={shared.depth + 1} container="group" />}
           </Custom>
         </div>
       );

@@ -668,6 +668,8 @@ export const ja: PartialMessages = {
     summary: '要約',
     summaryOffer: '文字起こしを要約できます。',
     generateSummary: '要約を生成',
+    editSummary: '要約を編集',
+    replaceSummary: '要約とすべての編集内容を新しく生成した要約に置き換えますか？',
     regenerateSummary: '要約を再生成',
     cancelSummary: 'キャンセル',
     generatingSummary: '要約を生成中…',

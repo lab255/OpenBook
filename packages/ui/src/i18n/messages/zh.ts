@@ -665,6 +665,8 @@ export const zh: PartialMessages = {
     summary: '摘要',
     summaryOffer: '转录已准备好，可以生成摘要。',
     generateSummary: '生成摘要',
+    editSummary: '编辑摘要',
+    replaceSummary: '用新生成的摘要替换当前摘要及所有编辑内容？',
     regenerateSummary: '重新生成摘要',
     cancelSummary: '取消',
     generatingSummary: '正在生成摘要…',

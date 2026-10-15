@@ -1114,6 +1114,8 @@ export const en = {
     summary: 'Summary',
     summaryOffer: 'Your transcript is ready to summarize.',
     generateSummary: 'Generate summary',
+    editSummary: 'Edit summary',
+    replaceSummary: 'Replace the summary and all edits with a newly generated summary?',
     regenerateSummary: 'Regenerate summary',
     cancelSummary: 'Cancel',
     generatingSummary: 'Generating summary…',

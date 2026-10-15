@@ -673,6 +673,8 @@ export const de: PartialMessages = {
     summary: 'Zusammenfassung',
     summaryOffer: 'Dein Transkript kann jetzt zusammengefasst werden.',
     generateSummary: 'Zusammenfassung erstellen',
+    editSummary: 'Zusammenfassung bearbeiten',
+    replaceSummary: 'Zusammenfassung und alle Änderungen durch eine neu generierte Zusammenfassung ersetzen?',
     regenerateSummary: 'Zusammenfassung neu erstellen',
     cancelSummary: 'Abbrechen',
     generatingSummary: 'Zusammenfassung wird erstellt…',

@@ -6,6 +6,7 @@ import {AiBridgeHost} from '@/components/AiBridgeHost';
 import {DataProvider} from '@/data';
 import type {DataClient} from '@book.dev/sdk';
 import {MeetingBlockView} from '../MeetingBlockView';
+import {materializeMeetingSummary} from '../meetingSummaryBlocks';
 import {meetingSummaryPrompt} from '../MeetingSummary';
 import {blockProp, createDoc, docToJSON, rootBlocks} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
@@ -44,7 +45,7 @@ describe('MEET-6 meeting summary', () => {
     expect(screen.getByRole('button', {name: 'Generate summary'})).toBeTruthy();
     expect(screen.queryByText(t('meetingBlock.summaryOffer'))).toBeNull();
   });
-  it('streams ephemerally and replaces only summary in one transaction, including exports', async () => {
+  it('streams ephemerally and materialises summary blocks in one transaction, including exports', async () => {
     let finish!: (text: string) => void;
     generate.mockImplementation((_prompt, token) => { token('New partial'); return new Promise((resolve) => { finish = resolve; }); });
     const {doc, block} = harness({summary: 'Old summary'});
@@ -56,7 +57,9 @@ describe('MEET-6 meeting summary', () => {
     expect(blockProp(block, 'summary')).toBe('Old summary'); expect(update).not.toHaveBeenCalled();
     await act(async () => finish('New final summary'));
     expect(update).toHaveBeenCalledTimes(1);
-    expect(docToJSON(doc)).toEqual([{...before[0], props: {...before[0].props, summary: 'New final summary'}}]);
+    expect(blockProp(block, 'summary')).toBe('');
+    expect(docToJSON(doc)[0].children?.slice(1)).toEqual(before[0].children);
+    expect(docToJSON(doc)[0].children?.[0]).toMatchObject({id: `${before[0].id}:summary`, type: 'meetingsummary', children: [{type: 'paragraph', text: [{t: 'New final summary'}]}]});
     for (const output of [blocksToHtml(docToJSON(doc)), blocksToMarkdown(docToJSON(doc)), JSON.stringify(projectBlocksForExport(docToJSON(doc)))]) {
       expect(output).toContain('New final summary'); expect(output).toContain('Private manual notes');
     }
@@ -104,6 +107,7 @@ describe('MEET-6 meeting summary', () => {
   });
   it('exports nonempty summary lines as separate HTML and Markdown paragraphs', () => {
     const {doc} = harness({summary: 'Meeting recap.\n\nDecision: ship Friday.\nAction: Alex will ship.\n'});
+    materializeMeetingSummary(doc, doc.getArray('blocks').get(0) as import('../model').BlockMap);
     const blocks = docToJSON(doc);
     const html = document.createElement('div');
     html.innerHTML = blocksToHtml(blocks);
@@ -131,7 +135,8 @@ describe('MEET-6 meeting summary', () => {
     await act(async () => {});
     await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Generate summary'})));
     expect(generate).toHaveBeenCalledWith(expect.stringContaining(transcript[0].text), expect.any(Function), {signal: expect.any(AbortSignal)});
-    expect(blockProp(block, 'summary')).toBe('Host summary');
+    expect(blockProp(block, 'summary')).toBe('');
+    expect(blocksToMarkdown(docToJSON(block.doc!))).toContain('Host summary');
   });
   it('disables generation for a local client whose AI status is unavailable', async () => {
     const client = {aiStatus: vi.fn(async () => ({ready: false, config: {provider: 'off'}})), aiGenerate: generate} as unknown as DataClient;
