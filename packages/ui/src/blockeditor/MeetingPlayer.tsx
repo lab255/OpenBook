@@ -24,7 +24,7 @@ function PlaybackChunk({audio, blob, register, onTime, onEnd, onError}: {
     return () => { disposed = true; media.current?.pause(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [audio.assetId, blob]);
   return url ? <>
-    <audio hidden preload="auto" ref={(element) => { media.current = element; register(element); }} src={url}
+    <audio hidden preload="auto" ref={(element) => { if (element) media.current = element; register(element); }} src={url}
       aria-label={t('meetingBlock.playback', {time: meetingTime(audio.startedAtMs ?? 0)})}
       onTimeUpdate={(event) => onTime(event.currentTarget)} onEnded={onEnd} onError={onError} />
     {blob && <a href={url} download={`meeting-${audio.startedAtMs ?? 0}.${blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`}>{t('meetingBlock.saveAudio')}</a>}

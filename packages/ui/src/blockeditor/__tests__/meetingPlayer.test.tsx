@@ -65,6 +65,9 @@ describe('unified meeting playback', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Play'})));
     expect(screen.getByRole('alert').textContent).toContain('could not be played');
     expect(screen.getByRole('button', {name: 'Play'})).toBeTruthy();
+    const pauses = vi.mocked(HTMLMediaElement.prototype.pause); pauses.mockClear();
     view.unmount(); expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+    expect(pauses.mock.instances).toContain(view.audio[0]);
+    expect(pauses.mock.instances).toContain(view.audio[1]);
   });
 });
