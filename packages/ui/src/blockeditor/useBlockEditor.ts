@@ -1,6 +1,8 @@
 import {useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import * as Y from 'yjs';
 import {
+  blockChildren,
+  blockProp,
   blockText,
   blockToJSON,
   blockType,
@@ -8,6 +10,7 @@ import {
   insertBlock,
   makeBlock,
   mergeWithPrevious,
+  nestInToggle,
   moveBlock,
   removeBlock,
   rootBlocks,
@@ -145,9 +148,15 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
 
     const orderedTextIds = (): string[] => {
       const ids: string[] = [];
-      for (const {block} of walkBlocks(rootBlocks(doc))) {
-        if (TEXT_BLOCKS.has(blockType(block)) && blockText(block)) ids.push(block.get('id') as string);
-      }
+      const walk = (blocks: Y.Array<BlockMap>): void => {
+        for (const block of blocks.toArray()) {
+          if (TEXT_BLOCKS.has(blockType(block)) && blockText(block)) ids.push(block.get('id') as string);
+          if (blockType(block) === 'togglelist' && blockProp(block, 'collapsed')) continue;
+          const children = blockChildren(block);
+          if (children) walk(children);
+        }
+      };
+      walk(rootBlocks(doc));
       return ids;
     };
 
@@ -178,6 +187,10 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
         const type = blockType(found.block);
         if (type !== 'paragraph' && type !== 'cell' && type !== 'code' && TEXT_BLOCKS.has(type)) {
           turnInto(doc, blockId, 'paragraph');
+          requestCaret({blockId, offset: 0});
+          return;
+        }
+        if (found.index === 0 && nestInToggle(doc, blockId, true)) {
           requestCaret({blockId, offset: 0});
           return;
         }

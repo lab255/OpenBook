@@ -95,16 +95,17 @@ const entry = (
  * — see the derivation guard in `dataColors.test.ts`. `teal`/`cyan`/`indigo` are
  * unrendered extension tokens (kept from the audit set, mode-invariant).
  */
+// DSX-13: red/yellow light fills separate calendar rails at 3px while staying pastel.
 const PASTEL: Palette = {
   gray: entry('#c3c6cb', '#e3e2e0', '#5c6475', '#31363f', '#cccfd7', '#b0b5bf'),
   brown: entry('#d7af9d', '#eee0da', '#9d4c2a', '#4f2f22', '#e8c8ba', '#ddac98'),
   orange: entry('#debea6', '#fadec9', '#935425', '#4f3522', '#e8ceba', '#e3bda1'),
-  yellow: entry('#dac495', '#fdecc8', '#876622', '#4f4022', '#e8d9ba', '#e0c690'),
+  yellow: entry('#e0ce86', '#fdecc8', '#876622', '#4f4022', '#e8d9ba', '#e0c690'),
   green: entry('#9fdf9f', '#dbeddb', '#1e761e', '#224f22', '#bae8ba', '#9ae49a'),
   blue: entry('#a9ccdf', '#d3e5ef', '#24698f', '#223f4f', '#bad8e8', '#a5cde4'),
   purple: entry('#cdade1', '#e8deee', '#9032c8', '#3e224f', '#d7bae8', '#cfa8e6'),
   pink: entry('#dea6be', '#f5e0e9', '#b82e69', '#4f2235', '#e8bace', '#e3a1bd'),
-  red: entry('#deaea6', '#ffe2dd', '#b4412d', '#4f2822', '#e8c1ba', '#e3aaa1'),
+  red: entry('#dc9896', '#ffe2dd', '#b4412d', '#4f2822', '#e8c1ba', '#e3aaa1'),
   teal: entry('#5eead4', '#99f6e4', '#115e59', '#203836', '#99f6e4'),
   cyan: entry('#67e8f9', '#a5f3fc', '#155e75', '#213840', '#a5f3fc'),
   indigo: entry('#a5b4fc', '#c7d2fe', '#3730a3', '#2c2b4c', '#c7d2fe'),

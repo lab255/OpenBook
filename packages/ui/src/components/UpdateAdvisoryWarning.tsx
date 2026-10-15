@@ -116,8 +116,8 @@ export function UpdateAdvisoryWarning({
         className={cn(
           'border-2',
           vulnerable
-            ? 'border-destructive bg-destructive/5'
-            : 'border-amber-500 bg-amber-500/5',
+            ? 'border-destructive bg-[image:linear-gradient(hsl(var(--destructive)/0.05),hsl(var(--destructive)/0.05))]'
+            : 'border-[var(--obe-fg-yellow)] bg-[image:linear-gradient(var(--obe-callout-warn),var(--obe-callout-warn))]',
         )}
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
@@ -135,7 +135,7 @@ export function UpdateAdvisoryWarning({
                 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
                 vulnerable
                   ? 'bg-destructive/15 text-destructive'
-                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+                  : 'bg-[var(--obe-callout-warn)] text-[var(--obe-fg-yellow)]',
               )}
             >
               {vulnerable ? (
@@ -182,7 +182,7 @@ export function UpdateAdvisoryWarning({
 
         <div className="grid gap-2">
           <Label htmlFor={inputId}>{t('updates.advisory.ackLabel')}</Label>
-          <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
+          <p id={`${inputId}-hint`} className="text-xs text-foreground/80">
             {t('updates.advisory.ackPrompt', {phrase})}
           </p>
           <Input
@@ -198,7 +198,7 @@ export function UpdateAdvisoryWarning({
         {installMessage && (
           <p
             role={installMessage.tone === 'error' ? 'alert' : 'status'}
-            className={cn('text-sm', installMessage.tone === 'error' ? 'text-destructive' : 'text-muted-foreground')}
+            className={cn('text-sm', installMessage.tone === 'error' ? 'text-destructive' : 'text-foreground/80')}
           >
             {installMessage.text}
           </p>

@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {WARN_SURFACE_CLASS, WARN_ICON_CLASS} from '@/lib/statusStyles';
 /**
  * LX-2: the export-time "Include your books" dialog. Shown when the
  * interactive-HTML export set contains `openbook.ledger/*` blocks, or when the
@@ -68,10 +70,10 @@ export function ExportBooksDialog({
               idiom) with a warning icon, in full-contrast foreground text. */}
           {canInclude && include && (
             <div
-              className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground"
+              className={cn('flex items-start gap-2 rounded-md px-3 py-2.5 text-sm', WARN_SURFACE_CLASS)}
               data-testid="export-books-warning"
             >
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+              <TriangleAlert className={cn('mt-0.5 h-4 w-4 shrink-0', WARN_ICON_CLASS)} aria-hidden />
               <span>{t('page.exportBooksWarning')}</span>
             </div>
           )}

@@ -252,8 +252,8 @@ describe('TBL-8 HTML export / import', () => {
     setTableRowColor(doc, 'tbl', 'row0', 'green');
     setTableCellRangeColor(doc, 'tbl', {top: 0, left: 0, bottom: 0, right: 0}, 'red');
     const html = cellRangeExportToHtml(tableRangeExport(doc, 'tbl', {top: 0, left: 0, bottom: 1, right: 1}));
-    expect(html).toContain('background:#e4444447');
-    expect(html).toContain('background:#31c4624d');
-    expect(html).toContain('background:#3994ef47');
+    expect(html).toContain('background:#df3a3a1f');
+    expect(html).toContain('background:#34b25e21');
+    expect(html).toContain('background:#308ce821');
   });
 });

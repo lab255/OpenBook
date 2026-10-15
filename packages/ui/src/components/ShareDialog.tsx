@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {Check, FileText, Globe, Info, Link2, Loader2, Share2, Trash2} from 'lucide-react';
 import {PAGE_VISIBILITIES, type AclLevel, type GuestAccess, type InstanceInfo, type PageAcl, type PageVisibility} from '@book.dev/sdk';
@@ -244,7 +246,7 @@ function FormSubmissionRow({
         data-form-public-submissions
         data-form-not-ready
         aria-live="polite"
-        className="flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-400"
+        className={cn('flex items-center justify-between gap-3 text-xs', STATUS_INK_CLASS.warn)}
       >
         <span className="flex items-center gap-1.5"><FileText className="h-4 w-4" />{t('share.forms.notReady')}</span>
         {canManage && (
@@ -269,7 +271,7 @@ function FormSubmissionRow({
         <span className="text-muted-foreground">{t(guestOff ? 'share.forms.blocked' : 'share.forms.status')}</span>
         <InfoTip text={reachabilityText} />
         {guestOff && (
-          <span aria-live="polite" className="text-amber-700 dark:text-amber-400">
+          <span aria-live="polite" className={STATUS_INK_CLASS.warn}>
             <InfoTip text={t('share.forms.guestOffCaveat')} />
             {canManage && (
               <>
@@ -336,7 +338,7 @@ function PublishRow({
   if (live) {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <Globe className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <Globe className={cn('h-4 w-4 shrink-0', STATUS_INK_CLASS.ok)} />
         <span className="font-medium">{t('share.publishState.liveAt')}</span>
         <a className="min-w-0 truncate font-mono text-muted-foreground underline" title={host} href={`https://${host}`} target="_blank" rel="noreferrer">{host}</a>
       </div>
@@ -352,7 +354,7 @@ function PublishRow({
     return (
       <div
         aria-live="polite"
-        className="flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-400"
+        className={cn('flex items-center justify-between gap-3 text-xs', STATUS_INK_CLASS.warn)}
       >
         <span className="flex items-center gap-1.5">{t('share.publishState.guestOff')}<InfoTip text={t('forwarding.visibility.guestOffCaveat')} /></span><button type="button" className="underline" onClick={onManageGuestAccess}>{t('share.forms.manageGuestAccess')}</button>
       </div>
@@ -904,7 +906,7 @@ export default function ShareDialog({
                   siteVisibility !== 'published' && (
                     <div
                       aria-live="polite"
-                      className="flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-400"
+                      className={cn('flex items-center justify-between gap-3 text-xs', STATUS_INK_CLASS.warn)}
                     >
                       {/* A "your link is silently bounced" warning must not read
                           low-priority — full-contrast body (not muted) on the caution

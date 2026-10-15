@@ -62,6 +62,14 @@ describe('tableDropTarget', () => {
 // ── Grip presence + gating ───────────────────────────────────────────────────
 
 describe('table drag grips (render gating)', () => {
+  it('hides add controls and grips in a kit-locked table', () => {
+    const {container} = render(
+      <BlockEditor doc={createDoc([{id: 'locked-group', type: 'group', props: {locked: true}, children: [makeTable(3, 3)]}])} />,
+    );
+    expect(container.querySelector('.obe-table')).not.toBeNull();
+    expect(container.querySelectorAll('.obe-table-add, .obe-table-row-grip, .obe-table-col-grip')).toHaveLength(0);
+  });
+
   it('renders a row grip per row and a column grip per column when editable', () => {
     const {container} = render(<BlockEditor doc={seedTableDoc(3, 3)} />);
     expect(container.querySelectorAll('.obe-table-row-grip')).toHaveLength(3);
@@ -71,6 +79,16 @@ describe('table drag grips (render gating)', () => {
     for (const g of container.querySelectorAll('.obe-table-row-grip')) {
       expect(g.getAttribute('draggable')).toBe('true');
     }
+  });
+
+  it('reveals only the hovered logical column and clears on leaving the table', () => {
+    const {container} = render(<BlockEditor doc={seedTableDoc()} />);
+    const cells = container.querySelectorAll('tbody > tr:nth-child(2) > td');
+    fireEvent.pointerEnter(cells[1]);
+    const grips = container.querySelectorAll('.obe-table-col-grip');
+    expect([...grips].map((grip) => grip.hasAttribute('data-revealed'))).toEqual([false, true, false]);
+    fireEvent.pointerLeave(container.querySelector('.obe-table-wrap')!);
+    expect(container.querySelectorAll('.obe-table-col-grip[data-revealed]')).toHaveLength(0);
   });
 
   it('renders keyboard-focusable buttons with localized row/column option names', () => {

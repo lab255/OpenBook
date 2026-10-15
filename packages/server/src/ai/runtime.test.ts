@@ -57,15 +57,16 @@ it.each(['zip', 'tar.xz'] as const)('enables a fresh installation from %s, prese
     expect(await readdir(path.dirname((await runtime.binary('ffmpeg'))!))).toEqual(['whisper-cli.exe']);
     await runtime.provision();
     expect(fetch).toHaveBeenCalledTimes(3);
-    const nextPin = {...pin, version: '2'};
-    const next = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': nextPin, ffmpeg: {...ffmpegPin, version: '2'}});
-    expect((await next.status()).tools['whisper-cli']).toMatchObject({status: 'missing', version: '2', installedVersion: '1'});
+    const nextPin = {...pin, version: '1+runtime-binaries-v1'};
+    const next = new ManagedRuntime(path.join(dir, 'bin'), 'fixture', {'whisper-cli': nextPin, ffmpeg: {...ffmpegPin, version: '1+runtime-binaries-v1'}});
+    expect((await next.status()).tools['whisper-cli']).toMatchObject({status: 'missing', version: '1+runtime-binaries-v1', installedVersion: '1'});
     for (const tool of ['whisper-cli', 'ffmpeg']) {
       await mkdir(path.join(dir, 'bin', tool, '.extract-crashed'));
       await mkdir(path.join(dir, 'bin', tool, 'install-crashed'));
     }
     await next.provision();
     expect(fetch).toHaveBeenCalledTimes(5);
+    expect((await local.status()).modelPresent).toBe(true);
     expect(await next.binary('whisper-cli')).not.toBe(binary);
     await expect(readFile(binary)).rejects.toMatchObject({code: 'ENOENT'});
     for (const tool of ['whisper-cli', 'ffmpeg'] as const) {
@@ -106,9 +107,13 @@ it('reports unsupported tools without throwing and provisions the supported tool
   });
   await runtime.provision();
   expect((await runtime.status()).tools).toMatchObject({'whisper-cli': {status: 'unsupported', reason: 'no-upstream-cli'}, ffmpeg: {status: 'provisioned'}});
-  const unknown = new ManagedRuntime(path.join(dir, 'bin'), runtimeTarget('linux', 'arm64'));
-  await unknown.provision();
-  expect((await unknown.status()).tools.ffmpeg.status).toBe('unsupported');
+  for (const platform of ['linux', 'win32']) {
+    const unknown = new ManagedRuntime(path.join(dir, 'bin'), runtimeTarget(platform, 'arm64'));
+    await unknown.provision();
+    expect((await unknown.status()).tools).toMatchObject({
+      'whisper-cli': {status: 'unsupported'}, ffmpeg: {status: 'unsupported'},
+    });
+  }
 });
 
 it('resolves Windows PATHEXT and PATH fallback', async () => {

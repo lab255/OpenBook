@@ -66,6 +66,46 @@ test('timeline view: a dated row renders as a bar', {tag: ['@database', '@visual
 
   // The month axis labels the spanned (current) month.
   await expect(page.getByText(monthLabelOf(due))).toBeVisible();
+  const measurements = [];
+  for (const dark of [false, true]) {
+    await page.evaluate((value) => localStorage.setItem('theme', value ? 'dark' : 'light'), dark);
+    await page.reload();
+    await expect(page.locator('[data-timeline-today]')).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(new RegExp(dark ? 'dark' : 'light'));
+    const measure = await page.evaluate(() => {
+      const ratio = (a: string, b: string): number => {
+        const lum = (color: string): number => {
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = 1;
+          const ctx = canvas.getContext('2d')!;
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 1, 1);
+          const channels = [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).map((n) => {
+            const c = n / 255;
+            return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+          });
+          return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+        };
+        const x = lum(a), y = lum(b);
+        return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+      };
+      const bar = document.querySelector<HTMLElement>('[title$="drag to reschedule"]')!;
+      const today = document.querySelector('[data-timeline-today]')!;
+      const barStyle = getComputedStyle(bar), todayStyle = getComputedStyle(today);
+      return {barHeight: bar.getBoundingClientRect().height, rail: barStyle.borderLeftWidth,
+        barContrast: ratio(barStyle.color, barStyle.backgroundColor),
+        todayContrast: ratio(todayStyle.color, todayStyle.backgroundColor),
+        todayButtonHeight: [...document.querySelectorAll('button')].find((el) => el.textContent?.trim() === 'Today')!.getBoundingClientRect().height};
+    });
+    expect(measure.barContrast).toBeGreaterThanOrEqual(4.5);
+    expect(measure.todayContrast).toBeGreaterThanOrEqual(4.5);
+    expect(measure.rail).toBe('3px');
+    expect(measure.todayButtonHeight).toBe(28);
+    measurements.push({dark, ...measure});
+    await page.screenshot({path: testInfo.outputPath(`timeline-${dark ? 'dark' : 'light'}.png`)});
+  }
+  console.log('DSX timeline ledger', JSON.stringify(measurements));
+  await testInfo.attach('timeline-ledger', {body: JSON.stringify(measurements, null, 2), contentType: 'application/json'});
   await takeSnapshot(page, testInfo); // visual: gantt timeline
 });
 
@@ -261,6 +301,7 @@ test('dependency graph: shows rows as connected nodes', {tag: ['@database']}, as
   await page.getByRole('button', {name: 'Add view'}).click();
   await page.getByRole('menuitem', {name: 'Graph'}).click();
   await expect(page.getByText('depends on 1 row')).toBeVisible();
+  expect(await page.getByText('depends on 1 row').locator('..').evaluate((node) => node.getBoundingClientRect().height)).toBe(46);
 });
 
 // Opening a database row shows its columns in the page-view properties panel,

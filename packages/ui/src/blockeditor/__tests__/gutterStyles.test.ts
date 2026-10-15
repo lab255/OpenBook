@@ -70,6 +70,17 @@ describe('block gutter pane geometry', () => {
 });
 
 describe('table grip geometry', () => {
+  it('pads only editable tables first below group and tab header rules', () => {
+    const spacing = ruleBody(
+      '.obe-group-body > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips),\n.obe-cnt-panel > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips)',
+    );
+    expect(spacing).toContain('padding-top: 12px');
+    expect(spacing).toContain('--obe-row-space-above: 12px');
+    expect(ruleBody(
+      '.obe-group-body > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips) > .obe-blockbody,\n.obe-cnt-panel > .obe-row[data-block-type=\'table\']:first-child:has(.obe-has-grips) > .obe-blockbody',
+    )).toContain('padding-top: var(--obe-block-pad-y)');
+  });
+
   it('does not charge the row grip or add-row control to the table width', () => {
     expect(ruleBody('.obe-table-wrap.obe-has-grips')).not.toMatch(/padding-left/);
     expect(ruleBody('.obe-table-add-row')).toMatch(/left:\s*0/);
@@ -78,8 +89,9 @@ describe('table grip geometry', () => {
 
   it('keeps the row grip fully outside the cells and aligns the table gutter', () => {
     const grip = ruleBody('.obe-table-row-grip');
-    expect(grip).toMatch(/left:\s*-1\.25rem/);
-    expect(grip).toMatch(/width:\s*1\.25rem/);
+    expect(grip).toContain('left: calc(-1 * (var(--obe-handle-w) + var(--obe-gutter-clear)))');
+    expect(grip).toContain('width: var(--obe-handle-w)');
+    expect(grip).toContain('height: var(--obe-gutter-btn)');
     // The grip yields the column gap to the resize divider by STACKING, never by
     // `pointer-events: none` — an unhittable drag origin kills HTML5 dragstart
     // once the pointer leaves the row and `tr:hover` drops (TABLE-2).
@@ -91,14 +103,24 @@ describe('table grip geometry', () => {
     expect(revealedGrip).not.toMatch(/pointer-events/);
     expect(revealedGrip).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);
     expect(ruleBody('.obe-row[data-block-type=\'table\']:has(.obe-has-grips)')).toMatch(
-      /--obe-lead-offset:\s*calc\(var\(--obe-block-pad-y\) - var\(--obe-gutter-clear\)\)/,
+      /--obe-lead-offset:\s*calc\(var\(--obe-row-space-above, 0px\) \+ var\(--obe-block-pad-y\) \+ var\(--obe-table-grip-top\) - var\(--obe-gutter-btn\)\)/,
     );
+  });
+
+  it('centres compact column grips and removes the tools and top band', () => {
+    const grip = CSS.match(/\n\.obe-table-col-grip \{([^}]*top:[^}]*)\}/)![1];
+    expect(grip).toContain('top: calc(-1 * var(--obe-handle-w) / 2)');
+    expect(grip).toContain('width: var(--obe-gutter-btn)');
+    expect(ruleBody('.obe-table-wrap.obe-has-grips')).not.toContain('padding-top');
+    expect(CSS).not.toContain('.obe-table-tools');
+    expect(ruleBody('.obe-table-row-grip,\n.obe-table-col-grip')).toContain('color: var(--obe-chrome-ink)');
   });
 
   it('reveals both row and column grips on keyboard focus', () => {
     const focusedGrip = ruleBody(
       '.obe-table tr .obe-table-row-grip:focus-visible,\n.obe-table-col-grip:focus-visible',
     );
+    expect(focusedGrip).toContain('outline: var(--obe-focus-ring)');
     expect(focusedGrip).toMatch(/opacity:\s*1/);
     expect(focusedGrip).toMatch(/pointer-events:\s*auto/);
     expect(focusedGrip).toMatch(/z-index:\s*var\(--z-index-local-overlay\)/);
@@ -154,7 +176,11 @@ describe('block chrome rhythm', () => {
   });
 
   it('reserves only the add-row height and puts add-column outside the table', () => {
-    expect(ruleBody('.obe-table-wrap')).toContain('padding: 0 0 16px 0');
+    expect(ruleBody('.obe-table-wrap')).toContain('padding: 0;');
+    expect(ruleBody('.obe-table-wrap.obe-has-grips')).toContain('padding-bottom: 16px');
+    expect(ruleBody('.obe-table')).toContain('font-size: var(--obe-small-size)');
+    expect(ruleBody('.obe-table')).toContain('line-height: var(--obe-table-line)');
+    expect(ruleBody('.obe-table td .obe-text')).toContain('padding: var(--obe-table-pad-y) var(--obe-table-pad-x)');
     expect(ruleBody('.obe-table-add-col')).toContain('right: -16px');
     expect(ruleBody('.obe-columns')).toContain('gap: var(--obe-columns-gap)');
     expect(ruleBody('.obe-col-divider')).toContain('left: calc(-1 * (var(--obe-columns-gap) + 1rem) / 2)');

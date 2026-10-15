@@ -96,6 +96,10 @@ test('chart + status light + button: the full artifact loop', {tag: ['@editor', 
   await expect(chart.locator('svg rect')).toHaveCount(3);
   await expect(chart.locator('svg text', {hasText: 'ten'})).toBeVisible();
 
+  // Wait for the portaled chart settings to finish closing before hovering
+  // another row: its exit surface can otherwise retain the hover hit target.
+  await expect(page.getByLabel('Chart data expression')).toBeHidden();
+
   // Status thresholds over n.
   const status = page.locator('.obe-kit-status');
   await status.hover();

@@ -49,6 +49,20 @@ test.beforeAll(() => {
   }
 });
 
+test('read-only tables use the shared row pitch without an add-row reserve', async ({page}) => {
+  await page.goto(fileUrl('export-page.html'));
+  const table = page.locator('.ob-viewer .obe-table').first();
+  await expect(table).toBeVisible();
+  const metrics = await table.evaluate((element) => ({
+    rows: [...element.querySelectorAll('tr')].map((row) => row.getBoundingClientRect().height),
+    paddingBottom: getComputedStyle(element.parentElement!).paddingBottom,
+    blockHeight: element.closest('.obe-row')!.getBoundingClientRect().height,
+  }));
+  for (const height of metrics.rows) expect(Math.abs(height - 33.02)).toBeLessThan(0.1);
+  expect(metrics.paddingBottom).toBe('0px');
+  console.log('DSX-5b viewer table metrics', JSON.stringify(metrics));
+});
+
 test.describe('page export, hydrated', () => {
   test('viewer replaces the static body and matches in-app locked behavior', async ({page}) => {
     const {network, errors} = watch(page);

@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useEffect, useState, useSyncExternalStore} from 'react';
 import {Globe, Link2, Presentation, Share2, Star} from 'lucide-react';
 import {useForwarding, useHud, useNavigation, useTranslation} from '@/providers';
@@ -167,7 +168,7 @@ function PagePublishIndicator({pageId}: {pageId: string}) {
       onClick={() => requestShareDialog(pageId)}
       aria-label={label}
       title={label}
-      className="text-emerald-600 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-400"
+      className={cn(STATUS_INK_CLASS.ok, 'hover:text-[var(--data-green-chip-fg)]')}
     >
       <Globe className="h-4 w-4" />
     </IconButton>

@@ -620,9 +620,9 @@ describe('per-cell tint (TBL-6)', () => {
     // Clipboard/standalone HTML: the cell's own tint paints its <td>, and the
     // row tint still paints its siblings (cell wins only where it is set).
     const html = blocksToHtml([json]);
-    expect(html).toContain(`background:${COLOR_EXPORT_HEX.red.hl}`);
-    expect(html).toContain(`background:${COLOR_EXPORT_HEX.green.hl}`);
-    expect(html.indexOf(COLOR_EXPORT_HEX.red.hl)).toBeLessThan(html.indexOf(COLOR_EXPORT_HEX.green.hl));
+    expect(html).toContain(`background:${COLOR_EXPORT_HEX.red.bg}`);
+    expect(html).toContain(`background:${COLOR_EXPORT_HEX.green.bg}`);
+    expect(html.indexOf(COLOR_EXPORT_HEX.red.bg)).toBeLessThan(html.indexOf(COLOR_EXPORT_HEX.green.bg));
 
     // HTML/PDF projection: the parallel cellColors grid carries the same token.
     const out = projectBlocksForExport(docToJSON(doc));
