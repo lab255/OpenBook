@@ -62,7 +62,7 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   });
   await meeting.getByRole('button', {name: 'Record', exact: true}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
-  await expect(meeting.locator('.obe-meeting-elapsed')).toHaveText('0:02');
+  await expect(meeting.locator('.obe-meeting-header .obe-meeting-elapsed')).toHaveText('0:02');
   // Pause closes a genuine standalone chunk without sleeping for the 45s
   // rollover. Resume proves transcript growth while the session is still live.
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
@@ -78,7 +78,7 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
 
   await meeting.getByRole('button', {name: 'Resume', exact: true}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
-  await expect(meeting.locator('.obe-meeting-elapsed')).toHaveText('0:04');
+  await expect(meeting.locator('.obe-meeting-header .obe-meeting-elapsed')).toHaveText('0:04');
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
   await expect(transcript).toHaveCount(2);
   await expect(transcript.first()).toHaveText(firstText);
