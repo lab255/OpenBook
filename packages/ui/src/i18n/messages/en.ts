@@ -1140,6 +1140,8 @@ export const en = {
     done: 'Done',
     player: 'Meeting playback',
     play: 'Play',
+    uploadFailedStatus: 'Upload failed',
+    failedChunks: '{count} chunks not transcribed',
     pausePlayback: 'Pause playback',
     seek: 'Playback position',
     playbackFailed: 'Audio could not be played. Try again.',

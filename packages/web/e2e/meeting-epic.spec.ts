@@ -99,7 +99,11 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await player.getByRole('button', {name: 'Play', exact: true}).click();
   await expect.poll(() => player.locator('audio[data-played="true"]').count()).toBe(2);
   await expect(player.getByRole('button', {name: 'Play', exact: true})).toBeVisible();
+  const playWidth = (await player.getByRole('button', {name: 'Play', exact: true}).boundingBox())!.width;
+  expect(playWidth).toBe(24);
   await player.getByRole('button', {name: 'Play', exact: true}).click();
+  await expect(player.getByRole('button', {name: 'Pause playback', exact: true})).toBeVisible();
+  expect((await player.getByRole('button', {name: 'Pause playback', exact: true}).boundingBox())!.width).toBe(playWidth);
   await expect.poll(() => player.locator('audio').evaluateAll((elements) => elements.some((element) => !(element as HTMLAudioElement).paused))).toBe(true);
   await player.getByRole('button', {name: 'Pause playback', exact: true}).click();
   await expect.poll(() => player.locator('audio').evaluateAll((elements) => elements.every((element) => (element as HTMLAudioElement).paused))).toBe(true);

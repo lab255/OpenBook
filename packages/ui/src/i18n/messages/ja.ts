@@ -694,6 +694,8 @@ export const ja: PartialMessages = {
     done: '完了',
     player: '会議の再生',
     play: '再生',
+    uploadFailedStatus: 'アップロード失敗',
+    failedChunks: '{count} チャンクが未文字起こし',
     pausePlayback: '再生を一時停止',
     seek: '再生位置',
     playbackFailed: '音声を再生できませんでした。もう一度お試しください。',

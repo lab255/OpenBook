@@ -691,6 +691,8 @@ export const zh: PartialMessages = {
     done: '完成',
     player: '会议播放',
     play: '播放',
+    uploadFailedStatus: '上传失败',
+    failedChunks: '{count} 个片段未转录',
     pausePlayback: '暂停播放',
     seek: '播放位置',
     playbackFailed: '无法播放音频，请重试。',

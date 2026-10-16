@@ -120,4 +120,45 @@ describe('unified meeting playback', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('keeps normal uploading quiet and announces status without opening details', () => {
+    const pending = {chunks: [{id: 'pending', audio: {...saved[0], startedAtMs: 0}, blob: new Blob(['audio']), phase: 'uploading'}], retry} as unknown as MeetingRecorder;
+    const view = render(<MeetingPlayer saved={[]} completed={[]} session={pending} readOnly={false} canTranscribe />);
+    expect(view.container.querySelector('[data-attention="true"]')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Save audio copy')).toBeNull();
+    expect(screen.getByRole('status').getAttribute('aria-live')).toBe('polite');
+    expect(screen.getByRole('status').textContent).toContain('Saving audio');
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+  it('renders failures inline, collapses more than two, and resolves them without floating surfaces', () => {
+    const audio = [...saved, {assetId: 'third', durationMs: 1000}].map((chunk, index) => ({...chunk, startedAtMs: index * 45000}));
+    const failedSession = {chunks: audio.map((chunk) => ({audio: chunk, phase: 'untranscribed', error: 'Service failed'})), retry} as unknown as MeetingRecorder;
+    const view = render(<MeetingPlayer saved={audio} completed={[]} session={failedSession} readOnly={false} canTranscribe />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(view.container.querySelectorAll('[data-attention="true"]')).toHaveLength(3);
+    expect(screen.queryByRole('button', {name: 'Retry transcription'})).toBeNull();
+    fireEvent.click(screen.getByRole('button', {name: '3 chunks not transcribed'}));
+    expect(screen.getAllByRole('button', {name: 'Retry transcription'})).toHaveLength(3);
+    fireEvent.click(screen.getAllByRole('button', {name: 'Retry transcription'})[0]);
+    expect(retry).toHaveBeenCalledWith(audio[0]);
+    view.rerender(<MeetingPlayer saved={audio} completed={audio.map((chunk) => `${chunk.startedAtMs}:${chunk.assetId}`)} session={session} readOnly={false} canTranscribe />);
+    expect(view.container.querySelectorAll('.obe-meeting-attention')).toHaveLength(0);
+  });
+  it('offers upload recovery only on failed rows and user-opened popovers', () => {
+    const upload = vi.fn();
+    const pending = {chunks: [{id: 'pending', audio: {...saved[0], startedAtMs: 0}, blob: new Blob(['audio']), phase: 'uploadFailed', error: 'Upload failed'}], retry, upload} as unknown as MeetingRecorder;
+    const view = render(<MeetingPlayer saved={[]} completed={[]} session={pending} readOnly={false} canTranscribe />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('link', {name: 'Save audio copy'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', {name: 'Retry upload'}));
+    expect(upload).toHaveBeenCalledWith(pending.chunks[0]);
+    fireEvent.click(screen.getByRole('button', {name: /0:00 · Upload failed/}));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getAllByRole('link', {name: 'Save audio copy'})).toHaveLength(2);
+    fireEvent.keyDown(screen.getByRole('dialog'), {key: 'Escape'});
+    expect(screen.queryByRole('dialog')).toBeNull();
+    view.rerender(<MeetingPlayer saved={[]} completed={[]} session={pending} readOnly canTranscribe />);
+    expect(screen.queryByRole('button', {name: 'Retry upload'})).toBeNull();
+  });
+
 });

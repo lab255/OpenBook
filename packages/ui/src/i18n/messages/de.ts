@@ -699,6 +699,8 @@ export const de: PartialMessages = {
     done: 'Fertig',
     player: 'Besprechungswiedergabe',
     play: 'Abspielen',
+    uploadFailedStatus: 'Upload fehlgeschlagen',
+    failedChunks: '{count} Abschnitte nicht transkribiert',
     pausePlayback: 'Wiedergabe pausieren',
     seek: 'Wiedergabeposition',
     playbackFailed: 'Audio konnte nicht abgespielt werden. Erneut versuchen.',
