@@ -55,7 +55,7 @@ import {
   renderLedgerReportBlock,
   type LedgerExportRecords,
 } from './exportLedgerReports';
-import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK} from '../blockeditor/colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../blockeditor/colors';
 import {kitChartRuntime, kitChartSvg} from './kitChart';
 import {formatValue} from './format';
 import {inlineScriptHash, pageCsp} from './exportCsp';
@@ -287,20 +287,21 @@ function visibleProps(schema: DatabaseSchema): DatabaseProperty[] {
   return chosen.filter((p) => p.type !== 'files' && p.type !== 'backlinks');
 }
 
-const tag = (label: string, color: string | undefined, scheme: DataColorScheme): string => {
-  const chip = DATA_PALETTE[scheme][isDataColorToken(color) ? color : 'gray'].chip.light;
-  return `<span class="tag" style="background:${chip.bg};color:${chip.fg}">${escapeHtml(label)}</span>`;
+const tag = (label: string, color: string | undefined, scheme: DataColorScheme, kind: 'select' | 'status'): string => {
+  const token = isDataColorToken(color) ? color : 'gray';
+  const chip = DATA_PALETTE[scheme][token].chip.light;
+  return `<span class="tag" data-kind="${kind}" style="background:var(--data-${token}-chip-bg, ${chip.bg});color:var(--data-${token}-chip-fg, ${chip.fg})">${escapeHtml(label)}</span>`;
 };
 
 function cellHtml(row: DatabaseRow, prop: DatabaseProperty, props: DatabaseProperty[], rows: DatabaseRow[], ctx: RenderCtx): string {
   const raw = cellValue(row, prop, props, rows);
   if (prop.type === 'select' || prop.type === 'status') {
     const opt = prop.options?.find((o) => o.id === raw);
-    return opt ? tag(opt.label, opt.color, ctx.scheme) : '';
+    return opt ? tag(opt.label, opt.color, ctx.scheme, prop.type) : '';
   }
   if (prop.type === 'multi_select') {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
-    return (prop.options ?? []).filter((o) => ids.includes(o.id)).map((o) => tag(o.label, o.color, ctx.scheme)).join(' ');
+    return (prop.options ?? []).filter((o) => ids.includes(o.id)).map((o) => tag(o.label, o.color, ctx.scheme, 'select')).join(' ');
   }
   if (prop.type === 'relation' || prop.type === 'dependency') {
     const ids = Array.isArray(raw) ? (raw as string[]) : [];
@@ -384,6 +385,9 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     case 'list':
       html.push(listToHtml(toListItems(d.items), d.style === 'ordered', ctx));
       break;
+    case 'togglelist':
+      html.push(`<details class="obe-x-togglelist"${d.open === false ? '' : ' open'}><summary>${inlineToHtml(parseInline(str(d.text)), ctx)}</summary>${renderBlocks(Array.isArray(d.children) ? d.children as ExportBlock[] : [], ctx)}</details>`);
+      break;
     case 'quote':
       html.push(`<blockquote>${inlineToHtml(parseInline(str(d.text)), ctx)}</blockquote>`);
       break;
@@ -401,7 +405,7 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
       const cell = (c: unknown) => inlineToHtml(parseInline(str(c)), ctx);
       const tint = (ri: number, ci: number): string => {
         const tok = colors[ri]?.[ci];
-        return typeof tok === 'string' && COLOR_EXPORT_HEX[tok] ? ` style="background:${COLOR_EXPORT_HEX[tok].hl}"` : '';
+        return typeof tok === 'string' && COLOR_EXPORT_HEX[tok] ? ` style="background:var(--obtb-${tok}, ${COLOR_EXPORT_HEX[tok].bg})"` : '';
       };
       const spanAttrs = (ri: number, ci: number): string => {
         const raw = spans[ri]?.[ci];
@@ -439,8 +443,10 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     }
     case 'callout': {
       const icon = str(d.icon);
-      const customIcon = icon && !icon.startsWith('lucide:')
-        ? `<span class="callout__icon">${escapeHtml(icon)}</span>` : '';
+      // Reserve authored Lucide icons instead of showing the wrong variant glyph.
+      // The hydrated viewer renders the SVG; static output stays dependency-light.
+      const customIcon = icon
+        ? `<span class="callout__icon">${escapeHtml(pageIconToText(icon))}</span>` : '';
       html.push(
         `<div class="callout" data-variant="${escapeHtml(str(d.variant) || 'info')}"${d.bg ? ` data-bg="${escapeHtml(str(d.bg))}"` : ''}>${customIcon}<div class="callout__body">${inlineToHtml(parseInline(str(d.text)), ctx)}</div></div>`,
       );
@@ -934,7 +940,7 @@ function document_(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <title>${escapeHtml(headTitle)}</title>
-<style>${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : SCHEME_DUAL}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
+<style>${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : schemeDual(ctx.scheme)}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
 </head>
 <body${!hydrate && rootId ? ` data-root="${escapeHtml(rootId)}"` : ''}>
 ${legacyHeader}${bodyHtml}
@@ -1274,17 +1280,19 @@ export function toHtmlSite(
 const SCHEME_LIGHT = `
 :root { color-scheme: light; }
 `;
-const SCHEME_DUAL = `
+const schemeDual = (scheme: DataColorScheme): string => `
 :root { color-scheme: light dark; }
 @media (prefers-color-scheme: dark) {
   body { background: #18181b; color: #e7e7ea; }
   .callout { background: hsl(0 0% 18.5%); }
-  :root { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); }
+  :root { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); --obe-x-head: hsl(0 0% 18.5% / 0.5); }
   /* Brighter text-colour tokens so palette colours stay legible on the dark page
      (the light-theme hex go muddy). Inline runs reference these via var(); when
      this query is inactive the var() falls back to the baked light hex. */
   :root {
     ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtc-${token}: ${value.fg};`).join('\n    ')}
+    ${Object.entries(COLOR_EXPORT_HEX_DARK).map(([token, value]) => `--obtb-${token}: ${value.bg};`).join('\n    ')}
+    ${Object.entries(DATA_PALETTE[scheme]).map(([token, value]) => `--data-${token}-chip-bg: ${value.chip.dark.bg}; --data-${token}-chip-fg: ${value.chip.dark.fg};`).join('\n    ')}
   }
   /* Palette highlight tints are translucent; let marked text inherit the light page ink. */
   mark[style] { color: inherit; }
@@ -1314,7 +1322,7 @@ pre { background: rgba(127,127,127,.12); padding: 12px 14px; border-radius: 8px;
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; }
 pre code { font-size: 14px; line-height: 1.5; }
 /* Unstyled highlights keep an opaque tint and dark text. Translucent palette
-   highlights inherit the light page ink in dark mode via SCHEME_DUAL. */
+   highlights inherit the light page ink in dark mode via schemeDual. */
 mark { background: #fde68a; color: #1c1917; padding: 0 .1em; border-radius: 2px; }
 hr { border: none; border-top: 1px solid rgba(127,127,127,.3); width: 30%; margin: 2em auto; }
 a.mention { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; color: inherit; }
@@ -1328,6 +1336,8 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .cols > .col > :first-child { margin-top: 0; }
 @media (max-width: 640px) { .cols { flex-direction: column; gap: 28px; } .cols > .col { width: 100%; } }
 /* Container mirrors guarded against editor tokens by containerParity.test.ts. */
+.obe-x-togglelist > :not(summary){margin-left:24px}
+.obe-x-togglelist > summary{cursor:pointer}
 .obe-x-group { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); border-radius: 8px; padding: 4px 24px; margin: 12px 0; }
 .obe-x-group-name { font-size: 12px; line-height: 1.33; letter-spacing: 0.04em; color: var(--obe-x-muted, hsl(40 3% 43.2%)); margin: 0 0 4px; }
 .obe-x-section > summary { cursor: pointer; min-height: 32px; font-size: 14px; font-weight: 600; }
@@ -1335,11 +1345,11 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .kitinput { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .kit-label { font-weight: 600; font-size: .92rem; }
 .kit-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.kit-pill { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
+.kit-pill { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
 .kit-pill .kit-dot { display: none; }
-.kit-pill.kit-on { background: #6366f1; border-color: #6366f1; color: #fff; }
+.kit-pill.kit-on { background: ${KIT_EXPORT_PRIMARY}; border-color: ${KIT_EXPORT_PRIMARY}; color: #fff; }
 .kit-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: .9rem; }
-.kit-check input, .kit-toggle input { accent-color: #6366f1; }
+.kit-check input, .kit-toggle input { accent-color: ${KIT_EXPORT_PRIMARY}; }
 .kitinput select, .kitinput input[type=text] { font: inherit; font-size: .9rem; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; padding: 4px 8px; }
 .kit-wide { display: block; }
 .kit-wide .kit-label { display: block; margin-bottom: 8px; }
@@ -1347,24 +1357,24 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .kit-wide .kit-pill, .kit-wide .kit-check { width: 100%; border-radius: 8px; padding: 9px 14px; display: flex; justify-content: flex-start; }
 .kit-wide .kit-pill { background: transparent; color: inherit; }
 .kit-wide .kit-pill:hover, .kit-wide .kit-check:hover { background: rgba(127,127,127,.1); }
-.kit-wide .kit-pill .kit-dot { display: inline-block; width: 13px; height: 13px; border-radius: 999px; border: 1.5px solid rgba(127,127,127,.6); flex-shrink: 0; }
-.kit-wide .kit-pill.kit-on { background: rgba(99,102,241,.1); border-color: #6366f1; }
-.kit-wide .kit-pill.kit-on .kit-dot { border-color: #6366f1; background: radial-gradient(circle, #6366f1 0 38%, transparent 42%); }
+.kit-wide .kit-pill .kit-dot { display: inline-block; width: 13px; height: 13px; border-radius: 9999px; border: 1.5px solid rgba(127,127,127,.6); flex-shrink: 0; }
+.kit-wide .kit-pill.kit-on { background: ${hexAlpha(KIT_EXPORT_PRIMARY, 0.08)}; border-color: ${KIT_EXPORT_PRIMARY}; }
+.kit-wide .kit-pill.kit-on .kit-dot { border-color: ${KIT_EXPORT_PRIMARY}; background: radial-gradient(circle, ${KIT_EXPORT_PRIMARY} 0 38%, transparent 42%); }
 .kit-wide select { width: 100%; padding: 8px 10px; }
 .kit-btn { font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.08); color: inherit; border-radius: 8px; padding: 6px 16px; text-decoration: none; display: inline-block; }
 .kit-btn:hover { background: rgba(127,127,127,.16); }
 .kitlight { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .kit-light-val { font-weight: 500; opacity: .6; font-size: .9em; }
-.kit-light-dot { width: 12px; height: 12px; border-radius: 999px; background: ${hexAlpha(DATA_PALETTE[scheme].gray.fill, 0.35)}; box-shadow: inset 0 0 0 1px ${DATA_STROKE}; }
+.kit-light-dot { width: 12px; height: 12px; border-radius: 9999px; background: ${hexAlpha(DATA_PALETTE[scheme].gray.fill, 0.35)}; box-shadow: inset 0 0 0 1px ${DATA_STROKE}; }
 ${statusLightCss(scheme)}
 .kitprogress { display: flex; flex-direction: column; gap: 6px; }
 .kit-prog-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .kit-prog-label { font-weight: 600; font-size: .92rem; }
 .kit-prog-val { font-variant-numeric: tabular-nums; opacity: .65; font-size: .9em; }
-.kit-prog-track { height: 8px; border-radius: 999px; background: rgba(127,127,127,.18); overflow: hidden; }
-.kit-prog-fill { height: 100%; border-radius: 999px; background: #6366f1; transition: width .25s ease; }
+.kit-prog-track { height: 8px; border-radius: 9999px; background: rgba(127,127,127,.18); overflow: hidden; }
+.kit-prog-fill { height: 100%; border-radius: 9999px; background: ${KIT_EXPORT_PRIMARY}; transition: width 180ms cubic-bezier(0.32,0.72,0,1); }
 .slider input[type=range] { vertical-align: middle; width: 60%; }
-.expr code { color: #4f46e5; }
+.expr code { color: inherit; }
 /* Long stringified readouts (arrays from live code) must wrap, not blow the
    page to tens of thousands of px wide (which also degrades the PDF slice). */
 .reactive code { overflow-wrap: anywhere; }
@@ -1425,13 +1435,14 @@ table.ledger-table td.ledger-empty { opacity: .6; font-style: italic; }
 .ledger-reversed { opacity: .6; font-size: .9em; }
 .ob-ledger-note { font-size: .85rem; opacity: .8; margin: 4px 0 0; }
 .ob-ledger-note.is-alarm { color: #b91c1c; font-weight: 600; opacity: 1; }
-table.block-table, table.db-table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: .95em; }
-table.block-table th, table.block-table td, table.db-table th, table.db-table td { border: 1px solid rgba(127,127,127,.3); padding: 4px 8px; text-align: left; vertical-align: top; }
-table.block-table th, table.db-table th { background: rgba(127,127,127,.08); font-weight: 600; padding-block: 6px; }
+table.block-table, table.db-table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 14px; line-height: 1.43; }
+table.block-table th, table.block-table td, table.db-table th, table.db-table td { border: 1px solid var(--obe-x-border, hsl(40 8% 90%)); padding: 6px 8px; text-align: left; vertical-align: top; }
+table.block-table th, table.db-table th { background: var(--obe-x-head, hsl(40 9% 96% / 0.5)); font-weight: 600; }
 table.db-table a.db-row { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; font-weight: 600; cursor: pointer; }
 table.db-table a.db-row:hover { text-decoration: underline; }
 .db-empty { opacity: .6; font-size: .9em; }
-.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .82em; margin: 1px 2px 1px 0; }
+.tag[data-kind=status] { border-radius:9999px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: .82em; margin: 1px 2px 1px 0; }
 .callout { display: flex; gap: 8px; margin: 8px 0; padding: 12px; border-radius: 8px; border: none; }
 .callout::before { content: "💡"; }
 .callout[data-variant=warn]::before, .callout[data-variant=warning]::before { content: "⚠️"; }
@@ -1442,6 +1453,7 @@ table.db-table a.db-row:hover { text-decoration: underline; }
 .callout[data-variant=success] { background: hsl(140 55% 45% / 0.13); }
 .callout[data-variant=danger] { background: hsl(0 72% 55% / 0.12); }
 .callout:has(.callout__icon)::before { content: none; }
+.callout__icon:empty { display: none; }
 .callout__icon { flex: none; }
 .callout[data-bg=gray] { background: hsl(0 0% 50% / 0.1); }
 .callout[data-bg=brown] { background: hsl(25 45% 50% / 0.13); }
@@ -1463,7 +1475,7 @@ nav.toc { margin: 8px 0; padding: 8px 12px; border-left: 3px solid rgba(127,127,
 nav.toc ul { list-style: none; padding-left: 0; margin: 0; }
 nav.toc a { text-decoration: none; opacity: .85; }
 nav.toc a:hover { opacity: 1; text-decoration: underline; }
-a.button { display: inline-block; background: #4f46e5; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
+a.button { display: inline-block; background: ${KIT_EXPORT_PRIMARY}; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; }
 a.button:hover { filter: brightness(1.08); }
 .button.is-empty { background: rgba(127,127,127,.3); }
 hr.divider[data-style=dashed] { border-top-style: dashed; }

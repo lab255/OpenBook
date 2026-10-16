@@ -15,6 +15,12 @@ import {
 } from '../model';
 
 describe('parseClipboardGrid', () => {
+  it.each(['#34b25e21', 'rgba(52, 178, 94, 0.129)'])('preserves editor background-role tint %s', (background) => {
+    expect(parseClipboardGrid({html: `<table><tr><td style="background:${background}">A</td></tr></table>`})).toEqual([
+      [{text: 'A', color: 'green'}],
+    ]);
+  });
+
   it('parses the first HTML table and preserves br as a newline', () => {
     expect(parseClipboardGrid({html: '<p>before</p><table><tr><th> A<br>B </th><th>C</th></tr></table><table><tr><td>ignored</td></tr></table>'})).toEqual([
       ['A\nB', 'C'],

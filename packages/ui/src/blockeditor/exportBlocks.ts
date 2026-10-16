@@ -219,7 +219,7 @@ function tableCellTint(tableProps: Props, rowProps: Props, cellProps: Props): st
 /** An inline `style="background:…"` for a cell tint token, or '' (for the
  *  self-contained HTML/PDF exports that can't use the theme CSS classes). */
 const tintStyle = (token: string | null): string =>
-  token && COLOR_EXPORT_HEX[token] ? ` style="background:${COLOR_EXPORT_HEX[token].hl}"` : '';
+  token && COLOR_EXPORT_HEX[token] ? ` style="background:${COLOR_EXPORT_HEX[token].bg}"` : '';
 
 /** A canonical projected-cell span (absent or malformed means one). */
 const tableCellSpan = (props: Props, key: 'colspan' | 'rowspan'): number => {
@@ -336,6 +336,10 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
       i += 1;
       break;
     }
+    case 'togglelist':
+      parts.push(`<details${b.props?.collapsed ? '' : ' open'}><summary>${textHtml(b.text)}</summary>${blocksToHtml(b.children ?? [], opts)}</details>`);
+      i += 1;
+      break;
     case 'quote':
       parts.push(`<blockquote>${textHtml(b.text)}</blockquote>`);
       i += 1;
@@ -526,6 +530,11 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
     case 'todo':
       out.push(`- [${b.props?.checked ? 'x' : ' '}] ${textMd(b.text)}`);
       break;
+    case 'togglelist': {
+      const body = blocksToMarkdown(b.children ?? [], opts);
+      out.push(textMd(b.text) + (body ? '\n' + body.split('\n').map(line => line ? `  ${line}` : '').join('\n') : ''));
+      break;
+    }
     case 'quote':
       out.push(`> ${textMd(b.text)}`);
       break;
@@ -798,6 +807,13 @@ export function projectBlocksForExport(
           i += 1;
         }
         sink.push({type: 'checklist', data: {items}});
+        break;
+      }
+      case 'togglelist': {
+        const children: ExportDoc['blocks'] = [];
+        emit(b.children ?? [], children);
+        sink.push({id: b.id, type: 'togglelist', data: {text: textHtml(b.text), open: !b.props?.collapsed, children}});
+        i += 1;
         break;
       }
       case 'quote':

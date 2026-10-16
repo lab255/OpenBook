@@ -29,7 +29,7 @@ export const kitWide = (block: BlockMap): boolean => !blockProp<boolean>(block, 
 export const ConfigField: React.FC<{label: string; hint?: string; children: React.ReactNode}> = ({label, hint, children}) => (
   <label className="flex flex-col gap-1">
     <span className="text-xs font-medium text-foreground/80">{label}</span>
-    {hint && <span className="-mt-0.5 text-[0.7rem] text-muted-foreground">{hint}</span>}
+    {hint && <span className="-mt-0.5 text-xs text-muted-foreground">{hint}</span>}
     {children}
   </label>
 );
@@ -61,20 +61,20 @@ export const ScopeHints: React.FC<{editor: BlockEditorController; onPick: (name:
   const cached = useCachedInputScope(editor);
   const names = Object.keys(cached.value ?? {}).sort();
   if (cached.pending && !cached.value) {
-    return <span className="text-[0.7rem] text-muted-foreground">Loading variables…</span>;
+    return <span className="text-xs text-muted-foreground">Loading variables…</span>;
   }
   if (names.length === 0) {
-    return <span className="text-[0.7rem] text-muted-foreground">No named inputs on this page yet — add a slider, number, or other input block.</span>;
+    return <span className="text-xs text-muted-foreground">No named inputs on this page yet — add a slider, number, or other input block.</span>;
   }
   return (
     <div className="flex flex-wrap items-center gap-1 pt-0.5">
-      <span className="text-[0.7rem] text-muted-foreground">Variables:</span>
+      <span className="text-xs text-muted-foreground">Variables:</span>
       {names.map((name) => (
         <button
           key={name}
           type="button"
           disabled={editor.readOnly}
-          className="cursor-pointer rounded border border-border bg-muted/40 px-1 py-0.5 font-mono text-[0.7rem] text-foreground/80 transition-colors hover:bg-hover"
+          className="cursor-pointer rounded-sm border border-border bg-muted/40 px-1 py-0.5 font-mono text-xs text-foreground/80 transition-colors hover:bg-hover"
           // preventDefault on mousedown keeps focus in the expression input.
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick(name)}
@@ -107,7 +107,7 @@ export const ConfigToggle: React.FC<{
   <label className="flex cursor-pointer items-center justify-between gap-3">
     <span className="flex flex-col">
       <span className="text-xs font-medium text-foreground/80">{label}</span>
-      {hint && <span className="text-[0.7rem] text-muted-foreground">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </span>
     <input
       type="checkbox"
@@ -294,6 +294,10 @@ const CommonFields: React.FC<{block: BlockMap; editor: BlockEditorController; de
 );
 
 export interface KitFrameProps {
+  as?: 'div' | 'figure';
+  rootProps?: Record<`data-${string}`, string | number>;
+  headerPlaceholder?: string;
+  hideEmptyHeaderWhenLocked?: boolean;
   /** Existing display-name prop for containers with their own title contract. */
   labelKey?: string;
   block: BlockMap;
@@ -320,6 +324,10 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   editor,
   kind,
   labelKey = 'label',
+  as: Root = 'div',
+  rootProps,
+  headerPlaceholder,
+  hideEmptyHeaderWhenLocked = false,
   defaultName,
   control,
   config,
@@ -327,6 +335,8 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   hideHeader = false,
   symbol = true,
 }) => {
+  const pageLocked = useKitPageLock();
+  const Header = Root === 'figure' ? 'figcaption' : 'span';
   const id = blockId(block);
   const explicitName = blockProp<string>(block, 'name') ?? '';
   const displayLabel = blockProp<string>(block, labelKey) ?? '';
@@ -345,19 +355,20 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   );
 
   return (
-    <div
+    <Root
+      {...rootProps}
       className={`obe-kit obe-kit-${kind}${wide ? ' obe-kit-wide' : ''}`}
       contentEditable={false}
       data-kit-name={name}
     >
-      {!hideHeader && (
-        <span className="obe-kit-head">
+      {!hideHeader && !(hideEmptyHeaderWhenLocked && !displayLabel.trim() && (editor.readOnly || pageLocked)) && (
+        <Header className="obe-kit-head">
           <KitInlineText
             className="obe-kit-label"
             value={displayLabel}
-            placeholder={name}
+            placeholder={headerPlaceholder ?? name}
             readOnly={editor.readOnly}
-            ariaLabel="Display name"
+            ariaLabel={headerPlaceholder ?? 'Display name'}
             onCommit={(v) => kitSet(editor, block, labelKey, v)}
           />
           {/* Only render the inline description when it HAS content — an empty
@@ -372,12 +383,12 @@ export const KitFrame: React.FC<KitFrameProps> = ({
               onCommit={(v) => kitSet(editor, block, 'description', v)}
             />
           )}
-        </span>
+        </Header>
       )}
       {control}
       <KitSettings blockId={id} title={label}>
         {fields}
       </KitSettings>
-    </div>
+    </Root>
   );
 };

@@ -1,4 +1,5 @@
 import {meetingSummaryContainer} from './meetingSummaryBlocks';
+import {shortId} from '@book.dev/sdk';
 import React, {useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {
   ArrowDown,
@@ -19,6 +20,7 @@ import {
   Lock,
   LockOpen,
   Plus,
+  Palette,
   RefreshCw,
   TableCellsSplit,
   Trash2,
@@ -83,7 +85,7 @@ import {
   type CellSelection,
 } from './model';
 import {TableColResizer} from './TableColResizer';
-import {TableRangeToolbar} from './TableRangeToolbar';
+import {TableRangeToolbar, selectedCellRangeRect} from './TableRangeToolbar';
 import {rangeHasAttr, readSelection, readSelectionDirected, writeSelection} from './richtext';
 import {marqueeRect, rowsInMarquee, shiftClickRange, type Rect} from './marquee';
 import {blocksToHtml, blocksToMarkdown} from './exportBlocks';
@@ -1819,6 +1821,7 @@ const TURN_OPTIONS: Array<{label: string; type: BlockType; props?: Record<string
   {label: 'Bulleted list', type: 'list', props: {kind: 'bullet'}},
   {label: 'Numbered list', type: 'list', props: {kind: 'number'}},
   {label: 'To-do', type: 'todo'},
+  {label: 'Toggle list', type: 'togglelist'},
   {label: 'Quote', type: 'quote'},
   {label: 'Callout', type: 'callout', props: {variant: 'info'}},
   {label: 'Code', type: 'code'},
@@ -2194,6 +2197,36 @@ const GroupView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   );
 };
 
+/** Rich-text disclosure: reader navigation stays live in the hydrated viewer. */
+const ToggleListView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) => {
+  const {editor, ui} = shared;
+  const collapsed = Boolean(blockProp(block, 'collapsed'));
+  const children = blockChildren(block)!;
+  const addChild = (): void => {
+    const id = shortId('b');
+    editor.doc.transact(() => children.insert(0, [makeBlock({id, type: 'paragraph'})]), 'local');
+    editor.requestCaret({blockId: id, offset: 0});
+  };
+  return (
+    <div className="obe-togglelist">
+      <div className="obe-togglelist-row">
+        <button type="button" className="obe-togglelist-marker" aria-label={t('blockEditor.togglelistToggle')}
+          aria-expanded={!collapsed} contentEditable={false}
+          onClick={() => editor.doc.transact(() => setBlockProp(block, 'collapsed', !collapsed), 'local')}>
+          <ChevronRight className="obe-togglelist-chevron" aria-hidden />
+        </button>
+        <TextBlockView block={block} editor={editor} ui={ui} />
+      </div>
+      {!collapsed && <div className="obe-togglelist-children">
+        <BlockList list={children} {...shared} depth={shared.depth + 1} container="togglelist" />
+        {children.length === 0 && !editor.readOnly && <button type="button" className="obe-togglelist-hint" onClick={addChild}>
+          {t('blockEditor.togglelistEmpty')}
+        </button>}
+      </div>}
+    </div>
+  );
+};
+
 // ── Tabs & Accordion (interactive-kit containers) ─────────────────────────────
 
 /** A small completion chip a tab/section shows: ✓ when complete, else N/M.
@@ -2483,6 +2516,9 @@ const BlockBody: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   case 'table':
     return <TableView block={block} {...shared} />;
 
+  case 'togglelist':
+    return <ToggleListView block={block} {...shared} editor={textEditor} />;
+
   case 'todo': {
     const checked = blockProp<boolean>(block, 'checked') ?? false;
     return (
@@ -2771,7 +2807,7 @@ const TableColorSubmenu: React.FC<{
   const {Item, Sub, SubContent, SubTrigger} = menu;
   return (
     <Sub>
-      <SubTrigger>{label}</SubTrigger>
+      <SubTrigger><Palette className="mr-2 h-3.5 w-3.5" />{label}</SubTrigger>
       <SubContent className={MENU_WIDTH_SM}>
         {COLOR_MENU.map((c) => (
           <Item key={c.id ?? 'default'} onSelect={() => onPick(c.id)}>
@@ -3048,12 +3084,13 @@ interface TableGripMenuProps {
   editor: BlockEditorController;
   style?: React.CSSProperties;
   spanOffset?: number;
+  revealed?: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
 }
 
 const TableGripMenu: React.FC<TableGripMenuProps> = ({
-  axis, tableId, index, itemId, count, header, editor, style, spanOffset, onDragStart, onDragEnd,
+  axis, tableId, index, itemId, count, header, editor, style, spanOffset, revealed, onDragStart, onDragEnd,
 }) => {
   const [open, setOpen] = useState(false);
   const [ctxOpen, setCtxOpen] = useState(false);
@@ -3087,6 +3124,7 @@ const TableGripMenu: React.FC<TableGripMenuProps> = ({
       data-drag-from={index}
       data-drag-id={itemId}
       data-span-offset={spanOffset}
+      data-revealed={revealed ? '' : undefined}
       draggable
       style={style}
       onMouseDown={(e) => e.stopPropagation()}
@@ -3170,6 +3208,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   // Drag handles are chrome — hidden in readOnly and in a kit-locked / present
   // context (acceptance #4; also enumerated in the `.ob-present` CSS hide-list).
   const showHandles = !editor.readOnly && !lockText;
+  const [hoverCols, setHoverCols] = useState<[number, number] | null>(null);
   const storedWidths = columns.map((column) => tableColumnWidth(block, column.id));
   const [previewWidths, setPreviewWidths] = useState<Record<string, number>>({});
   const renderedWidths = columns.map((column, index) => previewWidths[column.id] ?? storedWidths[index]);
@@ -3245,6 +3284,30 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   const rangeKey = activeCellSel
     ? `${activeCellSel.anchor.row}:${activeCellSel.anchor.col}:${activeCellSel.focus.row}:${activeCellSel.focus.col}`
     : '';
+  const [rangeBounds, setRangeBounds] = useState<React.CSSProperties | null>(null);
+  const widthsKey = renderedWidths.join();
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    const wrap = table?.parentElement;
+    if (!table || !wrap || !rangeKey) {
+      setRangeBounds(null);
+      return;
+    }
+    const update = (): void => {
+      const bounds = selectedCellRangeRect(table);
+      const origin = wrap.getBoundingClientRect();
+      setRangeBounds(bounds ? {
+        left: bounds.left - origin.left,
+        top: bounds.top - origin.top,
+        width: bounds.width,
+        height: bounds.height,
+      } : null);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [rangeKey, widthsKey]);
   const [rangeToolbarDismissed, setRangeToolbarDismissed] = useState(false);
   useEffect(() => setRangeToolbarDismissed(false), [rangeKey]);
   // Shift-click a cell extends the range from its anchor (the live range's
@@ -3283,7 +3346,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
   };
 
   return (
-    <div className={[showHandles ? 'obe-table-wrap obe-has-grips' : 'obe-table-wrap', activeCellSel && 'obe-cell-selecting'].filter(Boolean).join(' ')}>
+    <div onPointerLeave={() => setHoverCols(null)} className={[showHandles ? 'obe-table-wrap obe-has-grips' : 'obe-table-wrap', activeCellSel && 'obe-cell-selecting'].filter(Boolean).join(' ')}>
       <table ref={tableRef} tabIndex={-1} className={hasWidths ? 'obe-table obe-table-fixed' : 'obe-table'}>
         <colgroup>
           {showHandles && <col className="obe-table-grip-host-col" style={{width: 0}} />}
@@ -3377,10 +3440,9 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                               header={header}
                               editor={editor}
                               spanOffset={offset}
+                              revealed={!!hoverCols && from >= hoverCols[0] && from <= hoverCols[1]}
                               style={{
-                                left: `${(offset / slot.colspan) * 100}%`,
-                                right: 'auto',
-                                width: `${100 / slot.colspan}%`,
+                                left: `calc(${((offset + 0.5) / slot.colspan) * 100}% - var(--obe-gutter-btn) / 2)`,
                               }}
                               onDragStart={startDrag({axis: 'col', from, id: gripColId})}
                               onDragEnd={clearDrag}
@@ -3420,6 +3482,11 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                         key={`pad-${r}-${c}`}
                         aria-hidden
                         className={tdDropClass || undefined}
+                        onPointerEnter={showHandles ? () => {
+                          const from = c;
+                          const to = c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1;
+                          setHoverCols(prev => prev && prev[0] === from && prev[1] === to ? prev : [from, to]);
+                        } : undefined}
                         onMouseDownCapture={extendCellSelect(r, c)}
                         onDragOver={showHandles ? overCol(c) : undefined}
                         onDrop={showHandles ? commitDrop : undefined}
@@ -3470,6 +3537,11 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
                         className={tdDropClass || undefined}
                         colSpan={slot?.kind === 'cell' && slot.colspan > 1 ? slot.colspan : undefined}
                         rowSpan={slot?.kind === 'cell' && slot.rowspan > 1 ? slot.rowspan : undefined}
+                        onPointerEnter={showHandles ? () => {
+                          const from = c;
+                          const to = c + (slot?.kind === 'cell' ? slot.colspan : 1) - 1;
+                          setHoverCols(prev => prev && prev[0] === from && prev[1] === to ? prev : [from, to]);
+                        } : undefined}
                         onMouseDownCapture={extendCellSelect(r, c)}
                         onDragOver={showHandles ? overCol(c) : undefined}
                         onDrop={showHandles ? commitDrop : undefined}
@@ -3485,6 +3557,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
           })}
         </tbody>
       </table>
+      {cellRect && rangeBounds && <div className="obe-table-range" aria-hidden style={rangeBounds} />}
       {cellRect && isMultiCellRect(cellRect) && !editor.readOnly && !lockText && !rangeToolbarDismissed && (
         <TableRangeToolbar
           rect={cellRect}
@@ -3495,7 +3568,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
           onDismiss={() => setRangeToolbarDismissed(true)}
         />
       )}
-      {!editor.readOnly && (
+      {showHandles && (
         <>
           <button
             type="button"
@@ -3503,7 +3576,7 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
             aria-label="Add row"
             onClick={() => tableInsertRow(editor.doc, id, rows.length)}
           >
-            +
+            <Plus className="h-3.5 w-3.5" aria-hidden />
           </button>
           <button
             type="button"
@@ -3511,24 +3584,8 @@ const TableView: React.FC<RowShared & {block: BlockMap}> = ({block, ...shared}) 
             aria-label="Add column"
             onClick={() => tableInsertColumn(editor.doc, id, cols)}
           >
-            +
+            <Plus className="h-3.5 w-3.5" aria-hidden />
           </button>
-          <div className="obe-table-tools" contentEditable={false}>
-            <button type="button" aria-label="Delete last row" onClick={() => tableDeleteRow(editor.doc, id, rows.length - 1)}>
-              − row
-            </button>
-            <button type="button" aria-label="Delete last column" onClick={() => tableDeleteColumn(editor.doc, id, cols - 1)}>
-              − col
-            </button>
-            <button
-              type="button"
-              aria-pressed={header}
-              aria-label="Toggle header row"
-              onClick={() => editor.doc.transact(() => setBlockProp(block, 'header', !header), 'local')}
-            >
-              header
-            </button>
-          </div>
         </>
       )}
     </div>

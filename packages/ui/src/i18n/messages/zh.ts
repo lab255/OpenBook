@@ -1,7 +1,7 @@
 import type {PartialMessages} from './en';
 
 export const zh: PartialMessages = {
-  blockEditor: {resizeColumn: '调整列 {column} 的宽度', accordionItem: '项目 {number}', accordionAddLabel: '项目', accordionAdd: '添加项目', accordionItemLabel: '项目标签'},
+  blockEditor: {togglelistToggle: '展开或折叠列表', togglelistEmpty: '空折叠列表。点击添加内容。', togglelistSummary: '折叠列表', resizeColumn: '调整列 {column} 的宽度', accordionItem: '项目 {number}', accordionAddLabel: '项目', accordionAdd: '添加项目', accordionItemLabel: '项目标签'},
   navigation: {
     loadError: {
       title: '无法连接到此资料库',
@@ -866,6 +866,7 @@ export const zh: PartialMessages = {
     bullet: {label: '无序列表', hint: '简单列表'},
     number: {label: '有序列表', hint: '编号列表'},
     todo: {label: '待办', hint: '复选框条目'},
+    togglelist: {label: '折叠列表', hint: '显示或隐藏嵌套块'},
     quote: {label: '引用', hint: '突出引文'},
     callout: {label: '标注', hint: '高亮备注'},
     code: {label: '代码', hint: '等宽代码块'},
@@ -1549,6 +1550,7 @@ export const zh: PartialMessages = {
       },
     },
     formView: {
+      choose: '选择…',
       builder: '构建',
       fill: '填写',
       builderIntro: '字段实时映射数据库架构。重命名或更改列类型后，此表单会自动更新。从表单中移除字段时，数据库列及其现有值会保留。',

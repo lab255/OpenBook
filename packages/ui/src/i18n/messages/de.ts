@@ -1,7 +1,7 @@
 import type {PartialMessages} from './en';
 
 export const de: PartialMessages = {
-  blockEditor: {resizeColumn: 'Spalte {column} vergrößern oder verkleinern', accordionItem: 'Element {number}', accordionAddLabel: 'Element', accordionAdd: 'Element hinzufügen', accordionItemLabel: 'Elementbeschriftung'},
+  blockEditor: {togglelistToggle: 'Aufklappbare Liste öffnen oder schließen', togglelistEmpty: 'Leer. Klicken, um Inhalt hinzuzufügen.', togglelistSummary: 'Aufklappbare Liste', resizeColumn: 'Spalte {column} vergrößern oder verkleinern', accordionItem: 'Element {number}', accordionAddLabel: 'Element', accordionAdd: 'Element hinzufügen', accordionItemLabel: 'Elementbeschriftung'},
   navigation: {
     loadError: {
       title: 'Diese Bibliothek ist nicht erreichbar',
@@ -874,6 +874,7 @@ export const de: PartialMessages = {
     bullet: {label: 'Aufzählung', hint: 'Einfache Liste'},
     number: {label: 'Nummerierte Liste', hint: 'Geordnete Liste'},
     todo: {label: 'To-do', hint: 'Eintrag mit Checkbox'},
+    togglelist: {label: 'Aufklappbare Liste', hint: 'Verschachtelte Blöcke ein- oder ausblenden'},
     quote: {label: 'Zitat', hint: 'Hervorgehobenes Zitat'},
     callout: {label: 'Hinweis', hint: 'Hervorgehobene Notiz'},
     code: {label: 'Code', hint: 'Monospace-Block'},
@@ -1564,6 +1565,7 @@ export const de: PartialMessages = {
       },
     },
     formView: {
+      choose: 'Auswählen…',
       builder: 'Erstellen',
       fill: 'Ausfüllen',
       builderIntro: 'Felder bilden das aktuelle Datenbankschema ab. Wird eine Spalte umbenannt oder geändert, aktualisiert sich dieses Formular automatisch. Beim Entfernen eines Feldes bleiben seine Datenbankspalte und vorhandenen Werte erhalten.',

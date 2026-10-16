@@ -32,6 +32,26 @@ function makeIsland(): IslandPageJson {
 }
 
 describe('viewer', () => {
+  it('hydrates togglelist with locked text and live disclosure from both snapshot formats', () => {
+    const doc = createDoc([{id: 't', type: 'togglelist', text: 'Summary', props: {collapsed: true}, children: [{type: 'paragraph', text: 'Hidden body'}]}]);
+    for (const blockdoc of [encodeSnapshot(doc), {...encodeSnapshot(doc), update: undefined}]) {
+      const source: IslandPageJson = {...makeIsland(), data: {editor: 'blocks', blockdoc}};
+      const before = JSON.stringify(source);
+      const {container, unmount} = render(<ViewerApp source={source} />);
+      const button = screen.getByRole('button', {name: 'Expand or collapse toggle list'});
+      expect(container.textContent).toContain('Summary');
+      expect(container.textContent).not.toContain('Hidden body');
+      fireEvent.click(button);
+      expect(button.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Hidden body');
+      expect(container.querySelector('[contenteditable="true"]')).toBeNull();
+      fireEvent.click(button);
+      expect(container.textContent).not.toContain('Hidden body');
+      expect(JSON.stringify(source)).toBe(before);
+      unmount();
+    }
+  });
+
   it('renders an island from its base64 Y update, locked but interactive', async () => {
     const island = makeIsland();
     const sourceBefore = JSON.stringify(island);

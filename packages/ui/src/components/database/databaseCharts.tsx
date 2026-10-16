@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useLayoutEffect, useRef, useState} from 'react';
 import {X} from 'lucide-react';
 import {
   aggregateMatrix,
@@ -39,6 +39,7 @@ const fmt = (n: number): string => {
 
 /** Square viewBox for the DB pie/sunburst — the kit's default box is wide (640×240). */
 const PIE_SIZE = 240;
+const CHART_H = 240;
 
 /** Human label for the view's measure, e.g. `Count` or `Sum of Cost`. */
 const measureLabel = (view: DbView, properties: DatabaseProperty[]): string => {
@@ -49,8 +50,8 @@ const measureLabel = (view: DbView, properties: DatabaseProperty[]): string => {
   return prop ? `${verb} of ${prop.name}` : verb;
 };
 
-const NoData: React.FC = () => (
-  <div className="rounded-md border border-border px-4 py-10 text-center text-sm text-muted-foreground">No data to chart.</div>
+const NoData: React.FC<{bare?: boolean}> = ({bare = false}) => (
+  <div className={cn('px-4 py-10 text-center text-sm text-muted-foreground', !bare && 'rounded-lg border border-border')}>No data to chart.</div>
 );
 
 /** What the user clicked into: a label and the rows behind a bar/slice/segment. */
@@ -93,7 +94,7 @@ const ChartReadout: React.FC<{view: DbView; properties: DatabaseProperty[]; hove
 
 /** Rows behind the clicked bar/slice, listed and clickable to open. */
 const DrillPanel: React.FC<{db: UseDatabase; drill: NonNullable<Drill>; onClose: () => void}> = ({db, drill, onClose}) => (
-  <div className="mt-3 overflow-hidden rounded-md border border-border">
+  <div className="mt-3 overflow-hidden rounded-lg border border-border">
     <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/30 px-3 py-1.5">
       <span className="min-w-0 truncate text-xs font-medium">
         {drill.title}
@@ -140,6 +141,17 @@ export const BarChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
   const [readout, setReadout] = useState<Hover>(null);
   // The series lit from the breakdown legend — passed to the plot to dim the rest.
   const [legendKey, setLegendKey] = useState<string | null>(null);
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = useState(640);
+  useLayoutEffect(() => {
+    const node = plotRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setPlotWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [view.groupByPropertyId, db.visibleRows.length]);
   if (!view.groupByPropertyId) return <ViewSetupCard kind="chart" db={db} view={view} properties={properties} />;
 
   const {groups, series} = aggregateMatrix(db.visibleRows, view, properties);
@@ -149,22 +161,27 @@ export const BarChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
 
   return (
     <div>
-      <div className="space-y-3 rounded-md border border-border p-4">
+      <div className="space-y-3 rounded-lg border border-border p-4">
         <ChartReadout view={view} properties={properties} hover={readout} total={total} />
         {groups.length === 0 ? (
-          <NoData />
+          <NoData bare />
         ) : (
-          <KitChartPlot
-            kind="bar"
-            matrix={matrix}
-            palette={paletteFor(scheme)}
-            ariaLabel="Bar chart"
-            frameless
-            mode="action"
-            highlightKey={legendKey}
-            onSelect={(d: ChartDatum) => setDrill({title: d.label, rows: d.rows ?? []})}
-            onActiveChange={(d: ChartDatum | null) => setReadout(d ? {label: d.label, value: d.value} : null)}
-          />
+          <div ref={plotRef} className="ob-db-chart">
+            <KitChartPlot
+              viewW={plotWidth}
+              viewH={Math.min(CHART_H, Math.round(plotWidth * 240 / 640))}
+              padLeft={40}
+              kind="bar"
+              matrix={matrix}
+              palette={paletteFor(scheme)}
+              ariaLabel="Bar chart"
+              frameless
+              mode="action"
+              highlightKey={legendKey}
+              onSelect={(d: ChartDatum) => setDrill({title: d.label, rows: d.rows ?? []})}
+              onActiveChange={(d: ChartDatum | null) => setReadout(d ? {label: d.label, value: d.value} : null)}
+            />
+          </div>
         )}
         {stacked && groups.length > 0 && (
           <SeriesLegend
@@ -259,7 +276,7 @@ export const PieChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-6 rounded-md border border-border p-5">
+      <div className="flex flex-wrap items-center gap-6 rounded-lg border border-border p-4">
         <div className="h-44 w-44 shrink-0">
           <KitChartPlot
             kind="pie"
@@ -288,8 +305,8 @@ export const PieChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
                   onMouseLeave={leave}
                   onClick={() => setDrill({title: g.label || '—', rows: g.rows})}
                   className={cn(
-                    'flex w-full cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm transition-colors hover:text-foreground',
-                    hoverKey === g.key && 'bg-accent/50',
+                    'flex w-full cursor-pointer items-center gap-2 rounded-sm px-1 py-0.5 text-sm transition-colors hover:text-foreground',
+                    hoverKey === g.key && 'bg-hover',
                   )}
                 >
                   <span className="h-3 w-3 shrink-0 rounded-sm" style={{backgroundColor: chartColor(g, i, scheme)}} />
@@ -315,8 +332,8 @@ export const PieChartView: React.FC<{db: UseDatabase; view: DbView; properties: 
                             onMouseLeave={leave}
                             onClick={() => setDrill({title: label, rows: seg.rows})}
                             className={cn(
-                              'flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors',
-                              hoverKey === sk ? 'bg-accent text-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-hover hover:text-foreground',
+                              'flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs transition-colors',
+                              hoverKey === sk ? 'bg-hover-strong text-foreground' : 'bg-muted/50 text-muted-foreground hover:bg-hover hover:text-foreground',
                             )}
                           >
                             <span className="h-2 w-2 shrink-0 rounded-sm" style={{backgroundColor: chartColor(s, si, scheme)}} />

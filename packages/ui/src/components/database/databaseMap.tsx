@@ -7,11 +7,10 @@ import {
   type DatabaseRow,
   type DatabaseView as DbView,
 } from '@book.dev/sdk';
-import {cn} from '@/lib/utils';
 import {readPageIcon} from '@/lib/pageIcon';
 import {PageIcon} from '@/components/PageIcon';
 import type {UseDatabase} from './useDatabase';
-import {swatchHex} from './databaseColors';
+import {dotStyle, swatchHex} from './databaseColors';
 import {RowChips, RowContextMenu} from './databaseLayouts';
 import {cachedGeocode, geocodeAddress, locationFromGeocode} from './geocode';
 import type {PlacedMarker} from './databaseMapLeaflet';
@@ -23,7 +22,7 @@ import {ViewSetupCard} from './ViewSetupCard';
 const LeafletMap = lazy(() => import('./databaseMapLeaflet'));
 
 const Hint: React.FC<{children: React.ReactNode}> = ({children}) => (
-  <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">{children}</div>
+  <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">{children}</div>
 );
 
 /**
@@ -56,7 +55,7 @@ export const MapView: React.FC<{
   // Colour each placed row by its group (the same grouping every layout uses).
   const groups = groupRowsBy(db.visibleRows, view.groupByPropertyId, properties);
   const colorByRow = new Map<string, string>();
-  const usedGroups: {key: string; label: string; color: string}[] = [];
+  const usedGroups: {key: string; label: string; color: string; token: string}[] = [];
   for (const g of groups) {
     const color = g.color ? swatchHex(g.color, scheme) ?? defaultPin : defaultPin;
     let placedInGroup = 0;
@@ -67,7 +66,7 @@ export const MapView: React.FC<{
       }
     }
     // The legend lists only groups that actually contribute a marker.
-    if (view.groupByPropertyId && placedInGroup > 0) usedGroups.push({key: g.key, label: g.label, color});
+    if (view.groupByPropertyId && placedInGroup > 0) usedGroups.push({key: g.key, label: g.label, color, token: g.color || 'blue'});
   }
 
   const placed: PlacedMarker[] = [];
@@ -98,7 +97,7 @@ export const MapView: React.FC<{
         // panes from escaping the card; `overflow-hidden` clips the tile layer to
         // the rounded border. (Leaflet's sheet is `.leaflet-*`-namespaced, so it
         // doesn't bleed into the app — see the import note in databaseMapLeaflet.)
-        <div className="ob-leaflet h-[480px] overflow-hidden rounded-md border border-border" style={{contain: 'paint'}}>
+        <div className="ob-leaflet h-120 overflow-hidden rounded-lg border border-border" style={{contain: 'paint'}}>
           <Suspense fallback={<div className="ob-skeleton h-full w-full" aria-label="Loading map" />}>
             <LeafletMap markers={placed} clustered={view.mapClustered !== false} onOpen={(id) => db.openRow(id)} />
           </Suspense>
@@ -109,7 +108,7 @@ export const MapView: React.FC<{
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {usedGroups.map((g) => (
             <span key={g.key} className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor: g.color}} />
+              <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(g.token)} />
               {g.label}
             </span>
           ))}
@@ -172,7 +171,7 @@ const UnplacedRows: React.FC<{
   };
 
   return (
-    <div className="rounded-md border border-border">
+    <div className="rounded-lg border border-border">
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           onClick={() => setOpen((o) => !o)}
@@ -182,15 +181,12 @@ const UnplacedRows: React.FC<{
           <MapPin className="h-3.5 w-3.5" />
           Unplaced ({rows.length})
         </button>
-        {note && <span className="text-xs text-muted-foreground/70">{note}</span>}
+        {note && <span className="text-xs text-muted-foreground">{note}</span>}
         {addressProp && geoProp && (
           <button
             onClick={() => void runGeocode()}
             disabled={busy || geocodable.length === 0}
-            className={cn(
-              'ml-auto rounded border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground',
-              (busy || geocodable.length === 0) && 'opacity-40',
-            )}
+            className="ml-auto inline-flex h-control-xs items-center rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground disabled:opacity-50"
             title={`Look up coordinates from ${addressProp.name} (a network call)`}
           >
             {busy ? 'Geocoding…' : `Geocode ${addressProp.name}`}
@@ -203,7 +199,7 @@ const UnplacedRows: React.FC<{
             <RowContextMenu key={row.id} db={db} rowId={row.id}>
               <button
                 onClick={() => db.openRow(row.id)}
-                className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-hover"
+                className="flex w-full items-center gap-1.5 rounded-sm px-1.5 py-1 text-left text-sm transition-colors hover:bg-hover"
               >
                 <PageIcon value={readPageIcon(row.id)} className="shrink-0 text-sm leading-none" />
                 <span className="truncate">{row.name?.trim() || 'Untitled'}</span>

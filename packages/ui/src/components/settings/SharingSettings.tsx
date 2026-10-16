@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {WARN_SURFACE_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useState} from 'react';
 import type {EffectiveVisibility, GuestAccess, InstanceInfo} from '@book.dev/sdk';
 import {useData} from '@/data/DataProvider';
@@ -258,7 +260,7 @@ export function SharingSection() {
             // description would over-state privacy or over-claim what visitors can
             // do (see `accessStateDescription`). Same treatment as the address-level
             // guest-gate caveat so "read this one twice" looks the same app-wide.
-            <span className="mt-1.5 block rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-foreground">
+            <span className={cn('mt-1.5 block rounded-md px-2 py-1.5', WARN_SURFACE_CLASS)}>
               {t(caveat)}
             </span>
           )}

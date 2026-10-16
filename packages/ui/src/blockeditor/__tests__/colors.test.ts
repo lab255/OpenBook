@@ -2,7 +2,7 @@
 // @ts-expect-error -- Vitest runs in Node; the browser package omits Node ambient types.
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
-import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, COLOR_TOKENS} from '../colors';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, COLOR_TOKENS, KIT_EXPORT_PRIMARY} from '../colors';
 
 const css: string = readFileSync(new URL('../../index.css', import.meta.url), 'utf8');
 const roles = ['fg', 'bg', 'hl'] as const;
@@ -72,5 +72,23 @@ for (const dark of [false, true]) {
         expect(palette[id][role]).toBe(hex(rgba(literal(dark, role, id))));
       });
     }
+  });
+}
+
+it('static kit primary matches the light-theme primary', () => {
+  const root = css.match(/:root\s*\{([^}]+)\}/)?.[1];
+  const primary = root?.match(/--primary:\s*([^;]+);/)?.[1];
+  expect(primary).toBeTruthy();
+  expect(KIT_EXPORT_PRIMARY).toBe(hex(rgba(primary!)));
+});
+
+for (const dark of [false, true]) {
+  it(`primary text meets 4.5:1 in ${dark ? 'dark' : 'light'} mode`, () => {
+    const theme = css.match(dark ? /\.dark\s*\{([^}]+)\}/ : /:root\s*\{([^}]+)\}/)?.[1];
+    const primary = theme?.match(/--primary:\s*([^;]+);/)?.[1];
+    const foreground = theme?.match(/--primary-foreground:\s*([^;]+);/)?.[1];
+    expect(primary).toBeTruthy();
+    expect(foreground).toBeTruthy();
+    expect(contrast(rgba(primary!), rgba(foreground!))).toBeGreaterThanOrEqual(4.5);
   });
 }

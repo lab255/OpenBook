@@ -62,6 +62,14 @@ const build = (readOnly = false) => {
 };
 
 describe('native span → cell-range selection (acceptance #5)', () => {
+  it.each([false, true])('renders one range outline and removes it on clear (readOnly: %s)', (readOnly) => {
+    const {container, nativeSelect} = build(readOnly);
+    nativeSelect('r0c0', 'r1c1');
+    expect(container.querySelectorAll('.obe-table-range')).toHaveLength(1);
+    fireEvent.keyDown(document, {key: 'Escape'});
+    expect(container.querySelectorAll('.obe-table-range')).toHaveLength(0);
+  });
+
   it('a span WITHIN one table highlights the rectangle, not a block', () => {
     const {selectedCells, selectedRows, nativeSelect} = build();
     nativeSelect('r0c0', 'r1c1');

@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {Check, Link2, Loader2, Trash2, UserPlus} from 'lucide-react';
 import type {InstanceInfo, Member, MemberRole, MemberStatus, Principal} from '@book.dev/sdk';
@@ -55,8 +56,8 @@ const STATUS_LABEL: Record<MemberStatus, TKey> = {
 };
 
 const STATUS_TONE: Record<MemberStatus, string> = {
-  active: 'text-emerald-600 dark:text-emerald-400',
-  invited: 'text-amber-600 dark:text-amber-400',
+  active: STATUS_INK_CLASS.ok,
+  invited: STATUS_INK_CLASS.warn,
   suspended: 'text-muted-foreground',
 };
 

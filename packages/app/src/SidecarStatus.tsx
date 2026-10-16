@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import {invoke} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
-import {Button, useTranslation, type SidecarPlatform, type SidecarState} from '@book.dev/ui';
+import {Button, useTranslation, type SidecarPlatform, type SidecarState, WARN_SURFACE_CLASS} from '@book.dev/ui';
 
 const READINESS_GRACE_MS = 3000;
 
@@ -54,11 +54,11 @@ export function SidecarDegradedBanner({sidecar}: {sidecar: SidecarPlatform}) {
     try { await sidecar.restart(); } catch { /* The next host event remains authoritative. */ } finally { setRestarting(false); }
   };
   return (
-    <aside role="alert" className="flex flex-col gap-2 border-b border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-foreground">
+    <aside role="alert" className={`flex flex-col gap-2 border-b border-border px-4 py-3 text-sm ${WARN_SURFACE_CLASS}`}>
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="font-medium">{t('sidecar.bannerTitle')}</p>
-          <p className="text-muted-foreground">{stateLine}{state.lastExitCode == null ? '' : ` · ${t('sidecar.exitCode', {code: state.lastExitCode})}`}</p>
+          <p>{stateLine}{state.lastExitCode == null ? '' : ` · ${t('sidecar.exitCode', {code: state.lastExitCode})}`}</p>
         </div>
         <Button size="sm" variant="outline" disabled={restarting} onClick={() => void restart()}>
           {restarting ? t('sidecar.restarting') : t('sidecar.restart')}
