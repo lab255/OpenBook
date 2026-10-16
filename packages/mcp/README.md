@@ -60,7 +60,7 @@ Call `list_block_types` for the machine-readable source of truth: every entry ha
 
 | Types | Props |
 | --- | --- |
-| `paragraph`, `quote`, `notes`, `divider`, `columns`, `table`, `cell`, `tabs` | No type-specific props. Text-nature blocks carry content in `text`, not props. |
+| `paragraph`, `quote`, `notes`, `divider`, `columns`, `table`, `cell`, `tabs`, `meetingsummary` | No type-specific props. Text-nature blocks carry content in `text`, not props. |
 | `heading` | `level:number` (1–3) |
 | `list` | `kind:"bullet"\|"number"` |
 | `todo` | `checked:boolean` |
@@ -208,4 +208,4 @@ The integration test (`scripts/e2e.mts`) boots an embedded-PGlite OpenBook serve
 
 | Child-only type | Parent |
 | --- | --- |
-| `meetingsummary` | `meeting`; no props, first child, at most one with id `<meetingId>:summary`; contains editable summary blocks |
+| `meetingsummary` | `meeting`; no props; first container wins on read; editor-created containers use id `<meetingId>:summary`; contains editable summary blocks |
