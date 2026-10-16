@@ -254,10 +254,11 @@ describe('meeting asynchronous boundaries', () => {
     transcribeAsset.mockRejectedValueOnce(new Error('400'));
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
-    expect(screen.getByRole('alert').textContent).toContain('Settings → AI');
-    expect(screen.getByText('Not transcribed')).toBeTruthy();
+    expect(document.querySelector('.obe-meeting-attention')!.textContent).toContain('Settings → AI');
+    expect(screen.getByRole('button', {name: /· Not transcribed$/})).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Retry transcription'})); await flush(); });
-    expect(screen.getByText('Transcribed')).toBeTruthy(); expect(screen.getByText('hello')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+    expect(screen.getByRole('button', {name: /· Transcribed$/})).toBeTruthy(); expect(screen.getByText('hello')).toBeTruthy();
     unregister();
   });
 });
@@ -421,11 +422,13 @@ describe('MEET-5 review regressions', () => {
     const view = render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); await vi.advanceTimersByTimeAsync(45000); });
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
-    const second = screen.getByLabelText('Play audio chunk starting at 0:45');
+    await act(async () => { fireEvent.change(screen.getByRole('slider'), {target: {value: '45000'}}); await flush(); });
+    const second = view.container.querySelectorAll('audio')[1];
+    expect(second.hasAttribute('src')).toBe(true);
     await act(async () => { first({id: 'first'}); await flush(); });
-    expect(screen.getByLabelText('Play audio chunk starting at 0:45')).toBe(second);
+    expect(view.container.querySelectorAll('audio')[1]).toBe(second);
     await act(async () => { putAsset.mockResolvedValue({id: 'second'}); await vi.advanceTimersByTimeAsync(1000); });
-    expect(view.container.querySelectorAll('audio')).toHaveLength(0); // saved assets are unavailable in this mock bridge
+    expect(view.container.querySelectorAll('audio[src]')).toHaveLength(0); // saved assets are unavailable in this mock bridge
     unregister();
   });
 
