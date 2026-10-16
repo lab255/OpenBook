@@ -18,7 +18,9 @@ beforeEach(() => {
 afterEach(() => { cleanup(); setAssetBridge(null); vi.restoreAllMocks(); retry.mockClear(); });
 async function mount(readOnly = false) {
   const view = render(<MeetingPlayer saved={saved} completed={[]} session={session} readOnly={readOnly} canTranscribe />);
-  await waitFor(() => expect(view.container.querySelectorAll('audio')).toHaveLength(2));
+  expect(view.container.querySelectorAll('audio[src]')).toHaveLength(0);
+  fireEvent.change(screen.getByRole('slider'), {target: {value: '100'}});
+  await waitFor(() => expect(view.container.querySelectorAll('audio[src]')).toHaveLength(2));
   return {...view, audio: Array.from(view.container.querySelectorAll('audio'))};
 }
 
@@ -26,6 +28,7 @@ describe('unified meeting playback', () => {
   it('preloads chunks, seeks globally, hands over automatically and stops at the end', async () => {
     const {audio} = await mount();
     expect(screen.getAllByRole('slider')).toHaveLength(1);
+    fireEvent.change(screen.getByRole('slider'), {target: {value: '0'}});
     expect(screen.getByText('0:00 / 0:57')).toBeTruthy();
     expect(audio.every((element) => element.preload === 'auto' && !element.controls)).toBe(true);
     fireEvent.change(screen.getByRole('slider'), {target: {value: '44000'}});
@@ -38,8 +41,10 @@ describe('unified meeting playback', () => {
     audio[1].currentTime = 2; fireEvent.timeUpdate(audio[1]);
     expect(screen.getByText('0:47 / 0:57')).toBeTruthy();
     fireEvent.change(screen.getByRole('slider'), {target: {value: '1000'}});
-    expect(play.mock.instances.at(-1)).toBe(audio[0]);
-    fireEvent.ended(audio[0]); fireEvent.ended(audio[1]);
+    await waitFor(() => expect(play.mock.instances.at(-1)).toBe(audio[0]));
+    fireEvent.ended(audio[0]);
+    await waitFor(() => expect(play.mock.instances.at(-1)).toBe(audio[1]));
+    fireEvent.ended(audio[1]);
     expect(screen.getByRole('button', {name: 'Play'})).toBeTruthy();
     expect(screen.getByText('0:57 / 0:57')).toBeTruthy();
   });
@@ -70,4 +75,49 @@ describe('unified meeting playback', () => {
     expect(pauses.mock.instances).toContain(view.audio[0]);
     expect(pauses.mock.instances).toContain(view.audio[1]);
   });
+  it('resumes pending audio when it becomes saved during playback', async () => {
+    const blob = new Blob(['audio'], {type: 'audio/webm'});
+    const pending = {chunks: [{id: 'pending', audio: {...saved[0], assetId: '', startedAtMs: 0}, blob, phase: 'uploading'}], retry} as unknown as MeetingRecorder;
+    const view = render(<MeetingPlayer saved={[]} completed={[]} session={pending} readOnly={false} canTranscribe />);
+    fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    const audio = view.container.querySelector('audio')!;
+    audio.currentTime = 2;
+    fireEvent.timeUpdate(audio);
+    view.rerender(<MeetingPlayer saved={[saved[0]]} completed={[]} session={session} readOnly={false} canTranscribe />);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+    expect(view.container.querySelector('audio')).toBe(audio);
+    expect(audio.currentTime).toBe(2);
+    expect(screen.getByRole('button', {name: 'Pause playback'})).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('loads only the active and next chunk and advances the window on handover', async () => {
+    const view = render(<MeetingPlayer saved={[...saved, {assetId: 'third', durationMs: 10000}]} completed={[]} session={session} readOnly canTranscribe />);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(view.container.querySelectorAll('audio[src]')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+    await waitFor(() => expect(view.container.querySelectorAll('audio[src]')).toHaveLength(2));
+    const audio = view.container.querySelectorAll('audio');
+    expect(audio[2].hasAttribute('src')).toBe(false);
+    fireEvent.ended(audio[0]);
+    await waitFor(() => expect(audio[2].hasAttribute('src')).toBe(true));
+    expect(audio[0].hasAttribute('src')).toBe(false);
+    expect(view.container.querySelectorAll('audio[src]')).toHaveLength(2);
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(play.mock.instances.at(-1)).toBe(audio[1]);
+  });
+  it.each([false, true])('queues a seek before URLs load (play=%s)', async (playing) => {
+    let release!: (value: {bytes: Uint8Array; mime: string}) => void;
+    setAssetBridge({getAsset: () => new Promise((resolve) => { release = resolve; }), putAsset: vi.fn()});
+    const view = render(<MeetingPlayer saved={[saved[0]]} completed={[]} session={session} readOnly canTranscribe />);
+    fireEvent.change(screen.getByRole('slider'), {target: {value: '2000'}});
+    if (playing) fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(play).not.toHaveBeenCalled();
+    await act(async () => release({bytes: new Uint8Array([1]), mime: 'audio/webm'}));
+    expect(view.container.querySelector('audio')!.currentTime).toBe(2);
+    expect(play).toHaveBeenCalledTimes(playing ? 1 : 0);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
 });

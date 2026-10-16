@@ -90,6 +90,8 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await expect(player.getByRole('slider', {name: 'Playback position'})).toHaveCount(1);
   await expect(player.locator('.obe-meeting-marker-button')).toHaveCount(2);
   await expect(player.locator('audio[controls]')).toHaveCount(0);
+  await expect(player.locator('audio[src]')).toHaveCount(0);
+  await player.getByRole('slider', {name: 'Playback position'}).press('ArrowRight');
   await expect.poll(() => player.locator('audio[src]').count()).toBe(2);
   await player.locator('audio').evaluateAll((elements) => elements.forEach((element) => {
     element.addEventListener('playing', () => { (element as HTMLAudioElement).dataset.played = 'true'; });

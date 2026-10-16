@@ -1,45 +1,38 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {t} from '@/i18n';
 import {assetBridge} from '@/lib/assetBridge';
 import {meetingAudioDuration, meetingAudioGlobalTime, meetingAudioPosition, withMeetingAudioOffsets} from './meetingAudio';
 import {meetingTime} from './meetingTime';
 import {chunkKey, type MeetingAudio, type MeetingRecorder} from './meetingRecorder';
 
-function PlaybackChunk({audio, blob, register, onTime, onEnd, onError}: {
-  audio: MeetingAudio; blob?: Blob; register: (element: HTMLAudioElement | null) => void;
+function PlaybackChunk({src, register, onTime, onEnd, onError}: {
+  src?: string; register: (element: HTMLAudioElement | null) => void;
   onTime: (element: HTMLAudioElement) => void; onEnd: () => void; onError: () => void;
 }) {
-  const [url, setUrl] = useState('');
   const media = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => {
-    let disposed = false;
-    let objectUrl = '';
-    setUrl('');
-    void (async () => {
-      const asset = blob ? null : await assetBridge.getAsset(audio.assetId);
-      const data = blob ?? (asset ? new Blob([new Uint8Array(asset.bytes)], {type: asset.mime}) : null);
-      if (disposed || !data) return;
-      objectUrl = URL.createObjectURL(data); setUrl(objectUrl);
-    })().catch(() => {});
-    return () => { disposed = true; media.current?.pause(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [audio.assetId, blob]);
-  return url ? <>
-    <audio hidden preload="auto" ref={(element) => { if (element) media.current = element; register(element); }} src={url}
-      aria-label={t('meetingBlock.playback', {time: meetingTime(audio.startedAtMs ?? 0)})}
-      onTimeUpdate={(event) => onTime(event.currentTarget)} onEnded={onEnd} onError={onError} />
-    {blob && <a href={url} download={`meeting-${audio.startedAtMs ?? 0}.${blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`}>{t('meetingBlock.saveAudio')}</a>}
-  </> : null;
+  const latestRegister = useRef(register);
+  latestRegister.current = register;
+  useLayoutEffect(() => {
+    if (!src) return;
+    latestRegister.current(media.current);
+    return () => { media.current?.pause(); latestRegister.current(null); };
+  }, [src]);
+  return <audio hidden preload="auto" ref={media} src={src}
+    onTimeUpdate={(event) => onTime(event.currentTarget)} onEnded={onEnd} onError={onError} />;
 }
+
+interface AudioResource {assetId: string; blob?: Blob; url?: string; disposed: boolean}
 
 export function MeetingPlayer({saved, completed, session, readOnly, canTranscribe}: {
   saved: MeetingAudio[]; completed: string[]; session: MeetingRecorder; readOnly: boolean; canTranscribe: boolean;
 }) {
   const pending = session.chunks.filter((chunk) => chunk.blob);
-  const entries = [
+  const sources = [
     ...withMeetingAudioOffsets(saved).map((audio, index) => ({audio, id: chunkKey(saved[index]), originalKey: chunkKey(saved[index]), blob: undefined as Blob | undefined})),
     ...pending.map((chunk) => ({audio: chunk.audio, id: chunk.id, originalKey: chunkKey(chunk.audio), blob: chunk.blob})),
   ].sort((a, b) => (a.audio.startedAtMs ?? 0) - (b.audio.startedAtMs ?? 0));
-  const chunks = withMeetingAudioOffsets(entries.map((entry) => entry.audio));
+  const chunks = withMeetingAudioOffsets(sources.map((entry) => entry.audio));
+  const entries = sources.map((entry, index) => ({...entry, id: String(chunks[index].startedAtMs)}));
   const total = meetingAudioDuration(chunks);
   const elements = useRef(new Map<string, HTMLAudioElement>());
   const active = useRef<string | null>(null);
@@ -48,8 +41,44 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [failed, setFailed] = useState(false);
+  const resumeAt = useRef<number | null>(null);
+  const pendingSeek = useRef<{globalMs: number; play: boolean} | null>(null);
+  const [windowStart, setWindowStart] = useState<number | null>(null);
+  const resources = useRef(new Map<string, AudioResource>());
+  const [, refreshUrls] = useState(0);
+  // Retain overlapping URLs, and dispose requests as soon as they leave the window.
+  useEffect(() => {
+    const windowEntries = windowStart === null ? [] : entries.slice(windowStart, windowStart + 2);
+    for (const [id, resource] of resources.current) {
+      const entry = windowEntries.find((entry) => entry.id === id);
+      if (entry && resource.assetId === entry.audio.assetId && resource.blob === entry.blob) continue;
+      resource.disposed = true;
+      if (resource.url) URL.revokeObjectURL(resource.url);
+      resources.current.delete(id);
+    }
+    for (const entry of windowEntries) {
+      if (resources.current.has(entry.id)) continue;
+      const resource: AudioResource = {assetId: entry.audio.assetId, blob: entry.blob, disposed: false};
+      resources.current.set(entry.id, resource);
+      void (async () => {
+        const asset = entry.blob ? null : await assetBridge.getAsset(entry.audio.assetId);
+        const data = entry.blob ?? (asset ? new Blob([new Uint8Array(asset.bytes)], {type: asset.mime}) : null);
+        if (resource.disposed || !data) return;
+        resource.url = URL.createObjectURL(data);
+        refreshUrls((version) => version + 1);
+      })().catch(() => {});
+    }
+  });
+  useEffect(() => () => {
+    for (const resource of resources.current.values()) {
+      resource.disposed = true;
+      if (resource.url) URL.revokeObjectURL(resource.url);
+    }
+    resources.current.clear();
+  }, []);
   const [detail, setDetail] = useState<string | null>(null);
   const stop = () => {
+    pendingSeek.current = null; resumeAt.current = null;
     request.current++;
     playingRef.current = false; setPlaying(false);
     elements.current.forEach((element) => element.pause());
@@ -60,9 +89,10 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
     if (!target) return;
     const entry = entries[target.index];
     active.current = entry.id;
+    setWindowStart(target.index);
     setPosition(meetingAudioGlobalTime(chunks, target.index, target.offsetMs));
     const element = elements.current.get(entry.id);
-    if (!element) { setFailed(true); return; }
+    if (!element) { pendingSeek.current = {globalMs, play}; return; }
     element.currentTime = target.offsetMs / 1000;
     if (play) {
       playingRef.current = true; setPlaying(true);
@@ -98,14 +128,25 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
             {!readOnly && !entry.blob && !done && <button type="button" disabled={!canTranscribe || progress?.busy} onClick={() => { setDetail(entry.id); session.retry(audio); }}>{t('meetingBlock.retryTranscription')}</button>}
             {!readOnly && entry.blob && progress?.phase === 'uploadFailed' && <button type="button" onClick={() => void session.upload(progress)}>{t('meetingBlock.retryUpload')}</button>}
           </div>}
-          <PlaybackChunk audio={audio} blob={entry.blob} register={(element) => { if (element) elements.current.set(entry.id, element); else elements.current.delete(entry.id); }}
-            onTime={(element) => { if (active.current === entry.id) setPosition(meetingAudioGlobalTime(chunks, index, element.currentTime * 1000)); }}
-            onError={() => { if (active.current === entry.id) { stop(); setFailed(true); } }}
-            onEnd={() => {
-              if (active.current !== entry.id || !playingRef.current) return;
-              if (index + 1 < chunks.length) seek(chunks[index + 1].startedAtMs, true);
-              else { stop(); setPosition(total); }
-            }} />
+          <PlaybackChunk src={windowStart !== null && index >= windowStart && index <= windowStart + 1
+            && resources.current.get(entry.id)?.assetId === entry.audio.assetId && resources.current.get(entry.id)?.blob === entry.blob
+            ? resources.current.get(entry.id)?.url : undefined} register={(element) => {
+            if (element) {
+              elements.current.set(entry.id, element);
+              const pending = pendingSeek.current ?? (resumeAt.current === null ? null : {globalMs: resumeAt.current, play: true});
+              if (pending && meetingAudioPosition(chunks, pending.globalMs)?.index === index) seek(pending.globalMs, pending.play);
+            } else {
+              if (active.current === entry.id && playingRef.current) { const at = position; stop(); resumeAt.current = at; }
+              elements.current.delete(entry.id);
+            }
+          }}
+          onTime={(element) => { if (active.current === entry.id) setPosition(meetingAudioGlobalTime(chunks, index, element.currentTime * 1000)); }}
+          onError={() => { if (active.current === entry.id) { stop(); setFailed(true); } }}
+          onEnd={() => {
+            if (active.current !== entry.id || !playingRef.current) return;
+            if (index + 1 < chunks.length) seek(chunks[index + 1].startedAtMs, true);
+            else { stop(); setPosition(total); }
+          }} />
         </div>;
       })}
     </div>
