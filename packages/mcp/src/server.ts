@@ -548,7 +548,7 @@ const failure = (value: string) => ({content: [{type: 'text' as const, text: val
 // ── Nested block payloads (API-1) ─────────────────────────────────────────────
 // The document model is ONE recursive shape — a container block (`columns` →
 // `column`, `table` → `row` → `cell`, `group`, `tabs` → `tab`, `accordion` →
-// `accordionsection`) holds ordinary blocks in `children`, to any depth. The
+// `accordionsection`, `meeting` → `meetingsummary`) holds ordinary blocks in `children`, to any depth. The
 // tool schemas below mirror that with a `z.lazy` self-reference, so an MCP client
 // can build a table or a two-column layout in ONE call. The apply layer is
 // already recursive and type-agnostic (`coerceNewBlock`/`makeBlock`), so nothing
@@ -592,7 +592,7 @@ const textInputSchema = z.union([
 ]);
 
 const BLOCK_CHILDREN_DESC =
-  `Nested blocks — ONLY for container types (${[...CONTAINER_BLOCK_TYPES].join(', ')}); child-only types sit directly inside their parent (columns→column, table→row→cell, tabs→tab, accordion→accordionsection). ` +
+  `Nested blocks — ONLY for container types (${[...CONTAINER_BLOCK_TYPES].join(', ')}); child-only types sit directly inside their parent (columns→column, table→row→cell, tabs→tab, accordion→accordionsection, meeting→meetingsummary). ` +
   `Nest to at most ${MAX_BLOCK_DEPTH} levels, ${MAX_BLOCK_NODES} blocks total per call.`;
 
 /** A recursive block schema: `children` refers back to itself via `z.lazy`. */
@@ -1472,7 +1472,7 @@ export function createOpenBookMcpServer(client: PolicyClient, options: OpenBookM
         'Append typed blocks to the end of a block-editor page. Blocks NEST: a container block carries its contents in `children`, to any depth, so one call can build a whole table or layout. ' +
         'A TABLE is table → row → cell: {"type":"table","children":[{"type":"row","props":{"header":true},"children":[{"type":"cell","text":"Item"},{"type":"cell","text":"Qty"}]},{"type":"row","children":[{"type":"cell","text":"Apples"},{"type":"cell","text":"3"}]}]} — give every row the same number of cells (column widths/order are assigned automatically when the page opens). ' +
         'TWO COLUMNS are columns → column (span is a 12-unit grid): {"type":"columns","children":[{"type":"column","props":{"span":6},"children":[{"type":"heading","text":"Left","props":{"level":2}}]},{"type":"column","props":{"span":6},"children":[{"type":"paragraph","text":"Right"}]}]}. ' +
-        'Other containers: group, tabs → tab, accordion → accordionsection. Leaf blocks (paragraph/heading/todo/quote/callout/code/list/divider, kit inputs) take `text`/`props` and no children. ' +
+        'Other containers: group, tabs → tab, accordion → accordionsection, meeting → meetingsummary. Leaf blocks (paragraph/heading/todo/quote/callout/code/list/divider, kit inputs) take `text`/`props` and no children. ' +
         'Whether this applies directly or is queued as a REVIEWABLE SUGGESTION is decided per write by the library/page agent-edits policy (default: suggest — applied only when a human accepts it).',
       inputSchema: {
         pageId: z.string().describe('The page id (a block-editor page).'),

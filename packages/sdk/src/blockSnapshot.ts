@@ -155,6 +155,8 @@ const tableRefusal = (): never => {
 const touchesTable = (found: FoundSnapshotBlock): boolean =>
   found.ancestors.some((block) => block.type === 'table');
 
+const MIXED_CHILD_PARENTS = new Set(['meeting']);
+
 const assertParentAccepts = (parent: SnapshotBlock | null, childTypes: string[]): void => {
   if (!parent) {
     const child = childTypes.find((type) => CHILD_ONLY_PARENT[type]);
@@ -167,7 +169,7 @@ const assertParentAccepts = (parent: SnapshotBlock | null, childTypes: string[])
   }
   for (const childType of childTypes) {
     const required = CHILD_ONLY_PARENT[childType];
-    if ((required && required !== parent.type) || (!required && Object.values(CHILD_ONLY_PARENT).includes(parent.type))) {
+    if ((required && required !== parent.type) || (!required && !MIXED_CHILD_PARENTS.has(parent.type) && Object.values(CHILD_ONLY_PARENT).includes(parent.type))) {
       throw new BlockSnapshotError('invalid-parent', `${parent.type} cannot contain ${childType} blocks.`);
     }
   }
