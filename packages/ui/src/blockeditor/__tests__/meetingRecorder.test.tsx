@@ -177,6 +177,7 @@ describe('meeting UI and exports', () => {
     render(<DataProvider client={client}><AssetBridgeHost /><MeetingBlockView editor={editor} block={block} pageReadOnly={false} /></DataProvider>);
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
     expect(screen.getByText(/Transcription requires a connected/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
     expect((screen.getByRole('button', {name: 'Retry transcription'}) as HTMLButtonElement).disabled).toBe(true);
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
     expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
