@@ -1,4 +1,5 @@
-import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
+import {act, cleanup, fireEvent, render, screen, within} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {setAiBridge} from '@/lib/aiBridge';
 import {setLocale, t} from '@/i18n';
@@ -7,7 +8,7 @@ import {DataProvider} from '@/data';
 import type {DataClient} from '@book.dev/sdk';
 import {MeetingBlockView} from '../MeetingBlockView';
 import {materializeMeetingSummary} from '../meetingSummaryBlocks';
-import {meetingSummaryPrompt} from '../MeetingSummary';
+import {MeetingSummary, meetingSummaryPrompt} from '../MeetingSummary';
 import {blockProp, createDoc, docToJSON, rootBlocks} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
 import {blocksToHtml, blocksToMarkdown, projectBlocksForExport} from '../exportBlocks';
@@ -18,7 +19,7 @@ function harness(props = {}) {
   const doc = createDoc([{type: 'meeting', props: {status: 'done', transcript, ...props}, children: [{type: 'paragraph', text: 'Private manual notes'}]}]);
   const block = rootBlocks(doc).get(0);
   const editor = {doc, readOnly: false} as BlockEditorController;
-  const view = render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+  const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
   fireEvent.click(screen.getByRole('tab', {name: t('meetingBlock.summary')}));
   return {doc, block, ...view};
 }
@@ -105,16 +106,19 @@ describe('MEET-6 meeting summary', () => {
     expect(button.disabled).toBe(false);
     expect(document.activeElement).toBe(button);
   });
-  it('exports nonempty summary lines as separate HTML and Markdown paragraphs', () => {
+  it('seeds legacy summary lines as paragraphs, decisions and action items', () => {
     const {doc} = harness({summary: 'Meeting recap.\n\nDecision: ship Friday.\nAction: Alex will ship.\n'});
     materializeMeetingSummary(doc, doc.getArray('blocks').get(0) as import('../model').BlockMap);
     const blocks = docToJSON(doc);
     const html = document.createElement('div');
     html.innerHTML = blocksToHtml(blocks);
     const paragraphs = Array.from(html.querySelectorAll('p'), (paragraph) => paragraph.textContent);
-    expect(paragraphs.slice(-4)).toEqual(['Meeting recap.', 'Decision: ship Friday.', 'Action: Alex will ship.', 'Private manual notes']);
+    expect(paragraphs).toContain('Meeting recap.');
+    expect(paragraphs).toContain('Private manual notes');
+    expect(html.querySelector('h3')?.textContent).toBe('Decisions');
     expect(paragraphs).not.toContain('');
-    expect(blocksToMarkdown(blocks)).toContain('Meeting recap.\n\nDecision: ship Friday.\n\nAction: Alex will ship.\n\nPrivate manual notes');
+    expect(blocksToMarkdown(blocks)).toContain('ship Friday.');
+    expect(blocksToMarkdown(blocks)).toContain('Alex will ship.');
   });
   it('aborts on unmount and ignores even late tokens and completion', async () => {
     let finish!: (text: string) => void;
@@ -152,9 +156,46 @@ describe('MEET-6 meeting summary', () => {
     expect(screen.getByRole('alert').textContent).toBe(t('meetingBlock.summaryFailed'));
     expect(screen.getByRole('region', {name: t('meetingBlock.summary')})).toBeTruthy();
   });
+  it('preserves a collaborator summary created during generation and requires fresh confirmation to replace it', async () => {
+    let finish!: (text: string) => void;
+    generate.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const {doc, block} = harness();
+    fireEvent.click(screen.getByRole('button', {name: 'Generate summary'}));
+    act(() => materializeMeetingSummary(doc, block, [{type: 'paragraph', text: 'Collaborator edits'}]));
+    const before = docToJSON(doc);
+    await act(async () => finish('Generated draft'));
+    expect(docToJSON(doc)).toEqual(before);
+    expect(screen.getByText('Generated draft')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', {name: 'Replace summary'}));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Cancel'})));
+    expect(docToJSON(doc)).toEqual(before);
+    fireEvent.click(screen.getByRole('button', {name: 'Replace summary'}));
+    await act(async () => fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'Replace summary'})));
+    expect(blocksToMarkdown(docToJSON(doc))).toContain('Generated draft');
+    expect(blocksToMarkdown(docToJSON(doc))).not.toContain('Collaborator edits');
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+  it('offers Add summary for an editable empty meeting and a muted read-only empty state', () => {
+    const {unmount} = harness({transcript: []});
+    expect(screen.getByRole('button', {name: 'Add summary'})).toBeTruthy();
+    unmount();
+    const doc = createDoc([{type: 'meeting'}]);
+    render(<ConfirmProvider><MeetingSummary block={rootBlocks(doc).get(0)} editor={{doc} as BlockEditorController} readOnly status="idle" transcript={[]} /></ConfirmProvider>);
+    expect(screen.getByText('No summary yet.').className).toBe('obe-meeting-summary-empty');
+  });
+  it('generates without confirmation into an empty summary container', async () => {
+    generate.mockResolvedValue('New summary');
+    const {doc, block} = harness();
+    act(() => materializeMeetingSummary(doc, block));
+    await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Generate summary'})));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(blocksToMarkdown(docToJSON(doc))).toContain('New summary');
+  });
   it('bounds long input using the existing completion budget and discloses the excerpt', () => {
     const prompt = meetingSummaryPrompt([{startMs: 0, endMs: 1, text: 'x'.repeat(10000)}]);
     expect(prompt).toContain('excerpt'); expect(prompt).toContain('x'.repeat(4000)); expect(prompt).not.toContain('x'.repeat(4001));
+    expect(prompt).toContain('literally in English on their own lines'); expect(prompt).toContain('content in the transcript\'s language');
     expect(prompt).toContain('2–3 sentence'); expect(prompt).toContain('owners only if named');
   });
 });

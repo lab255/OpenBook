@@ -5,7 +5,7 @@ import {getPageIdForDoc} from '@/lib/aiBridge';
 import {blockChildren, blockProp, blockType, insertBlock} from './model';
 import type {CustomBlockDef, CustomBlockProps} from './registry';
 import {exportMeetingAudio} from './meetingAudioExport';
-import {meetingSummaryContainer} from './meetingSummaryBlocks';
+import {hasMeetingSummary} from './meetingSummaryBlocks';
 import {MeetingSummary} from './MeetingSummary';
 import {MeetingHeader} from './MeetingHeader';
 import {MeetingTranscript} from './MeetingTranscript';
@@ -49,7 +49,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
     {exportError && <p role="alert">{t('meetingBlock.exportAudioFailed')}</p>}
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}
-    <MeetingTabs status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={!!meetingSummaryContainer(block) || !!blockProp<string>(block, 'summary')?.trim()}
+    <MeetingTabs status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={hasMeetingSummary(block)}
       transcript={<MeetingTranscript saved={saved} completed={completed} transcript={transcript} session={session} readOnly={readOnly} canTranscribe={canTranscribe} />}
       summary={<MeetingSummary block={block} editor={editor} readOnly={readOnly} status={status} transcript={transcript}>{summaryChildren}</MeetingSummary>}
       notes={<section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}>{children}

@@ -1,3 +1,4 @@
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {BlockEditor} from '../BlockEditor';
@@ -15,7 +16,7 @@ describe('meeting summary editor', () => {
       {id: 'm:summary', type: 'meetingsummary', children: [{type: 'paragraph', text: 'Recap'}, {type: 'todo', text: 'Ship', props: {checked: false}}]},
       {type: 'paragraph', text: 'Notes'},
     ]}]);
-    const {container} = render(<BlockEditor doc={doc} />);
+    const {container} = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
     const text = container.querySelector('.obe-meeting-summary .obe-text') as HTMLElement;
     act(() => { text.focus(); writeSelection(text, 0, 5); });
     act(() => { text.dispatchEvent(new InputEvent('beforeinput', {inputType: 'insertText', data: 'Edited recap', bubbles: true, cancelable: true})); });
@@ -31,18 +32,17 @@ describe('meeting summary editor', () => {
     const generate = vi.fn().mockResolvedValue('Replacement');
     setAiBridge({ready: () => true, generate, complete: vi.fn(), tasks: vi.fn(), applyProposals: vi.fn(), applySuggestion: vi.fn()});
     const doc = createDoc([{id: 'm', type: 'meeting', props: {summary: 'Old summary', transcript: [{startMs: 0, endMs: 1, text: 'Hello'}]}, children: [{type: 'paragraph', text: 'Note'}]}]);
-    render(<BlockEditor doc={doc} />);
+    render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
     expect(docToJSON(doc)[0].children).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', {name: 'Edit summary'}));
     const before = docToJSON(doc);
-    const confirm = vi.fn().mockReturnValue(false);
-    vi.stubGlobal('confirm', confirm);
     fireEvent.click(screen.getByRole('button', {name: 'Regenerate summary'}));
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Cancel'})));
     expect(generate).not.toHaveBeenCalled();
     expect(docToJSON(doc)).toEqual(before);
-    confirm.mockReturnValue(true);
     await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Regenerate summary'})));
+    await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Replace summary'})));
     expect(JSON.stringify(docToJSON(doc))).toContain('Replacement');
     expect(docToJSON(doc)[0].children?.slice(1)).toEqual(before[0].children?.slice(1));
   });

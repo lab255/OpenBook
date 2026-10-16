@@ -1,3 +1,4 @@
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {unzipSync} from 'fflate';
@@ -16,7 +17,7 @@ const chunks = [{assetId: 'a', startedAtMs: 0, durationMs: 45000}, {assetId: 'b'
 function harness(audioChunks: MeetingAudio[], readOnly = false, pageReadOnly = false) {
   const doc = createDoc([{type: 'meeting', props: {title: 'Team / sync', audioChunks}}]);
   const block = rootBlocks(doc).get(0);
-  render(<MeetingBlockView block={block} editor={{doc, readOnly} as BlockEditorController} pageReadOnly={pageReadOnly} />);
+  render(<ConfirmProvider><MeetingBlockView block={block} editor={{doc, readOnly} as BlockEditorController} pageReadOnly={pageReadOnly} /></ConfirmProvider>);
   return doc;
 }
 beforeEach(() => {

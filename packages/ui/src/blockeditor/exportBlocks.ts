@@ -16,14 +16,14 @@ import type {MeetingAudio} from './meetingRecorder';
 function meetingContent(b: BlockJSON): BlockJSON[] {
   const children = b.children ?? [];
   const summary = children.find((child) => child.type === 'meetingsummary');
-  return [...(summary?.children ?? []), ...children.filter((child) => child.type !== 'meetingsummary')];
+  return [...(summary?.children ?? String(b.props?.summary ?? '').split('\n').filter(Boolean).map((text): BlockJSON => ({id: '', type: 'paragraph', text: [{t: text}]}))), ...children.filter((child) => child.type !== 'meetingsummary')];
 }
 
 function meetingParagraphs(b: BlockJSON): string[] {
   const p = b.props ?? {};
   const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
   return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
-    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`), ...(!b.children?.some((child) => child.type === 'meetingsummary') && p.summary ? String(p.summary).split('\n').filter(Boolean) : [])];
+    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`)];
 }
 
 function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions, format: 'html' | 'markdown' = 'html'): string[] {
