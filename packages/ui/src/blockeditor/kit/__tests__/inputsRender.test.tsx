@@ -29,6 +29,12 @@ describe('kit input rendering', () => {
     expect(within(group).getByText('Two')).toBeTruthy();
   });
 
+  it.each([false, true])('sizes the dropdown wrapper for compact=%s', (compact) => {
+    const {container} = renderInput('dropdown', {compact, opts: [{label: 'One'}]});
+    const trigger = container.querySelector('.obe-kit-dropdown-select')!;
+    expect(trigger.parentElement!.classList.contains('w-full')).toBe(!compact);
+  });
+
   it('opts into the compact layout when asked', () => {
     const {container} = renderInput('radio', {name: 'mode', compact: true, opts: [{label: 'One'}]});
     expect(container.querySelector('.obe-kit-radio')!.classList.contains('obe-kit-wide')).toBe(false);

@@ -1,3 +1,5 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
+import {sectionLabel} from './databaseRecipes';
 import React, {useRef, useState} from 'react';
 import {BadgeCheck, Check, ChevronDown, ExternalLink, MapPin, Plus, X} from 'lucide-react';
 import {
@@ -82,10 +84,10 @@ export const VerificationBadge: React.FC<{value: unknown}> = ({value}) => {
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs',
-        verified ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground',
+        verified ? STATUS_INK_CLASS.ok : 'text-muted-foreground',
       )}
     >
-      <BadgeCheck className={cn('h-3.5 w-3.5', verified ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50')} />
+      <BadgeCheck className={cn('h-3.5 w-3.5', verified ? STATUS_INK_CLASS.ok : 'text-muted-foreground/50')} />
       {verified ? 'Verified' : 'Unverified'}
     </span>
   );
@@ -101,8 +103,8 @@ const findOption = (property: DatabaseProperty, value: unknown): DatabaseSelectO
   property.options?.find((o) => o.id === value);
 
 /** A colored select-option chip. */
-export const SelectChip: React.FC<{option: DatabaseSelectOption}> = ({option}) => (
-  <span className="inline-flex max-w-full items-center truncate rounded px-1.5 py-0.5 text-xs" style={chipStyle(option.color)}>
+export const SelectChip: React.FC<{option: DatabaseSelectOption; pill?: boolean; title?: string}> = ({option, pill = false, title}) => (
+  <span title={title} className={cn('inline-flex max-w-full items-center truncate px-1.5 py-0.5 text-xs', pill ? 'rounded-full' : 'rounded-sm')} style={chipStyle(option.color)}>
     {option.label}
   </span>
 );
@@ -508,7 +510,7 @@ const RatingCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
           key={n}
           type="button"
           onClick={() => onChange(current === n ? null : n)}
-          className={cn('text-base leading-none transition-colors', n <= current ? 'text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400/60')}
+          className={cn('text-base leading-none transition-colors', n <= current ? 'text-primary' : 'text-muted-foreground/30 hover:text-primary/60')}
           aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
           aria-pressed={n <= current}
         >
@@ -573,7 +575,7 @@ const DateCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'on
         aria-label={property.name}
         {...controlProps}
       >
-        {text || <span className={emptyHint}>Empty</span>}
+        {text || <span data-empty-hint className={emptyHint}>Empty</span>}
       </button>
     );
   }
@@ -891,7 +893,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
       <PopoverContent align="start" className="w-64 space-y-2 p-2.5">
         <div className="flex gap-1.5">
           <label className="flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Latitude</span>
+            <span className={sectionLabel}>Latitude</span>
             <input
               value={lat}
               onChange={(e) => setLat(e.target.value)}
@@ -902,7 +904,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
             />
           </label>
           <label className="flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Longitude</span>
+            <span className={sectionLabel}>Longitude</span>
             <input
               value={lng}
               onChange={(e) => setLng(e.target.value)}
@@ -914,7 +916,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
           </label>
         </div>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Label</span>
+          <span className={sectionLabel}>Label</span>
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
@@ -924,7 +926,7 @@ const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' |
           />
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Address</span>
+          <span className={sectionLabel}>Address</span>
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -957,7 +959,7 @@ const MultiSelectCell: React.FC<PropertyValueCellProps> = ({property, value, pla
           {selected.length > 0 ? (
             selected.map((o) => <SelectChip key={o.id} option={o} />)
           ) : (
-            <span className={emptyHint}>{placeholder || 'Empty'}</span>
+            <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>
           )}
         </button>
       </DropdownMenuTrigger>
@@ -1140,7 +1142,7 @@ const SelectCell: React.FC<PropertyValueCellProps> = ({property, value, placehol
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-sm hover:bg-hover" {...controlProps}>
-          {selected ? <SelectChip option={selected} /> : <span className={emptyHint}>{placeholder || 'Empty'}</span>}
+          {selected ? <SelectChip option={selected} /> : <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>}
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         </button>
       </DropdownMenuTrigger>
@@ -1216,7 +1218,7 @@ const StatusCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
               {selected.label}
             </span>
           ) : (
-            <span className={emptyHint}>{placeholder || 'Empty'}</span>
+            <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>
           )}
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         </button>
@@ -1227,7 +1229,7 @@ const StatusCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
           if (opts.length === 0) return null;
           return (
             <React.Fragment key={group.id}>
-              <div className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              <div className={cn('px-2 pb-0.5 pt-1.5', sectionLabel)}>
                 {group.label}
               </div>
               {opts.map((o) => (

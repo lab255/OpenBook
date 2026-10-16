@@ -88,6 +88,45 @@ describe('escapeSrcdocAttribute', () => {
 });
 
 describe('wrapSandboxDocument', () => {
+  it.each(['<p>Plain HTML</p>', '<!doctype html><html><head></head><body>Hello</body></html>'])('defaults unstyled sandbox content to a light document: %s', (html) => {
+    const wrapped = wrapSandboxDocument(html, {defaultLightBackground: true});
+    expect(wrapped).toContain('<style>:root { color-scheme: light; } body { background-color: white; }</style>');
+    expect(wrapped.endsWith(html)).toBe(true);
+  });
+
+  it.each([
+    '<body style="background: black; color: white">Styled</body>',
+    '<html style="background-color: pink"><body>Styled</body></html>',
+    '<style>body { background-image: linear-gradient(red, blue); }</style>',
+    '<style>html, body { BACKGROUND: transparent; }</style>',
+    '<body bgcolor="#123456">Legacy</body>',
+    '<html BGCOLOR="white"><body>Legacy</body></html>',
+    '<style>@media (prefers-color-scheme: dark) { body { background: black; } }</style>',
+    '<style>.card { background: pink; }</style>',
+    '<script>document.body.style.backgroundColor = "black";</script>',
+    '<link rel="stylesheet" href="theme.css">',
+    '<style>@import "theme.css";</style>',
+  ])('preserves authored or potentially external backgrounds verbatim: %s', (html) => {
+    expect(wrapSandboxDocument(html, {defaultLightBackground: true})).toBe(wrapSandboxDocument(html));
+  });
+
+  it('does not inject defaults when the artifact declares a color scheme', () => {
+    const html = '<meta name="color-scheme" content="light dark"><p>Hello</p>';
+    expect(wrapSandboxDocument(html, {defaultLightBackground: true})).toBe(`<!doctype html><meta charset="utf-8">${html}`);
+  });
+
+  it('preserves the pre-change wrap when body text merely mentions background', () => {
+    const html = '<body><p>Some background information</p></body>';
+    const csp = '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;">';
+    expect(wrapSandboxDocument(html, {csp: 'default-src \'none\'', defaultLightBackground: true})).toBe(`<!doctype html><meta charset="utf-8">${csp}${html}`);
+  });
+
+  it('places default styles after CSP and before the original content', () => {
+    const wrapped = wrapSandboxDocument('<p>Hello</p>', {csp: 'default-src \'none\'', defaultLightBackground: true});
+    expect(wrapped.indexOf('Content-Security-Policy')).toBeLessThan(wrapped.indexOf('<style>'));
+    expect(wrapped.indexOf('</style>')).toBeLessThan(wrapped.indexOf('<p>'));
+  });
+
   it('prepends a standards-mode doctype + utf-8 charset', () => {
     expect(wrapSandboxDocument('<p>hi</p>')).toBe('<!doctype html><meta charset="utf-8"><p>hi</p>');
   });

@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useState} from 'react';
 import {Bot, Check, ChevronDown, ChevronRight, Copy, User, X} from 'lucide-react';
 import type {CommentInput, StoredComment, StoredSuggestion} from '@book.dev/sdk';
@@ -83,7 +84,7 @@ export function SuggestionCard({
             </span>
             <span className="flex-1" />
             {!open && (
-              <span className={cn('text-[11px] font-medium', s.status === 'accepted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+              <span className={cn('text-[11px] font-medium', s.status === 'accepted' ? STATUS_INK_CLASS.ok : 'text-muted-foreground')}>
                 {s.status === 'accepted' ? 'Accepted' : 'Rejected'}
               </span>
             )}
@@ -92,12 +93,12 @@ export function SuggestionCard({
           {/* before → after diff */}
           <div className="rounded-md border border-border bg-muted px-2.5 py-1.5 font-mono text-[11px] leading-relaxed">
             {s.before ? (
-              <p className="break-words text-destructive/80">- {s.before}</p>
+              <p className="break-words text-[var(--data-red-chip-fg)]">- {s.before}</p>
             ) : (
               <p className="break-words text-muted-foreground">- (nothing)</p>
             )}
             {s.after ? (
-              <p className="break-words text-emerald-600 dark:text-emerald-400">+ {s.after}</p>
+              <p className="break-words text-[var(--data-green-chip-fg)]">+ {s.after}</p>
             ) : (
               <p className="break-words text-muted-foreground">+ (removed)</p>
             )}

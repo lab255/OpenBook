@@ -17,6 +17,7 @@
 import {jsPDF} from 'jspdf';
 import 'svg2pdf.js';
 import {elementToSVG} from 'dom-to-svg';
+import {KIT_EXPORT_PRIMARY} from '../blockeditor/colors';
 
 const PAGE_W = 612; // US Letter, points
 const PAGE_H = 792;
@@ -90,9 +91,9 @@ function staticizeSliders(root: Element): void {
     const track = doc.createElement('span');
     track.setAttribute('style', 'position:relative;display:inline-block;width:60%;height:8px;background:rgba(127,127,127,.18);border-radius:999px;vertical-align:middle');
     const fill = doc.createElement('span');
-    fill.setAttribute('style', `position:absolute;left:0;top:0;height:8px;width:${pct.toFixed(2)}%;background:#6366f1;border-radius:999px`);
+    fill.setAttribute('style', `position:absolute;left:0;top:0;height:8px;width:${pct.toFixed(2)}%;background:${KIT_EXPORT_PRIMARY};border-radius:999px`);
     const thumb = doc.createElement('span');
-    thumb.setAttribute('style', `position:absolute;top:-3px;left:${pct.toFixed(2)}%;width:14px;height:14px;margin-left:-7px;background:#6366f1;border-radius:999px`);
+    thumb.setAttribute('style', `position:absolute;top:-3px;left:${pct.toFixed(2)}%;width:14px;height:14px;margin-left:-7px;background:${KIT_EXPORT_PRIMARY};border-radius:999px`);
     track.appendChild(fill);
     track.appendChild(thumb);
     el.replaceWith(track);

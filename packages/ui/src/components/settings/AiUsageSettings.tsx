@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {Loader2} from 'lucide-react';
 import type {AiModelPrice, AiPricingResponse, AiPricingTable, AiProvider, AiUsageResponse} from '@book.dev/sdk';
@@ -302,7 +304,7 @@ export default function AiUsageSettings() {
             {savingPrice ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {t('aiUsage.savePricing')}
           </Button>
-          {priceSaved && <span className="text-xs text-emerald-600 dark:text-emerald-400">{t('aiUsage.saved')}</span>}
+          {priceSaved && <span className={cn('text-xs', STATUS_INK_CLASS.ok)}>{t('aiUsage.saved')}</span>}
         </div>
       </SettingsSection>
 
@@ -331,7 +333,7 @@ export default function AiUsageSettings() {
             {savingRetention ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {t('aiUsage.saveRetention')}
           </Button>
-          {retentionSaved && <span className="pb-1.5 text-xs text-emerald-600 dark:text-emerald-400">{t('aiUsage.saved')}</span>}
+          {retentionSaved && <span className={cn('pb-1.5 text-xs', STATUS_INK_CLASS.ok)}>{t('aiUsage.saved')}</span>}
         </div>
       </SettingsSection>
     </div>

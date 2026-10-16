@@ -1,4 +1,5 @@
 import React from 'react';
+import {ui} from './ui';
 import {describeDraftExclusion} from './reports';
 import {
   CURRENT_EARNINGS_LABEL,
@@ -15,25 +16,7 @@ import {
   type StatementSection,
 } from './statements';
 import {ShapeControls, StatementTable, parseCollapsed, serializeCollapsed, type StatementLine} from './statementShell';
-import {
-  EmptyState,
-  ReportError,
-  SetupPrompt,
-  TruncationNotice,
-  buttonStyle,
-  controlStyle,
-  frameStyle,
-  mutedStyle,
-  noticeStyle,
-  readBool,
-  readProps,
-  readString,
-  titleStyle,
-  useLedgerReport,
-  writeProp,
-  type BlockLike,
-  type EditorLike,
-} from './reportShell';
+import {EmptyState, ReportError, SetupPrompt, TruncationNotice, readBool, readProps, readString, useLedgerReport, writeProp, type BlockLike, type EditorLike} from './reportShell';
 import {describeClosedPeriodMarker, latestCloseThrough} from './periods';
 import {todayIso} from './model';
 
@@ -149,16 +132,16 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
 
   if (data.state === 'loading') {
     return (
-      <div data-ledger-balance-sheet data-ledger-loading contentEditable={false} style={frameStyle}>
-        <span style={mutedStyle}>Loading balance sheet…</span>
+      <div data-ledger-balance-sheet data-ledger-loading contentEditable={false} className={ui.frame}>
+        <span className={ui.muted}>Loading balance sheet…</span>
       </div>
     );
   }
 
   if (data.state === 'uninitialized') {
     return (
-      <div data-ledger-balance-sheet data-ledger-setup contentEditable={false} style={frameStyle}>
-        <h3 style={titleStyle}>
+      <div data-ledger-balance-sheet data-ledger-setup contentEditable={false} className={ui.frame}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Balance sheet
         </h3>
         <SetupPrompt label="Set up books" readOnly={pageLocked} onDone={data.reload} />
@@ -201,17 +184,17 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
   }
 
   return (
-    <div data-ledger-balance-sheet contentEditable={false} style={frameStyle}>
-      <div style={{display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap'}}>
-        <h3 style={{...titleStyle, lineHeight: '1.9rem'}}>
+    <div data-ledger-balance-sheet contentEditable={false} className={ui.frame}>
+      <div className={ui.header}>
+        <h3 className={ui.title}>
           <span aria-hidden="true">📒 </span>Balance sheet
         </h3>
-        <label style={{display: 'flex', flexDirection: 'column', gap: '0.2rem'}}>
-          <span style={mutedStyle}>As at</span>
-          <input type="date" data-ledger-as-of style={controlStyle} value={asOf} onChange={(e) => updateAsOf(e.target.value)} />
+        <label className={ui.labelled}>
+          <span className={ui.muted}>As at</span>
+          <input type="date" data-ledger-as-of className={ui.field} value={asOf} onChange={(e) => updateAsOf(e.target.value)} />
         </label>
         {!defaulted && (
-          <button type="button" data-ledger-reset-as-of style={{...mutedStyle, border: 'none', background: 'transparent', padding: 0, textDecoration: 'underline', cursor: 'pointer'}} onClick={() => updateAsOf('')}>
+          <button type="button" data-ledger-reset-as-of className={ui.btn + ' ' + ui.muted} data-variant="link" onClick={() => updateAsOf('')}>
             Back to today
           </button>
         )}
@@ -219,7 +202,7 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
 
       {/* A defaulted date is a CHOICE the reader did not make — say so. */}
       {defaulted && (
-        <div data-ledger-as-of-defaulted style={mutedStyle}>
+        <div data-ledger-as-of-defaulted className={ui.muted}>
           Dated to today ({asOf}). Pick a date above to pin it.
         </div>
       )}
@@ -231,12 +214,12 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
           latest-entry default walked into, since a single post-dated invoice
           moved the whole position. Say which, whenever it applies. */}
       {!defaulted && asOf < today && (
-        <div data-ledger-as-of-backdated style={mutedStyle}>
+        <div data-ledger-as-of-backdated className={ui.muted}>
           {latest === asOf ? `Dated to your latest posted entry (${asOf})` : `Dated ${asOf}`} — not today ({today}).
         </div>
       )}
       {!defaulted && asOf > today && (
-        <div data-ledger-as-of-ahead style={mutedStyle}>
+        <div data-ledger-as-of-ahead className={ui.muted}>
           {latest === asOf ? `Dated to your latest posted entry (${asOf})` : `Dated ${asOf}`} — ahead of today ({today}); this position includes entries that have not happened yet.
         </div>
       )}
@@ -244,10 +227,10 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
       {/* LGR-12, display-only: a position dated at or after a closed period
           rests on locked books — a fact worth a line, never a gate. */}
       {describeClosedPeriodMarker(data.periods, '', asOf) !== null && (
-        <div data-ledger-closed-periods style={mutedStyle}>{describeClosedPeriodMarker(data.periods, '', asOf)}</div>
+        <div data-ledger-closed-periods className={ui.muted}>{describeClosedPeriodMarker(data.periods, '', asOf)}</div>
       )}
 
-      <div data-ledger-drafts-excluded={sheet !== null ? sheet.draftCount : 0} style={mutedStyle}>
+      <div data-ledger-drafts-excluded={sheet !== null ? sheet.draftCount : 0} className={ui.muted}>
         {describeDraftExclusion(sheet !== null ? sheet.draftCount : 0)}
         {asOfNote !== null && <span data-ledger-as-of-excluded> {asOfNote}</span>}
       </div>
@@ -260,15 +243,15 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
       {sheet !== null && assertion !== null && (
         <>
           {/* polite, never `alert`: this line re-renders on every ledger change. */}
-          <div data-ledger-identity data-ledger-balanced={assertion.ok ? 'true' : 'false'} role="status" aria-live="polite" style={noticeStyle(assertion.ok ? 'quiet' : 'alarm')}>
+          <div data-ledger-identity data-ledger-balanced={assertion.ok ? 'true' : 'false'} role="status" aria-live="polite" className={ui.notice} data-tone={assertion.ok ? 'quiet' : 'alarm'}>
             <div>{assertion.text}</div>
             {assertion.culprits != null && (
-              <div data-ledger-culprits style={{marginTop: '0.35rem', fontWeight: 400}}>
+              <div data-ledger-culprits className={ui.noticeDetail}>
                 {assertion.culprits}
               </div>
             )}
             {assertion.unclassified != null && (
-              <div data-ledger-unclassified-cause style={{marginTop: '0.35rem', fontWeight: 400}}>
+              <div data-ledger-unclassified-cause className={ui.noticeDetail}>
                 {assertion.unclassified}
               </div>
             )}
@@ -282,7 +265,7 @@ export const BalanceSheetBlock = ({block, editor, pageReadOnly}: {block: BlockLi
               {latest !== null && latest > asOf ? (
                 <>
                   Nothing was posted on or before {asOf} — this book’s latest posted entry is {latest}.{' '}
-                  <button type="button" data-ledger-show-latest style={{...buttonStyle, marginLeft: '0.25rem'}} onClick={() => updateAsOf(latest)}>
+                  <button type="button" data-ledger-show-latest className={ui.btn} data-size="xs" style={{marginLeft: '0.25rem'}} onClick={() => updateAsOf(latest)}>
                     Show your latest period instead — through {latest}
                   </button>
                 </>

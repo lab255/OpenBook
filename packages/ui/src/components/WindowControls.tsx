@@ -4,6 +4,9 @@ import {usePlatformCapabilities} from '@/providers';
 import {cn} from '@/lib/utils';
 import {suppressContextMenu} from '@/lib/suppressContextMenu';
 
+// eslint-disable-next-line tailwind/no-palette-color -- Windows caption close-button convention (platform red, not theme destructive)
+const CLOSE_HOVER_CLASS = 'hover:bg-red-600 hover:text-white';
+
 /**
  * Minimize / maximize / close buttons for a frameless window (Windows & Linux,
  * where the host provides `windowControls`). Drawn on the right of the titlebar
@@ -44,7 +47,7 @@ export default function WindowControls() {
         type="button"
         onClick={windowControls.close}
         aria-label="Close"
-        className={cn(button, 'hover:bg-red-600 hover:text-white')}
+        className={cn(button, CLOSE_HOVER_CLASS)}
       >
         <X className="h-4 w-4" />
       </button>

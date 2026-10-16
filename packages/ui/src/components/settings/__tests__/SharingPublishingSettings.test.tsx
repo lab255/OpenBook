@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
 import React from 'react';
 import {cleanup, render, screen} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
@@ -82,7 +83,7 @@ describe('ForwardingSection failure copy', () => {
   it('presents an enabled IPC failure as paused information, not destructive', () => {
     const {container} = renderFailure('ipc', true);
     const notice = screen.getByText('The local service isn\'t running.').parentElement;
-    expect(notice?.className).toContain('text-amber');
+    expect(notice?.className).toContain(STATUS_INK_CLASS.warn);
     expect(notice?.className).not.toContain('text-destructive');
     expect(screen.getByText('Check the local-service banner, or use Restart in Diagnostics.')).toBeTruthy();
     expect(container.querySelector('[data-checked="true"]')).toBeTruthy();

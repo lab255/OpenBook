@@ -107,6 +107,10 @@ test('calendar drag: reschedule a row by dragging to another day', {tag: ['@data
   await page.getByRole('menuitem', {name: 'Calendar'}).click();
   const pill = page.locator('[draggable="true"]:not([role])').filter({hasText: 'Event'});
   await expect(pill).toBeVisible();
+  await expect(pill).toHaveCSS('height', '20px');
+  await expect(pill).toHaveCSS('border-radius', '4px');
+  await expect(pill).toHaveCSS('font-size', '12px');
+  await expect(page.locator(`[data-day-key="${onDay(10)}"]`)).toHaveCSS('min-height', '88px');
   // Dispatch HTML5 drag events directly (the handlers use React state, not
   // dataTransfer); awaited dispatches let React re-render between them.
   await pill.dispatchEvent('dragstart');

@@ -28,6 +28,15 @@ import {
 } from './blockCatalogue';
 
 describe('catalogue integrity', () => {
+  it('exposes togglelist summary, children and typed collapsed state to MCP', () => {
+    expect(blockTypeInfo('togglelist')).toMatchObject({category: 'core', nature: 'container', richText: true});
+    expect(TEXT_BLOCK_TYPES.has('togglelist')).toBe(true);
+    expect(CONTAINER_BLOCK_TYPES.has('togglelist')).toBe(true);
+    expect(blockTreeError([{type: 'togglelist', text: 'Summary', props: {collapsed: true}, children: [{type: 'paragraph', text: 'Body'}]}])).toBeNull();
+    expect(invalidBlockProps('togglelist', {collapsed: 'yes'})).toContain('boolean');
+    const entry = JSON.parse(blockCatalogueText([], ['togglelist'])).blocks[0];
+    expect(entry).toMatchObject({type: 'togglelist', richText: true, propsSchema: {properties: {collapsed: {type: 'boolean'}}}});
+  });
   it('has unique type ids', () => {
     const ids = BLOCK_TYPE_CATALOGUE.map((e) => e.type);
     expect(new Set(ids).size).toBe(ids.length);
@@ -48,10 +57,10 @@ describe('catalogue integrity', () => {
     }
   });
 
-  it('derived sets partition by nature', () => {
+  it('derived sets reflect nature and rich-text containers', () => {
     for (const e of BLOCK_TYPE_CATALOGUE) {
       expect(CONTAINER_BLOCK_TYPES.has(e.type as never), e.type).toBe(e.nature === 'container');
-      expect(TEXT_BLOCK_TYPES.has(e.type as never), e.type).toBe(e.nature === 'text');
+      expect(TEXT_BLOCK_TYPES.has(e.type as never), e.type).toBe(e.nature === 'text' || e.richText === true);
     }
   });
 });

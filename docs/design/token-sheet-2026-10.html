@@ -14,7 +14,7 @@
   .lt {
     --background: 0 0% 100%; --foreground: 34 9% 19%;
     --muted: 40 9% 96%; --muted-foreground: 40 3% 43.2%;
-    --border: 40 8% 90%; --ring: 207 75% 49%; --primary: 207 75% 49%;
+    --border: 40 8% 90%; --ring: 207 75% 44%; --primary: 207 75% 44%;
     --primary-foreground: 0 0% 100%; --accent: 40 12% 93%;
     --hover: hsl(var(--primary) / 0.1); --hover-strong: hsl(var(--primary) / 0.15);
     --shadow-menu: 0 0 0 1px hsl(var(--foreground) / 0.03), 0 3px 10px -3px hsl(var(--foreground) / 0.1);
@@ -134,7 +134,7 @@
   code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
   .muted { color: #8a857d; }
   .tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 9999px; background: #f1efeb; color: #6f6b65; }
-  .tag.new { background: #e0eefa; color: #1e5a96; }
+  .tag.new { background: #dfecf7; color: #1e5a96; }
   .tag.fix { background: #fbe7e7; color: #8f2424; }
 
   /* ── 1. Type ramp ── */
@@ -157,7 +157,7 @@
   .motion-grid { display: grid; grid-template-columns: 150px repeat(3, 1fr); gap: 8px 16px; align-items: center; }
   .motion-grid .h { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6f6b65; }
   .track { position: relative; height: 28px; border-radius: 9999px; background: #f4f2ee; overflow: hidden; }
-  .dot { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 9999px; background: hsl(207 75% 49%); }
+  .dot { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 9999px; background: hsl(207 75% 44%); }
   /* 2s cycle: travel occupies duration/2000 of the cycle, then holds. */
   @keyframes travel-fast { 0% { transform: translateX(0); } 6% { transform: translateX(var(--d)); } 50% { transform: translateX(var(--d)); } 56% { transform: translateX(0); } 100% { transform: translateX(0); } }
   @keyframes travel-base { 0% { transform: translateX(0); } 9% { transform: translateX(var(--d)); } 50% { transform: translateX(var(--d)); } 59% { transform: translateX(0); } 100% { transform: translateX(0); } }
@@ -176,8 +176,8 @@
   .recipe .spec { font-size: 11px; color: #8a857d; margin-bottom: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .hover-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-md); color: hsl(40 3% 43.2% / 0.8); cursor: pointer;
     transition: background-color var(--motion-fast) var(--ease-out-soft), color var(--motion-fast) var(--ease-out-soft); }
-  .hover-chip:hover { background: hsl(207 75% 49% / 0.1); color: hsl(34 9% 19%); }
-  .hover-chip:active { background: hsl(207 75% 49% / 0.15); transition-duration: 0s; }
+  .hover-chip:hover { background: hsl(207 75% 44% / 0.1); color: hsl(34 9% 19%); }
+  .hover-chip:active { background: hsl(207 75% 44% / 0.15); transition-duration: 0s; }
   /* Menu: enter base/out-soft (opacity + scale .98 + 2px), hold, exit fast/in-out-soft (opacity only). 2.4s cycle. */
   @keyframes menu-cycle {
     0%     { opacity: 0; transform: translateY(-2px) scale(0.98); animation-timing-function: var(--ease-out-soft); }
@@ -189,7 +189,7 @@
   .menu { width: 170px; background: #fff; border: 1px solid hsl(40 8% 90%); border-radius: var(--radius-lg); padding: 4px; box-shadow: 0 0 0 1px hsl(34 9% 19% / 0.03), 0 3px 10px -3px hsl(34 9% 19% / 0.1);
     transform-origin: top left; animation: menu-cycle 2.4s infinite; }
   .menu div { padding: 6px 8px; border-radius: var(--radius-sm); font-size: 13px; }
-  .menu div.on { background: hsl(207 75% 49% / 0.1); }
+  .menu div.on { background: hsl(207 75% 44% / 0.1); }
   /* Dialog: enter slow 240ms over a 3.2s cycle (7.5%), exit fast 120ms (3.75%). */
   @keyframes dialog-cycle {
     0%    { opacity: 0; transform: scale(0.98); animation-timing-function: var(--ease-out-soft); }
@@ -210,7 +210,7 @@
   .toggle-body { padding: 4px 0 0 22px; font-size: 14px; animation: content-cycle 4s infinite; }
   /* Switch: knob spring, track colour out-soft, both base. */
   @keyframes knob-cycle { 0%, 45% { transform: translateX(0); animation-timing-function: var(--ease-spring); } 49.5%, 95% { transform: translateX(16px); animation-timing-function: var(--ease-spring); } 99.5%, 100% { transform: translateX(0); } }
-  @keyframes track-cycle { 0%, 45% { background: hsl(40 9% 96%); animation-timing-function: var(--ease-out-soft); } 49.5%, 95% { background: hsl(207 75% 49%); } 99.5%, 100% { background: hsl(40 9% 96%); } }
+  @keyframes track-cycle { 0%, 45% { background: hsl(40 9% 96%); animation-timing-function: var(--ease-out-soft); } 49.5%, 95% { background: hsl(207 75% 44%); } 99.5%, 100% { background: hsl(40 9% 96%); } }
   .switch { width: 38px; height: 22px; border-radius: 9999px; border: 1px solid hsl(40 8% 90%); position: relative; animation: track-cycle 4s infinite; }
   .knob { position: absolute; top: 1px; left: 1px; width: 18px; height: 18px; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); animation: knob-cycle 4s infinite; }
   /* Block insert: no entrance — rows appear on the frame. */
@@ -232,7 +232,7 @@
   /* ── 3. Radius ── */
   .radius-row { display: flex; flex-wrap: wrap; gap: 20px; }
   .rchip { width: 150px; }
-  .rchip .shape { height: 72px; background: hsl(207 86% 95%); box-shadow: inset 0 0 0 1.5px hsl(207 75% 49% / 0.55); margin-bottom: 8px; }
+  .rchip .shape { height: 72px; background: hsl(207 86% 95%); box-shadow: inset 0 0 0 1.5px hsl(207 75% 44% / 0.55); margin-bottom: 8px; }
   .rchip b { display: block; font-size: 13px; }
   .rchip span { font-size: 12px; color: #8a857d; line-height: 1.4; display: block; }
 

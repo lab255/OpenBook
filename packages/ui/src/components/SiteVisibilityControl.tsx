@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {WARN_SURFACE_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useState} from 'react';
 import type {SiteVisibility} from '@book.dev/sdk';
 import {useData} from '@/data';
@@ -109,7 +111,7 @@ export function SiteVisibilityControl({compact = false}: {compact?: boolean}) {
       {showGuestCaveat && (
         <p
           aria-live="polite"
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-foreground"
+          className={cn('rounded-md px-3 py-2 text-xs', WARN_SURFACE_CLASS)}
         >
           {/* Point at the fix that matches the INTENT of the chosen scope: a
               `published` address needs per-page publishing turned on, a `public`

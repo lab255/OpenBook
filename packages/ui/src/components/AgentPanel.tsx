@@ -1,3 +1,4 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import {useEffect, useRef, useState} from 'react';
 import {ArrowUp, Bot, Brain, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Loader2, Pencil, Plus, ShieldCheck, Sparkles, Square} from 'lucide-react';
 import {
@@ -461,7 +462,7 @@ export function AgentPanel() {
                       name, with an "external" badge so its provenance is obvious. */}
                   {item.name.startsWith('mcp__') ? (
                     <span className="flex min-w-0 items-center gap-1.5 truncate">
-                      <span className="rounded-sm bg-amber-500/15 px-1 py-px text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400" data-agent-tool-external>
+                      <span className={cn('rounded-sm px-1 py-px text-[10px] font-medium uppercase tracking-wide', DATA_CHIP_CLASS.yellow)} data-agent-tool-external>
                         {t('agent.externalBadge')}
                       </span>
                       <span className="truncate">
@@ -531,9 +532,9 @@ export function AgentPanel() {
                       </p>
                       {(s.before || s.after) && (
                         <p className="mt-0.5 break-words font-mono text-[10px] leading-relaxed text-muted-foreground">
-                          {s.before && <span className="text-destructive/80">- {s.before}</span>}
+                          {s.before && <span className="text-[var(--data-red-chip-fg)]">- {s.before}</span>}
                           {s.before && s.after && ' '}
-                          {s.after && <span className="text-emerald-600 dark:text-emerald-400">+ {s.after}</span>}
+                          {s.after && <span className="text-[var(--data-green-chip-fg)]">+ {s.after}</span>}
                         </p>
                       )}
                     </li>
@@ -600,7 +601,7 @@ export function AgentPanel() {
               <div
                 key={i}
                 data-agent-applied
-                className="inline-flex items-center gap-1.5 self-start rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2.5 py-1 text-[11px] text-emerald-700 dark:text-emerald-300"
+                className={cn('inline-flex items-center gap-1.5 self-start rounded-md px-2.5 py-1 text-[11px]', DATA_CHIP_CLASS.green)}
               >
                 <Check className="size-3.5" aria-hidden />
                 {item.text}

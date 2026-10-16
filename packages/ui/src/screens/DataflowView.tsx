@@ -1,3 +1,4 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import {createContext, useContext, useEffect, useMemo, useState} from 'react';
 import {
   Background,
@@ -49,12 +50,12 @@ import {cn} from '@/lib/utils';
  */
 
 const KIND_META: Record<DataflowNode['kind'], {icon: typeof Code2; chip: string}> = {
-  input: {icon: SlidersHorizontal, chip: 'bg-sky-500/15 text-sky-700 dark:text-sky-300'},
-  code: {icon: Code2, chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300'},
-  formula: {icon: Sigma, chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300'},
-  chart: {icon: ChartLine, chip: 'bg-amber-500/15 text-amber-700 dark:text-amber-300'},
-  light: {icon: CircleDot, chip: 'bg-green-500/15 text-green-700 dark:text-green-300'},
-  button: {icon: MousePointerClick, chip: 'bg-pink-500/15 text-pink-700 dark:text-pink-300'},
+  input: {icon: SlidersHorizontal, chip: DATA_CHIP_CLASS.blue},
+  code: {icon: Code2, chip: DATA_CHIP_CLASS.purple},
+  formula: {icon: Sigma, chip: DATA_CHIP_CLASS.purple},
+  chart: {icon: ChartLine, chip: DATA_CHIP_CLASS.yellow},
+  light: {icon: CircleDot, chip: DATA_CHIP_CLASS.green},
+  button: {icon: MousePointerClick, chip: DATA_CHIP_CLASS.pink},
   outlet: {icon: ArrowUpRight, chip: 'bg-primary/15 text-primary'},
 };
 

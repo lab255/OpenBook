@@ -1,3 +1,5 @@
+import {cn} from '@/lib/utils';
+import {WARN_SURFACE_CLASS, WARN_ICON_CLASS, STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {AppWindow, Blocks, Check, FileText, Image, Loader2, TriangleAlert, Upload} from 'lucide-react';
 import {notionAssetResolver, urlAssetResolver, type AssetBytes, type ImportedDoc} from '@book.dev/sdk';
@@ -623,7 +625,7 @@ export default function ImportDialog() {
         {phase.step === 'done' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
-              <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <Check className={cn('mt-0.5 h-5 w-5 shrink-0', STATUS_INK_CLASS.ok)} aria-hidden />
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm font-medium">{t('importer.done')}</span>
                 <span className="text-xs text-muted-foreground">
@@ -658,9 +660,9 @@ export default function ImportDialog() {
             {(phase.ledger?.status === 'refused' || phase.ledger?.status === 'failed') && (
               <p
                 role="alert"
-                className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-foreground"
+                className={cn('flex items-start gap-2 rounded-lg p-3 text-xs', WARN_SURFACE_CLASS)}
               >
-                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                <TriangleAlert className={cn('mt-0.5 h-4 w-4 shrink-0', WARN_ICON_CLASS)} aria-hidden />
                 {t(phase.ledger.status === 'refused' ? 'importer.ledgerRefused' : 'importer.ledgerFailed', {
                   error: phase.ledger.message,
                 })}

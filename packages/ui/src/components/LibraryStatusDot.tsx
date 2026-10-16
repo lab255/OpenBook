@@ -1,11 +1,12 @@
+import {STATUS_DOT_CLASS} from '@/lib/statusStyles';
 import {useTranslation} from '@/providers';
 import {useLibraryStatus, type LibraryStatus} from '@/lib/libraryReachability';
 import {cn} from '@/lib/utils';
 
 const DOT_CLASS: Record<LibraryStatus, string> = {
-  connected: 'bg-emerald-500',
-  reachable: 'bg-emerald-500',
-  unreachable: 'bg-amber-500',
+  connected: STATUS_DOT_CLASS.ok,
+  reachable: STATUS_DOT_CLASS.ok,
+  unreachable: STATUS_DOT_CLASS.warn,
   checking: 'bg-muted-foreground/50 animate-pulse',
   unknown: 'bg-muted-foreground/40',
 };

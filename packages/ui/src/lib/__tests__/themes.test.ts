@@ -50,7 +50,7 @@ describe('composeAppearance', () => {
     expect(t.border).toBe('40 8% 90%');
     expect(t.input).toBe('40 8% 87%');
     expect(t.accent).toBe('40 12% 93%');
-    expect(t.primary).toBe('207 75% 49%');
+    expect(t.primary).toBe('207 75% 44%');
     // The canvas stays white (saturation 0 reads identical to the old `0 0% 100%`).
     expect(satOf(t.background)).toBe(0);
     // The one intended departure (#7): the sidebar sheets are tinted by default.

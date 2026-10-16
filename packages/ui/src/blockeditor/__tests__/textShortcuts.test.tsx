@@ -30,10 +30,10 @@ describe('text shortcuts', () => {
     typeText(document.activeElement as HTMLElement, 'Next');
     expect(blockPlainText(blocks[1])).toBe('Next');
   });
-  it.each(['"', '>'])('converts %s plus space to quote', prefix => {
+  it.each([['"', 'quote'], ['>', 'togglelist']])('converts %s plus space to %s', (prefix, type) => {
     const {doc, el} = mount();
     typeText(el, prefix + ' ');
-    expect(blockType(rootBlocks(doc).get(0))).toBe('quote');
+    expect(blockType(rootBlocks(doc).get(0))).toBe(type);
     expect(blockPlainText(rootBlocks(doc).get(0))).toBe('');
   });
   it.each(['1.', '12.', '123.'])('converts %s plus space to a numbered list', prefix => {

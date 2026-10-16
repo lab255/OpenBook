@@ -712,6 +712,32 @@ test('multi-cell selection: no-cell-focused paste still makes a new table, delet
   expect(await origTexts()).toEqual(['A1', 'B1', 'A2', 'B2']);
 });
 
+for (const trigger of ['More cell actions', 'Cell colour']) {
+  test(`table range toolbar opens ${trigger} on mouse click`, {tag: ['@editor', '@p1']}, async ({page}) => {
+    await freshLab(page);
+    await caretAtEnd(page, 2);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+
+    const cells = page.locator('.obe-table td');
+    const first = (await cells.nth(0).boundingBox())!;
+    const last = (await cells.nth(4).boundingBox())!;
+    await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, {steps: 10});
+    await page.mouse.up();
+    await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(4);
+
+    const toolbar = page.getByRole('toolbar', {name: 'Cell selection actions'});
+    await toolbar.getByRole('button', {name: trigger}).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    if (trigger === 'More cell actions') {
+      await expect(page.getByRole('menu').getByRole('menuitem', {name: 'Insert 2 rows above'})).toBeVisible();
+    }
+  });
+}
+
 test('table range toolbar clears a dragged 2x2 selection', {tag: ['@editor', '@p1']}, async ({page}) => {
   await freshLab(page);
   await caretAtEnd(page, 2);
@@ -1077,10 +1103,28 @@ test('range-aware cell menu: right-click inside a selection tints/deletes the wh
     return {background: computed.backgroundColor, expectedBackground, shadow: computed.boxShadow};
   });
   expect(selectedPaint.background).toBe(selectedPaint.expectedBackground);
-  expect(selectedPaint.shadow.match(/inset/g)).toHaveLength(2);
+  expect(selectedPaint.shadow.match(/inset/g)).toHaveLength(1);
+  const outline = page.locator('.obe-table-range');
+  await expect(outline).toHaveCount(1);
+  await expect(outline).toBeVisible();
+  const union = await page.locator('.obe-table td.obe-cell-selected').evaluateAll((cells) => {
+    const boxes = cells.map((cell) => cell.getBoundingClientRect());
+    const left = Math.min(...boxes.map((box) => box.left));
+    const top = Math.min(...boxes.map((box) => box.top));
+    return {x: left, y: top, width: Math.max(...boxes.map((box) => box.right)) - left, height: Math.max(...boxes.map((box) => box.bottom)) - top};
+  });
+  const outlineBox = (await outline.boundingBox())!;
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(outlineBox[key] - union[key])).toBeLessThanOrEqual(1.5);
+  }
 
+  const toolbarBox = (await page.getByRole('toolbar', {name: 'Cell selection actions'}).boundingBox())!;
+  expect(Math.abs(toolbarBox.x - union.x)).toBeLessThanOrEqual(1.5);
+  expect(toolbarBox.width).toBe(128);
+
+  // Use the rightmost outside cell, clear of the range's left-aligned toolbar.
   // A right-click OUTSIDE the rectangle still opens the single-cell menu.
-  await td.nth(6).click({button: 'right'});
+  await td.nth(8).click({button: 'right'});
   await expect(page.getByRole('menuitem', {name: 'Duplicate row'})).toBeVisible();
   await expect(page.getByRole('menuitem', {name: 'Clear contents'})).toHaveCount(0);
   await page.keyboard.press('Escape');

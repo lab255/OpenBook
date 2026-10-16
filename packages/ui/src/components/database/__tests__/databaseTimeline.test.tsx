@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {cleanup, render} from '@testing-library/react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {cleanup, fireEvent, render} from '@testing-library/react';
 import type {DatabaseProperty, DatabaseRow, DatabaseView} from '@book.dev/sdk';
 import {TimelineView} from '../databaseTimeline';
 import type {UseDatabase} from '../useDatabase';
@@ -57,6 +58,16 @@ describe('TimelineView', () => {
     const bar = container.querySelector<HTMLElement>('[title="Launch review — drag to reschedule"]');
     const label = container.querySelector<HTMLElement>('[data-timeline-bar-label="outside"]');
     expect(bar?.style.width).toBe('30px');
+    // happy-dom drops CSS var colors; assert the authored style via SSR.
+    const markup = renderToStaticMarkup(<TimelineView db={db} view={view} properties={[dateProperty]} />);
+    const style = markup.match(/style="[^"]*color:var\(--data-blue-chip-fg[^"]*"/)?.[0];
+    expect(style).toContain('color:var(--data-blue-chip-fg');
+    expect(style).not.toContain('white');
+    expect(style).toContain('background-color:var(--data-blue-chip-bg');
+    fireEvent.keyDown(bar!, {key: 'Enter'});
+    fireEvent.keyDown(bar!, {key: ' '});
+    expect(db.openRow).toHaveBeenCalledTimes(2);
+    expect(db.openRow).toHaveBeenLastCalledWith(row.id);
     expect(label?.textContent).toBe('Launch review');
     expect(label?.style.minWidth).toBe('72px');
   });

@@ -42,6 +42,7 @@ export interface TableCellSpan {
 
 export type DocBlock =
   | {type: 'paragraph'; runs: InlineRun[]}
+  | {type: 'togglelist'; runs: InlineRun[]; children: DocBlock[]}
   | {type: 'header'; level: number; runs: InlineRun[]}
   | {type: 'list'; ordered: boolean; items: ListItem[]}
   | {type: 'quote'; runs: InlineRun[]; caption: string}
@@ -185,6 +186,12 @@ export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets =
     const data = block.data ?? {};
     const id = block.id ?? '';
     switch (block.type) {
+    case 'togglelist': {
+      const children = buildDocumentModel({title: '', icon: '', snapshot: {...snapshot, editor: undefined, blockdoc: undefined,
+        editorjs: {blocks: Array.isArray(data.children) ? data.children : []}}, assets, audioAssets, dbSeries}).blocks;
+      out.push({type: 'togglelist', runs: parseInline(str(data.text)), children});
+      break;
+    }
     case 'paragraph':
       out.push({type: 'paragraph', runs: parseInline(str(data.text))});
       break;

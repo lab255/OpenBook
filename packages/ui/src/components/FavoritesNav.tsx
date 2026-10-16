@@ -78,7 +78,7 @@ export default function FavoritesNav() {
                       title={t('menu.unfavorite')}
                       onClick={() => toggleFavorite(page.id)}
                     >
-                      <Star className="h-3.5 w-3.5 fill-current text-amber-400" />
+                      <Star className="h-3.5 w-3.5 fill-current" />
                     </IconButton>
                   </span>
                 </div>

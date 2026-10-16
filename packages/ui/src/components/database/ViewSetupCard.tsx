@@ -170,8 +170,8 @@ export const ViewSetupCard: React.FC<{
   };
 
   return (
-    <div className="rounded-md border border-dashed border-border px-6 py-8 text-center">
-      <Icon className="mx-auto h-6 w-6 text-muted-foreground/50" aria-hidden />
+    <div className="rounded-lg border border-dashed border-border px-6 py-8 text-center">
+      <Icon className="mx-auto h-6 w-6 text-muted-foreground/80" aria-hidden />
       <p className="mx-auto mt-2.5 max-w-md text-sm text-muted-foreground">
         {t(candidates.length > 0 ? pickKey : missingKey)}
       </p>

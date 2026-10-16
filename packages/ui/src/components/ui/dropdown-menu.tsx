@@ -98,6 +98,8 @@ const DropdownMenuContent = React.forwardRef<
 })
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
+export const menuItemClass = "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors hover:bg-hover focus-visible:bg-hover"
+
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {

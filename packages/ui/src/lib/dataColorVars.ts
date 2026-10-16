@@ -125,3 +125,20 @@ export const dataStrokeVar = (): string => `var(--data-stroke, ${DATA_STROKE})`;
 
 /** Inset hairline ring for swatch dots and status lamps. */
 export const DATA_DOT_RING = `inset 0 0 0 1px ${dataStrokeVar()}`;
+
+/** Data-palette chip pair as utilities (status chips, identity hues, diff marks).
+ *  Literal per token so Tailwind generates every class. */
+export const DATA_CHIP_CLASS = {
+  gray: 'bg-[var(--data-gray-chip-bg)] text-[var(--data-gray-chip-fg)]',
+  brown: 'bg-[var(--data-brown-chip-bg)] text-[var(--data-brown-chip-fg)]',
+  orange: 'bg-[var(--data-orange-chip-bg)] text-[var(--data-orange-chip-fg)]',
+  yellow: 'bg-[var(--data-yellow-chip-bg)] text-[var(--data-yellow-chip-fg)]',
+  green: 'bg-[var(--data-green-chip-bg)] text-[var(--data-green-chip-fg)]',
+  blue: 'bg-[var(--data-blue-chip-bg)] text-[var(--data-blue-chip-fg)]',
+  purple: 'bg-[var(--data-purple-chip-bg)] text-[var(--data-purple-chip-fg)]',
+  pink: 'bg-[var(--data-pink-chip-bg)] text-[var(--data-pink-chip-fg)]',
+  red: 'bg-[var(--data-red-chip-bg)] text-[var(--data-red-chip-fg)]',
+  teal: 'bg-[var(--data-teal-chip-bg)] text-[var(--data-teal-chip-fg)]',
+  cyan: 'bg-[var(--data-cyan-chip-bg)] text-[var(--data-cyan-chip-fg)]',
+  indigo: 'bg-[var(--data-indigo-chip-bg)] text-[var(--data-indigo-chip-fg)]',
+} as const satisfies Record<DataColorToken, string>;

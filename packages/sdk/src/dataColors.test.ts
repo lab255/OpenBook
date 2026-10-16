@@ -237,19 +237,19 @@ function auditPastelExt(t: string): DataColor {
 }
 
 // ── Guard B: the soft-pastel select tokens — owner light + derived dark ───────
-// Owner-picked (rendered candidate, 2026-07-05): fill / chipBg / chipFg / fillDark.
+// Owner-picked (2026-07-05), with DSX-13 red/yellow rail fills: fill / chipBg / chipFg / fillDark.
 // The per-hue dark chip is DERIVED here identically to the module: a deep muted
 // bg + a light on-hue fg, both taken from the light chipFg's hue.
 const PASTEL_OWNER: Record<string, {fill: string; chipBg: string; chipFg: string; fillDark: string}> = {
   gray:   {fill: '#c3c6cb', chipBg: '#e3e2e0', chipFg: '#5c6475', fillDark: '#b0b5bf'},
   brown:  {fill: '#d7af9d', chipBg: '#eee0da', chipFg: '#9d4c2a', fillDark: '#ddac98'},
   orange: {fill: '#debea6', chipBg: '#fadec9', chipFg: '#935425', fillDark: '#e3bda1'},
-  yellow: {fill: '#dac495', chipBg: '#fdecc8', chipFg: '#876622', fillDark: '#e0c690'},
+  yellow: {fill: '#e0ce86', chipBg: '#fdecc8', chipFg: '#876622', fillDark: '#e0c690'},
   green:  {fill: '#9fdf9f', chipBg: '#dbeddb', chipFg: '#1e761e', fillDark: '#9ae49a'},
   blue:   {fill: '#a9ccdf', chipBg: '#d3e5ef', chipFg: '#24698f', fillDark: '#a5cde4'},
   purple: {fill: '#cdade1', chipBg: '#e8deee', chipFg: '#9032c8', fillDark: '#cfa8e6'},
   pink:   {fill: '#dea6be', chipBg: '#f5e0e9', chipFg: '#b82e69', fillDark: '#e3a1bd'},
-  red:    {fill: '#deaea6', chipBg: '#ffe2dd', chipFg: '#b4412d', fillDark: '#e3aaa1'},
+  red:    {fill: '#dc9896', chipBg: '#ffe2dd', chipFg: '#b4412d', fillDark: '#e3aaa1'},
 };
 /** Derive the dark chip for a soft-pastel token from its light chip fg (on-hue). */
 function pastelDarkChip(chipFgHex: string): {bg: string; fg: string} {
@@ -311,6 +311,6 @@ describe('dataColors matches its derivation (drift guard)', () => {
     expect(warn).toBeGreaterThan(30);
     expect(warn).toBeLessThan(70);
     expect(bad).toBeLessThan(25);
-    expect(Math.min(Math.abs(ok - warn), Math.abs(warn - bad), Math.abs(ok - bad))).toBeGreaterThan(20);
+    expect(Math.min(Math.abs(ok - warn), Math.abs(warn - bad), Math.abs(ok - bad))).toBeGreaterThan(40);
   });
 });

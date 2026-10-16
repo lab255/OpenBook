@@ -26,7 +26,7 @@ call. Matching it is not a goal in itself; each row states our own reason.
 | # | Rule |
 |---|---|
 | G1 | **Export parity.** Core block visuals stay plain CSS in `index.css` (comment at :932-935). Every token a core block reads is a CSS custom property declared in the plain `:root` / `.dark` layer (:215-350). `@theme` may *alias* a token for Tailwind utilities; core block CSS never depends on a Tailwind-generated variable or utility. Nothing here prescribes Tailwind for core block visuals. |
-| G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). |
+| G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). Kit inputs: `KIT_EXPORT_PRIMARY` = `#1c79c4` (light `--primary` `207 75% 44%`, `colors.ts`, equality-tested in `colors.test.ts`). |
 | G3 | **Token namespaces.** Editor/content tokens: `--obe-*`. Motion durations: `--motion-*`. Easings: existing `--ease-*`. Radius: existing `--radius-*` (+ one new step). z-index: existing `--z-index-*`. No other new prefixes. |
 | G4 | **Mode pairs.** Any colour token that is not derived from a theme variable (`--foreground`, `--muted`, `--ring`, …) declares both a `:root` and a `.dark` value. A literal colour with no dark value is a defect. |
 | G5 | **Sequencing.** A foundation change lands first (declare tokens §1-§5, global retunes §2.4, lint guards §10 at `warn`); family tasks then migrate their own selectors. Guards flip to `error` when their baseline reaches zero. |
@@ -147,17 +147,19 @@ Select exit: **none** — nested dismissable layer.
 
 ## 3. Radius scale
 
+Owner decision (2026-10-10): select/multi-select chips use `--radius-sm`; status chips remain pill.
+
 DSX-2 exception: the compact 16px todo checkbox uses `--radius-sm` (4px).
 The checked todo tick uses `--primary-foreground` (not white) for correct contrast in dark mode.
 
 | Step | Token | Value | Surfaces (exhaustive by role) |
 |---|---|---:|---|
 | none | `0` | 0 | Table cells, dividers, full-bleed media, the rail side of quote/notes shapes |
-| sm | `--radius-sm` | 4px | **Inline marks** (inline code, mention, highlight runs, `@cell` token); **items inside a menu/list**; row hover/selection wash; marquee; table grips; small tool chips inside an overlay (image size chips) |
+| sm | `--radius-sm` | 4px | **Inline marks** (inline code, mention, highlight runs, `@cell` token); **items inside a menu/list**; row hover/selection wash; marquee; table grips; small tool chips inside an overlay (image size chips); select/multi-select chips |
 | md | `--radius-md` | 6px | **Standalone controls**: gutter buttons, toolbar buttons, icon buttons, inputs/selects/buttons inside blocks and forms, callout icon button, tooltips, drag ghost |
 | lg | `--radius-lg` | 8px | **Block surfaces** (callout, code block, image frame + img, image placeholder, group, kit cards, embeds, artifact frames) and **floating menus** (popover, dropdown, select, context, slash, inline toolbar) |
 | xl | `--radius-xl` **(new)** = `calc(var(--radius) + 4px)` | 12px | Dialogs, command palette, lightbox frame, presentation slide frame |
-| pill | `9999px` (TSX `rounded-full`) | — | Tags/chips, switches, progress track + fill, status lamps; `50%` for true circles (avatars, presence dots) |
+| pill | `9999px` (TSX `rounded-full`) | — | Status chips, switches, progress track + fill, status lamps; `50%` for true circles (avatars, presence dots) |
 | page | `--ob-page-radius` | ≥10px | Notebook sheets only (window-concentric, :282) |
 
 Rules:
@@ -207,7 +209,7 @@ reference the palette by name.
 
 Decision: **variant tints are the editor palette's block-background tints**; the default
 (info) variant is the theme neutral. No border (the reference editor's callout is a
-borderless tinted panel; borders double up with block-bg colours).
+borderless tinted panel; borders double up with block-bg colours); warning tints also serve app warning notes and banners (`WARN_SURFACE_CLASS`: tint + `--foreground` text + `--obe-fg-yellow` icon; borderless; full-bleed banners keep a `--border` separator).
 
 | Token | Maps to | Light | Dark | `--foreground` on it (L / D) |
 |---|---|---|---|---:|
@@ -239,6 +241,14 @@ darkened until they pass 4.5:1 on the code-block surface. Surface:
 Dark values are exactly the editor palette's dark `fg` values for those hues, so dark
 code reads as the same family as coloured prose.
 
+### 5.4 Chart ink
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--obe-chart-ink-on-pale` | `#233246` | `#233246` (same; explicit G4 pair) | label ink on near-opaque pale data fills (`.obe-chart-heat-label-strong`) |
+
+Funnel stage labels take no token: ink is `readableTextColor(fill)` per stage (chrome ink derived from the data colour; data values untouched).
+
 ---
 
 ## 6. z-index usage rules
@@ -263,12 +273,15 @@ The scale (:131-145) is complete; this section only governs use.
 | Source | `blockeditor/colors.ts` (`COLOR_TOKENS`, 9) + `--obe-fg/bg/hl-*` | `sdk/src/dataColors.ts` (12 tokens × pastel/vivid/muted) + `lib/dataColorVars.ts` (`--data-*`) |
 | Meaning | **Authored emphasis** stored in the document | **Encodes data**: category, series, status |
 | Chosen by | The author (persisted per block/run) | The viewer's appearance preference |
-| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers |
+| Consumers | Text colour, highlight, block bg/fg, **callout tints**, **code syntax hues** | Select/tag chips, chart series, status lamps, swatch dots, kanban/board headers; board column tint = chip-bg via color-mix at `--data-column-tint` (50% light / 35% dark), including collapsed strips; app status inks, status chips/badges, status dots, diff marks (added/changed/removed), identity monograms + dataflow kind chips (via `DATA_CHIP_CLASS` / `STATUS_*_CLASS`) |
 
 **Rule:** if the colour carries meaning *about data*, it reads `--data-*`; if it is
 emphasis an author placed on prose or a block, it reads `--obe-*`. Never cross:
 chips never use `obe-bg-*`; prose never reads `--data-*`. Single-value meters and
-controls (progress fill, switch on, slider track) are **neither** — they use `--primary`.
+controls (progress fill, switch on, slider track, rating stars in database cells and public forms) are **neither** — they use `--primary`.
+Default primary pair: light `207 75% 44%` / `0 0% 100%` (4.60:1); dark `207 78% 62%` / `207 50% 12%` (6.29:1). Primary buttons and the timeline today marker use this pair directly.
+Default light `--ring` and `--brand` also use `207 75% 44%`, mirrored in `themes.ts` so appearance application preserves the match. Focus geometry stays unchanged; the ring needs no lighter variant. Dark values remain `207 78% 62%` for primary/ring and `207 70% 57%` for brand. Static exported buttons already use DSX-13's `KIT_EXPORT_PRIMARY` `#1c79c4` with white ink (4.5837:1 after hex rounding).
+Pastel light data fills: red `#dc9896` (near-red hue 1.7°) and yellow `#e0ce86` (48°) separate the 3px calendar rails from green `#9fdf9f` and blue `#a9ccdf`. These canonical fills also flow to swatches, charts and status lamps; dark fills and chip pairs stay unchanged.
 Shared hue *names* stay aligned (one mental model), values do not.
 
 ---
@@ -287,9 +300,11 @@ Shared hue *names* stay aligned (one mental model), values do not.
 | `--obe-chrome-ink-hover` | `hsl(var(--foreground))` | same |
 | `--obe-chrome-hover` | `var(--hover)` | `hsl(var(--accent))` :1090 (two competing recipes today) |
 | `--obe-chrome-active` | `var(--hover-strong)` | — (menu-open state had none) |
-| `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#e0eefa`), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49`) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
-| `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (3.81 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
+| `--obe-select-wash` | `:root` `hsl(var(--ring) / 0.14)` (`#dfecf7` over white), `.dark` `hsl(var(--ring) / 0.2)` (`#2b3c49` over the dark page) | `accent / 0.55` + `0 0 0 2px ring / 0.35` :983-986; marquee fill :994; cell selection `/0.16` :1999 |
+| `--obe-drop` | `hsl(var(--primary))`, drawn **2px solid** (4.60 / 6.11 vs page) | `2px dashed` :1113, :1121 (tables already solid :2111-2114) |
 | `--obe-drag-dim` | `0.4` | table `0.45` :2116; block rows none |
+| `--obe-notice-pad-x` | `0.75rem` — public plugin notice horizontal padding; also aligns adjacent arithmetic | new |
+| `--obe-disabled-opacity` | `0.5` — one rule: `.obe-kit :is(button, input, select, textarea, [role='switch']):disabled`, `.obe-kit-card`, `.obe-kit-searchtrigger`; never on read-only/present pages. Plugin UI surface exception: `.obe-ui-btn`/`.obe-ui-field` off face is a dashed border in `--muted-foreground`, never opacity. It must stay visible on read-only pages, which the kit rule exempts; field values retain `--foreground`. | card `0.55`, search trigger `0.6`; app `disabled:opacity-50` |
 | `--obe-focus-ring` / `--obe-focus-offset` | `2px solid hsl(var(--ring))` / `2px` | offset `1px` :2450 vs `2px` :2108, :3949 |
 
 ### 8.2 Gutter geometry — one rule replaces the per-type offsets
@@ -374,14 +389,15 @@ todo, quote, callout, code, divider, image, table, columns, group, database embe
 | slider | `reactiveBlocks.tsx:65` | KitFrame | — |
 | form | `FormBlockView.tsx:181` | KitFrame (`symbol={false}`) | — |
 | meeting | `MeetingBlockView.tsx:115` | KitFrame | — |
-| **statuslight** | `kit/cards.tsx:35` | hand-rolled root + `KitSettings` | **adopt**: `symbol={false}`, header = label |
-| **tooltipcard** | `kit/cards.tsx:84` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader` (the term labels itself) |
-| **linkcard** | `kit/cards.tsx:126` | hand-rolled | **adopt**: `symbol={false}`, `hideHeader` (the card labels itself) |
-| **progressbar** | `kit/progress.tsx:36` | hand-rolled | **adopt**: `symbol={false}`, header = label; value readout stays in `control` |
-| **kitchart** | `kit/charts.tsx:1522` | hand-rolled `<figure>` + own caption | **adopt**: KitFrame gains a figure-root option so its header renders as the `figcaption` (accessible name preserved) |
+| **statuslight** | `kit/cards.tsx:35` | KitFrame | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
+| **tooltipcard** | `kit/cards.tsx:84` | KitFrame | **adopt**: `symbol={false}`, `hideHeader` (the term labels itself) |
+| **linkcard** | `kit/cards.tsx:126` | KitFrame | **adopt**: `symbol={false}`, `hideHeader`, `kind="linkcard-wrap"` (the card labels itself) |
+| **progressbar** | `kit/progress.tsx:36` | KitFrame | **adopt**: `symbol={false}`, `hideHeader`; the label stays inline in `control` (compact-kit exception) |
+| **kitchart** | `kit/charts.tsx:1522` | KitFrame (`as="figure"`) | **adopt**: `as="figure"`, header = `title` renders as the `figcaption` (accessible name preserved) |
 
-Acceptance: `grep -n "KitSettings" blockeditor/kit/*.tsx` matches only `KitFrame.tsx`
-(today it also matches `cards.tsx`, `progress.tsx`, `charts.tsx`).
+Compact kits (status, progress), whose label shares a row with its value, keep the label inline in `control` with `hideHeader`.
+
+Acceptance: `grep -n "KitSettings" blockeditor/kit/*.tsx` matches only `KitFrame.tsx`.
 
 ---
 
@@ -407,12 +423,12 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
 | Font size (editor) | `declaration-property-value-allowed-list` `font-size` in `.obe-*` | `var(--obe-*-size)`, `var(--obe-code-inline)`, `inherit`, `em` ≤ 1 | other literals | ~120 |
 | Reduced-motion blocks | assert script counts `prefers-reduced-motion: reduce` occurrences | the global block + listed end-state exceptions (§2.3) | any other | 4 |
 
-### 10.2 ESLint (TSX, `packages/ui/src`, `packages/web/src`)
+### 10.2 ESLint (TSX, `packages/ui/src`, `packages/web/src`, `packages/app/src`)
 
 | Rule (new file in `eslint-rules/`) | Flags | Allowed | Baseline |
 |---|---|---|---:|
 | `tailwind/no-arbitrary-motion` | `duration-<n>`, `duration-[…]`, `delay-<n>`, `ease-(in|out|in-out|linear)`, `ease-[…]`, `animate-[…]`, raw `zoom-in-95`/`zoom-out-95` outside the shared overlay constant | `duration-(--motion-*)`, `ease-out-soft`, `ease-in-out-soft`, `ease-spring` (switch files only), bare `transition*` (reads the retuned default) | 13 durations + 3 easings + 15 files with raw zoom |
-| `tailwind/no-palette-color` | Tailwind palette literals `(bg|text|border|ring|fill|stroke|outline|from|via|to|decoration|caret|accent)-(slate|gray|…|rose)-\d{2,3}`, arbitrary colour brackets `-[#…]`/`-[rgb(…)]`/`-[hsl(<digit>…)]`, and hex/rgb literals in JSX `style={{…}}` colour keys | semantic utilities (`bg-muted`, `text-muted-foreground`, …), `var(--data-*)` via `dataColorVars` helpers, `var(--obe-*)` | 208 palette utilities |
+| `tailwind/no-palette-color` | Tailwind palette literals `(bg|text|border|ring|fill|stroke|outline|from|via|to|decoration|caret|accent)-(slate|gray|…|rose)-\d{2,3}`, arbitrary colour brackets `-[#…]`/`-[rgb(…)]`/`-[hsl(<digit>…)]`, and hex/rgb literals in JSX `style={{…}}` colour keys | semantic utilities (`bg-muted`, `text-muted-foreground`, …), `var(--data-*)` via `dataColorVars` helpers, `var(--obe-*)` | 0 (**error**; 2 described disables: Windows caption close, standalone OAuth callback) |
 | `tailwind/no-raw-z` | `z-<n>`, `z-[…]` | named tiers (`z-menu`, `z-overlay`, …) | 43 |
 
 ---
@@ -425,6 +441,7 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
 | F2 | **Dead CSS:** `index.css:727-930` (`.block-callout/-accordion/-divider/-button/-toc`) has no TS/TSX consumer in any package. Delete (removes a fourth placeholder alpha and literal callout hues). | foundation |
 | F3 | **Editor palette contrast:** `.obe-fg-orange` (4.08) and `.obe-fg-yellow` (3.92) fail 4.5:1 as text on the light page; `COLOR_EXPORT_HEX` (`colors.ts:35`) has drifted from the CSS values (e.g. gray `#6b7280` vs `hsl(0 0% 45%)` `#737373`). §5.1 hoists values verbatim; the fix belongs to a palette audit (open question 3). | foundation / palette |
 | F4 | `.obe-gutter` comment (:1024) references "`.obe-row`'s top padding" that no longer exists (`padding: 0` :981). Removed by §8.2. | chrome family |
+| DSX-8 F1 | **Destructive text contrast:** `--destructive` is 4.36:1 on white and 4.01 on muted; dark 3.47 and 3.09 on popover. This affects app-wide error text, TrashList and Diagnostics bad status. Retune foundation light L 53% → about 48%, dark L 52% → about 62%, then re-run `sidebar-accent-contrast` and `lib/__tests__/themes.test.ts`. Outside the palette-literal sweep. | foundation |
 
 ---
 
@@ -451,3 +468,55 @@ description (`reportDescriptionlessDisables` is already on). Custom-property dec
 3. **Editor-palette contrast + export drift (F3)** are recorded, not fixed, here.
    *Recommend: spin out a short palette-audit task before the text-family redesign*, so
    callout tints (§5.2) and text colours change once, together.
+
+## 14. Plugin UI surface
+
+Plugins use the documented `.obe-ui-*` classes and inline layout. They never use
+`.obe-kit-*`, other host-internal classes, Tailwind utilities, or host TypeScript
+helpers. The zip loader does not accept CSS, and Tailwind does not scan zip source.
+This is a CSS contract; no SDK export or API version bump is required. Class renames
+are breaking changes, guarded by `PUBLIC_PLUGIN_UI_CLASSES` and host tests.
+
+Public classes (the host-only `PUBLIC_PLUGIN_UI_CLASSES` list is authoritative):
+
+- `obe-ui-frame`, `obe-ui-title`, `obe-ui-header`, `obe-ui-muted`, `obe-ui-eyebrow`
+- `obe-ui-labelled`, `obe-ui-field`, `obe-ui-btn`, `obe-ui-check`, `obe-ui-fieldset`, `obe-ui-file`
+- `obe-ui-chip`, `obe-ui-notice`, `obe-ui-notice-detail`
+- `obe-ui-table-wrap`, `obe-ui-table`, `obe-ui-num`, `obe-ui-total`, `obe-ui-section`
+- `obe-ui-pin-start`, `obe-ui-pin-end`, `obe-ui-list`, `obe-ui-sr-only`, `obe-ui-row`, `obe-ui-stack`
+
+Variants use attributes: buttons support `data-variant="primary|ghost|link"`,
+`data-size="sm|xs"`, `data-weight="strong"`, and `aria-busy`; fields support
+`data-size="sm"` and `aria-invalid`. Native disabled controls and `aria-disabled`
+buttons receive the visible dashed off face, including primary, ghost and link
+buttons. Keep an explanatory reason beside disabled controls and connect it with
+`aria-describedby`. Notices support `data-tone="alarm|info|quiet"` (quiet by default);
+reserve alarm for broken or uncomputable results. Detail text resets alarm weight.
+
+Tables default to 6/8px cell padding; `data-density="compact"` uses 4/8px and
+`data-density="tight"` uses 2/6px with caption type. Totals in `tfoot` receive a
+2px top rule; other summary rows use `obe-ui-total` with `data-rule` for the rule
+and `data-strong` for stronger weight. Numeric cells use `obe-ui-num`; a glyph flag
+inside one may use `data-ui-mark="alarm"`. Table cells support `data-ui-flag="alarm"`
+for an inset leading rule, and rows support `data-ui-state="located"` for a jump target.
+Scroll regions use `obe-ui-table-wrap` with `tabIndex=0`, `role="region"`, and a label.
+
+Public tokens allowed inline:
+
+- Theme: `--foreground`, `--muted-foreground`, `--border`, `--card`, `--background`,
+  `--primary`, `--destructive`, read as `hsl(var(--token))`.
+- Type: `--obe-small-size`, `--obe-caption-size`, `--obe-font-mono`.
+- Focus: `--obe-focus-ring`. Radii: `--radius-sm`, `--radius-md`, `--radius-lg`.
+- Notice alignment: `--obe-notice-pad-x`.
+- Data only: `--data-<token>-chip-bg`, `--data-<token>-chip-fg`,
+  `--data-status-ok`, `--data-status-warn`, `--data-status-bad`. These encode data,
+  never decorative emphasis. Do not hard-code colours: they lack dark values.
+
+A root `obe-ui-frame` directly inside the custom-block host receives radius-xl
+selection and gutter alignment to its first content line: lead offset is block
+padding + 1px border + 0.75rem frame padding; lead line is small size × small leading.
+Header rows keep bottom alignment when they contain labelled controls; link buttons
+in a header row take control height. Nested frames
+have transparent fill. Keep bespoke flex/grid/width layout inline; row/stack classes
+are optional conveniences. The complete `obe-ui-sr-only` clipping recipe includes
+negative margin, white-space and border reset as well as `clip`.
