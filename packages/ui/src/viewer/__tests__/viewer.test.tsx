@@ -207,7 +207,10 @@ describe('viewer', () => {
         two: {mime: 'audio/webm', encoding: 'base64', data: 'Ag=='},
       }}); });
       fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+      expect(container.querySelectorAll('audio[src]')).toHaveLength(0);
+      fireEvent.change(screen.getByRole('slider'), {target: {value: '100'}});
       await waitFor(() => expect(container.querySelectorAll('audio[src]')).toHaveLength(2));
+      fireEvent.change(screen.getByRole('slider'), {target: {value: '0'}});
       expect(screen.getAllByRole('slider')).toHaveLength(1);
       expect(screen.getByText('0:00 / 0:50')).toBeTruthy();
       fireEvent.click(screen.getByRole('button', {name: '0:45 · Not transcribed'}));
