@@ -454,13 +454,17 @@ describe('app lifetime meeting sessions', () => {
     const {doc, block, editor} = harness();
     const unregister = registerBlockEditorDoc('away-page', doc);
     const session = meetingRecorder(editor, block, 'away-page');
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
     await session.start();
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
     let stored = {id: 'away-page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
     const savePage = vi.fn(async (page) => { stored = page; });
     setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
     session.detach(); unregister();
     await vi.advanceTimersByTimeAsync(2000);
     expect(session.mode).toBe('recording');
+    expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
     window.dispatchEvent(new Event('visibilitychange'));
     expect(session.mode).toBe('recording');
     session.stop();
@@ -471,6 +475,8 @@ describe('app lifetime meeting sessions', () => {
     expect(blockProp(persisted, 'status')).toBe('done');
     expect(blockProp(block, 'audioChunks')).toBeUndefined();
     expect(savePage).toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith('beforeunload', guard);
+    add.mockRestore(); remove.mockRestore();
   });
 
   it('rebinds a recreated document to the same live session and stops only on a lock transition', async () => {

@@ -667,6 +667,10 @@ export const de: PartialMessages = {
     urlLabel: 'Link-URL',
   },
   meetingBlock: {
+    recordingSessions: 'Laufende Aufnahmen',
+    elapsed: 'Aufnahmedauer',
+    goToMeeting: 'Zum Meeting',
+
     tabs: 'Besprechungsbereiche',
     exportAudio: 'Audio exportieren',
     exportAudioFailed: 'Audio konnte nicht exportiert werden. Prüfe den Zugriff und versuche es erneut.',

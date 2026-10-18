@@ -659,6 +659,10 @@ export const zh: PartialMessages = {
     urlLabel: '链接地址',
   },
   meetingBlock: {
+    recordingSessions: '录音会话',
+    elapsed: '已录音时长',
+    goToMeeting: '前往会议',
+
     tabs: '会议分区',
     exportAudio: '导出音频',
     exportAudioFailed: '无法导出音频。请检查访问权限后重试。',

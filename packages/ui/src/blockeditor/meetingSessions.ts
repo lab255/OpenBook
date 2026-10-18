@@ -163,14 +163,17 @@ export class MeetingRecorder {
   get recordingElsewhere(): boolean {
     return this.persistedBusy && !this.active && this.mode !== 'processing';
   }
-  async start(): Promise<void> {
-    if (this.active || this.mode === 'processing' || this.readOnly || this.recordingElsewhere) return;
+  private resolvePageId(): void {
     const pageId = getPageIdForDoc(this.editor.doc);
     if (pageId && pageId !== this.pageId) {
       sessions.delete(`${this.pageId}:${this.blockId}`);
       this.pageId = pageId;
       sessions.set(`${pageId}:${this.blockId}`, this);
     }
+  }
+  async start(): Promise<void> {
+    if (this.active || this.mode === 'processing' || this.readOnly || this.recordingElsewhere) return;
+    this.resolvePageId();
     if (!this.pageId || !assetBridge.ready()) { this.error = t('meetingBlock.noStore'); this.changed(); return; }
     if (!globalThis.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
       this.error = t('meetingBlock.unsupported'); this.changed(); return;
@@ -301,6 +304,7 @@ export class MeetingRecorder {
   }
   async transcribe(chunk: RecordingChunk): Promise<void> {
     if (chunk.busy || !chunk.audio.assetId || !assetBridge.canTranscribe()) return;
+    this.resolvePageId();
     if (!this.pageId) { chunk.error = t('meetingBlock.noStore'); this.changed(); return; }
     const key = chunkKey(chunk.audio);
     if ((blockProp<string[]>(this.block, 'transcriptionCompleted') ?? []).includes(key)) { chunk.phase = 'done'; this.changed(); return; }

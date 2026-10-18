@@ -662,6 +662,10 @@ export const ja: PartialMessages = {
     urlLabel: 'リンク URL',
   },
   meetingBlock: {
+    recordingSessions: '録音セッション',
+    elapsed: '録音経過時間',
+    goToMeeting: '会議に移動',
+
     tabs: '会議のセクション',
     exportAudio: '音声をエクスポート',
     exportAudioFailed: '音声をエクスポートできませんでした。アクセス権を確認して再試行してください。',
