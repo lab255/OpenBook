@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
 import {PauseIcon, PlayIcon} from '@heroicons/react/24/outline';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {downloadBlob} from '@/lib/download';
@@ -26,8 +26,9 @@ function PlaybackChunk({src, register, onTime, onEnd, onError}: {
 
 interface AudioResource {assetId: string; blob?: Blob; url?: string; disposed: boolean}
 
-export function MeetingPlayer({saved, completed, session, readOnly, canTranscribe}: {
+export function MeetingPlayer({saved, completed, session, readOnly, canTranscribe, children}: {
   saved: MeetingAudio[]; completed: string[]; session: MeetingRecorder; readOnly: boolean; canTranscribe: boolean;
+  children?: (playback: {position: number; playing: boolean; canSeek: boolean; seek: (globalMs: number) => void}) => ReactNode;
 }) {
   const pending = session.chunks.filter((chunk) => chunk.blob);
   const sources = [
@@ -125,8 +126,10 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
       downloadBlob(`meeting-${entry.audio.startedAtMs}.${blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`, blob);
     }}>{t('meetingBlock.saveAudio')}</a>}
   </>;
-  if (!entries.length) return null;
-  return <section className="obe-meeting-player" aria-label={t('meetingBlock.player')}>
+  const wantsPlay = () => playingRef.current || !!pendingSeek.current?.play || resumeAt.current !== null;
+  const transcript = children?.({position, playing, canSeek: entries.length > 0, seek: (globalMs) => seek(globalMs, wantsPlay())});
+  if (!entries.length) return transcript ?? null;
+  return <><section className="obe-meeting-player" aria-label={t('meetingBlock.player')}>
     <div className="obe-meeting-controls">
       <button type="button" className="obe-meeting-play" aria-label={t(`meetingBlock.${playing ? 'pausePlayback' : 'play'}`)}
         onClick={() => playing ? stop() : seek(position >= total ? 0 : position, true)}>
@@ -134,7 +137,7 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
       </button>
       <div className="obe-meeting-track">
         <input type="range" min={0} max={total} step={100} value={Math.min(position, total)} aria-label={t('meetingBlock.seek')}
-          aria-valuetext={`${meetingTime(position)} / ${meetingTime(total)}`} onChange={(event) => seek(Number(event.target.value), playingRef.current)} />
+          aria-valuetext={`${meetingTime(position)} / ${meetingTime(total)}`} onChange={(event) => seek(Number(event.target.value), wantsPlay())} />
         <div className="obe-meeting-markers">
           {statuses.map((entry) => <div className="obe-meeting-marker" key={entry.id} style={{flexGrow: entry.audio.durationMs || 1}}>
             <Popover open={detail === entry.id} onOpenChange={(open) => setDetail(open ? entry.id : null)}>
@@ -184,5 +187,5 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
       else { stop(); setPosition(total); }
     }} />
     )}
-  </section>;
+  </section>{transcript}</>;
 }

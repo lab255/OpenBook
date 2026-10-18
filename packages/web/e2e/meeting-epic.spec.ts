@@ -1,4 +1,5 @@
 import {readFile} from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
 import type {Download, Page} from '@playwright/test';
 import {unzipSync} from 'fflate';
 import {expect, test} from './fixtures';
@@ -52,7 +53,7 @@ test.beforeEach(async ({page, request, dataServer}) => {
   await insertMeeting(page);
 });
 
-test('record, progressively transcribe, summarize, note and export a meeting', {tag: ['@meeting', '@p1']}, async ({page, request, dataServer}) => {
+test('record, progressively transcribe, summarize, note and export a meeting', {tag: ['@meeting', '@p1']}, async ({page, request, dataServer}, testInfo) => {
   test.setTimeout(90_000);
   const meeting = page.getByRole('region', {name: 'Meeting', exact: true});
   const transcript = meeting.locator('.obe-meeting-transcript p');
@@ -91,8 +92,15 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await expect(player.locator('.obe-meeting-marker-button')).toHaveCount(2);
   await expect(player.locator('audio[controls]')).toHaveCount(0);
   await expect(player.locator('audio[src]')).toHaveCount(0);
+  await transcript.nth(1).getByRole('button', {name: /^Seek to /}).click();
+  await expect.poll(async () => Number(await player.getByRole('slider').inputValue())).toBeGreaterThan(1000);
+  await expect(player.locator('.obe-meeting-elapsed')).not.toHaveText(/^0:00 /);
+  await transcript.first().getByRole('button', {name: 'Seek to 0:00'}).click();
+  await expect(player.locator('audio[src]')).toHaveCount(2);
+  await expect(player.getByRole('alert')).toHaveCount(0);
+  const rowPitch = await transcript.evaluateAll((rows) => rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top);
+  expect(rowPitch).toBeCloseTo(32, 0);
   await player.getByRole('slider', {name: 'Playback position'}).press('ArrowRight');
-  await expect.poll(() => player.locator('audio[src]').count()).toBe(2);
   await player.locator('audio').evaluateAll((elements) => elements.forEach((element) => {
     element.addEventListener('playing', () => { (element as HTMLAudioElement).dataset.played = 'true'; });
   }));
@@ -103,6 +111,8 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   expect(playWidth).toBe(24);
   await player.getByRole('button', {name: 'Play', exact: true}).click();
   await expect(player.getByRole('button', {name: 'Pause playback', exact: true})).toBeVisible();
+  await expect(meeting.locator('.obe-meeting-transcript-row[data-active="true"]')).toHaveCount(1);
+  await expect(meeting.locator('.obe-meeting-timestamp[aria-current="time"]')).toHaveCount(1);
   expect((await player.getByRole('button', {name: 'Pause playback', exact: true}).boundingBox())!.width).toBe(playWidth);
   await expect.poll(() => player.locator('audio').evaluateAll((elements) => elements.some((element) => !(element as HTMLAudioElement).paused))).toBe(true);
   await player.getByRole('button', {name: 'Pause playback', exact: true}).click();
@@ -148,6 +158,24 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   }
   for (const line of summary) expect(markdown).toContain(line);
   expect(markdown).toContain(note);
+
+  await page.getByRole('button', {name: 'Page actions'}).click();
+  await page.getByRole('menuitem', {name: 'Export', exact: true}).click();
+  const htmlDownload = page.waitForEvent('download');
+  await page.getByRole('menuitem', {name: 'Interactive HTML', exact: true}).click();
+  const htmlPath = testInfo.outputPath('meeting.html');
+  await (await htmlDownload).saveAs(htmlPath);
+  await page.goto(pathToFileURL(htmlPath).href);
+  const viewer = page.locator('.ob-viewer');
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole('tab', {name: 'Transcript', exact: true}).click();
+  await expect(viewer.getByRole('button', {name: 'Record', exact: true})).toBeDisabled();
+  await viewer.locator('.obe-meeting-timestamp').nth(1).click();
+  await expect.poll(async () => Number(await viewer.getByRole('slider', {name: 'Playback position'}).inputValue())).toBeGreaterThan(1000);
+  await viewer.getByRole('button', {name: 'Play', exact: true}).click();
+  await expect(viewer.locator('.obe-meeting-timestamp[aria-current="time"]')).toHaveCount(1);
+  await expect(viewer.locator('.obe-meeting-transcript-row[data-active="true"]')).toHaveCount(1);
+
 });
 
 test('microphone denial shows recovery copy and leaves the editor usable', {tag: ['@meeting', '@p1']}, async ({page}) => {
