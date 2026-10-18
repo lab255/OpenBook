@@ -161,8 +161,8 @@ async function main(): Promise<void> {
   const meetingPage = await seed.savePage({name: 'Meeting target', data: {editor: 'blocks', blockdoc: {blocks: [{id: 'meeting1', type: 'meeting', children: [{id: 'note1', type: 'paragraph', text: [{t: 'Notes'}]}]}]}, editorjs: {blocks: []}, values: [], names: []}});
   const meetingUpdate = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: meetingPage.id, blockId: 'meeting1', props: meetingProps}});
   check('meeting structured props update is accepted', !isError(meetingUpdate));
-  const meetingCreate = await mcp.client.callTool({name: 'append_blocks', arguments: {pageId: meetingPage.id, blocks: [{type: 'meeting', props: meetingProps, children: [{type: 'paragraph', text: 'Manual notes'}]}]}});
-  check('meeting creation with manual note children is accepted', !isError(meetingCreate));
+  const meetingCreate = await mcp.client.callTool({name: 'append_blocks', arguments: {pageId: meetingPage.id, blocks: [{type: 'meeting', props: meetingProps, children: [{type: 'meetingsummary', children: [{type: 'todo', text: 'Follow up', props: {checked: false}}]}, {type: 'paragraph', text: 'Manual notes'}]}]}});
+  check('meeting creation with summary and manual note children is accepted', !isError(meetingCreate));
   for (const props of [{status: 'paused'}, {audioChunks: [{assetId: 'a', durationMs: -1}]}, {transcript: [{startMs: 2, endMs: 1, text: 'Reversed'}]}]) {
     const badCreate = await mcp.client.callTool({name: 'append_blocks', arguments: {pageId: meetingPage.id, blocks: [{type: 'meeting', props}]}});
     const badUpdate = await mcp.client.callTool({name: 'update_block_props', arguments: {pageId: meetingPage.id, blockId: 'meeting1', props}});

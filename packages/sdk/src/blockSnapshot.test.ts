@@ -67,3 +67,19 @@ describe('generic block snapshot operations', () => {
     expect(() => insertBlocks(snapshot(), {parentId: 'tabs', index: 0, blocks: [{type: 'paragraph'}]})).toThrow(/cannot contain/);
   });
 });
+
+describe('meeting mixed children', () => {
+  it('accepts inserted and moved notes alongside multiple summary containers', () => {
+    const meeting = insertBlocks(snapshot(), {index: 0, idPrefix: 'meeting', blocks: [{type: 'meeting'}]});
+    const first = insertBlocks(meeting, {parentId: 'meeting-0', index: 0, idPrefix: 'first', blocks: [
+      {type: 'meetingsummary', children: [{type: 'paragraph', text: 'First'}]},
+      {type: 'paragraph', text: 'Note'},
+    ]});
+    const second = insertBlocks(first, {parentId: 'meeting-0', index: 2, idPrefix: 'second', blocks: [
+      {type: 'meetingsummary', children: [{type: 'paragraph', text: 'Second'}]},
+    ]});
+    const moved = moveBlock(second, {blockId: 'a', parentId: 'meeting-0', index: 3});
+    expect(childIds(moved, 'meeting-0')).toEqual(['first-0', 'first-1', 'second-0', 'a']);
+    expect(findBlock(moved, 'meeting-0')?.block.children?.find((child) => child.type === 'meetingsummary')?.id).toBe('first-0');
+  });
+});

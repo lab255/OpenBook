@@ -116,8 +116,8 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await meeting.getByRole('button', {name: 'Generate summary', exact: true}).click();
   expect((await generation).headers()['content-type']).toContain('text/event-stream');
   await expect(meeting.getByRole('button', {name: 'Regenerate summary'})).toBeVisible();
-  const summary = await meeting.locator('.obe-meeting-summary').innerText();
-  expect(summary).toContain('Mock response to:');
+  const summary = await meeting.locator('.obe-meeting-summary .obe-text').allTextContents();
+  expect(summary.join('\n')).toContain('Mock response to:');
   await meeting.getByRole('tab', {name: 'Notes', exact: true}).click();
   const note = 'Ellis will send the meeting follow-up.';
   await meeting.locator('.obe-meeting-notes .obe-text').fill(note);
@@ -146,7 +146,7 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   for (const segment of await transcript.allTextContents()) {
     expect(markdown).toContain(segment.replace(/^\S+\s+/, '').trim());
   }
-  expect(markdown).toContain(summary);
+  for (const line of summary) expect(markdown).toContain(line);
   expect(markdown).toContain(note);
 });
 

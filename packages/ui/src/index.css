@@ -4039,6 +4039,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-meeting audio { max-width: 100%; }
 .obe-meeting-transcript { user-select: text; white-space: pre-wrap; }
 .obe-meeting time { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.obe-meeting-summary, .obe-meeting-notes { padding-inline: var(--obe-cnt-inset); }
+.obe-meeting-summary-draft, .obe-meeting-summary-empty { color: hsl(var(--muted-foreground)); }
+.obe-meeting-summary-empty { font-size: var(--obe-small-size); }
 .obe-meeting-summary { user-select: text; white-space: pre-wrap; margin-block: 12px; }
 .obe-meeting-notes { border-top: 1px solid hsl(var(--border)); margin-top: 16px; padding-top: 12px; }
 

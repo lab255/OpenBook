@@ -1,3 +1,4 @@
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import {useState} from 'react';
 import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
 import {afterEach, describe, expect, it} from 'vitest';
@@ -32,7 +33,7 @@ describe('meeting tabs', () => {
 
   it('preserves the actual CRDT notes editor across switches', () => {
     const doc = createDoc([{type: 'meeting', children: [{type: 'paragraph', text: 'Agenda'}]}]);
-    const {container} = render(<BlockEditor doc={doc} />);
+    const {container} = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
     const note = container.querySelector('.obe-meeting-notes .obe-text') as HTMLElement;
     act(() => { note.focus(); writeSelection(note, 0, 6); });
     act(() => { note.dispatchEvent(new InputEvent('beforeinput', {inputType: 'insertText', data: 'Edited agenda', bubbles: true, cancelable: true})); });

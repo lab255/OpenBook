@@ -1,3 +1,4 @@
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import * as Y from 'yjs';
 import {setLocale, t} from '@/i18n';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -157,15 +158,15 @@ describe('meeting UI and exports', () => {
   it('renders editable note children and freezes both notes and recording on read-only pages and locked groups', () => {
     registerArtifactKit();
     const {doc} = harness();
-    const view = render(<BlockEditor doc={doc} />);
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
     expect(view.container.querySelector('[data-block-text="note"]')?.getAttribute('contenteditable')).toBe('true');
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(false);
-    view.rerender(<BlockEditor doc={doc} readOnly />);
+    view.rerender(<ConfirmProvider><BlockEditor doc={doc} readOnly /></ConfirmProvider>);
     expect(view.container.querySelector('[data-block-text="note"]')?.getAttribute('contenteditable')).toBe('false');
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
     view.unmount();
     const locked = createDoc([{type: 'group', props: {locked: true}, children: docToJSON(doc)}]);
-    const group = render(<BlockEditor doc={locked} />);
+    const group = render(<ConfirmProvider><BlockEditor doc={locked} /></ConfirmProvider>);
     expect(group.container.querySelector('[data-block-text="note"]')?.getAttribute('contenteditable')).toBe('false');
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
   });
@@ -174,7 +175,7 @@ describe('meeting UI and exports', () => {
     const {editor, block, doc} = harness({audioChunks: [{assetId: 'saved', durationMs: 2000}]});
     const unregister = registerBlockEditorDoc('page', doc);
     const client = {supportsTranscription: false, putAsset, getAsset: async () => null, transcribeAsset} as unknown as DataClient;
-    render(<DataProvider client={client}><AssetBridgeHost /><MeetingBlockView editor={editor} block={block} pageReadOnly={false} /></DataProvider>);
+    render(<DataProvider client={client}><AssetBridgeHost /><ConfirmProvider><MeetingBlockView editor={editor} block={block} pageReadOnly={false} /></ConfirmProvider></DataProvider>);
     await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
     expect(screen.getByText(/Transcription requires a connected/)).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
@@ -247,7 +248,7 @@ describe('meeting asynchronous boundaries', () => {
 
   it('shows permission errors and actionable configuration errors with working retry buttons', async () => {
     const {block, editor, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
-    render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
     getUserMedia.mockRejectedValueOnce(new Error('denied'));
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
     expect(screen.getByRole('alert').textContent).toContain('Allow microphone access');
@@ -290,7 +291,7 @@ describe('MEET-5 review regressions', () => {
 
   it('keeps oversized audio recoverable without bricking Record or adding idle gaps', async () => {
     const {editor, block, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
-    render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
     const session = meetingRecorder(editor, block, 'page');
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
     const recorder = Recorder.instances[0];
@@ -316,7 +317,7 @@ describe('MEET-5 review regressions', () => {
   it('keeps one focused toggle and announces only status, with no idle timer', async () => {
     const {editor, block, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
     const interval = vi.spyOn(globalThis, 'setInterval');
-    const view = render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
     expect(interval).not.toHaveBeenCalled();
     const toggle = screen.getByRole('button', {name: 'Record'}); toggle.focus();
     await act(async () => { fireEvent.click(toggle); await flush(); });
@@ -340,15 +341,15 @@ describe('MEET-5 review regressions', () => {
 
   it('edits the durable title through KitFrame and distinguishes page read-only from section locks', () => {
     registerArtifactKit(); const {doc, block} = harness({title: 'Planning'});
-    const view = render(<BlockEditor doc={doc} />);
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
     expect(view.container.querySelector('.obe-kit-meeting')).toBeTruthy();
     fireEvent.change(screen.getByRole('textbox', {name: 'Display name'}), {target: {value: 'Weekly planning'}});
     expect(blockProp(block, 'title')).toBe('Weekly planning'); expect(blockProp(block, 'label')).toBeUndefined();
-    view.rerender(<BlockEditor doc={doc} readOnly />);
+    view.rerender(<ConfirmProvider><BlockEditor doc={doc} readOnly /></ConfirmProvider>);
     expect(screen.queryByRole('textbox', {name: 'Display name'})).toBeNull();
     expect(screen.getByText('Read-only meeting')).toBeTruthy(); view.unmount();
     const locked = createDoc([{type: 'group', props: {locked: true}, children: docToJSON(doc)}]);
-    const group = render(<BlockEditor doc={locked} />);
+    const group = render(<ConfirmProvider><BlockEditor doc={locked} /></ConfirmProvider>);
     expect(group.container.querySelector('.obe-kit-meeting input')).toBeNull();
     expect(screen.getByText('Meeting locked by its section')).toBeTruthy();
   });
@@ -372,13 +373,13 @@ describe('MEET-5 review regressions', () => {
 
   it.each(['recording', 'processing'])('blocks a new local recording when the persisted status is %s', async (status) => {
     const {doc, block, editor, session} = harness({status});
-    render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText('Recording or processing on another client.')).toBeTruthy();
     await session.start(); expect(getUserMedia).not.toHaveBeenCalled();
     expect(blockProp(block, 'status')).toBe(status);
     // A remote completion is observed by the editor and unblocks recording.
-    cleanup(); registerArtifactKit(); const view = render(<BlockEditor doc={doc} />);
+    cleanup(); registerArtifactKit(); const view = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
     act(() => doc.transact(() => setBlockProp(block, 'status', 'done')));
     expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(false);
     view.unmount();
@@ -395,7 +396,7 @@ describe('MEET-5 review regressions', () => {
 
   it('enforces effective read-only inside start, including permission-time changes', async () => {
     const {block, editor, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
-    render(<MeetingBlockView block={block} editor={editor} pageReadOnly />);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly /></ConfirmProvider>);
     const session = meetingRecorder(editor, block, 'page');
     expect(editor.readOnly).toBe(false); await session.start(); expect(getUserMedia).not.toHaveBeenCalled();
     cleanup(); session.readOnly = false;
@@ -419,7 +420,7 @@ describe('MEET-5 review regressions', () => {
     let first!: (asset: {id: string}) => void;
     putAsset.mockImplementationOnce(() => new Promise((resolve) => { first = resolve; })).mockRejectedValue(new Error('offline'));
     const {block, editor, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
-    const view = render(<MeetingBlockView block={block} editor={editor} pageReadOnly={false} />);
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
     await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); await vi.advanceTimersByTimeAsync(45000); });
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
     await act(async () => { fireEvent.change(screen.getByRole('slider'), {target: {value: '45000'}}); await flush(); });

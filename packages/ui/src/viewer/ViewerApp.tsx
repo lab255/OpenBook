@@ -1,3 +1,4 @@
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import React, {useEffect, useMemo, useState} from 'react';
 import {PresentBlocks} from '@/blockeditor/PresentBlocks';
 import {FormOriginContext, formOriginUrl} from '@/blockeditor/FormBlockView';
@@ -133,38 +134,40 @@ export const ViewerApp: React.FC<{
   return (
     // The concrete-hex chart/map surfaces (kit charts) resolve the scheme the
     // export baked in, matching the CSS-var surfaces applyDataColors set (OB-379).
-    <DataSchemeProvider value={readGlobalDataScheme()}>
-      {/* Static renders the host document carried for blocks this bundle has no
+    <ConfirmProvider>
+      <DataSchemeProvider value={readGlobalDataScheme()}>
+        {/* Static renders the host document carried for blocks this bundle has no
         renderer for (ledger report tables, LX-5) — replanted rather than
         replaced by a missing-plugin card. */}
-      <StaticKeepContext.Provider value={staticBlocks ?? null}>
-        <KitPageLockContext.Provider value={true}>
-          {/* Standalone exports stay quiet on open: artifacts get the sub-resource-
+        <StaticKeepContext.Provider value={staticBlocks ?? null}>
+          <KitPageLockContext.Provider value={true}>
+            {/* Standalone exports stay quiet on open: artifacts get the sub-resource-
             off CSP on top of the opaque-origin sandbox (closes fetch/img/media/
             font/form loads; frame self-navigation is the documented residual —
             see EXPORT_ARTIFACT_CSP). */}
-          <SandboxCspContext.Provider value={EXPORT_ARTIFACT_CSP}>
-            <div className="ob-viewer" onClick={onClick}>
-              {pages.length > 1 && (
-                <nav className="ob-viewer-nav" aria-label="Pages">
-                  {pages.map((p) => (
-                    <a
-                      key={p.id}
-                      href={`#page=${encodeURIComponent(p.id)}`}
-                      className={`ob-viewer-nav-link${p.id === active.id ? ' ob-viewer-nav-on' : ''}`}
-                      aria-current={p.id === active.id ? 'page' : undefined}
-                    >
-                      {p.icon ? `${p.icon} ` : ''}
-                      {(p.name ?? '').trim() || 'Untitled'}
-                    </a>
-                  ))}
-                </nav>
-              )}
-              <PageView key={active.id} page={active} originUrl={formOrigins?.[active.id]} />
-            </div>
-          </SandboxCspContext.Provider>
-        </KitPageLockContext.Provider>
-      </StaticKeepContext.Provider>
-    </DataSchemeProvider>
+            <SandboxCspContext.Provider value={EXPORT_ARTIFACT_CSP}>
+              <div className="ob-viewer" onClick={onClick}>
+                {pages.length > 1 && (
+                  <nav className="ob-viewer-nav" aria-label="Pages">
+                    {pages.map((p) => (
+                      <a
+                        key={p.id}
+                        href={`#page=${encodeURIComponent(p.id)}`}
+                        className={`ob-viewer-nav-link${p.id === active.id ? ' ob-viewer-nav-on' : ''}`}
+                        aria-current={p.id === active.id ? 'page' : undefined}
+                      >
+                        {p.icon ? `${p.icon} ` : ''}
+                        {(p.name ?? '').trim() || 'Untitled'}
+                      </a>
+                    ))}
+                  </nav>
+                )}
+                <PageView key={active.id} page={active} originUrl={formOrigins?.[active.id]} />
+              </div>
+            </SandboxCspContext.Provider>
+          </KitPageLockContext.Provider>
+        </StaticKeepContext.Provider>
+      </DataSchemeProvider>
+    </ConfirmProvider>
   );
 };
