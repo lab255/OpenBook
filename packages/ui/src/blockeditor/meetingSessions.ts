@@ -82,6 +82,7 @@ export class MeetingRecorder {
   }
   get visible(): boolean { return this.attached.size > 0; }
   attach(editor: BlockEditorController, block: BlockMap): void {
+    if (!this.active && !this.unsaved) { this.store = client; this.assets = assetBridge.target(); }
     this.editor = editor; this.block = block; this.attached.add(editor); sessions.set(`${this.pageId}:${this.blockId}`, this); this.retryStatus(); this.changed();
   }
   detach(editor = this.editor): void {

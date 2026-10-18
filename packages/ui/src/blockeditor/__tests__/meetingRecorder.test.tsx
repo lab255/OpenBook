@@ -595,13 +595,41 @@ describe('navigation persistence failure recovery', () => {
 });
 
 describe('MTG-7 fix regressions', () => {
+  it.each(['install', 'switch'])('refreshes an idle session on attach after client %s so saved audio can be retried', async (change) => {
+    if (change === 'switch') setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    setAssetBridge(null);
+    const audio = {assetId: 'saved-audio', durationMs: 1000};
+    const {session, editor, block} = harness({status: 'done', audioChunks: [audio]});
+    setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    setAssetBridge({putAsset, getAsset: async () => null, transcribeAsset});
+    session.attach(editor, block);
+    session.retry(audio); await flush();
+    expect(transcribeAsset).toHaveBeenCalledWith('saved-audio', 'page');
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual([chunkKey(audio)]);
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(session.error).toBe('');
+    session.detach();
+  });
+
+  it('does not refresh a stopped session with unsaved audio on attach', async () => {
+    const {session, editor, block} = harness();
+    session.chunks.push({id: 'failed', audio: {assetId: '', durationMs: 1000}, blob: new Blob(['audio']), phase: 'uploadFailed'});
+    setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    session.attach(editor, block);
+    session.retry({assetId: 'saved-audio', durationMs: 1000}); await flush();
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    expect(session.error).not.toBe('');
+    session.discard(); session.detach();
+  });
+
   it('refuses the new client and asset target after a recording switches stores', async () => {
     const first = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
     const next = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
     setMeetingSessionClient(first);
-    const {session} = harness(); await session.start();
+    const {session, editor, block} = harness(); await session.start();
     track.stop.mockClear();
     setMeetingSessionClient(next);
+    session.attach(editor, block);
     session.pause(); await flush();
     expect(track.stop).toHaveBeenCalled();
     expect(next.getPage).not.toHaveBeenCalled(); expect(next.savePage).not.toHaveBeenCalled();
