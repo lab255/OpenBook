@@ -182,6 +182,7 @@ export class MeetingRecorder {
     return pending.catch((error) => { this.failed(error); throw error; });
   }
   private writeStatus(props: Record<string, unknown>): void {
+    if (this.discarded) return;
     this.statusProps = {...this.statusProps, ...props}; this.statusDirty = true;
     this.retryStatus();
   }
@@ -192,7 +193,10 @@ export class MeetingRecorder {
     const pending = this.write(props);
     this.statusWriting = false;
     void pending.then(() => {
-      if (props === this.statusProps) this.statusDirty = false;
+      if (props === this.statusProps) {
+        this.statusDirty = false;
+        if (!this.unsaved && !this.chunks.some((chunk) => chunk.error)) this.error = '';
+      }
     }).catch((error) => { this.failed(error); }).finally(() => {
       this.changed();
     });

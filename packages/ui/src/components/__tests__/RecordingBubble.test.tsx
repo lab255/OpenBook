@@ -4,12 +4,15 @@ import {setLocale, t} from '@/i18n';
 import PresentMode from '../PresentMode';
 import {createDoc} from '@/blockeditor/model';
 import {registerOpenDoc} from '@/lib/openDocs';
-import {RecordingBubble} from '../MeetingSessionHost';
+import {MeetingSessionHost, RecordingBubble} from '../MeetingSessionHost';
 
 const state = vi.hoisted(() => ({
   go: vi.fn(),
+  client: {},
+  setClient: vi.fn(),
   sessions: [] as {pageId: string; blockId: string; unsaved?: boolean; error?: string; active?: boolean; discard?: ReturnType<typeof vi.fn>; visible: boolean; readOnly: boolean; mode: string; elapsedMs: number; pause: ReturnType<typeof vi.fn>; resume: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>}[],
 }));
+vi.mock('@/data', () => ({useData: () => state.client}));
 vi.mock('@/lib/useCanWrite', () => ({useCanWrite: () => true}));
 vi.mock('../appearance/PageCustomiseBody', () => ({usePageThemeStyle: () => undefined}));
 vi.mock('@/blockeditor/PresentBlocks', () => ({PresentBlocks: () => <p>Slide without a meeting</p>}));
@@ -17,6 +20,7 @@ vi.mock('@/providers/ConfirmProvider', () => ({useConfirm: () => async () => tru
 vi.mock('@/providers', () => ({useNavigation: () => ({selectPageAtBlock: state.go, pageLabel: () => 'Slides'}), useHud: () => ({hud: {present: {open: true, mode: 'fullscreen', pageId: 'slides'}}, setHud: vi.fn()})}));
 vi.mock('@/blockeditor/meetingSessions', async (original) => ({
   ...await original<typeof import('@/blockeditor/meetingSessions')>(),
+  setMeetingSessionClient: state.setClient,
   activeSessions: () => state.sessions,
   meetingSessions: () => state.sessions,
 }));
@@ -90,4 +94,15 @@ it('portals operable recording controls into the present dialog above a slide wi
   stop.focus(); expect(document.activeElement).toBe(stop);
   fireEvent.click(stop); expect(current.stop).toHaveBeenCalledOnce();
   view.unmount(); unregister();
+});
+
+
+it('stops sessions before clearing or replacing the client on host cleanup', () => {
+  const current = session(); state.sessions = [current]; state.setClient.mockClear();
+  const view = render(<MeetingSessionHost />);
+  state.client = {}; view.rerender(<MeetingSessionHost />);
+  expect(current.stop).toHaveBeenCalledOnce();
+  expect(state.setClient.mock.calls.map(([value]) => value)).toEqual([expect.any(Object), null, state.client]);
+  expect(current.stop.mock.invocationCallOrder[0]).toBeLessThan(state.setClient.mock.invocationCallOrder[1]);
+  view.unmount();
 });
