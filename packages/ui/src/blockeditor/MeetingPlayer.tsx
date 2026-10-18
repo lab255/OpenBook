@@ -28,7 +28,7 @@ interface AudioResource {assetId: string; blob?: Blob; url?: string; disposed: b
 
 export function MeetingPlayer({saved, completed, session, readOnly, canTranscribe, children}: {
   saved: MeetingAudio[]; completed: string[]; session: MeetingRecorder; readOnly: boolean; canTranscribe: boolean;
-  children?: (playback: {position: number; playing: boolean; seek: (globalMs: number) => void}) => ReactNode;
+  children?: (playback: {position: number; playing: boolean; canSeek: boolean; seek: (globalMs: number) => void}) => ReactNode;
 }) {
   const pending = session.chunks.filter((chunk) => chunk.blob);
   const sources = [
@@ -126,7 +126,8 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
       downloadBlob(`meeting-${entry.audio.startedAtMs}.${blob.type.includes('mp4') ? 'mp4' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`, blob);
     }}>{t('meetingBlock.saveAudio')}</a>}
   </>;
-  const transcript = children?.({position, playing, seek: (globalMs) => seek(globalMs, playingRef.current)});
+  const wantsPlay = () => playingRef.current || !!pendingSeek.current?.play || resumeAt.current !== null;
+  const transcript = children?.({position, playing, canSeek: entries.length > 0, seek: (globalMs) => seek(globalMs, wantsPlay())});
   if (!entries.length) return transcript ?? null;
   return <><section className="obe-meeting-player" aria-label={t('meetingBlock.player')}>
     <div className="obe-meeting-controls">
@@ -136,7 +137,7 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
       </button>
       <div className="obe-meeting-track">
         <input type="range" min={0} max={total} step={100} value={Math.min(position, total)} aria-label={t('meetingBlock.seek')}
-          aria-valuetext={`${meetingTime(position)} / ${meetingTime(total)}`} onChange={(event) => seek(Number(event.target.value), playingRef.current)} />
+          aria-valuetext={`${meetingTime(position)} / ${meetingTime(total)}`} onChange={(event) => seek(Number(event.target.value), wantsPlay())} />
         <div className="obe-meeting-markers">
           {statuses.map((entry) => <div className="obe-meeting-marker" key={entry.id} style={{flexGrow: entry.audio.durationMs || 1}}>
             <Popover open={detail === entry.id} onOpenChange={(open) => setDetail(open ? entry.id : null)}>

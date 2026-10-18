@@ -78,19 +78,49 @@ describe('transcript playback', () => {
     const audio = view.container.querySelector('audio')!;
     audio.currentTime = 3; fireEvent.timeUpdate(audio);
     expect(pane.scrollTop).toBe(180);
+    const measurements = vi.mocked(pane.getBoundingClientRect).mock.calls.length;
+    audio.currentTime = 4; fireEvent.timeUpdate(audio);
+    expect(pane.getBoundingClientRect).toHaveBeenCalledTimes(measurements);
     fireEvent.wheel(pane);
     audio.currentTime = 46; fireEvent.timeUpdate(audio);
     expect(pane.scrollTop).toBe(180);
     fireEvent.click(screen.getByRole('button', {name: 'Seek to 0:01'}));
     expect(pane.scrollTop).toBe(270);
+    fireEvent.pointerDown(pane); // Suppress before a scrollbar drag changes scrollTop.
+    audio.currentTime = 3; fireEvent.timeUpdate(audio);
+    expect(pane.scrollTop).toBe(270);
+    fireEvent.click(screen.getByRole('button', {name: 'Seek to 0:01'}));
     pane.scrollTop = 30; fireEvent.scroll(pane); // Scrollbar drag.
     audio.currentTime = 3; fireEvent.timeUpdate(audio);
     expect(pane.scrollTop).toBe(30);
+  });
+  it.each(['timestamp', 'slider'])('preserves play intent across queued %s seeks', async (control) => {
+    let resolveAsset!: (asset: {bytes: Uint8Array; mime: string}) => void;
+    setAssetBridge({getAsset: (id) => id === 'three'
+      ? new Promise((resolve) => { resolveAsset = resolve; })
+      : Promise.resolve({bytes: new Uint8Array([1]), mime: 'audio/webm'}), putAsset: vi.fn()});
+    const view = render(<MeetingTranscript saved={[
+      {assetId: 'one', durationMs: 20000}, {assetId: 'two', durationMs: 20000}, {assetId: 'three', durationMs: 10000},
+    ]} completed={[]} session={session} readOnly canTranscribe transcript={[
+      {startMs: 46000, endMs: 47000, text: 'First target'}, {startMs: 47000, endMs: 48000, text: 'Second target'},
+    ]} />);
+    fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Pause playback'})).toBeTruthy());
+    for (const value of [46000, 47000]) {
+      if (control === 'timestamp') fireEvent.click(screen.getByRole('button', {name: `Seek to 0:${value / 1000}`}));
+      else fireEvent.change(screen.getByRole('slider'), {target: {value}});
+    }
+    resolveAsset({bytes: new Uint8Array([1]), mime: 'audio/webm'});
+    await waitFor(() => expect(screen.getByRole('button', {name: 'Pause playback'})).toBeTruthy());
+    expect(view.container.querySelectorAll('audio')[2].currentTime).toBe(7);
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2);
   });
   it('keeps transcripts visible without audio and does not seek when selecting prose', () => {
     render(<MeetingTranscript saved={[]} completed={[]} session={session} readOnly canTranscribe={false} transcript={transcript} />);
     fireEvent.click(screen.getByText('First segment'));
     expect(screen.getByText('First segment')).toBeTruthy();
+    expect(screen.queryByRole('button', {name: /^Seek to /})).toBeNull();
+    expect(screen.getByText('0:01').tagName).toBe('TIME');
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   });
 });
