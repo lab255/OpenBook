@@ -662,6 +662,7 @@ export const zh: PartialMessages = {
     needsAttention: '需要处理',
     discard: '丢弃',
     discardConfirm: '丢弃未保存的会议音频？',
+    discardConfirmBody: '此音频尚未保存到页面，丢弃后无法恢复。',
     recordingSessions: '录音会话',
     elapsed: '已录音时长',
     goToMeeting: '前往会议',

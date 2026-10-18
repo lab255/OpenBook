@@ -665,6 +665,7 @@ export const ja: PartialMessages = {
     needsAttention: '対応が必要です',
     discard: '破棄',
     discardConfirm: '未保存の会議音声を破棄しますか？',
+    discardConfirmBody: 'この音声はページに保存されておらず、復元できません。',
     recordingSessions: '録音セッション',
     elapsed: '録音経過時間',
     goToMeeting: '会議に移動',

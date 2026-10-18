@@ -39,17 +39,17 @@ export function RecordingBubble({canWrite, presenting = false}: {canWrite: boole
     const timer = setInterval(() => tick((value) => value + 1), 1000);
     return () => clearInterval(timer);
   }, [running]);
-  return <aside aria-label={t('meetingBlock.recordingSessions')} className="fixed bottom-4 right-4 z-menu pointer-events-auto flex max-w-full flex-col gap-2 print:hidden">
+  return <aside aria-label={t('meetingBlock.recordingSessions')} className="fixed bottom-4 right-4 z-menu pointer-events-auto flex max-w-[calc(100vw-2rem)] flex-col gap-2 print:hidden">
     <span className="sr-only" role="status" aria-live="polite">{sessions.map((session) => session.error || t(`meetingBlock.${session.unsaved && !session.active ? 'needsAttention' : session.mode === 'paused' ? 'paused' : 'recording'}`)).join(', ')}</span>
-    {sessions.map((session) => <div key={`${session.pageId}:${session.blockId}`} className="flex flex-wrap items-center gap-2 rounded-full border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-overlay">
-      <span aria-hidden="true" className={cn('size-2 rounded-full', session.unsaved || session.error || session.mode === 'paused' ? STATUS_DOT_CLASS.warn : STATUS_DOT_CLASS.ok)} />
-      <span>{session.error || (session.unsaved && !session.active ? t('meetingBlock.needsAttention') : t(`meetingBlock.${session.mode === 'paused' ? 'paused' : 'recording'}`))}</span>
-      <span className="tabular-nums" aria-label={t('meetingBlock.elapsed')}>{meetingTime(session.elapsedMs)}</span>
+    {sessions.map((session) => <div key={`${session.pageId}:${session.blockId}`} className="flex flex-wrap items-center gap-2 rounded-full border border-border bg-popover pl-3 pr-1 py-1.5 text-xs text-popover-foreground shadow-overlay">
+      <span aria-hidden="true" className={cn('size-2 rounded-full', session.unsaved || session.error ? STATUS_DOT_CLASS.bad : session.mode === 'paused' ? STATUS_DOT_CLASS.warn : STATUS_DOT_CLASS.ok)} />
+      <span>{(session.unsaved || session.error) ? t(session.chunks.some((chunk) => chunk.phase === 'uploadFailed') ? 'meetingBlock.uploadFailedStatus' : 'meetingBlock.needsAttention') : t(`meetingBlock.${session.mode === 'paused' ? 'paused' : 'recording'}`)}</span>
+      {session.active && <span className="tabular-nums" aria-label={t('meetingBlock.elapsed')}>{meetingTime(session.elapsedMs)}</span>}
       {canWrite && session.active && <Button size="xs" variant="ghost" onClick={() => session.mode === 'paused' ? session.resume() : session.pause()}>{t(`meetingBlock.${session.mode === 'paused' ? 'resume' : 'pause'}`)}</Button>}
       {session.active && <Button size="xs" variant="ghost" onClick={() => session.stop()}>{t('meetingBlock.stop')}</Button>}
       <Button size="xs" variant="ghost" onClick={() => selectPageAtBlock(session.pageId, session.blockId)}>{t('meetingBlock.goToMeeting')}</Button>
       {(session.unsaved || session.error) && <Button size="xs" variant="ghost" onClick={async () => {
-        if (await confirm({title: t('meetingBlock.discardConfirm'), confirmText: t('meetingBlock.discard'), destructive: true})) session.discard();
+        if (await confirm({title: t('meetingBlock.discardConfirm'), description: t('meetingBlock.discardConfirmBody'), confirmText: t('meetingBlock.discard'), destructive: true})) session.discard();
       }}>{t('meetingBlock.discard')}</Button>}
     </div>)}
   </aside>;

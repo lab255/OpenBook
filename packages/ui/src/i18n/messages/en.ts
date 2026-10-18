@@ -1111,6 +1111,7 @@ export const en = {
     needsAttention: 'Needs attention',
     discard: 'Discard',
     discardConfirm: 'Discard unsaved meeting audio?',
+    discardConfirmBody: 'This audio hasn\'t been saved to the page and can\'t be recovered.',
     recordingSessions: 'Recording sessions',
     elapsed: 'Elapsed recording time',
     goToMeeting: 'Go to meeting',

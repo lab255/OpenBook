@@ -670,6 +670,7 @@ export const de: PartialMessages = {
     needsAttention: 'Aufmerksamkeit erforderlich',
     discard: 'Verwerfen',
     discardConfirm: 'Ungespeicherte Meeting-Aufnahme verwerfen?',
+    discardConfirmBody: 'Diese Audioaufnahme wurde nicht auf der Seite gespeichert und kann nicht wiederhergestellt werden.',
     recordingSessions: 'Laufende Aufnahmen',
     elapsed: 'Aufnahmedauer',
     goToMeeting: 'Zum Meeting',

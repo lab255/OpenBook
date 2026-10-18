@@ -8,15 +8,16 @@ import {MeetingSessionHost, RecordingBubble} from '../MeetingSessionHost';
 
 const state = vi.hoisted(() => ({
   go: vi.fn(),
+  confirm: vi.fn(async () => true),
   client: {},
   setClient: vi.fn(),
-  sessions: [] as {pageId: string; blockId: string; unsaved?: boolean; error?: string; active?: boolean; discard?: ReturnType<typeof vi.fn>; visible: boolean; readOnly: boolean; mode: string; elapsedMs: number; pause: ReturnType<typeof vi.fn>; resume: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>}[],
+  sessions: [] as {pageId: string; blockId: string; chunks: {phase: string}[]; unsaved?: boolean; error?: string; active?: boolean; discard?: ReturnType<typeof vi.fn>; visible: boolean; readOnly: boolean; mode: string; elapsedMs: number; pause: ReturnType<typeof vi.fn>; resume: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn>}[],
 }));
 vi.mock('@/data', () => ({useData: () => state.client}));
 vi.mock('@/lib/useCanWrite', () => ({useCanWrite: () => true}));
 vi.mock('../appearance/PageCustomiseBody', () => ({usePageThemeStyle: () => undefined}));
 vi.mock('@/blockeditor/PresentBlocks', () => ({PresentBlocks: () => <p>Slide without a meeting</p>}));
-vi.mock('@/providers/ConfirmProvider', () => ({useConfirm: () => async () => true}));
+vi.mock('@/providers/ConfirmProvider', () => ({useConfirm: () => state.confirm}));
 vi.mock('@/providers', () => ({useNavigation: () => ({selectPageAtBlock: state.go, pageLabel: () => 'Slides'}), useHud: () => ({hud: {present: {open: true, mode: 'fullscreen', pageId: 'slides'}}, setHud: vi.fn()})}));
 vi.mock('@/blockeditor/meetingSessions', async (original) => ({
   ...await original<typeof import('@/blockeditor/meetingSessions')>(),
@@ -24,8 +25,8 @@ vi.mock('@/blockeditor/meetingSessions', async (original) => ({
   activeSessions: () => state.sessions,
   meetingSessions: () => state.sessions,
 }));
-afterEach(() => { cleanup(); state.sessions = []; state.go.mockClear(); setLocale('en'); vi.useRealTimers(); });
-const session = (blockId = 'block') => ({pageId: 'page', blockId, visible: false, readOnly: false, active: true, mode: 'recording', elapsedMs: 2000, pause: vi.fn(), resume: vi.fn(), stop: vi.fn()});
+afterEach(() => { cleanup(); state.sessions = []; state.go.mockClear(); state.confirm.mockClear(); setLocale('en'); vi.useRealTimers(); });
+const session = (blockId = 'block') => ({pageId: 'page', blockId, chunks: [], visible: false, readOnly: false, active: true, mode: 'recording', elapsedMs: 2000, pause: vi.fn(), resume: vi.fn(), stop: vi.fn()});
 
 describe('recording bubble', () => {
   it('controls off-page capture, updates elapsed without announcing ticks, and navigates to the block anchor', () => {
@@ -66,12 +67,15 @@ describe('recording bubble', () => {
 
 
 it('shows detached failed recordings and confirms discard', async () => {
-  const current = {...session(), active: false, mode: 'done', unsaved: true, error: '403: upload failed', discard: vi.fn()};
+  const current = {...session(), active: false, mode: 'done', unsaved: true, chunks: [{phase: 'uploadFailed'}], error: '403: upload failed', discard: vi.fn()};
   state.sessions = [current]; render(<RecordingBubble canWrite />);
   expect(screen.getByRole('status').textContent).toContain('403');
+  expect(screen.getByText('Upload failed')).toBeTruthy();
+  expect(screen.queryByLabelText('Elapsed recording time')).toBeNull();
   expect(screen.getByRole('button', {name: 'Go to meeting'})).toBeTruthy();
   await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Discard'})); });
   expect(current.discard).toHaveBeenCalledOnce();
+  expect(state.confirm).toHaveBeenCalledWith(expect.objectContaining({description: 'This audio hasn\'t been saved to the page and can\'t be recovered.'}));
 });
 
 it('keeps attached recording controls operable in present mode without a meeting block', () => {
@@ -105,4 +109,11 @@ it('stops sessions before clearing or replacing the client on host cleanup', () 
   expect(state.setClient.mock.calls.map(([value]) => value)).toEqual([expect.any(Object), null, state.client]);
   expect(current.stop.mock.invocationCallOrder[0]).toBeLessThan(state.setClient.mock.invocationCallOrder[1]);
   view.unmount();
+});
+
+it('uses a short attention label while announcing the full non-upload error', () => {
+  state.sessions = [{...session(), active: false, error: 'Keep this page open to recover audio.'}];
+  render(<RecordingBubble canWrite />);
+  expect(screen.getByText('Needs attention')).toBeTruthy();
+  expect(screen.getByRole('status').textContent).toBe('Keep this page open to recover audio.');
 });
