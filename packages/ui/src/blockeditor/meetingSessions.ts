@@ -92,7 +92,7 @@ export class MeetingRecorder {
   private protect = (event: BeforeUnloadEvent): void => { event.preventDefault(); event.returnValue = ''; };
   private changed(): void {
     // Retain the recovery guard even after navigating away from the block view.
-    if (this.active || this.unsaved || this.finalizing || this.writeCount > 0) window.addEventListener('beforeunload', this.protect);
+    if (this.active || this.unsaved || this.finalizing || this.pending > 0 || this.writeCount > 0) window.addEventListener('beforeunload', this.protect);
     else window.removeEventListener('beforeunload', this.protect);
     this.revision += 1; this.listeners.forEach((listener) => listener()); notify();
   }
@@ -112,8 +112,12 @@ export class MeetingRecorder {
   private write(props: Record<string, unknown> | ((block: BlockMap) => Record<string, unknown>)): Promise<void> {
     const live = this.liveDoc();
     if (live && !writes.has(this.pageId)) {
-      this.mutate(live, props);
-      return Promise.resolve();
+      try {
+        this.mutate(live, props);
+        return Promise.resolve();
+      } catch (error) {
+        return Promise.reject(error);
+      }
     }
     this.writeCount += 1; this.changed();
     const operation = async (): Promise<void> => {
@@ -299,7 +303,7 @@ export class MeetingRecorder {
     } finally {
       chunk.busy = false; this.pending -= 1;
     }
-    if (chunk.audio.assetId && assetBridge.canTranscribe()) void this.transcribe(chunk);
+    if (!chunk.blob && chunk.audio.assetId && assetBridge.canTranscribe()) void this.transcribe(chunk);
     this.settle(); this.changed();
   }
   async transcribe(chunk: RecordingChunk): Promise<void> {

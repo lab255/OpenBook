@@ -505,3 +505,89 @@ describe('app lifetime meeting sessions', () => {
     unregisterNext();
   });
 });
+
+
+describe('navigation persistence failure recovery', () => {
+  it.each(['load', 'save'] as const)('reconciles a page reopened during the stored-page %s', async (stage) => {
+    const {doc, session} = harness();
+    await session.start();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const getPage = vi.fn(async () => { if (stage === 'load') await gate; return stored; });
+    const savePage = vi.fn(async (page) => { if (stage === 'save') await gate; stored = page; });
+    setMeetingSessionClient({getPage, savePage} as unknown as DataClient);
+    session.detach(); session.pause(); await flush();
+    expect(getPage).toHaveBeenCalledOnce();
+    if (stage === 'save') expect(savePage).toHaveBeenCalledOnce();
+    const reopened = decodeSnapshot(stored.data.blockdoc);
+    const block = rootBlocks(reopened).get(0);
+    setBlockProp(block, 'title', 'Edited while reopening');
+    const unregister = registerBlockEditorDoc('page', reopened);
+    release(); await flush();
+    expect(rootBlocks(reopened).length).toBe(1);
+    expect(blockProp(block, 'title')).toBe('Edited while reopening');
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(block, 'transcript')).toHaveLength(1);
+    expect(session.chunks[0].phase).toBe('done');
+    if (stage === 'load') expect(savePage).not.toHaveBeenCalled();
+    session.stop(); await flush(); unregister();
+  });
+
+  it('retains a retryable upload when saving its off-page reference fails', async () => {
+    const {doc, session} = harness();
+    await session.start();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => { stored = page; });
+    savePage.mockRejectedValueOnce(new Error('offline'));
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    session.detach();
+    session.pause();
+    await flush();
+    const chunk = session.chunks[0];
+    expect(chunk.phase).toBe('uploadFailed');
+    expect(chunk.blob).toBeDefined();
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    await session.upload(chunk);
+    await flush();
+    expect(chunk.phase).toBe('done');
+    expect(chunk.blob).toBeUndefined();
+    const persisted = rootBlocks(decodeSnapshot(stored.data.blockdoc)).get(0);
+    expect(blockProp<MeetingAudio[]>(persisted, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(persisted, 'transcript')).toHaveLength(1);
+    session.stop(); await flush();
+  });
+
+  it('still releases the microphone when the live meeting block was deleted', async () => {
+    const {doc, session} = harness();
+    await session.start();
+    track.stop.mockClear();
+    rootBlocks(doc).delete(0);
+    expect(() => session.stop()).not.toThrow();
+    await flush();
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(session.active).toBe(false);
+    expect(session.chunks[0].phase).toBe('uploadFailed');
+    expect(session.unsaved).toBe(true);
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    // Release the test's intentionally retained recovery guard.
+    session.chunks[0].blob = undefined;
+    session.setReadOnly(true);
+  });
+
+  it('protects pending transcription after stopping until the transcript is persisted', async () => {
+    const {session} = harness();
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    let finish!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    await session.start();
+    session.stop(); remove.mockClear(); await flush();
+    expect(session.unsaved).toBe(false);
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
+    expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
+    finish({text: 'saved', durationMs: 1000}); await flush();
+    expect(remove).toHaveBeenCalledWith('beforeunload', guard);
+    add.mockRestore(); remove.mockRestore();
+  });
+});
