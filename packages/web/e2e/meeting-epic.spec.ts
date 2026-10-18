@@ -62,6 +62,7 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   });
   await meeting.getByRole('button', {name: 'Record', exact: true}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
+  await expect(meeting.locator('.obe-meeting-header .obe-meeting-elapsed')).toHaveText('0:02');
   // Pause closes a genuine standalone chunk without sleeping for the 45s
   // rollover. Resume proves transcript growth while the session is still live.
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
@@ -77,12 +78,35 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
 
   await meeting.getByRole('button', {name: 'Resume', exact: true}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
+  await expect(meeting.locator('.obe-meeting-header .obe-meeting-elapsed')).toHaveText('0:04');
   await meeting.getByRole('button', {name: 'Pause', exact: true}).click();
   await expect(transcript).toHaveCount(2);
   await expect(transcript.first()).toHaveText(firstText);
   await expect(transcript.nth(1)).toContainText(/Mock transcription \([1-9]\d* bytes\)/);
   expect(transcriptions).toHaveLength(2);
-  await expect(meeting.locator('audio')).toHaveCount(2);
+  await meeting.getByRole('tab', {name: 'Transcript', exact: true}).click();
+  const player = meeting.getByRole('region', {name: 'Meeting playback', exact: true});
+  await expect(player).toHaveCount(1);
+  await expect(player.getByRole('slider', {name: 'Playback position'})).toHaveCount(1);
+  await expect(player.locator('.obe-meeting-marker-button')).toHaveCount(2);
+  await expect(player.locator('audio[controls]')).toHaveCount(0);
+  await expect(player.locator('audio[src]')).toHaveCount(0);
+  await player.getByRole('slider', {name: 'Playback position'}).press('ArrowRight');
+  await expect.poll(() => player.locator('audio[src]').count()).toBe(2);
+  await player.locator('audio').evaluateAll((elements) => elements.forEach((element) => {
+    element.addEventListener('playing', () => { (element as HTMLAudioElement).dataset.played = 'true'; });
+  }));
+  await player.getByRole('button', {name: 'Play', exact: true}).click();
+  await expect.poll(() => player.locator('audio[data-played="true"]').count()).toBe(2);
+  await expect(player.getByRole('button', {name: 'Play', exact: true})).toBeVisible();
+  const playWidth = (await player.getByRole('button', {name: 'Play', exact: true}).boundingBox())!.width;
+  expect(playWidth).toBe(24);
+  await player.getByRole('button', {name: 'Play', exact: true}).click();
+  await expect(player.getByRole('button', {name: 'Pause playback', exact: true})).toBeVisible();
+  expect((await player.getByRole('button', {name: 'Pause playback', exact: true}).boundingBox())!.width).toBe(playWidth);
+  await expect.poll(() => player.locator('audio').evaluateAll((elements) => elements.some((element) => !(element as HTMLAudioElement).paused))).toBe(true);
+  await player.getByRole('button', {name: 'Pause playback', exact: true}).click();
+  await expect.poll(() => player.locator('audio').evaluateAll((elements) => elements.every((element) => (element as HTMLAudioElement).paused))).toBe(true);
   await meeting.getByRole('button', {name: 'Stop', exact: true}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Done');
 
