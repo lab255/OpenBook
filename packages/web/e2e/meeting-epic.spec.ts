@@ -217,4 +217,9 @@ test('recording survives navigation, rebinds, and saves the final chunk while aw
   await page.getByRole('treeitem').filter({hasText: 'Meeting epic'}).click();
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Done');
   await expect(meeting.locator('.obe-meeting-transcript p')).toHaveCount(3);
+  // A full reload discards the singleton and proves recovery from durable state.
+  await page.reload();
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Done');
+  await expect(meeting.locator('.obe-meeting-transcript p')).toHaveCount(3);
+  await expect(bubble.getByRole('button')).toHaveCount(0);
 });

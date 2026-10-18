@@ -465,7 +465,7 @@ describe('app lifetime meeting sessions', () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(session.mode).toBe('recording');
     expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
-    window.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event('visibilitychange'));
     expect(session.mode).toBe('recording');
     session.stop();
     await vi.advanceTimersByTimeAsync(0);
