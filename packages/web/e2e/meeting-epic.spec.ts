@@ -96,8 +96,11 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await expect.poll(async () => Number(await player.getByRole('slider').inputValue())).toBeGreaterThan(1000);
   await expect(player.locator('.obe-meeting-elapsed')).not.toHaveText(/^0:00 /);
   await transcript.first().getByRole('button', {name: 'Seek to 0:00'}).click();
+  await expect(player.locator('audio[src]')).toHaveCount(2);
+  await expect(player.getByRole('alert')).toHaveCount(0);
+  const rowPitch = await transcript.evaluateAll((rows) => rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().top);
+  expect(rowPitch).toBeCloseTo(32, 0);
   await player.getByRole('slider', {name: 'Playback position'}).press('ArrowRight');
-  await expect.poll(() => player.locator('audio[src]').count()).toBe(2);
   await player.locator('audio').evaluateAll((elements) => elements.forEach((element) => {
     element.addEventListener('playing', () => { (element as HTMLAudioElement).dataset.played = 'true'; });
   }));
