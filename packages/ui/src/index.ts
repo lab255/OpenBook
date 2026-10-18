@@ -51,4 +51,4 @@ export {toHtml, toSlideDeck, toHtmlSite} from './export/toHtml';
 
 export * from './lib/statusStyles';
 
-export {activeSessions} from './blockeditor/meetingSessions';
+export {stopAllMeetingSessions} from './blockeditor/meetingSessions';

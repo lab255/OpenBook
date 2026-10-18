@@ -5,7 +5,7 @@ import {type BackgroundThrottlingPolicy, getCurrentWindow} from '@tauri-apps/api
 import {open as openExternal} from '@tauri-apps/plugin-shell';
 import {getCurrent as currentDeepLink, onOpenUrl} from '@tauri-apps/plugin-deep-link';
 import {
-  activeSessions,
+  stopAllMeetingSessions,
   AccountProvider,
   DataProvider,
   DefaultLayout,
@@ -229,7 +229,7 @@ const platform: PlatformCapabilities = {
 function App() {
   const sidecar = useSidecarStatus();
   useEffect(() => {
-    const unlisten = getCurrentWindow().onCloseRequested(() => activeSessions().forEach((session) => session.stop()));
+    const unlisten = getCurrentWindow().onCloseRequested(() => stopAllMeetingSessions());
     return () => { void unlisten.then((dispose) => dispose()); };
   }, []);
   // Embedded local server by default, or an external one if configured. Built

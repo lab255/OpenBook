@@ -399,6 +399,7 @@ export class MeetingRecorder {
 const sessions = new Map<string, MeetingRecorder>();
 export const meetingSessions = (): MeetingRecorder[] => [...sessions.values()];
 export const activeSessions = (): MeetingRecorder[] => [...sessions.values()].filter((session) => session.active);
+export function stopAllMeetingSessions(): void { activeSessions().forEach((session) => session.stop()); }
 export function meetingRecorder(editor: BlockEditorController, block: BlockMap, pageId: string): MeetingRecorder {
   const id = getPageIdForDoc(editor.doc) ?? pageId;
   const key = `${id}:${blockId(block)}`;
