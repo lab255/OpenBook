@@ -1,4 +1,5 @@
-import {useEffect, useMemo, useState, useSyncExternalStore} from 'react';
+import {MeetingPageContext} from './meetingPageContext';
+import {useContext, useEffect, useMemo, useState, useSyncExternalStore} from 'react';
 import {t} from '@/i18n';
 import {assetBridge, subscribeAssetBridge} from '@/lib/assetBridge';
 import {getPageIdForDoc} from '@/lib/aiBridge';
@@ -19,7 +20,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
   const [exportError, setExportError] = useState(false);
   const locked = useKitLock();
   const readOnly = editor.readOnly || pageReadOnly || locked;
-  const session = meetingRecorder(editor, block, getPageIdForDoc(editor.doc) ?? '');
+  const session = meetingRecorder(editor, block, useContext(MeetingPageContext) ?? getPageIdForDoc(editor.doc) ?? '');
   const chromeEditor = useMemo(() => ({...editor, readOnly}), [editor, readOnly]);
   useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
   const [, tick] = useState(0);
@@ -31,8 +32,8 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
   }, [active]);
   useEffect(() => {
     session.attach(editor, block);
-    return () => session.detach();
-  }, [session, editor, block]);
+    return () => session.detach(editor);
+  }, [session, editor.doc, block]);
   useEffect(() => { session.setReadOnly(readOnly); }, [readOnly, session]);
   const saved = blockProp<MeetingAudio[]>(block, 'audioChunks') ?? [];
   const completed = blockProp<string[]>(block, 'transcriptionCompleted') ?? [];

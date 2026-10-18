@@ -67,17 +67,43 @@ export class MeetingRecorder {
   private pending = 0;
   private finalizing = false;
   readonly blockId: string;
-  private attached = true;
+  private attached = new Set<BlockEditorController>();
+  private store: SessionClient | null = client;
+  private assets = assetBridge.target();
+  private discarded = false;
+  statusDirty = false;
+  private statusProps: Record<string, unknown> = {};
+  private statusWriting = false;
   private writeCount = 0;
-  constructor(private editor: BlockEditorController, private block: BlockMap, public pageId: string) {
-    this.readOnly = editor.readOnly;
+  constructor(private editor: BlockEditorController | undefined, private block: BlockMap, public pageId: string) {
+    this.readOnly = editor!.readOnly;
+    this.attached.add(editor!);
     this.blockId = blockId(block);
   }
-  get visible(): boolean { return this.attached; }
+  get visible(): boolean { return this.attached.size > 0; }
   attach(editor: BlockEditorController, block: BlockMap): void {
-    this.editor = editor; this.block = block; this.attached = true; this.changed();
+    this.editor = editor; this.block = block; this.attached.add(editor); sessions.set(`${this.pageId}:${this.blockId}`, this); this.retryStatus(); this.changed();
   }
-  detach(): void { this.attached = false; this.changed(); }
+  detach(editor = this.editor): void {
+    if (editor) this.attached.delete(editor);
+    this.editor = this.attached.values().next().value;
+    this.changed();
+  }
+  private assertStore(): void {
+    if (this.discarded || client !== this.store || assetBridge.target() !== this.assets) throw new Error('Meeting page store changed');
+  }
+  private failed(error: unknown): void {
+    if (this.discarded) return;
+    this.error = t('meetingBlock.uploadFailed');
+    const status = (error as {status?: number})?.status;
+    if (status === 403 || status === 404 || /\b(403|404)\b|no longer exists|store changed/.test(String(error))) this.stop();
+    this.changed();
+  }
+  discard(): void {
+    this.discarded = true; this.stop(); this.release();
+    this.chunks.forEach((chunk) => { chunk.blob = undefined; });
+    this.error = ''; this.statusDirty = false; this.changed();
+  }
   setReadOnly(value: boolean): void {
     const wasReadOnly = this.readOnly;
     this.readOnly = value;
@@ -92,12 +118,13 @@ export class MeetingRecorder {
   private protect = (event: BeforeUnloadEvent): void => { event.preventDefault(); event.returnValue = ''; };
   private changed(): void {
     // Retain the recovery guard even after navigating away from the block view.
-    if (this.active || this.unsaved || this.finalizing || this.pending > 0 || this.writeCount > 0) window.addEventListener('beforeunload', this.protect);
+    if (!this.discarded && (this.active || this.unsaved || this.finalizing || this.pending > 0 || this.writeCount > 0)) window.addEventListener('beforeunload', this.protect);
     else window.removeEventListener('beforeunload', this.protect);
+    if (!this.visible && !this.active && !this.pending && !this.finalizing && this.writeCount === 0 && !this.unsaved && !this.error && !this.statusDirty) sessions.delete(`${this.pageId}:${this.blockId}`);
     this.revision += 1; this.listeners.forEach((listener) => listener()); notify();
   }
   private liveDoc(): Y.Doc | undefined {
-    return getBlockEditorDoc(this.pageId) ?? openDoc(this.pageId) ?? (this.attached ? this.editor.doc : undefined);
+    return getBlockEditorDoc(this.pageId) ?? openDoc(this.pageId) ?? this.editor?.doc;
   }
   private mutate(doc: Y.Doc, props: Record<string, unknown> | ((block: BlockMap) => Record<string, unknown>)): void {
     const target = findBlock(doc, this.blockId)?.block;
@@ -110,22 +137,26 @@ export class MeetingRecorder {
     this.changed();
   }
   private write(props: Record<string, unknown> | ((block: BlockMap) => Record<string, unknown>)): Promise<void> {
+    try { this.assertStore(); } catch (error) { this.failed(error); return Promise.reject(error); }
+    this.retryStatus();
     const live = this.liveDoc();
     if (live && !writes.has(this.pageId)) {
       try {
         this.mutate(live, props);
         return Promise.resolve();
       } catch (error) {
-        return Promise.reject(error);
+        this.failed(error); return Promise.reject(error);
       }
     }
     this.writeCount += 1; this.changed();
     const operation = async (): Promise<void> => {
+      this.assertStore();
       const current = this.liveDoc();
       if (current) { this.mutate(current, props); return; }
-      const store = client;
+      const store = this.store;
       if (!store) throw new Error('Meeting page store unavailable');
       const page = await store.getPage(this.pageId);
+      this.assertStore();
       // Navigation may have mounted a fresh editor while getPage was pending.
       const mounted = this.liveDoc();
       if (mounted) { this.mutate(mounted, props); return; }
@@ -133,7 +164,10 @@ export class MeetingRecorder {
       const doc = decodeSnapshot(page.data.blockdoc as BlockDocSnapshot | undefined);
       try {
         this.mutate(doc, props);
+        // Known limitation: off-page saves send full name/data; CRDT-delta writes are a follow-up.
+        this.assertStore();
         await store.savePage({id: page.id, name: page.name, data: {...page.data, editor: 'blocks', blockdoc: encodeSnapshot(doc)}});
+        this.assertStore();
         const reopened = this.liveDoc();
         if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
       } finally { doc.destroy(); }
@@ -145,17 +179,31 @@ export class MeetingRecorder {
       this.changed();
     });
     writes.set(this.pageId, settled);
-    return pending;
+    return pending.catch((error) => { this.failed(error); throw error; });
   }
   private writeStatus(props: Record<string, unknown>): void {
-    void this.write(props).catch(() => { this.error = t('meetingBlock.uploadFailed'); this.changed(); });
+    this.statusProps = {...this.statusProps, ...props}; this.statusDirty = true;
+    this.retryStatus();
+  }
+  private retryStatus(): void {
+    if (!this.statusDirty || this.statusWriting || this.discarded) return;
+    const props = this.statusProps;
+    this.statusWriting = true;
+    const pending = this.write(props);
+    this.statusWriting = false;
+    void pending.then(() => {
+      if (props === this.statusProps) this.statusDirty = false;
+    }).catch((error) => { this.failed(error); }).finally(() => {
+      this.changed();
+    });
   }
   get active(): boolean { return ['requesting', 'recording', 'paused'].includes(this.mode); }
   get unsaved(): boolean { return this.chunks.some((chunk) => !!chunk.blob); }
   private closedDuration(): number {
     const saved = blockProp<MeetingAudio[]>(this.block, 'audioChunks') ?? [];
+    const savedKeys = new Set(saved.map(chunkKey));
     return saved.reduce((total, audio) => total + audio.durationMs, 0)
-      + this.chunks.reduce((total, chunk) => total + (chunk.blob ? chunk.audio.durationMs : 0), 0);
+      + this.chunks.reduce((total, chunk) => total + (chunk.blob && !savedKeys.has(chunkKey(chunk.audio)) ? chunk.audio.durationMs : 0), 0);
   }
   get elapsedMs(): number {
     const closed = this.active || this.mode === 'processing' ? this.capturedMs ?? this.closedDuration() : this.closedDuration();
@@ -165,10 +213,10 @@ export class MeetingRecorder {
     return ['recording', 'processing'].includes(blockProp<string>(this.block, 'status') ?? 'idle');
   }
   get recordingElsewhere(): boolean {
-    return this.persistedBusy && !this.active && this.mode !== 'processing';
+    return !this.statusDirty && this.persistedBusy && !this.active && this.mode !== 'processing';
   }
   private resolvePageId(): void {
-    const pageId = getPageIdForDoc(this.editor.doc);
+    const pageId = this.editor && getPageIdForDoc(this.editor.doc);
     if (pageId && pageId !== this.pageId) {
       sessions.delete(`${this.pageId}:${this.blockId}`);
       this.pageId = pageId;
@@ -182,6 +230,7 @@ export class MeetingRecorder {
     if (!globalThis.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
       this.error = t('meetingBlock.unsupported'); this.changed(); return;
     }
+    this.store = client; this.assets = assetBridge.target(); this.discarded = false;
     this.mode = 'requesting'; this.error = ''; this.changed();
     const generation = ++this.generation;
     try {
@@ -191,10 +240,12 @@ export class MeetingRecorder {
       if (this.readOnly || this.persistedBusy) {
         stream.getTracks().forEach((track) => track.stop()); this.mode = 'idle'; this.changed(); return;
       }
-      this.capturedMs = this.closedDuration();
       this.stream = stream;
-      if (blockProp<number>(this.block, 'startedAt') == null) this.writeStatus({startedAt: Date.now()});
+      this.assertStore();
+      this.capturedMs = this.closedDuration();
       this.mode = 'recording';
+      if (blockProp<number>(this.block, 'startedAt') == null) this.writeStatus({startedAt: Date.now()});
+      if (!this.active) return;
       this.beginChunk();
       this.writeStatus({status: 'recording'});
     } catch {
@@ -226,7 +277,7 @@ export class MeetingRecorder {
       this.finalizing = false;
       this.recorder = undefined;
       const blob = new Blob(parts, {type: recorder.mimeType || mimeType || parts[0]?.type || 'audio/webm'});
-      if (blob.size) {
+      if (blob.size && !this.discarded) {
         const chunk: RecordingChunk = {id: crypto.randomUUID(), blob, audio: {assetId: '', durationMs: duration!, startedAtMs: offset}, phase: 'uploading'};
         this.chunks.push(chunk);
         void this.upload(chunk);
@@ -281,7 +332,7 @@ export class MeetingRecorder {
   private async backoff<T>(operation: () => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt += 1) {
       try { return await operation(); } catch (error) {
-        if (attempt >= 2 || /\b(400|403|404|413)\b/.test(String(error))) throw error;
+        if (/store changed/.test(String(error)) || this.discarded || [400, 403, 404, 413].includes((error as {status?: number})?.status ?? 0) || attempt >= 2 || /\b(400|403|404|413)\b/.test(String(error))) throw error;
         await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
       }
     }
@@ -294,11 +345,12 @@ export class MeetingRecorder {
       const blob = chunk.blob;
       if (blob.size > 10 * 1024 * 1024) throw new Error('413');
       const bytes = new Uint8Array(await blob.arrayBuffer());
-      const asset = await this.backoff(() => assetBridge.putAsset(bytes, blob.type.split(';')[0], this.pageId));
+      const asset = await this.backoff(() => { this.assertStore(); return this.assets!.putAsset(bytes, blob.type.split(';')[0], this.pageId); });
       chunk.audio = {...chunk.audio, assetId: asset.id};
       await this.write((block) => ({audioChunks: [...(blockProp<MeetingAudio[]>(block, 'audioChunks') ?? []).filter((audio) => chunkKey(audio) !== chunkKey(chunk.audio)), chunk.audio].sort((a, b) => (a.startedAtMs ?? 0) - (b.startedAtMs ?? 0))}));
-      chunk.blob = undefined; chunk.phase = 'untranscribed';
-    } catch {
+      chunk.blob = undefined; chunk.phase = 'untranscribed'; this.error = '';
+    } catch (error) {
+      if (!this.discarded) this.failed(error);
       chunk.phase = 'uploadFailed'; chunk.error = t('meetingBlock.uploadFailed');
     } finally {
       chunk.busy = false; this.pending -= 1;
@@ -315,7 +367,7 @@ export class MeetingRecorder {
     chunk.busy = true; chunk.phase = 'transcribing'; chunk.error = undefined;
     this.pending += 1; this.changed();
     try {
-      const result = await this.backoff(() => assetBridge.transcribeAsset(chunk.audio.assetId, this.pageId));
+      const result = await this.backoff(() => { this.assertStore(); return this.assets!.transcribeAsset!(chunk.audio.assetId, this.pageId); });
       await this.write((block) => {
         const completed = blockProp<string[]>(block, 'transcriptionCompleted') ?? [];
         if (completed.includes(key)) return {};
@@ -327,6 +379,7 @@ export class MeetingRecorder {
       });
       chunk.phase = 'done';
     } catch (error) {
+      if (!this.discarded) this.failed(error);
       chunk.phase = 'untranscribed'; chunk.error = transcriptionError(error);
     } finally {
       chunk.busy = false; this.pending -= 1; this.settle(); this.changed();
@@ -340,14 +393,12 @@ export class MeetingRecorder {
 }
 
 const sessions = new Map<string, MeetingRecorder>();
+export const meetingSessions = (): MeetingRecorder[] => [...sessions.values()];
 export const activeSessions = (): MeetingRecorder[] => [...sessions.values()].filter((session) => session.active);
 export function meetingRecorder(editor: BlockEditorController, block: BlockMap, pageId: string): MeetingRecorder {
   const id = getPageIdForDoc(editor.doc) ?? pageId;
   const key = `${id}:${blockId(block)}`;
-  let session = sessions.get(key) ?? sessions.get(`:${blockId(block)}`);
-  if (session && id && !session.pageId) {
-    sessions.delete(`:${blockId(block)}`); session.pageId = id; sessions.set(key, session);
-  }
+  let session = sessions.get(key);
   if (!session) { session = new MeetingRecorder(editor, block, id); sessions.set(key, session); }
   return session;
 }

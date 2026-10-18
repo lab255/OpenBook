@@ -1,3 +1,4 @@
+import {MeetingPageContext} from './meetingPageContext';
 import {meetingSummaryContainer} from './meetingSummaryBlocks';
 import {shortId} from '@book.dev/sdk';
 import React, {useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
@@ -1409,13 +1410,13 @@ export const BlockEditor: React.FC<{
         }
       }}
     >
-      <CellSelectionContext.Provider value={cellSelCtx}>
+      <MeetingPageContext.Provider value={pageId}><CellSelectionContext.Provider value={cellSelCtx}>
         <KitPageLockContext.Provider value={readOnly}>
           <KitLockContext.Provider value={readOnlyLock}>
             <BlockList list={rootBlocks(doc)} editor={editor} ui={ui} drag={drag} setDrag={setDrag} performDrop={performDrop} computeRegion={computeRegion} depth={0} container={null} />
           </KitLockContext.Provider>
         </KitPageLockContext.Provider>
-      </CellSelectionContext.Provider>
+      </CellSelectionContext.Provider></MeetingPageContext.Provider>
       {slash.open && (
         <SlashMenu
           state={slash}

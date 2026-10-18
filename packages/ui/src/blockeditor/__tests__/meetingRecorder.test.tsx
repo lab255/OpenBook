@@ -456,11 +456,11 @@ describe('app lifetime meeting sessions', () => {
     const session = meetingRecorder(editor, block, 'away-page');
     const add = vi.spyOn(window, 'addEventListener');
     const remove = vi.spyOn(window, 'removeEventListener');
-    await session.start();
-    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
     let stored = {id: 'away-page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
     const savePage = vi.fn(async (page) => { stored = page; });
     setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start();
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
     session.detach(); unregister();
     await vi.advanceTimersByTimeAsync(2000);
     expect(session.mode).toBe('recording');
@@ -510,13 +510,14 @@ describe('app lifetime meeting sessions', () => {
 describe('navigation persistence failure recovery', () => {
   it.each(['load', 'save'] as const)('reconciles a page reopened during the stored-page %s', async (stage) => {
     const {doc, session} = harness();
-    await session.start();
     let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const getPage = vi.fn(async () => { if (stage === 'load') await gate; return stored; });
     const savePage = vi.fn(async (page) => { if (stage === 'save') await gate; stored = page; });
     setMeetingSessionClient({getPage, savePage} as unknown as DataClient);
+    await session.start(); await flush();
+    stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
     session.detach(); session.pause(); await flush();
     expect(getPage).toHaveBeenCalledOnce();
     if (stage === 'save') expect(savePage).toHaveBeenCalledOnce();
@@ -536,11 +537,12 @@ describe('navigation persistence failure recovery', () => {
 
   it('retains a retryable upload when saving its off-page reference fails', async () => {
     const {doc, session} = harness();
-    await session.start();
     let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
     const savePage = vi.fn(async (page) => { stored = page; });
     savePage.mockRejectedValueOnce(new Error('offline'));
     setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start(); await flush();
+    stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
     session.detach();
     session.pause();
     await flush();
@@ -589,5 +591,89 @@ describe('navigation persistence failure recovery', () => {
     finish({text: 'saved', durationMs: 1000}); await flush();
     expect(remove).toHaveBeenCalledWith('beforeunload', guard);
     add.mockRestore(); remove.mockRestore();
+  });
+});
+
+describe('MTG-7 fix regressions', () => {
+  it('refuses the new client and asset target after a recording switches stores', async () => {
+    const first = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
+    const next = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
+    setMeetingSessionClient(first);
+    const {session} = harness(); await session.start();
+    track.stop.mockClear();
+    setMeetingSessionClient(next);
+    session.pause(); await flush();
+    expect(track.stop).toHaveBeenCalled();
+    expect(next.getPage).not.toHaveBeenCalled(); expect(next.savePage).not.toHaveBeenCalled();
+    expect(putAsset).not.toHaveBeenCalled();
+    session.discard();
+  });
+
+  it('evicts a clean detached session and releases its editor', async () => {
+    const {editor, block} = harness();
+    const session = meetingRecorder(editor, block, 'evict');
+    await session.start(); session.stop(); await flush();
+    session.detach(editor);
+    expect((session as unknown as {editor?: unknown}).editor).toBeUndefined();
+    expect(meetingRecorder(editor, block, 'evict')).not.toBe(session);
+  });
+
+  it('keeps a second attached view visible when the first leaves', () => {
+    const {editor, block} = harness();
+    const session = meetingRecorder(editor, block, 'two-views');
+    const second = {...editor}; session.attach(second, block);
+    session.detach(editor); expect(session.visible).toBe(true);
+    session.detach(second); expect(session.visible).toBe(false);
+  });
+
+  it('uses the page id on the first render before document registration', async () => {
+    registerArtifactKit();
+    const {doc, block, editor} = harness();
+    const session = meetingRecorder(editor, block, 'early-page');
+    await session.start();
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} pageId="early-page" /></ConfirmProvider>);
+    expect(screen.queryByText('Recording or processing on another client.')).toBeNull();
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    const unregister = registerBlockEditorDoc('early-page', doc);
+    expect(meetingRecorder(editor, block, 'early-page')).toBe(session);
+    await act(async () => { session.stop(); await flush(); });
+    view.unmount(); unregister(); session.detach(editor);
+  });
+
+  it.each(['403', 'deleted'])('stops capture on a definitive %s write failure', async (failure) => {
+    const {doc, session} = harness();
+    const stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    setMeetingSessionClient({getPage: async () => stored, savePage: async () => { throw Object.assign(new Error('forbidden'), {status: 403}); }} as unknown as DataClient);
+    await session.start(); await flush(); track.stop.mockClear();
+    if (failure === '403') session.detach();
+    else rootBlocks(doc).delete(0);
+    await vi.advanceTimersByTimeAsync(45000); await flush();
+    expect(track.stop).toHaveBeenCalled(); expect(session.active).toBe(false);
+    expect(session.error).not.toBe(''); session.discard();
+  });
+
+  it('retries a failed final status on attach without claiming another client owns it', async () => {
+    const {doc, block, editor, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => {
+      const status = blockProp(rootBlocks(decodeSnapshot(page.data.blockdoc)).get(0), 'status');
+      if (status === 'done') throw new Error('offline');
+      stored = page;
+    });
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start(); await flush(); stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach(); session.stop(); await vi.advanceTimersByTimeAsync(0);
+    expect(session.statusDirty).toBe(true); expect(session.recordingElsewhere).toBe(false);
+    session.attach(editor, block); await flush();
+    expect(blockProp(block, 'status')).toBe('done'); expect(session.statusDirty).toBe(false);
+    session.discard(); session.detach();
+  });
+
+  it('counts saved audio once while its upload blob is still pending', () => {
+    const audio = {assetId: 'saved', startedAtMs: 0, durationMs: 2000};
+    const {session} = harness({audioChunks: [audio]});
+    session.chunks.push({id: 'pending', audio, blob: new Blob(['audio']), phase: 'uploading'});
+    expect(session.elapsedMs).toBe(2000);
+    session.discard();
   });
 });
