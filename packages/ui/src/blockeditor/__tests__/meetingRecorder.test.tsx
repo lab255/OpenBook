@@ -9,7 +9,7 @@ import {registerBlockEditorDoc} from '@/lib/aiBridge';
 import {AssetBridgeHost} from '@/components/AssetBridgeHost';
 import {DataProvider} from '@/data';
 import type {DataClient} from '@book.dev/sdk';
-import {MeetingRecorder, meetingRecorder, meetingSegments, chunkKey, type MeetingAudio, type RecordingChunk} from '../meetingRecorder';
+import {setMeetingSessionClient, MeetingRecorder, meetingRecorder, meetingSegments, chunkKey, type MeetingAudio, type RecordingChunk} from '../meetingSessions';
 import {MeetingBlockView} from '../MeetingBlockView';
 import {blockProp, createDoc, decodeSnapshot, docToJSON, encodeSnapshot, rootBlocks, setBlockProp} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
@@ -59,7 +59,7 @@ beforeEach(() => {
   transcribeAsset.mockReset().mockResolvedValue({text: 'hello', segments: [{start: 0.25, end: 1.5, text: 'hello'}], durationMs: 2000});
   setAssetBridge({putAsset, getAsset: async () => null, transcribeAsset});
 });
-afterEach(() => { cleanup(); setLocale('en'); setAssetBridge(null); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); setMeetingSessionClient(null); setLocale('en'); setAssetBridge(null); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('meeting recording and recovery', () => {
   it('restarts recorders into independent files, pauses/resumes, saves ordered durations and transcript offsets', async () => {
@@ -445,5 +445,57 @@ describe('MEET-5 review regressions', () => {
         expect(output).toContain('Manual note');
       }
     }
+  });
+});
+
+
+describe('app lifetime meeting sessions', () => {
+  it('persists final audio and transcript after the view and doc detach', async () => {
+    const {doc, block, editor} = harness();
+    const unregister = registerBlockEditorDoc('away-page', doc);
+    const session = meetingRecorder(editor, block, 'away-page');
+    await session.start();
+    let stored = {id: 'away-page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => { stored = page; });
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    session.detach(); unregister();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(session.mode).toBe('recording');
+    window.dispatchEvent(new Event('visibilitychange'));
+    expect(session.mode).toBe('recording');
+    session.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    const persisted = rootBlocks(decodeSnapshot(stored.data.blockdoc)).get(0);
+    expect(blockProp<MeetingAudio[]>(persisted, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(persisted, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(blockProp(persisted, 'status')).toBe('done');
+    expect(blockProp(block, 'audioChunks')).toBeUndefined();
+    expect(savePage).toHaveBeenCalled();
+  });
+
+  it('rebinds a recreated document to the same live session and stops only on a lock transition', async () => {
+    const {doc, block, editor} = harness();
+    const unregister = registerBlockEditorDoc('return-page', doc);
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    const session = meetingRecorder(editor, block, 'return-page');
+    await act(async () => { await session.start(); });
+    view.unmount(); unregister();
+    expect(session.mode).toBe('recording'); expect(session.visible).toBe(false);
+    const reopened = decodeSnapshot(encodeSnapshot(doc));
+    const nextBlock = rootBlocks(reopened).get(0);
+    const nextEditor = {...editor, doc: reopened};
+    const unregisterNext = registerBlockEditorDoc('return-page', reopened);
+    const next = render(<ConfirmProvider><MeetingBlockView block={nextBlock} editor={nextEditor} pageReadOnly={false} /></ConfirmProvider>);
+    expect(meetingRecorder(nextEditor, nextBlock, 'return-page')).toBe(session);
+    expect(session.recordingElsewhere).toBe(false); expect(session.visible).toBe(true);
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(45000); });
+    expect(blockProp<MeetingAudio[]>(nextBlock, 'audioChunks')).toHaveLength(1);
+    next.rerender(<ConfirmProvider><MeetingBlockView block={nextBlock} editor={nextEditor} pageReadOnly /></ConfirmProvider>);
+    await act(async () => { await flush(); });
+    expect(session.active).toBe(false);
+    expect(blockProp(nextBlock, 'status')).toBe('done');
+    unregisterNext();
   });
 });

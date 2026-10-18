@@ -12,7 +12,7 @@ import {MeetingTranscript} from './MeetingTranscript';
 import {MeetingTabs} from './MeetingTabs';
 import {useKitLock} from './kit/lock';
 import {KitFrame, NameDescriptionFields} from './kit/KitFrame';
-import {meetingRecorder, type MeetingAudio, type MeetingSegment} from './meetingRecorder';
+import {meetingRecorder, type MeetingAudio, type MeetingSegment} from './meetingSessions';
 
 export function MeetingBlockView({block, editor, pageReadOnly, children, summaryChildren}: CustomBlockProps) {
   const [exporting, setExporting] = useState(false);
@@ -20,7 +20,6 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
   const locked = useKitLock();
   const readOnly = editor.readOnly || pageReadOnly || locked;
   const session = meetingRecorder(editor, block, getPageIdForDoc(editor.doc) ?? '');
-  session.readOnly = readOnly;
   const chromeEditor = useMemo(() => ({...editor, readOnly}), [editor, readOnly]);
   useSyncExternalStore(session.subscribe, session.snapshot, session.snapshot);
   const [, tick] = useState(0);
@@ -30,8 +29,11 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
     const timer = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(timer);
   }, [active]);
-  useEffect(() => () => session.stop(), [session]);
-  useEffect(() => { if (readOnly) session.stop(); }, [readOnly, session]);
+  useEffect(() => {
+    session.attach(editor, block);
+    return () => session.detach();
+  }, [session, editor, block]);
+  useEffect(() => { session.setReadOnly(readOnly); }, [readOnly, session]);
   const saved = blockProp<MeetingAudio[]>(block, 'audioChunks') ?? [];
   const completed = blockProp<string[]>(block, 'transcriptionCompleted') ?? [];
   const transcript = blockProp<MeetingSegment[]>(block, 'transcript') ?? [];
