@@ -662,10 +662,12 @@ export const ja: PartialMessages = {
     urlLabel: 'リンク URL',
   },
   meetingBlock: {
+    needsAttention: '対応が必要です',
+    discard: '破棄',
+    discardConfirm: '未保存の会議音声を破棄しますか？',
     recordingSessions: '録音セッション',
     elapsed: '録音経過時間',
     goToMeeting: '会議に移動',
-
     tabs: '会議のセクション',
     exportAudio: '音声をエクスポート',
     exportAudioFailed: '音声をエクスポートできませんでした。アクセス権を確認して再試行してください。',
@@ -686,7 +688,6 @@ export const ja: PartialMessages = {
     summaryUnavailable: 'OpenBook サーバーに接続し、設定 → AI で AI を構成すると会議を要約できます。',
     summaryForbidden: '要約には、有料または対象のプラン、アカウントへのログイン、およびページへのアクセス権が必要です。',
     summaryFailed: '要約の生成に失敗しました。以前の要約は変更されていません。再試行してください。',
-
     locked: 'セクションにより会議がロックされています',
     readOnly: '読み取り専用の会議',
     elsewhere: '別のクライアントで録音または処理中です。',

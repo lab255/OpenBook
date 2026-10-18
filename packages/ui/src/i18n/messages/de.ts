@@ -667,10 +667,12 @@ export const de: PartialMessages = {
     urlLabel: 'Link-URL',
   },
   meetingBlock: {
+    needsAttention: 'Aufmerksamkeit erforderlich',
+    discard: 'Verwerfen',
+    discardConfirm: 'Ungespeicherte Meeting-Aufnahme verwerfen?',
     recordingSessions: 'Laufende Aufnahmen',
     elapsed: 'Aufnahmedauer',
     goToMeeting: 'Zum Meeting',
-
     tabs: 'Besprechungsbereiche',
     exportAudio: 'Audio exportieren',
     exportAudioFailed: 'Audio konnte nicht exportiert werden. Prüfe den Zugriff und versuche es erneut.',
@@ -691,7 +693,6 @@ export const de: PartialMessages = {
     summaryUnavailable: 'Verbinde einen OpenBook-Server und konfiguriere KI unter Einstellungen → KI, um dieses Meeting zusammenzufassen.',
     summaryForbidden: 'Zusammenfassungen erfordern einen kostenpflichtigen oder berechtigten Tarif, ein angemeldetes Konto und Zugriff auf die Seite.',
     summaryFailed: 'Die Zusammenfassung konnte nicht erstellt werden. Die bisherige Zusammenfassung bleibt erhalten; versuche es erneut.',
-
     locked: 'Besprechung durch ihren Abschnitt gesperrt',
     readOnly: 'Schreibgeschützte Besprechung',
     elsewhere: 'Aufnahme oder Verarbeitung auf einem anderen Client.',

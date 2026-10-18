@@ -1108,10 +1108,12 @@ export const en = {
     noDatabases: 'No databases found',
   },
   meetingBlock: {
+    needsAttention: 'Needs attention',
+    discard: 'Discard',
+    discardConfirm: 'Discard unsaved meeting audio?',
     recordingSessions: 'Recording sessions',
     elapsed: 'Elapsed recording time',
     goToMeeting: 'Go to meeting',
-
     tabs: 'Meeting sections',
     exportAudio: 'Export audio',
     exportAudioFailed: 'Audio could not be exported. Check access and try again.',
@@ -1132,7 +1134,6 @@ export const en = {
     summaryUnavailable: 'Connect an OpenBook server and configure AI in Settings → AI to summarize this meeting.',
     summaryForbidden: 'Summaries require a paid or eligible plan, a signed-in account and page access.',
     summaryFailed: 'Summary generation failed. Your previous summary is unchanged; try again.',
-
     locked: 'Meeting locked by its section',
     readOnly: 'Read-only meeting',
     elsewhere: 'Recording or processing on another client.',
