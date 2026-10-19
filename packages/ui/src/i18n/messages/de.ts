@@ -716,6 +716,7 @@ export const de: PartialMessages = {
     uploadFailedStatus: 'Upload fehlgeschlagen',
     failedChunks: '{count} Abschnitte nicht transkribiert',
     pausePlayback: 'Wiedergabe pausieren',
+    seekSegment: 'Zu {time} springen',
     seek: 'Wiedergabeposition',
     playbackFailed: 'Audio konnte nicht abgespielt werden. Erneut versuchen.',
     playback: 'Audioabschnitt ab {time} abspielen',

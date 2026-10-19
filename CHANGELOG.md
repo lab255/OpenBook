@@ -1,3 +1,17 @@
+## 3.25.0 (2026-10-19)
+
+### 🚀 Features
+
+- **ui:** meeting block v2 shell — header + Summary | Notes | Transcript tabs (MTG-1) ([#415](https://github.com/lab255/OpenBook/pull/415))
+- **ui:** meeting block unified player — one timeline across chunks (MTG-2) ([#416](https://github.com/lab255/OpenBook/pull/416))
+- **ui:** meeting summary as editable blocks — container contract + confirm-replace (MTG-4) ([#417](https://github.com/lab255/OpenBook/pull/417))
+- **ui:** interactive meeting transcript — click-to-seek, now-playing highlight, auto-follow (MTG-3) ([#418](https://github.com/lab255/OpenBook/pull/418))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
 ## 3.24.0 (2026-10-15)
 
 ### 🚀 Features

@@ -242,6 +242,7 @@
     --obe-row-space-above: 0px;
     --obe-select-radius: var(--radius-sm);
     --obe-select-wash: hsl(var(--ring) / 0.14);
+    --obe-now-wash: hsl(var(--foreground) / 0.05);
     --obe-chrome-ink: hsl(var(--muted-foreground) / 0.8);
     --obe-chrome-ink-hover: hsl(var(--foreground));
     --obe-chrome-hover: var(--hover);
@@ -422,6 +423,7 @@
     --data-column-tint: 35%;
     --obe-chart-ink-on-pale: #233246;
     --obe-select-wash: hsl(var(--ring) / 0.2);
+    --obe-now-wash: hsl(var(--foreground) / 0.08);
     --obe-fg-gray: hsl(0 0% 66%);
     --obe-fg-brown: hsl(25 40% 62%);
     --obe-fg-orange: hsl(28 85% 62%);
@@ -4029,16 +4031,26 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-meeting-header .obe-meeting-controls { margin: 0 0 0 auto; }
 .obe-meeting-header > p { flex-basis: 100%; order: 1; margin: 0; }
 .obe-kit-meeting > .obe-meeting { flex: 1 1 100%; min-width: 0; }
-.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure) { border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; background: hsl(var(--background)); color: hsl(var(--foreground)); transition: background-color var(--motion-fast) var(--ease-out-soft); }
-.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):hover:not(:disabled) { background: var(--hover); }
-.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):active { transition: none; }
+.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):not(.obe-meeting-timestamp) { border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; background: hsl(var(--background)); color: hsl(var(--foreground)); transition: background-color var(--motion-fast) var(--ease-out-soft); }
+.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):not(.obe-meeting-timestamp):hover:not(:disabled) { background: var(--obe-chrome-hover); }
+.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):not(.obe-meeting-timestamp):active { transition: none; }
 .obe-meeting-elapsed, .obe-meeting-lock { color: hsl(var(--muted-foreground)); font-size: var(--obe-small-size); }
 .obe-meeting-elapsed { font-variant-numeric: tabular-nums; }
 .obe-meeting button:disabled { opacity: 0.5; cursor: default; }
-.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):focus-visible, .obe-meeting a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.obe-meeting button:not(.obe-tab):not(.obe-meeting-marker-button):not(.obe-meeting-play):not(.obe-meeting-failure-disclosure):not(.obe-meeting-timestamp):focus-visible, .obe-meeting a:focus-visible { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
 .obe-meeting audio { max-width: 100%; }
-.obe-meeting-transcript { user-select: text; white-space: pre-wrap; }
-.obe-meeting time { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+/* Twelve body lines maximum; scrolling stays inside the transcript pane. */
+.obe-meeting-transcript { user-select: text; white-space: pre-wrap; --obe-transcript-row: calc(var(--obe-line) + 8px); max-height: calc(var(--obe-transcript-row) * 12.5); overflow-y: auto; overscroll-behavior: contain; }
+.obe-meeting-transcript-row { margin: 0; padding: 4px 8px; border-radius: var(--radius-sm); color: hsl(var(--foreground)); font-size: var(--obe-font-size); line-height: var(--obe-leading); }
+.obe-meeting-transcript-row[data-active="true"] { background: var(--obe-now-wash); }
+.obe-meeting-transcript-row[data-active="true"] time { color: hsl(var(--foreground)); font-weight: var(--obe-heading-weight); text-decoration: underline; }
+.obe-meeting-timestamp { border: 0; border-radius: var(--radius-md); padding: 0 4px; line-height: inherit; background: transparent; font-size: var(--obe-small-size); cursor: default; }
+button.obe-meeting-timestamp { cursor: pointer; }
+button.obe-meeting-timestamp:hover { background: var(--obe-chrome-hover); }
+.obe-meeting-timestamp:focus-visible { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
+.obe-meeting-transcript:focus-visible { outline: var(--obe-focus-ring); outline-offset: -2px; }
+.obe-meeting time { display: inline-grid; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.obe-meeting time::after { content: attr(data-t); font-weight: var(--obe-heading-weight); visibility: hidden; height: 0; overflow: hidden; }
 .obe-meeting-summary, .obe-meeting-notes { padding-inline: var(--obe-cnt-inset); }
 .obe-meeting-summary-draft, .obe-meeting-summary-empty { color: hsl(var(--muted-foreground)); }
 .obe-meeting-summary-empty { font-size: var(--obe-small-size); }

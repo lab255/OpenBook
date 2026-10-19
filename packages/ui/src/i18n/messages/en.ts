@@ -1157,6 +1157,7 @@ export const en = {
     uploadFailedStatus: 'Upload failed',
     failedChunks: '{count} chunks not transcribed',
     pausePlayback: 'Pause playback',
+    seekSegment: 'Seek to {time}',
     seek: 'Playback position',
     playbackFailed: 'Audio could not be played. Try again.',
     playback: 'Play audio chunk starting at {time}',

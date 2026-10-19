@@ -708,6 +708,7 @@ export const zh: PartialMessages = {
     uploadFailedStatus: '上传失败',
     failedChunks: '{count} 个片段未转录',
     pausePlayback: '暂停播放',
+    seekSegment: '跳转至 {time}',
     seek: '播放位置',
     playbackFailed: '无法播放音频，请重试。',
     playback: '播放从 {time} 开始的音频片段',

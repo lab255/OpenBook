@@ -711,6 +711,7 @@ export const ja: PartialMessages = {
     uploadFailedStatus: 'アップロード失敗',
     failedChunks: '{count} チャンクが未文字起こし',
     pausePlayback: '再生を一時停止',
+    seekSegment: '{time} に移動',
     seek: '再生位置',
     playbackFailed: '音声を再生できませんでした。もう一度お試しください。',
     playback: '{time} からの音声チャンクを再生',
