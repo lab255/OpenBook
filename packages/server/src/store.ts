@@ -2657,7 +2657,7 @@ export class PageStore {
   }
 
   /** Atomically merge a stored-page delta, preserving current metadata and deletion. */
-  async applyPageUpdate(id: string, update: Uint8Array, author: Principal): Promise<StoredPage | null> {
+  async applyPageUpdate(id: string, update: Uint8Array, author: Principal): Promise<StoredPage | 'stale' | null> {
     await this.assertNotLedgerPage(id);
     return this.db.begin(async (tx) => {
       const prior = await tx.query<{name: string | null; data: PageSnapshot | string | null}>(
@@ -2666,10 +2666,12 @@ export class PageStore {
       if (!prior.length) return null;
       const data = parseSnapshot(prior[0].data);
       const base = (data.blockdoc as {update?: string} | undefined)?.update;
+      if (!base) return 'stale' as const;
       const doc = new Y.Doc();
       try {
         if (base) Y.applyUpdate(doc, Buffer.from(base, 'base64'));
         Y.applyUpdate(doc, update);
+        if (doc.store.pendingStructs || doc.store.pendingDs) return 'stale' as const;
         return await this.upsertPageTx(tx, id, {
           id, name: prior[0].name, data: {...data, editor: 'blocks', blockdoc: encodeServerBlockDoc(doc)},
         }, author);

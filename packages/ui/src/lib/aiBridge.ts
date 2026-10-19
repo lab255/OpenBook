@@ -31,7 +31,6 @@ import {
   blockType,
   cellPosition,
   coerceNewBlock,
-  decodeSnapshot,
   encodeSnapshot,
   findBlock,
   insertBlock,
@@ -463,18 +462,12 @@ const applyPageAppearance = (pageId: string, payload: Record<string, unknown>): 
 
 /** Off-page path: fetch, mutate, and persist only the CRDT delta when supported. */
 const applyToStoredPage = async (client: ApplyClient, pageId: string, p: AgentProposal): Promise<void> => {
-  const page = await client.getPage(pageId);
-  if (!page) throw new Error('page not found');
-  const blockdoc = page.data.blockdoc as BlockDocSnapshot | undefined;
-  // Rebuild a Y.Doc from the stored snapshot, mutate it, re-encode. This keeps
-  // the CRDT history coherent for the next reader rather than hand-editing the
-  // JSON projection.
-  const doc = decodeSnapshot(blockdoc);
+  const {doc, page} = await saveStoredPageUpdate(client, pageId, (doc) => applyProposalToDoc(doc, p));
   try {
-    applyProposalToDoc(doc, p);
-    await saveStoredPageUpdate(client, page, doc);
     const reopened = getBlockEditorDoc(pageId);
-    if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
+    if (reopened && (page.data.blockdoc as BlockDocSnapshot | undefined)?.update) {
+      Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
+    }
   } finally { doc.destroy(); }
 };
 

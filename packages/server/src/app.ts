@@ -1768,6 +1768,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     async (c) => {
       const id = c.req.param('id');
       await requireAccess(c, store, 'write', id);
+      await rejectManagedPage(id);
       await requireAgentDirectWrite(c, id);
       const body = await c.req.json<{update?: string; clientId?: number}>().catch(() => ({} as {update?: string; clientId?: number}));
       if (typeof body.update !== 'string' || !body.update.length) return c.json({error: 'invalid update'}, 400);
@@ -1777,16 +1778,23 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
       catch { return c.json({error: 'invalid update'}, 400); }
       finally { probe.destroy(); }
       const principal = c.get('principal');
-      const write = () => store.applyPageUpdate(id, bytes, principal);
+      const write = async () => {
+        const result = await store.applyPageUpdate(id, bytes, principal);
+        // Reject inside the fence so its canonical merge never adopts a refused delta.
+        if (result === 'stale') throw new HTTPException(409, {message: 'stale stored base'});
+        if (!result) throw new HTTPException(404, {message: 'page not found'});
+        return result;
+      };
       const page = persister
         ? await persister.withSnapshotWriteFence(id, write, {intent: 'merge', snapshotUpdate: bytes, subject: authoredSubject(principal)})
         : await write();
       if (!page) return c.json({error: 'page not found'}, 404);
       hub.publishPage(page);
       hub.publishPageUpdate(id, body.update, typeof body.clientId === 'number' ? body.clientId : 0);
-      await relay.ingest(id, bytes, loadRelayBase);
+      void relay.ingest(id, bytes, loadRelayBase).catch(console.error);
       await broadcastList();
       if (page.databaseId) await broadcastRows(page.databaseId);
+      logEdit(c, page.id, 'page.save', page.name ?? '');
       return c.body(null, 204);
     },
   );

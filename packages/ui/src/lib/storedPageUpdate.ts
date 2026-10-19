@@ -4,37 +4,57 @@ import {decodeSnapshot, encodeSnapshot, type BlockDocSnapshot} from '@/blockedit
 
 export type StoredPageClient = Pick<DataClient, 'getPage' | 'savePage' | 'applyPageUpdate'>;
 
-/** Persist only this mutation when supported; older/local stores re-read before saving. */
+/** Own the read/mutate/delta cycle. The caller destroys the returned document. */
 export async function saveStoredPageUpdate(
-  client: StoredPageClient, page: StoredPage, doc: Y.Doc,
+  client: StoredPageClient, pageId: string, mutate: (doc: Y.Doc) => void,
   assertStore: () => void = () => {},
-): Promise<void> {
-  assertStore();
-  // JSON-only legacy snapshots have no shared CRDT identities to address with a delta.
-  const storedUpdate = (page.data.blockdoc as BlockDocSnapshot | undefined)?.update;
-  if (storedUpdate && client.applyPageUpdate) {
-    // Decode may add an empty-page placeholder. Diff against the stored vector,
-    // not the reconstructed doc, so those new dependencies travel with the edit.
-    const stateVector = Y.encodeStateVectorFromUpdate(Uint8Array.from(atob(storedUpdate), (c) => c.charCodeAt(0)));
-    const delta = Y.encodeStateAsUpdate(doc, stateVector);
-    let binary = '';
-    for (const byte of delta) binary += String.fromCharCode(byte);
-    const applied = await client.applyPageUpdate(page.id, btoa(binary), doc.clientID);
+): Promise<{doc: Y.Doc; page: StoredPage}> {
+  const read = async () => {
     assertStore();
-    if (applied) return;
+    const page = await client.getPage(pageId);
+    assertStore();
+    if (!page) throw Object.assign(new Error('page no longer exists'), {status: 404});
+    return page;
+  };
+  for (let attempt = 0; ; attempt++) {
+    const page = await read();
+    let doc = decodeSnapshot(page.data.blockdoc as BlockDocSnapshot | undefined);
+    try {
+      mutate(doc);
+      const storedUpdate = (page.data.blockdoc as BlockDocSnapshot | undefined)?.update;
+      if (storedUpdate && client.applyPageUpdate) {
+        // Include any placeholder dependencies added by decoding an empty document.
+        const sv = Y.encodeStateVectorFromUpdate(Uint8Array.from(atob(storedUpdate), (c) => c.charCodeAt(0)));
+        const delta = Y.encodeStateAsUpdate(doc, sv);
+        let binary = '';
+        for (const byte of delta) binary += String.fromCharCode(byte);
+        let applied: boolean;
+        try {
+          applied = await client.applyPageUpdate(pageId, btoa(binary), doc.clientID);
+        } catch (error) {
+          assertStore();
+          if ((error as {status?: number}).status !== 409 || attempt === 1) throw error;
+          doc.destroy();
+          continue;
+        }
+        assertStore();
+        if (applied) return {doc, page};
+      }
+      const latest = await read();
+      const merged = decodeSnapshot(latest.data.blockdoc as BlockDocSnapshot | undefined);
+      try {
+        if (storedUpdate && (latest.data.blockdoc as BlockDocSnapshot | undefined)?.update) {
+          Y.applyUpdate(merged, Y.encodeStateAsUpdate(doc));
+        } else {
+          // JSON projections rebuild identities: replay the edit on the latest projection.
+          mutate(merged);
+        }
+      } catch (error) { merged.destroy(); throw error; }
+      doc.destroy();
+      doc = merged;
+      await client.savePage({id: pageId, name: latest.name, data: {...latest.data, editor: 'blocks', blockdoc: encodeSnapshot(doc)}});
+      assertStore();
+      return {doc, page: storedUpdate ? latest : page};
+    } catch (error) { doc.destroy(); throw error; }
   }
-  const latest = await client.getPage(page.id);
-  assertStore();
-  if (!latest) throw Object.assign(new Error('page no longer exists'), {status: 404});
-  const merged = decodeSnapshot(latest.data.blockdoc as BlockDocSnapshot | undefined);
-  try {
-    // A legacy snapshot was independently reconstructed, so preserve the mutated
-    // document's projection rather than merging unrelated synthetic identities.
-    if ((page.data.blockdoc as BlockDocSnapshot | undefined)?.update) {
-      Y.applyUpdate(merged, Y.encodeStateAsUpdate(doc));
-      Y.applyUpdate(doc, Y.encodeStateAsUpdate(merged));
-    }
-    await client.savePage({id: page.id, name: latest.name, data: {...latest.data, editor: 'blocks', blockdoc: encodeSnapshot(doc)}});
-    assertStore();
-  } finally { merged.destroy(); }
 }

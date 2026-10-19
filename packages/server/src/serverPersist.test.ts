@@ -843,6 +843,55 @@ describe('durable stored-page deltas', () => {
     client.destroy(); other.destroy();
   });
 
+  it.each([false, true])('rejects base-less and dangling dependencies without writes (serverPersist=%s)', async (enabled) => {
+    const store = await freshStore();
+    const app = enabled ? persistedApp(store) : createApp(store);
+    const {id, client} = await seed(store, 'unchanged');
+    const sv = Y.encodeStateVector(client);
+    (client.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).insert(0, 'missing dependency');
+    const delta = Y.encodeStateAsUpdate(client, sv);
+    // A valid but unrelated stored lineage cannot satisfy the incoming delta.
+    const unrelated = blockDoc('other', 'preserve');
+    await store.upsertPage({id, data: snapshotOf(unrelated)});
+    const before = await store.getPage(id);
+    const res = await apply(app, id, delta);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({error: 'stale stored base'});
+    expect(await store.getPage(id)).toEqual(before);
+    // A deletion-only delta must also reject pending delete-set dependencies.
+    const deleteSV = Y.encodeStateVector(client);
+    (client.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).delete(0, 1);
+    expect((await apply(app, id, Y.encodeStateAsUpdate(client, deleteSV))).status).toBe(409);
+    expect(await store.getPage(id)).toEqual(before);
+    const jsonOnly = {...encodeServerBlockDoc(unrelated), update: undefined};
+    await store.upsertPage({id, data: {editor: 'blocks', blockdoc: jsonOnly} as unknown as PageSnapshot});
+    const legacy = await store.getPage(id);
+    expect((await apply(app, id, Y.encodeStateAsUpdate(client))).status).toBe(409);
+    if (enabled) await (app as AppWithCollab).collabPersist!.close();
+    expect(await store.getPage(id)).toEqual(legacy);
+    client.destroy(); unrelated.destroy();
+  });
+
+  it('preserves concurrent /updates arriving inside the durable-write fence', async () => {
+    const store = await freshStore();
+    const app = persistedApp(store);
+    const {id, client} = await seed(store, 'concurrent relay');
+    const other = new Y.Doc(); Y.applyUpdate(other, Y.encodeStateAsUpdate(client));
+    const sv = Y.encodeStateVector(client);
+    (client.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).insert(0, 'DURABLE');
+    (other.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).insert(0, 'RELAY');
+    const original = store.applyPageUpdate.bind(store);
+    vi.spyOn(store, 'applyPageUpdate').mockImplementationOnce(async (...args) => {
+      expect((await postUpdate(app, id, Y.encodeStateAsUpdate(other, sv), other.clientID)).status).toBe(204);
+      return original(...args);
+    });
+    expect((await apply(app, id, Y.encodeStateAsUpdate(client, sv))).status).toBe(204);
+    await waitFor(async () => (await textOf(store, id)).includes('RELAY'));
+    expect(await textOf(store, id)).toContain('DURABLE');
+    expect((await store.listEdits(id)).some((edit) => edit.kind === 'page.save')).toBe(true);
+    client.destroy(); other.destroy();
+  });
+
   it('does not resurrect a page deleted after authorization but before the transaction', async () => {
     const store = await freshStore();
     const app = createApp(store);
@@ -857,7 +906,7 @@ describe('durable stored-page deltas', () => {
     client.destroy();
   });
 
-  it('denies a page belonging to another instance and rejects malformed updates', async () => {
+  it('unknown id returns 404 and malformed updates are rejected', async () => {
     const store = await freshStore();
     const foreign = await freshStore();
     const app = createApp(store);
