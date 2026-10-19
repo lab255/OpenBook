@@ -71,8 +71,15 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await expect(transcript.first()).toContainText(/Mock transcription \([1-9]\d* bytes\)/);
   await expect(meeting.locator('.obe-meeting-header')).toContainText('Paused');
   const firstText = await transcript.first().innerText();
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await meeting.getByRole('button', {name: 'Meeting actions'}).click();
+  await page.getByRole('menuitem', {name: 'Copy transcript', exact: true}).click();
+  const time = await transcript.first().locator('time').innerText();
+  const text = await transcript.first().locator('span').innerText();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`[${time}] ${text}`);
   const singleDownload = page.waitForEvent('download');
-  await meeting.getByRole('button', {name: 'Export audio', exact: true}).click();
+  await meeting.getByRole('button', {name: 'Meeting actions'}).click();
+  await page.getByRole('menuitem', {name: 'Export audio', exact: true}).click();
   const single = await singleDownload;
   expect(single.suggestedFilename()).toBe('Meeting-00h00m00s.webm');
   const singleBytes = await downloadBytes(single);
@@ -139,7 +146,8 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   }).toContain(note);
 
   const zipDownload = page.waitForEvent('download');
-  await meeting.getByRole('button', {name: 'Export audio', exact: true}).click();
+  await meeting.getByRole('button', {name: 'Meeting actions'}).click();
+  await page.getByRole('menuitem', {name: 'Export audio', exact: true}).click();
   const zip = await zipDownload;
   expect(zip.suggestedFilename()).toMatch(/-audio\.zip$/);
   const files = unzipSync(await downloadBytes(zip));
@@ -168,6 +176,10 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await page.goto(pathToFileURL(htmlPath).href);
   const viewer = page.locator('.ob-viewer');
   await expect(viewer).toBeVisible();
+  await viewer.getByRole('button', {name: 'Meeting actions'}).click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Export audio', 'Copy transcript']);
+  await page.getByRole('menuitem', {name: 'Copy transcript'}).click();
+  await expect(page.getByText('Transcript copied', {exact: true})).toBeVisible();
   await viewer.getByRole('tab', {name: 'Transcript', exact: true}).click();
   await expect(viewer.getByRole('button', {name: 'Record', exact: true})).toBeDisabled();
   await viewer.locator('.obe-meeting-timestamp').nth(1).click();
