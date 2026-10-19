@@ -7,7 +7,8 @@ import {blockChildren, blockProp, blockType, insertBlock} from './model';
 import type {CustomBlockDef, CustomBlockProps} from './registry';
 import {exportMeetingAudio} from './meetingAudioExport';
 import {hasMeetingSummary} from './meetingSummaryBlocks';
-import {MeetingSummary} from './MeetingSummary';
+import {useMeetingSummary} from './MeetingSummary';
+import {MeetingManagementMenu} from './MeetingManagementMenu';
 import {MeetingHeader} from './MeetingHeader';
 import {MeetingTranscript} from './MeetingTranscript';
 import {MeetingTabs} from './MeetingTabs';
@@ -41,20 +42,23 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
   const elapsed = session.elapsedMs;
   const status = session.active ? session.mode : blockProp<string>(block, 'status') ?? 'idle';
   const canTranscribe = useSyncExternalStore(subscribeAssetBridge, assetBridge.canTranscribe, assetBridge.canTranscribe);
+  const summary = useMeetingSummary({block, editor, readOnly, status, transcript, children: summaryChildren});
   const control = <section className="obe-meeting" aria-label={t('meetingBlock.label')}>
     <MeetingHeader session={session} status={status} elapsed={elapsed} readOnly={readOnly} pageReadOnly={pageReadOnly} locked={locked}
-      management={saved.length > 0 && <button type="button" disabled={exporting} aria-busy={exporting} onClick={async () => {
-        setExporting(true); setExportError(false);
-        try { await exportMeetingAudio(saved, blockProp<string>(block, 'title') || t('meetingBlock.label')); }
-        catch { setExportError(true); }
-        finally { setExporting(false); }
-      }}>{t('meetingBlock.exportAudio')}</button>} />
+      management={<MeetingManagementMenu block={block} editor={editor} session={session} readOnly={readOnly}
+        saved={saved} transcript={transcript} canTranscribe={canTranscribe} summary={summary} exporting={exporting}
+        onExport={async () => {
+          setExporting(true); setExportError(false);
+          try { await exportMeetingAudio(saved, blockProp<string>(block, 'title') || t('meetingBlock.label')); }
+          catch { setExportError(true); }
+          finally { setExporting(false); }
+        }} />} />
     {exportError && <p role="alert">{t('meetingBlock.exportAudioFailed')}</p>}
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}
     <MeetingTabs status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={hasMeetingSummary(block)}
       transcript={<MeetingTranscript saved={saved} completed={completed} transcript={transcript} session={session} readOnly={readOnly} canTranscribe={canTranscribe} />}
-      summary={<MeetingSummary block={block} editor={editor} readOnly={readOnly} status={status} transcript={transcript}>{summaryChildren}</MeetingSummary>}
+      summary={summary.content}
       notes={<section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}>{children}
         {!readOnly && !blockChildren(block)?.toArray().some((child) => String(blockType(child)) !== 'meetingsummary') && <button type="button" onClick={() => editor.doc.transact(() => {
           const notes = blockChildren(block);
