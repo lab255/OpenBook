@@ -11,12 +11,14 @@ import {useMeetingSummary} from './MeetingSummary';
 import {MeetingManagementMenu} from './MeetingManagementMenu';
 import {MeetingHeader} from './MeetingHeader';
 import {MeetingTranscript} from './MeetingTranscript';
-import {MeetingTabs} from './MeetingTabs';
+import {meetingManagementVisible} from './meetingManagement';
+import {MeetingTabs, type MeetingTab} from './MeetingTabs';
 import {useKitLock} from './kit/lock';
 import {KitFrame, NameDescriptionFields} from './kit/KitFrame';
 import {meetingRecorder, type MeetingAudio, type MeetingSegment} from './meetingSessions';
 
 export function MeetingBlockView({block, editor, pageReadOnly, children, summaryChildren}: CustomBlockProps) {
+  const [selectedTab, showTab] = useState<MeetingTab | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
   const locked = useKitLock();
@@ -45,7 +47,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
   const summary = useMeetingSummary({block, editor, readOnly, status, transcript, children: summaryChildren});
   const control = <section className="obe-meeting" aria-label={t('meetingBlock.label')}>
     <MeetingHeader session={session} status={status} elapsed={elapsed} readOnly={readOnly} pageReadOnly={pageReadOnly} locked={locked}
-      management={<MeetingManagementMenu block={block} editor={editor} session={session} readOnly={readOnly}
+      management={meetingManagementVisible(readOnly, saved, transcript) && <MeetingManagementMenu showTab={showTab} block={block} editor={editor} session={session} readOnly={readOnly}
         saved={saved} transcript={transcript} canTranscribe={canTranscribe} summary={summary} exporting={exporting}
         onExport={async () => {
           setExporting(true); setExportError(false);
@@ -56,7 +58,7 @@ export function MeetingBlockView({block, editor, pageReadOnly, children, summary
     {exportError && <p role="alert">{t('meetingBlock.exportAudioFailed')}</p>}
     {session.error && <p role="alert">{session.error}</p>}
     {!canTranscribe && <p>{t('meetingBlock.noAI')}</p>}
-    <MeetingTabs status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={hasMeetingSummary(block)}
+    <MeetingTabs selected={selectedTab} onSelect={showTab} status={status} attention={session.unsaved || session.chunks.some((c) => !!c.error)} hasSummary={hasMeetingSummary(block)}
       transcript={<MeetingTranscript saved={saved} completed={completed} transcript={transcript} session={session} readOnly={readOnly} canTranscribe={canTranscribe} />}
       summary={summary.content}
       notes={<section className="obe-meeting-notes" aria-label={t('meetingBlock.notes')}>{children}

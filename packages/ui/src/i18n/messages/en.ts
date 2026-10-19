@@ -1109,12 +1109,14 @@ export const en = {
   },
   meetingBlock: {
     manage: 'Meeting actions',
-    retryAll: 'Retry transcription (all failed chunks)',
+    retryAll: 'Retry failed transcriptions',
     copyTranscript: 'Copy transcript',
     transcriptCopied: 'Transcript copied',
     transcriptCopyFailed: 'Could not copy transcript',
     deleteTranscript: 'Delete transcript',
-    deleteTranscriptBody: 'This removes the transcript text; audio, summary and notes are kept. Transcription in progress may add new text.',
+    deleteTranscriptTitle: 'Delete transcript?',
+    deleteTranscriptBody: 'Removes the transcript text. Audio, summary and notes are kept.',
+    deleteTranscriptPending: 'Transcription still in progress may add new text.',
 
     needsAttention: 'Needs attention',
     discard: 'Discard',

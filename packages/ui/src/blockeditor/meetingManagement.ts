@@ -1,7 +1,7 @@
 import type * as Y from 'yjs';
 import {setBlockProp, type BlockMap} from './model';
 import {meetingTime} from './meetingTime';
-import type {MeetingRecorder, RecordingChunk} from './meetingSessions';
+import type {MeetingAudio, MeetingSegment, MeetingRecorder, RecordingChunk} from './meetingSessions';
 
 export function meetingTranscriptLines(transcript: {startMs: number; text: string}[]): string[] {
   return transcript.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`);
@@ -20,4 +20,8 @@ export function deleteMeetingTranscript(doc: Y.Doc, block: BlockMap): void {
     setBlockProp(block, 'transcript', []);
     setBlockProp(block, 'transcriptionCompleted', []);
   }, 'local');
+}
+
+export function meetingManagementVisible(readOnly: boolean, saved: MeetingAudio[], transcript: MeetingSegment[]): boolean {
+  return !readOnly || saved.length > 0 || transcript.length > 0;
 }

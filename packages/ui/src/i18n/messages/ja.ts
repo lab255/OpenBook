@@ -663,12 +663,14 @@ export const ja: PartialMessages = {
   },
   meetingBlock: {
     manage: '会議の操作',
-    retryAll: '文字起こしを再試行（失敗したすべての区間）',
+    retryAll: '失敗した文字起こしを再試行',
     copyTranscript: '文字起こしをコピー',
     transcriptCopied: '文字起こしをコピーしました',
     transcriptCopyFailed: '文字起こしをコピーできませんでした',
     deleteTranscript: '文字起こしを削除',
-    deleteTranscriptBody: '文字起こしのテキストを削除します。音声、要約、ノートは保持されます。処理中の文字起こしによって新しいテキストが追加される場合があります。',
+    deleteTranscriptTitle: '文字起こしを削除しますか？',
+    deleteTranscriptBody: '文字起こしのテキストを削除します。音声、要約、ノートは保持されます。',
+    deleteTranscriptPending: '処理中の文字起こしによって新しいテキストが追加される場合があります。',
 
     needsAttention: '対応が必要です',
     discard: '破棄',

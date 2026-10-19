@@ -87,11 +87,12 @@ export function useMeetingSummary({block, editor, readOnly, status, transcript, 
     }
   };
 
+  const label = t(hasSummary ? 'meetingBlock.regenerateSummary' : 'meetingBlock.generateSummary');
   const content = <section aria-label={t('meetingBlock.summary')}>
     {hasTranscript && <>
       {status === 'done' && !hasSummary && stream === null && <p>{t('meetingBlock.summaryOffer')}</p>}
       <button type="button" disabled={stream === null && (readOnly || !available)} onClick={() => stream !== null ? pending.current?.abort() : void generate()}>
-        {t(stream !== null ? 'meetingBlock.cancelSummary' : hasSummary ? 'meetingBlock.regenerateSummary' : 'meetingBlock.generateSummary')}
+        {stream !== null ? t('meetingBlock.cancelSummary') : label}
       </button>
       {!available && <p>{t('meetingBlock.summaryUnavailable')}</p>}
     </>}
@@ -102,5 +103,5 @@ export function useMeetingSummary({block, editor, readOnly, status, transcript, 
     {!readOnly && (!container || !hasSummary) && stream === null && draft === null && <button type="button" onClick={() => materializeMeetingSummary(editor.doc, block)}>{t(summary ? 'meetingBlock.editSummary' : 'meetingBlock.addSummary')}</button>}
     {error && <p role="alert">{error}</p>}
   </section>;
-  return {content, generate, canGenerate: !readOnly && available && hasTranscript && stream === null};
+  return {content, label, generate, canGenerate: !readOnly && available && hasTranscript && stream === null};
 }

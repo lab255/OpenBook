@@ -660,12 +660,14 @@ export const zh: PartialMessages = {
   },
   meetingBlock: {
     manage: '会议操作',
-    retryAll: '重试转录（所有失败片段）',
+    retryAll: '重试失败的转录',
     copyTranscript: '复制转录',
     transcriptCopied: '已复制转录',
     transcriptCopyFailed: '无法复制转录',
     deleteTranscript: '删除转录',
-    deleteTranscriptBody: '这将删除转录文本；音频、摘要和笔记将保留。正在进行的转录可能会添加新文本。',
+    deleteTranscriptTitle: '删除转录？',
+    deleteTranscriptBody: '删除转录文本。音频、摘要和笔记将保留。',
+    deleteTranscriptPending: '正在进行的转录可能会添加新文本。',
 
     needsAttention: '需要处理',
     discard: '丢弃',

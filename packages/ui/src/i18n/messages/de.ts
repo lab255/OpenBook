@@ -668,12 +668,14 @@ export const de: PartialMessages = {
   },
   meetingBlock: {
     manage: 'Besprechungsaktionen',
-    retryAll: 'Transkription wiederholen (alle fehlgeschlagenen Abschnitte)',
+    retryAll: 'Fehlgeschlagene Transkriptionen wiederholen',
     copyTranscript: 'Transkript kopieren',
     transcriptCopied: 'Transkript kopiert',
     transcriptCopyFailed: 'Transkript konnte nicht kopiert werden',
     deleteTranscript: 'Transkript löschen',
-    deleteTranscriptBody: 'Der Transkripttext wird entfernt; Audio, Zusammenfassung und Notizen bleiben erhalten. Laufende Transkriptionen können neuen Text hinzufügen.',
+    deleteTranscriptTitle: 'Transkript löschen?',
+    deleteTranscriptBody: 'Entfernt den Transkripttext. Audio, Zusammenfassung und Notizen bleiben erhalten.',
+    deleteTranscriptPending: 'Laufende Transkriptionen können neuen Text hinzufügen.',
 
     needsAttention: 'Aufmerksamkeit erforderlich',
     discard: 'Verwerfen',
