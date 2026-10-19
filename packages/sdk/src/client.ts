@@ -306,6 +306,9 @@ export interface DataClient {
    * own echo can be dropped. Ephemeral — never persisted (durability stays with
    * {@link savePage}'s debounced snapshot).
    */
+  /** Durably merge a delta. False only when the transport/server lacks support.
+   * A page-level 403/404 rejects; callers must never fall back after that failure. */
+  applyPageUpdate?(id: string, update: string, clientId: number): Promise<boolean>;
   postPageUpdate(id: string, update: string, clientId: number): Promise<void>;
   /**
    * Subscribe to a page's incremental Yjs updates. `onUpdate` fires with the base64
@@ -1530,6 +1533,20 @@ export class HttpDataClient implements DataClient {
       cache: 'no-store',
     });
     await throwIfNotOk(res);
+  }
+
+  async applyPageUpdate(id: string, update: string, clientId: number): Promise<boolean> {
+    // Probe outside the page namespace: an old server and a deleted page must
+    // never be confused. Do not cache across server upgrades or store switches.
+    const health = await this.authFetch(`${this.baseUrl}${API.health}`, {cache: 'no-store'});
+    await throwIfNotOk(health);
+    if (health.headers.get('X-OpenBook-Stored-Updates') !== '1') return false;
+    const res = await this.authFetch(`${this.baseUrl}${API.pageUpdateApply(id)}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({update, clientId}), cache: 'no-store',
+    });
+    await throwIfNotOk(res);
+    return true;
   }
 
   subscribePageUpdates(id: string, onUpdate: (update: string, clientId: number) => void): () => void {

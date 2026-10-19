@@ -75,6 +75,8 @@ export const API = {
    * debounced snapshot save (`PUT /api/pages/:id`) remains the sole durable
    * checkpoint, so the relay is a best-effort live nudge, never a system of record.
    */
+  /** Durable CRDT delta merge; 404 is definitive (never inserts). */
+  pageUpdateApply: (id: string): string => `/api/pages/${encodeURIComponent(id)}/updates/apply`,
   pageUpdates: (id: string): string => `/api/pages/${encodeURIComponent(id)}/updates`,
   /**
    * Live collaboration — late-joiner sync handshake (Collab T1). `POST {sv}` (the
