@@ -1,10 +1,11 @@
 import * as Y from 'yjs';
 import type {DataClient, AiTranscriptionResult} from '@book.dev/sdk';
+import {saveStoredPageUpdate} from '@/lib/storedPageUpdate';
 import {assetBridge} from '@/lib/assetBridge';
 import {openDoc} from '@/lib/openDocs';
 import {getBlockEditorDoc, getPageIdForDoc} from '@/lib/aiBridge';
 import {t} from '@/i18n';
-import {blockId, decodeSnapshot, encodeSnapshot, findBlock, blockProp, setBlockProp, type BlockDocSnapshot, type BlockMap} from './model';
+import {blockId, decodeSnapshot, findBlock, blockProp, setBlockProp, type BlockDocSnapshot, type BlockMap} from './model';
 import type {BlockEditorController} from './useBlockEditor';
 
 export interface MeetingAudio {assetId: string; durationMs: number; startedAtMs?: number}
@@ -36,7 +37,7 @@ export function transcriptionError(error: unknown): string {
   return t('meetingBlock.transcriptionFailed');
 }
 
-type SessionClient = Pick<DataClient, 'getPage' | 'savePage'>;
+type SessionClient = Pick<DataClient, 'getPage' | 'savePage' | 'applyPageUpdate'>;
 let client: SessionClient | null = null;
 export function setMeetingSessionClient(next: SessionClient | null): void { client = next; }
 const writes = new Map<string, Promise<void>>();
@@ -164,10 +165,9 @@ export class MeetingRecorder {
       if (!page) throw new Error('Meeting page no longer exists');
       const doc = decodeSnapshot(page.data.blockdoc as BlockDocSnapshot | undefined);
       try {
+        const stateVector = Y.encodeStateVector(doc);
         this.mutate(doc, props);
-        // Known limitation: off-page saves send full name/data; CRDT-delta writes are a follow-up.
-        this.assertStore();
-        await store.savePage({id: page.id, name: page.name, data: {...page.data, editor: 'blocks', blockdoc: encodeSnapshot(doc)}});
+        await saveStoredPageUpdate(store, page, doc, stateVector, () => this.assertStore());
         this.assertStore();
         const reopened = this.liveDoc();
         if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');

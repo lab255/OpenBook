@@ -1,4 +1,5 @@
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
+import {saveStoredPageUpdate} from '@/lib/storedPageUpdate';
 import {richTextRuns, type RichTextInput} from '@book.dev/sdk';
 import {
   buildMovePlan,
@@ -77,7 +78,7 @@ import type {AppearanceOverride} from '@/lib/themes';
  *     ONE Y transaction (origin 'local') so it's undoable and broadcasts live,
  *     exactly like a kit click or a streamed token.
  *  2. Server fallback — otherwise the change is applied through the data client
- *     (savePage / updateRow). A live editor on that page merges it (CRDT union)
+ *     (durable CRDT delta / updateRow; savePage on older stores). A live editor on that page merges it (CRDT union)
  *     on its next server push.
  *
  * Keeping the editor-doc handle in a singleton (rather than coupling the agent
@@ -159,7 +160,7 @@ export const getPageIdForDoc = (doc: Y.Doc): string | null => {
 // so the live-vs-stored branching is unit-testable against the doc registry.
 
 /** The subset of the data client the agent write path calls. */
-export type ApplyClient = Pick<DataClient, 'listPages' | 'updateRow' | 'getPage' | 'savePage' | 'createDatabase' | 'updateDatabase' | 'deletePage' | 'setPageProperties' | 'movePage'>;
+export type ApplyClient = Pick<DataClient, 'listPages' | 'updateRow' | 'getPage' | 'savePage' | 'applyPageUpdate' | 'createDatabase' | 'updateDatabase' | 'deletePage' | 'setPageProperties' | 'movePage'>;
 
 /**
  * When deleting `found` would empty its table, the id of the TABLE to delete
@@ -460,7 +461,7 @@ const applyPageAppearance = (pageId: string, payload: Record<string, unknown>): 
   }
 };
 
-/** Fallback: fetch, mutate the stored snapshot's block doc, and save. */
+/** Off-page path: fetch, mutate, and persist only the CRDT delta when supported. */
 const applyToStoredPage = async (client: ApplyClient, pageId: string, p: AgentProposal): Promise<void> => {
   const page = await client.getPage(pageId);
   if (!page) throw new Error('page not found');
@@ -469,12 +470,13 @@ const applyToStoredPage = async (client: ApplyClient, pageId: string, p: AgentPr
   // the CRDT history coherent for the next reader rather than hand-editing the
   // JSON projection.
   const doc = decodeSnapshot(blockdoc);
-  applyProposalToDoc(doc, p);
-  await client.savePage({
-    id: page.id,
-    name: page.name,
-    data: {...page.data, editor: 'blocks', blockdoc: encodeSnapshot(doc)},
-  });
+  try {
+    const stateVector = Y.encodeStateVector(doc);
+    applyProposalToDoc(doc, p);
+    await saveStoredPageUpdate(client, page, doc, stateVector);
+    const reopened = getBlockEditorDoc(pageId);
+    if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
+  } finally { doc.destroy(); }
 };
 
 /**
