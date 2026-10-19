@@ -74,9 +74,9 @@ test('record, progressively transcribe, summarize, note and export a meeting', {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await meeting.getByRole('button', {name: 'Meeting actions'}).click();
   await page.getByRole('menuitem', {name: 'Copy transcript', exact: true}).click();
-  const time = await transcript.first().locator('time').innerText();
-  const text = await transcript.first().locator('span').innerText();
-  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(`[${time}] ${text}`);
+  const expectedTranscript = (await Promise.all((await transcript.all()).map(async (row) =>
+    `[${await row.locator('time').innerText()}] ${await row.locator('span').innerText()}`))).join('\n');
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(expectedTranscript);
   const singleDownload = page.waitForEvent('download');
   await meeting.getByRole('button', {name: 'Meeting actions'}).click();
   await page.getByRole('menuitem', {name: 'Export audio', exact: true}).click();

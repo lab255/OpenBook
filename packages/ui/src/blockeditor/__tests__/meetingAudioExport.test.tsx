@@ -31,9 +31,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); setAssetBridge(null); setLocale('en'); });
 
 describe('MEET-7 audio export', () => {
-  it('hides the affordance without chunks', () => {
+  it('disables the affordance without chunks', () => {
     harness([]);
-    expect(screen.queryByRole('button', {name: 'Export audio'})).toBeNull();
+    openMenu();
+    expect(screen.getByRole('menuitem', {name: 'Export audio'}).getAttribute('aria-disabled')).toBe('true');
+    cleanup();
+    harness([], true);
+    expect(screen.queryByRole('button', {name: 'Meeting actions'})).toBeNull();
+    expect(document.querySelector('.obe-meeting-management')).toBeNull();
   });
   it.each([[false, false], [true, false], [false, true]])('downloads a single original file, including viewer modes (%s, %s)', async (readOnly, pageReadOnly) => {
     const doc = harness([chunks[0]], readOnly, pageReadOnly);
