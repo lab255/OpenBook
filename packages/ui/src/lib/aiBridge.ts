@@ -471,9 +471,8 @@ const applyToStoredPage = async (client: ApplyClient, pageId: string, p: AgentPr
   // JSON projection.
   const doc = decodeSnapshot(blockdoc);
   try {
-    const stateVector = Y.encodeStateVector(doc);
     applyProposalToDoc(doc, p);
-    await saveStoredPageUpdate(client, page, doc, stateVector);
+    await saveStoredPageUpdate(client, page, doc);
     const reopened = getBlockEditorDoc(pageId);
     if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
   } finally { doc.destroy(); }

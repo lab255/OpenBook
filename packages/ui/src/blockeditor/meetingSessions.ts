@@ -165,9 +165,8 @@ export class MeetingRecorder {
       if (!page) throw new Error('Meeting page no longer exists');
       const doc = decodeSnapshot(page.data.blockdoc as BlockDocSnapshot | undefined);
       try {
-        const stateVector = Y.encodeStateVector(doc);
         this.mutate(doc, props);
-        await saveStoredPageUpdate(store, page, doc, stateVector, () => this.assertStore());
+        await saveStoredPageUpdate(store, page, doc, () => this.assertStore());
         this.assertStore();
         const reopened = this.liveDoc();
         if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');

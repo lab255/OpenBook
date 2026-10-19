@@ -6,15 +6,19 @@ export type StoredPageClient = Pick<DataClient, 'getPage' | 'savePage' | 'applyP
 
 /** Persist only this mutation when supported; older/local stores re-read before saving. */
 export async function saveStoredPageUpdate(
-  client: StoredPageClient, page: StoredPage, doc: Y.Doc, stateVector: Uint8Array,
+  client: StoredPageClient, page: StoredPage, doc: Y.Doc,
   assertStore: () => void = () => {},
 ): Promise<void> {
-  const delta = Y.encodeStateAsUpdate(doc, stateVector);
-  let binary = '';
-  for (const byte of delta) binary += String.fromCharCode(byte);
   assertStore();
   // JSON-only legacy snapshots have no shared CRDT identities to address with a delta.
-  if ((page.data.blockdoc as BlockDocSnapshot | undefined)?.update && client.applyPageUpdate) {
+  const storedUpdate = (page.data.blockdoc as BlockDocSnapshot | undefined)?.update;
+  if (storedUpdate && client.applyPageUpdate) {
+    // Decode may add an empty-page placeholder. Diff against the stored vector,
+    // not the reconstructed doc, so those new dependencies travel with the edit.
+    const stateVector = Y.encodeStateVectorFromUpdate(Uint8Array.from(atob(storedUpdate), (c) => c.charCodeAt(0)));
+    const delta = Y.encodeStateAsUpdate(doc, stateVector);
+    let binary = '';
+    for (const byte of delta) binary += String.fromCharCode(byte);
     const applied = await client.applyPageUpdate(page.id, btoa(binary), doc.clientID);
     assertStore();
     if (applied) return;
