@@ -1,3 +1,5 @@
+import {RecordingBubble} from './MeetingSessionHost';
+import {useCanWrite} from '@/lib/useCanWrite';
 import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {ChevronLeft, ChevronRight, Maximize2, Monitor, X} from 'lucide-react';
@@ -19,6 +21,7 @@ import {suppressContextMenu} from '@/lib/suppressContextMenu';
  * speaker notes. Entered from the page's "…" menu; driven by HUD state.
  */
 export default function PresentMode() {
+  const canWrite = useCanWrite();
   const {hud, setHud} = useHud();
   const {open, mode, pageId} = hud.present;
   const close = useCallback(() => setHud((d) => {d.present.open = false; return d;}), [setHud]);
@@ -38,6 +41,7 @@ export default function PresentMode() {
           <DialogPrimitive.Title className="sr-only">Present</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">Slide presentation of the page</DialogPrimitive.Description>
           {open && <Deck pageId={pageId} mode={mode} onClose={close} onSetMode={setMode} />}
+          {open && <RecordingBubble canWrite={canWrite} presenting />}
         </DialogPrimitive.Content>
       </DialogPortal>
     </DialogPrimitive.Root>
@@ -81,7 +85,8 @@ const Deck: React.FC<{
   // Full screen: take the real OS fullscreen so browser chrome vanishes too.
   useEffect(() => {
     if (mode !== 'fullscreen') return;
-    const el = rootRef.current;
+    // Fullscreen the portal's dialog so the recording controls share its top layer.
+    const el = rootRef.current?.closest<HTMLElement>('[role="dialog"]');
     void el?.requestFullscreen?.().catch(() => undefined);
     return () => {
       if (typeof document !== 'undefined' && document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);

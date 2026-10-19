@@ -659,6 +659,13 @@ export const zh: PartialMessages = {
     urlLabel: '链接地址',
   },
   meetingBlock: {
+    needsAttention: '需要处理',
+    discard: '丢弃',
+    discardConfirm: '丢弃未保存的会议音频？',
+    discardConfirmBody: '此音频尚未保存到页面，丢弃后无法恢复。',
+    recordingSessions: '录音会话',
+    elapsed: '已录音时长',
+    goToMeeting: '前往会议',
     tabs: '会议分区',
     exportAudio: '导出音频',
     exportAudioFailed: '无法导出音频。请检查访问权限后重试。',
@@ -679,7 +686,6 @@ export const zh: PartialMessages = {
     summaryUnavailable: '连接 OpenBook 服务器并在设置 → AI 中配置 AI，以生成会议摘要。',
     summaryForbidden: '生成摘要需要付费或符合条件的套餐、已登录的账号以及页面访问权限。',
     summaryFailed: '摘要生成失败。原有摘要未更改，请重试。',
-
     locked: '会议已被所在分区锁定',
     readOnly: '只读会议',
     elsewhere: '正在其他客户端上录音或处理。',

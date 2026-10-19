@@ -162,3 +162,12 @@ describe('unified meeting playback', () => {
   });
 
 });
+
+it('renders one marker while a saved chunk still retains its pending upload blob', () => {
+  const audio = {assetId: 'saved', startedAtMs: 0, durationMs: 2000};
+  const pending = {chunks: [{id: 'pending', audio, blob: new Blob(['audio']), phase: 'uploading'}], retry} as unknown as MeetingRecorder;
+  const error = vi.spyOn(console, 'error');
+  const view = render(<MeetingPlayer saved={[audio]} completed={[]} session={pending} readOnly={false} canTranscribe />);
+  expect(view.container.querySelectorAll('.obe-meeting-marker')).toHaveLength(1);
+  expect(screen.getByText('0:00 / 0:02')).toBeTruthy(); expect(error).not.toHaveBeenCalled();
+});

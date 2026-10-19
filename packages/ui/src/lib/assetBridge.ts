@@ -35,6 +35,7 @@ export const setAssetBridge = (next: AssetBridgeImpl | null): void => {
 
 /** The bridge actions, safe to call before the host mounts (upload rejects; get resolves null). */
 export const assetBridge = {
+  target: (): AssetBridgeImpl | null => bridge,
   canTranscribe: (): boolean => bridge?.transcribeAsset != null,
   transcribeAsset: (assetId: string, pageId: string): Promise<AiTranscriptionResult> =>
     bridge?.transcribeAsset ? bridge.transcribeAsset(assetId, pageId) : Promise.reject(new Error('Transcription unavailable')),

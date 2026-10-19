@@ -50,3 +50,5 @@ export {registerCustomBlock, registerReactiveBlocks, registerArtifactKit, blocks
 export {toHtml, toSlideDeck, toHtmlSite} from './export/toHtml';
 
 export * from './lib/statusStyles';
+
+export {stopAllMeetingSessions} from './blockeditor/meetingSessions';

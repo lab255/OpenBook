@@ -8,6 +8,7 @@ export const STATUS_INK_CLASS = {
   bad: 'text-destructive',
 } as const;
 export const STATUS_DOT_CLASS = {
+  bad: 'bg-[var(--data-status-bad)] shadow-[inset_0_0_0_1px_var(--data-stroke)]',
   ok: 'bg-[var(--data-status-ok)] shadow-[inset_0_0_0_1px_var(--data-stroke)]',
   warn: 'bg-[var(--data-status-warn)] shadow-[inset_0_0_0_1px_var(--data-stroke)]',
 } as const;

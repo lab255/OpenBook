@@ -194,3 +194,60 @@ test('microphone denial shows recovery copy and leaves the editor usable', {tag:
   await expect(meeting.locator('audio')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('recording survives navigation, rebinds, and saves the final chunk while away', {tag: ['@meeting', '@p1']}, async ({page, request, dataServer}) => {
+  test.setTimeout(90_000);
+  const pageId = new URL(page.url()).searchParams.get('page');
+  const other = await request.post(`${dataServer}/api/pages`, {data: {
+    name: 'Other meeting page', data: {editor: 'blocks', blockdoc: {blocks: [{id: 'other', type: 'paragraph', text: [{t: 'Other page'}]}]}, editorjs: {blocks: []}, values: [], names: []},
+  }});
+  expect(other.ok()).toBeTruthy();
+  await expect.poll(async () => JSON.stringify(await (await request.get(`${dataServer}/api/pages/${pageId}`)).json())).toContain('"type":"meeting"');
+  // Refresh before capture so the sidebar includes the second page.
+  await page.reload();
+  const meeting = page.getByRole('region', {name: 'Meeting', exact: true});
+  const bubble = page.getByRole('complementary', {name: 'Recording sessions'});
+  const otherRow = page.getByRole('treeitem').filter({hasText: 'Other meeting page'});
+  await meeting.getByRole('button', {name: 'Record', exact: true}).click();
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
+  await expect(bubble.getByRole('button')).toHaveCount(0);
+  await otherRow.click();
+  await expect(meeting).toHaveCount(0);
+  await expect(bubble.getByRole('button', {name: 'Pause', exact: true})).toBeVisible();
+  const elapsed = bubble.getByLabel('Elapsed recording time');
+  const initialElapsed = await elapsed.innerText();
+  await expect(elapsed).not.toHaveText(initialElapsed);
+  // Leave capture running through its actual 45s rollover while off-page.
+  await expect.poll(async () => {
+    const stored = await request.get(`${dataServer}/api/pages/${pageId}`);
+    return JSON.stringify(await stored.json());
+  }, {timeout: 60_000}).toContain('Mock transcription');
+  await bubble.getByRole('button', {name: 'Pause', exact: true}).click();
+  await expect(bubble.getByRole('button', {name: 'Resume', exact: true})).toBeVisible();
+  await bubble.getByRole('button', {name: 'Resume', exact: true}).click();
+  await bubble.getByRole('button', {name: 'Go to meeting'}).click();
+  await expect(page.locator('.ob-anchor-flash')).toBeVisible();
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Recording');
+  await expect(meeting).not.toContainText('Recording or processing on another client.');
+  await expect(bubble.getByRole('button')).toHaveCount(0);
+  await expect(meeting.locator('.obe-meeting-transcript p')).toHaveCount(2);
+  await otherRow.click();
+  await expect(bubble.getByRole('button', {name: 'Pause', exact: true})).toBeVisible();
+  await expect(elapsed).not.toHaveText('0:00');
+  await bubble.getByRole('button', {name: 'Stop', exact: true}).click();
+  await expect.poll(async () => {
+    const stored = await request.get(`${dataServer}/api/pages/${pageId}`);
+    const value = await stored.json() as {data: {blockdoc: {blocks: {type: string; props?: {status?: string; audioChunks?: unknown[]; transcript?: unknown[]}}[]}}};
+    const props = value.data.blockdoc.blocks.find((block) => block.type === 'meeting')?.props;
+    return {status: props?.status, chunks: props?.audioChunks?.length, transcript: props?.transcript?.length};
+  }).toEqual({status: 'done', chunks: 3, transcript: 3});
+  await expect(bubble.getByRole('button')).toHaveCount(0);
+  await page.getByRole('treeitem').filter({hasText: 'Meeting epic'}).click();
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Done');
+  await expect(meeting.locator('.obe-meeting-transcript p')).toHaveCount(3);
+  // A full reload discards the singleton and proves recovery from durable state.
+  await page.reload();
+  await expect(meeting.locator('.obe-meeting-header')).toContainText('Done');
+  await expect(meeting.locator('.obe-meeting-transcript p')).toHaveCount(3);
+  await expect(bubble.getByRole('button')).toHaveCount(0);
+});

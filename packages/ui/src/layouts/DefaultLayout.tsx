@@ -6,6 +6,7 @@ import WindowTitle from '@/components/WindowTitle';
 import TemplateGallery from '@/components/TemplateGallery';
 import ImportDialog from '@/components/ImportDialog';
 import MovePageDialog from '@/components/MovePageDialog';
+import {MeetingSessionHost} from '@/components/MeetingSessionHost';
 import {ToastHost} from '@/components/ui/toast';
 import {TooltipProvider} from '@/components/ui/tooltip';
 import {ShareDialogHost} from '@/components/ShareDialog';
@@ -143,6 +144,7 @@ export default function DefaultLayout(props: DefaultLayoutProps) {
             <TemplateGallery/>
             <ImportDialog/>
             <MovePageDialog/>
+            <MeetingSessionHost/>
             <ToastHost/>
             <AiBridgeHost/>
             <AssetBridgeHost/>

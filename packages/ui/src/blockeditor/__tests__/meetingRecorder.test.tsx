@@ -9,7 +9,7 @@ import {registerBlockEditorDoc} from '@/lib/aiBridge';
 import {AssetBridgeHost} from '@/components/AssetBridgeHost';
 import {DataProvider} from '@/data';
 import type {DataClient} from '@book.dev/sdk';
-import {MeetingRecorder, meetingRecorder, meetingSegments, chunkKey, type MeetingAudio, type RecordingChunk} from '../meetingRecorder';
+import {setMeetingSessionClient, MeetingRecorder, meetingRecorder, meetingSegments, chunkKey, type MeetingAudio, type RecordingChunk} from '../meetingSessions';
 import {MeetingBlockView} from '../MeetingBlockView';
 import {blockProp, createDoc, decodeSnapshot, docToJSON, encodeSnapshot, rootBlocks, setBlockProp} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
@@ -59,7 +59,7 @@ beforeEach(() => {
   transcribeAsset.mockReset().mockResolvedValue({text: 'hello', segments: [{start: 0.25, end: 1.5, text: 'hello'}], durationMs: 2000});
   setAssetBridge({putAsset, getAsset: async () => null, transcribeAsset});
 });
-afterEach(() => { cleanup(); setLocale('en'); setAssetBridge(null); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); setMeetingSessionClient(null); setLocale('en'); setAssetBridge(null); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('meeting recording and recovery', () => {
   it('restarts recorders into independent files, pauses/resumes, saves ordered durations and transcript offsets', async () => {
@@ -445,5 +445,263 @@ describe('MEET-5 review regressions', () => {
         expect(output).toContain('Manual note');
       }
     }
+  });
+});
+
+
+describe('app lifetime meeting sessions', () => {
+  it('persists final audio and transcript after the view and doc detach', async () => {
+    const {doc, block, editor} = harness();
+    const unregister = registerBlockEditorDoc('away-page', doc);
+    const session = meetingRecorder(editor, block, 'away-page');
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    let stored = {id: 'away-page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => { stored = page; });
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start();
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
+    session.detach(); unregister();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(session.mode).toBe('recording');
+    expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(session.mode).toBe('recording');
+    session.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    const persisted = rootBlocks(decodeSnapshot(stored.data.blockdoc)).get(0);
+    expect(blockProp<MeetingAudio[]>(persisted, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(persisted, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(blockProp(persisted, 'status')).toBe('done');
+    expect(blockProp(block, 'audioChunks')).toBeUndefined();
+    expect(savePage).toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith('beforeunload', guard);
+    add.mockRestore(); remove.mockRestore();
+  });
+
+  it('rebinds a recreated document to the same live session and stops only on a lock transition', async () => {
+    const {doc, block, editor} = harness();
+    const unregister = registerBlockEditorDoc('return-page', doc);
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    const session = meetingRecorder(editor, block, 'return-page');
+    await act(async () => { await session.start(); });
+    view.unmount(); unregister();
+    expect(session.mode).toBe('recording'); expect(session.visible).toBe(false);
+    const reopened = decodeSnapshot(encodeSnapshot(doc));
+    const nextBlock = rootBlocks(reopened).get(0);
+    const nextEditor = {...editor, doc: reopened};
+    const unregisterNext = registerBlockEditorDoc('return-page', reopened);
+    const next = render(<ConfirmProvider><MeetingBlockView block={nextBlock} editor={nextEditor} pageReadOnly={false} /></ConfirmProvider>);
+    expect(meetingRecorder(nextEditor, nextBlock, 'return-page')).toBe(session);
+    expect(session.recordingElsewhere).toBe(false); expect(session.visible).toBe(true);
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(45000); });
+    expect(blockProp<MeetingAudio[]>(nextBlock, 'audioChunks')).toHaveLength(1);
+    next.rerender(<ConfirmProvider><MeetingBlockView block={nextBlock} editor={nextEditor} pageReadOnly /></ConfirmProvider>);
+    await act(async () => { await flush(); });
+    expect(session.active).toBe(false);
+    expect(blockProp(nextBlock, 'status')).toBe('done');
+    unregisterNext();
+  });
+});
+
+
+describe('navigation persistence failure recovery', () => {
+  it.each(['load', 'save'] as const)('reconciles a page reopened during the stored-page %s', async (stage) => {
+    const {doc, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const getPage = vi.fn(async () => { if (stage === 'load') await gate; return stored; });
+    const savePage = vi.fn(async (page) => { if (stage === 'save') await gate; stored = page; });
+    setMeetingSessionClient({getPage, savePage} as unknown as DataClient);
+    await session.start(); await flush();
+    stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach(); session.pause(); await flush();
+    expect(getPage).toHaveBeenCalledOnce();
+    if (stage === 'save') expect(savePage).toHaveBeenCalledOnce();
+    const reopened = decodeSnapshot(stored.data.blockdoc);
+    const block = rootBlocks(reopened).get(0);
+    setBlockProp(block, 'title', 'Edited while reopening');
+    const unregister = registerBlockEditorDoc('page', reopened);
+    release(); await flush();
+    expect(rootBlocks(reopened).length).toBe(1);
+    expect(blockProp(block, 'title')).toBe('Edited while reopening');
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(block, 'transcript')).toHaveLength(1);
+    expect(session.chunks[0].phase).toBe('done');
+    if (stage === 'load') expect(savePage).not.toHaveBeenCalled();
+    session.stop(); await flush(); unregister();
+  });
+
+  it('retains a retryable upload when saving its off-page reference fails', async () => {
+    const {doc, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => { stored = page; });
+    savePage.mockRejectedValueOnce(new Error('offline'));
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start(); await flush();
+    stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach();
+    session.pause();
+    await flush();
+    const chunk = session.chunks[0];
+    expect(chunk.phase).toBe('uploadFailed');
+    expect(chunk.blob).toBeDefined();
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    await session.upload(chunk);
+    await flush();
+    expect(chunk.phase).toBe('done');
+    expect(chunk.blob).toBeUndefined();
+    const persisted = rootBlocks(decodeSnapshot(stored.data.blockdoc)).get(0);
+    expect(blockProp<MeetingAudio[]>(persisted, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(persisted, 'transcript')).toHaveLength(1);
+    session.stop(); await flush();
+  });
+
+  it('still releases the microphone when the live meeting block was deleted', async () => {
+    const {doc, session} = harness();
+    await session.start();
+    track.stop.mockClear();
+    rootBlocks(doc).delete(0);
+    expect(() => session.stop()).not.toThrow();
+    await flush();
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(session.active).toBe(false);
+    expect(session.chunks[0].phase).toBe('uploadFailed');
+    expect(session.unsaved).toBe(true);
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    // Release the test's intentionally retained recovery guard.
+    session.chunks[0].blob = undefined;
+    session.setReadOnly(true);
+  });
+
+  it('protects pending transcription after stopping until the transcript is persisted', async () => {
+    const {session} = harness();
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    let finish!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    await session.start();
+    session.stop(); remove.mockClear(); await flush();
+    expect(session.unsaved).toBe(false);
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
+    expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
+    finish({text: 'saved', durationMs: 1000}); await flush();
+    expect(remove).toHaveBeenCalledWith('beforeunload', guard);
+    add.mockRestore(); remove.mockRestore();
+  });
+});
+
+describe('MTG-7 fix regressions', () => {
+  it.each(['install', 'switch'])('refreshes an idle session on attach after client %s so saved audio can be retried', async (change) => {
+    if (change === 'switch') setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    setAssetBridge(null);
+    const audio = {assetId: 'saved-audio', durationMs: 1000};
+    const {session, editor, block} = harness({status: 'done', audioChunks: [audio]});
+    setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    setAssetBridge({putAsset, getAsset: async () => null, transcribeAsset});
+    session.attach(editor, block);
+    session.retry(audio); await flush();
+    expect(transcribeAsset).toHaveBeenCalledWith('saved-audio', 'page');
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual([chunkKey(audio)]);
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(session.error).toBe('');
+    session.detach();
+  });
+
+  it('does not refresh a stopped session with unsaved audio on attach', async () => {
+    const {session, editor, block} = harness();
+    session.chunks.push({id: 'failed', audio: {assetId: '', durationMs: 1000}, blob: new Blob(['audio']), phase: 'uploadFailed'});
+    setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    session.attach(editor, block);
+    session.retry({assetId: 'saved-audio', durationMs: 1000}); await flush();
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    expect(session.error).not.toBe('');
+    session.discard(); session.detach();
+  });
+
+  it('refuses the new client and asset target after a recording switches stores', async () => {
+    const first = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
+    const next = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
+    setMeetingSessionClient(first);
+    const {session, editor, block} = harness(); await session.start();
+    track.stop.mockClear();
+    setMeetingSessionClient(next);
+    session.attach(editor, block);
+    session.pause(); await flush();
+    expect(track.stop).toHaveBeenCalled();
+    expect(next.getPage).not.toHaveBeenCalled(); expect(next.savePage).not.toHaveBeenCalled();
+    expect(putAsset).not.toHaveBeenCalled();
+    session.discard();
+  });
+
+  it('evicts a clean detached session and releases its editor', async () => {
+    const {editor, block} = harness();
+    const session = meetingRecorder(editor, block, 'evict');
+    await session.start(); session.stop(); await flush();
+    session.detach(editor);
+    expect((session as unknown as {editor?: unknown}).editor).toBeUndefined();
+    expect(meetingRecorder(editor, block, 'evict')).not.toBe(session);
+  });
+
+  it('keeps a second attached view visible when the first leaves', () => {
+    const {editor, block} = harness();
+    const session = meetingRecorder(editor, block, 'two-views');
+    const second = {...editor}; session.attach(second, block);
+    session.detach(editor); expect(session.visible).toBe(true);
+    session.detach(second); expect(session.visible).toBe(false);
+  });
+
+  it('uses the page id on the first render before document registration', async () => {
+    registerArtifactKit();
+    const {doc, block, editor} = harness();
+    const session = meetingRecorder(editor, block, 'early-page');
+    await session.start();
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} pageId="early-page" /></ConfirmProvider>);
+    expect(screen.queryByText('Recording or processing on another client.')).toBeNull();
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    const unregister = registerBlockEditorDoc('early-page', doc);
+    expect(meetingRecorder(editor, block, 'early-page')).toBe(session);
+    await act(async () => { session.stop(); await flush(); });
+    view.unmount(); unregister(); session.detach(editor);
+  });
+
+  it.each(['403', 'deleted'])('stops capture on a definitive %s write failure', async (failure) => {
+    const {doc, session} = harness();
+    const stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    setMeetingSessionClient({getPage: async () => stored, savePage: async () => { throw Object.assign(new Error('forbidden'), {status: 403}); }} as unknown as DataClient);
+    await session.start(); await flush(); track.stop.mockClear();
+    if (failure === '403') session.detach();
+    else rootBlocks(doc).delete(0);
+    await vi.advanceTimersByTimeAsync(45000); await flush();
+    expect(track.stop).toHaveBeenCalled(); expect(session.active).toBe(false);
+    expect(session.error).not.toBe(''); session.discard();
+  });
+
+  it('retries a failed final status on attach without claiming another client owns it', async () => {
+    const {doc, block, editor, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => {
+      const status = blockProp(rootBlocks(decodeSnapshot(page.data.blockdoc)).get(0), 'status');
+      if (status === 'done') throw new Error('offline');
+      stored = page;
+    });
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start(); await flush(); stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach(); session.stop(); await vi.advanceTimersByTimeAsync(0);
+    expect(session.statusDirty).toBe(true); expect(session.recordingElsewhere).toBe(false);
+    session.attach(editor, block); await flush();
+    expect(blockProp(block, 'status')).toBe('done'); expect(session.statusDirty).toBe(false);
+    session.discard(); session.detach();
+  });
+
+  it('counts saved audio once while its upload blob is still pending', () => {
+    const audio = {assetId: 'saved', startedAtMs: 0, durationMs: 2000};
+    const {session} = harness({audioChunks: [audio]});
+    session.chunks.push({id: 'pending', audio, blob: new Blob(['audio']), phase: 'uploading'});
+    expect(session.elapsedMs).toBe(2000);
+    session.discard();
   });
 });

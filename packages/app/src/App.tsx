@@ -1,10 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {invoke} from '@tauri-apps/api/core';
 import {WebviewWindow} from '@tauri-apps/api/webviewWindow';
-import {getCurrentWindow} from '@tauri-apps/api/window';
+import {type BackgroundThrottlingPolicy, getCurrentWindow} from '@tauri-apps/api/window';
 import {open as openExternal} from '@tauri-apps/plugin-shell';
 import {getCurrent as currentDeepLink, onOpenUrl} from '@tauri-apps/plugin-deep-link';
 import {
+  stopAllMeetingSessions,
   AccountProvider,
   DataProvider,
   DefaultLayout,
@@ -64,6 +65,8 @@ function openWindow(pageId: string): void {
   const view = new WebviewWindow(newWindowLabel(), {
     url: `${url.pathname}${url.search}`,
     title: 'OpenBook',
+    // Tauri exports this string enum as a type only.
+    backgroundThrottling: 'disabled' as BackgroundThrottlingPolicy,
     width: 1440,
     height: 900,
     // macOS keeps its native traffic lights via an overlay titlebar; elsewhere
@@ -225,6 +228,10 @@ const platform: PlatformCapabilities = {
 
 function App() {
   const sidecar = useSidecarStatus();
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onCloseRequested(() => stopAllMeetingSessions());
+    return () => { void unlisten.then((dispose) => dispose()); };
+  }, []);
   // Embedded local server by default, or an external one if configured. Built
   // async because we ask the host for the server status (loopback address + the
   // access token when published) before connecting. `connKey` keys the data

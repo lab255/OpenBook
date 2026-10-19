@@ -31,9 +31,10 @@ export function MeetingPlayer({saved, completed, session, readOnly, canTranscrib
   children?: (playback: {position: number; playing: boolean; canSeek: boolean; seek: (globalMs: number) => void}) => ReactNode;
 }) {
   const pending = session.chunks.filter((chunk) => chunk.blob);
+  const savedKeys = new Set(saved.map(chunkKey));
   const sources = [
     ...withMeetingAudioOffsets(saved).map((audio, index) => ({audio, id: chunkKey(saved[index]), originalKey: chunkKey(saved[index]), blob: undefined as Blob | undefined})),
-    ...pending.map((chunk) => ({audio: chunk.audio, id: chunk.id, originalKey: chunkKey(chunk.audio), blob: chunk.blob})),
+    ...pending.filter((chunk) => !savedKeys.has(chunkKey(chunk.audio))).map((chunk) => ({audio: chunk.audio, id: chunk.id, originalKey: chunkKey(chunk.audio), blob: chunk.blob})),
   ].sort((a, b) => (a.audio.startedAtMs ?? 0) - (b.audio.startedAtMs ?? 0));
   const chunks = withMeetingAudioOffsets(sources.map((entry) => entry.audio));
   const entries = sources.map((entry, index) => ({...entry, id: String(chunks[index].startedAtMs)}));
