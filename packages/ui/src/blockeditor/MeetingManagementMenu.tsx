@@ -26,7 +26,7 @@ export function MeetingManagementMenu({block, editor, session, readOnly, saved, 
     <DropdownMenuTrigger asChild>
       <button type="button" className="obe-meeting-manage" aria-label={t('meetingBlock.manage')} title={t('meetingBlock.manage')}><MoreHorizontal className="h-4 w-4" /></button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className={MENU_WIDTH_LG}>
+    <DropdownMenuContent align="end" className={`${MENU_WIDTH_LG} whitespace-nowrap`}>
       {!readOnly && <>
         {failedTranscriptionChunks(session).length > 0 && <DropdownMenuItem disabled={!canTranscribe} onSelect={() => { showTab('transcript'); retryFailedTranscriptions(session); }}><RefreshCw className="mr-2 h-3.5 w-3.5" />{t('meetingBlock.retryAll')}</DropdownMenuItem>}
         <DropdownMenuItem disabled={!summary.canGenerate} onSelect={() => { showTab('summary'); void summary.generate(); }}><Sparkles className="mr-2 h-3.5 w-3.5" />{summary.label}</DropdownMenuItem>
