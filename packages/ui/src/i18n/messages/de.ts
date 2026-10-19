@@ -667,6 +667,16 @@ export const de: PartialMessages = {
     urlLabel: 'Link-URL',
   },
   meetingBlock: {
+    manage: 'Besprechungsaktionen',
+    retryAll: 'Fehlgeschlagene Transkriptionen wiederholen',
+    copyTranscript: 'Transkript kopieren',
+    transcriptCopied: 'Transkript kopiert',
+    transcriptCopyFailed: 'Transkript konnte nicht kopiert werden',
+    deleteTranscript: 'Transkript löschen',
+    deleteTranscriptTitle: 'Transkript löschen?',
+    deleteTranscriptBody: 'Entfernt den Transkripttext. Audio, Zusammenfassung und Notizen bleiben erhalten.',
+    deleteTranscriptPending: 'Laufende Transkriptionen können neuen Text hinzufügen.',
+
     needsAttention: 'Aufmerksamkeit erforderlich',
     discard: 'Verwerfen',
     discardConfirm: 'Ungespeicherte Meeting-Aufnahme verwerfen?',

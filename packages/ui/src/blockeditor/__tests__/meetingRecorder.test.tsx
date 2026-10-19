@@ -10,6 +10,7 @@ import {AssetBridgeHost} from '@/components/AssetBridgeHost';
 import {DataProvider} from '@/data';
 import type {DataClient} from '@book.dev/sdk';
 import {setMeetingSessionClient, MeetingRecorder, meetingRecorder, meetingSegments, chunkKey, type MeetingAudio, type RecordingChunk} from '../meetingSessions';
+import {deleteMeetingTranscript} from '../meetingManagement';
 import {MeetingBlockView} from '../MeetingBlockView';
 import {blockProp, createDoc, decodeSnapshot, docToJSON, encodeSnapshot, rootBlocks, setBlockProp} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
@@ -703,5 +704,21 @@ describe('MTG-7 fix regressions', () => {
     session.chunks.push({id: 'pending', audio, blob: new Blob(['audio']), phase: 'uploading'});
     expect(session.elapsedMs).toBe(2000);
     session.discard();
+  });
+});
+
+describe('transcript deletion during transcription', () => {
+  it('keeps only new segments and one new completion key after an in-flight result arrives', async () => {
+    const audio = {assetId: 'new-audio', startedAtMs: 2000, durationMs: 2000};
+    const {doc, block, session} = harness({transcript: [{startMs: 0, endMs: 1000, text: 'Old'}], transcriptionCompleted: ['0:old'], audioChunks: [audio]});
+    let finish!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const pending = session.transcribe({id: 'pending', phase: 'untranscribed', audio});
+    await flush();
+    deleteMeetingTranscript(doc, block);
+    finish({text: 'New', segments: [{start: 0, end: 1, text: 'New'}], durationMs: 2000});
+    await pending;
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 2000, endMs: 3000, text: 'New'}]);
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual([chunkKey(audio)]);
   });
 });

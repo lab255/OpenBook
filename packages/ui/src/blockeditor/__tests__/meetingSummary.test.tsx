@@ -30,6 +30,17 @@ beforeEach(() => { generate.mockReset(); install(); });
 afterEach(() => { cleanup(); setAiBridge(null); setLocale('en'); });
 
 describe('MEET-6 meeting summary', () => {
+  it('opens Summary and shows the stream when regenerating from Notes via the menu', async () => {
+    let finish!: (text: string) => void;
+    generate.mockImplementation((_prompt, token) => { token('Menu partial'); return new Promise((resolve) => { finish = resolve; }); });
+    harness({summary: 'Old summary'});
+    fireEvent.click(screen.getByRole('tab', {name: 'Notes'}));
+    fireEvent.keyDown(screen.getByRole('button', {name: 'Meeting actions'}), {key: 'ArrowDown'});
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', {name: 'Regenerate summary'})));
+    expect(screen.getByRole('tab', {name: 'Summary'}).getAttribute('aria-selected')).toBe('true');
+    expect(within(screen.getByRole('tabpanel')).getByText('Menu partial')).toBeTruthy();
+    await act(async () => finish('Menu final'));
+  });
   it('offers a single-click generation on done without starting a paid call automatically', () => {
     harness();
     expect(screen.getByText(t('meetingBlock.summaryOffer'))).toBeTruthy();
