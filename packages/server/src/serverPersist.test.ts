@@ -816,3 +816,56 @@ describe('Collab T9 — server-authoritative persistence (opt-in)', () => {
     client2.destroy();
   });
 });
+
+describe('durable stored-page deltas', () => {
+  const apply = (app: ReturnType<typeof createApp>, id: string, update: Uint8Array) => app.request(`/api/pages/${id}/updates/apply`, {
+    method: 'POST', headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+    body: JSON.stringify({update: Buffer.from(update).toString('base64'), clientId: 7}),
+  });
+
+  it.each([false, true])('merges concurrent content without reverting rename/data (serverPersist=%s)', async (enabled) => {
+    const store = await freshStore();
+    const app = enabled ? persistedApp(store) : createApp(store);
+    const {id, client} = await seed(store, 'before');
+    const other = new Y.Doc();
+    Y.applyUpdate(other, Y.encodeStateAsUpdate(client));
+    const sv = Y.encodeStateVector(client);
+    (client.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).insert(0, 'OFFPAGE');
+    (other.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).insert(0, 'CONCURRENT');
+    await store.upsertPage({id, name: 'renamed', data: {...snapshotOf(other), names: [['key', 'keep-me']]}});
+    const res = await apply(app, id, Y.encodeStateAsUpdate(client, sv));
+    expect(res.status).toBe(204);
+    const page = (await store.getPage(id))!;
+    expect(page.name).toBe('renamed');
+    expect(page.data.names).toEqual([['key', 'keep-me']]);
+    expect(await textOf(store, id)).toContain('OFFPAGE');
+    expect(await textOf(store, id)).toContain('CONCURRENT');
+    client.destroy(); other.destroy();
+  });
+
+  it('does not resurrect a page deleted after authorization but before the transaction', async () => {
+    const store = await freshStore();
+    const app = createApp(store);
+    const {id, client} = await seed(store, 'deleted');
+    const original = store.applyPageUpdate.bind(store);
+    vi.spyOn(store, 'applyPageUpdate').mockImplementationOnce(async (...args) => {
+      await store.deletePage(id);
+      return original(...args);
+    });
+    expect((await apply(app, id, Y.encodeStateAsUpdate(client))).status).toBe(404);
+    expect(await store.getPage(id)).toBeNull();
+    client.destroy();
+  });
+
+  it('denies a page belonging to another instance and rejects malformed updates', async () => {
+    const store = await freshStore();
+    const foreign = await freshStore();
+    const app = createApp(store);
+    const {id, client} = await seed(foreign, 'foreign');
+    expect((await apply(app, id, Y.encodeStateAsUpdate(client))).status).toBe(404);
+    const local = await seed(store, 'local');
+    expect((await apply(app, local.id, new Uint8Array([255]))).status).toBe(400);
+    expect(await textOf(store, local.id)).toBe('');
+    client.destroy(); local.client.destroy();
+  });
+});

@@ -375,6 +375,12 @@ describe('Collab T4 — identity integrity + read-gating', () => {
       body: JSON.stringify({update: 'AQ==', clientId: doc.clientID}),
     });
     expect(uRes.status).toBe(403);
+    const durable = await app.request(`/api/pages/${page.id}/updates/apply`, {
+      method: 'POST', headers: {'Content-Type': 'application/json', [IDENTITY_HEADER]: viewerJws},
+      body: JSON.stringify({update: 'AQ==', clientId: doc.clientID}),
+    });
+    expect(durable.status).toBe(403);
+
 
     // A non-reader is hidden the page entirely: presence POST + snapshot GET both 404.
     expect(

@@ -1,3 +1,4 @@
+import * as Y from 'yjs';
 import {createHash, randomUUID} from 'node:crypto';
 import {Hono, type Context} from 'hono';
 import {cors} from 'hono/cors';
@@ -817,6 +818,7 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
     '*',
     cors({
       origin: (origin) => (isAppOrigin(origin) ? origin : null),
+      exposeHeaders: ['X-OpenBook-Stored-Updates'],
       allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowHeaders: [
         'Content-Type',
@@ -1226,7 +1228,11 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
   mountAgentTokenRoutes(app, store, logEdit);
   if (opts.ableOidc) mountAbleOidcRoutes(app, store, opts.ableOidc);
 
-  app.get(API.health, (c) => c.text('ok'));
+  app.get(API.health, (c) => {
+    c.header('X-OpenBook-Stored-Updates', '1');
+    c.header('Cache-Control', 'no-store');
+    return c.text('ok');
+  });
 
   app.get(API.pages, async (c) => c.json(await store.listPagesFor(c.get('principal'))));
 
@@ -1751,6 +1757,36 @@ export function createApp(store: PageStore, ai?: AiService, hub: PageHub = new P
           .ingest(id, updateBytes, authoredSubject(c.get('principal')))
           .catch((err) => console.error('OpenBook server-persist ingest failed:', err));
       }
+      return c.body(null, 204);
+    },
+  );
+
+  // Unlike the relay, this acknowledges only a durable, metadata-preserving merge.
+  app.post(
+    `${API.pages}/:id/updates/apply`,
+    bodyLimit({maxSize: RELAY_UPDATE_MAX_BYTES, onError: (c) => c.json({error: 'request body too large'}, 413)}),
+    async (c) => {
+      const id = c.req.param('id');
+      await requireAccess(c, store, 'write', id);
+      await requireAgentDirectWrite(c, id);
+      const body = await c.req.json<{update?: string; clientId?: number}>().catch(() => ({} as {update?: string; clientId?: number}));
+      if (typeof body.update !== 'string' || !body.update.length) return c.json({error: 'invalid update'}, 400);
+      const bytes = Buffer.from(body.update, 'base64');
+      const probe = new Y.Doc();
+      try { Y.applyUpdate(probe, bytes); }
+      catch { return c.json({error: 'invalid update'}, 400); }
+      finally { probe.destroy(); }
+      const principal = c.get('principal');
+      const write = () => store.applyPageUpdate(id, bytes, principal);
+      const page = persister
+        ? await persister.withSnapshotWriteFence(id, write, {intent: 'merge', snapshotUpdate: bytes, subject: authoredSubject(principal)})
+        : await write();
+      if (!page) return c.json({error: 'page not found'}, 404);
+      hub.publishPage(page);
+      hub.publishPageUpdate(id, body.update, typeof body.clientId === 'number' ? body.clientId : 0);
+      await relay.ingest(id, bytes, loadRelayBase);
+      await broadcastList();
+      if (page.databaseId) await broadcastRows(page.databaseId);
       return c.body(null, 204);
     },
   );
