@@ -102,6 +102,14 @@ export default tseslint.config(
     },
   },
   {
+    // @fluid registry bytes stay pristine; springsRegistry.test.ts guards drift.
+    // Keep semantic rules active, but never autofix upstream formatting.
+    files: ['packages/ui/src/lib/springs.ts'],
+    rules: {
+      'indent': 'off', 'linebreak-style': 'off', 'quotes': 'off', 'semi': 'off',
+    },
+  },
+  {
     // Next.js rules for the web shell only (replaces `next lint`).
     files: ['packages/web/**/*.{ts,tsx}'],
     plugins: {'@next/next': nextPlugin},
