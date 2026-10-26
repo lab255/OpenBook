@@ -1064,7 +1064,7 @@ function pageIsland(rawSnapshot: PageSnapshot, title: string, icon: string, meta
 const SLIDE_STYLES = `
 .ob-deck { max-width: none; padding: 0; }
 .slide { display: none; box-sizing: border-box; min-height: 100vh; max-width: 60rem; margin: 0 auto; padding: clamp(2rem,6vh,5rem) clamp(1.5rem,6vw,5rem); }
-.slide[data-current] { display: block; animation: ob-slide-in 340ms cubic-bezier(.2,.7,.2,1) both; }
+.slide[data-current] { display: block; animation: ob-slide-in 240ms cubic-bezier(0.32,0.72,0,1) both; }
 .slide .slide-title h1 { font-size: 2.4rem; margin: 0 0 1.5rem; }
 @keyframes ob-slide-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 .deck-nav { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .6rem; padding: .3rem .6rem; border: 1px solid #e5e7eb; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 2px 10px rgba(0,0,0,.08); font: 14px system-ui, sans-serif; }
@@ -1372,7 +1372,7 @@ ${statusLightCss(scheme)}
 .kit-prog-label { font-weight: 600; font-size: .92rem; }
 .kit-prog-val { font-variant-numeric: tabular-nums; opacity: .65; font-size: .9em; }
 .kit-prog-track { height: 8px; border-radius: 9999px; background: rgba(127,127,127,.18); overflow: hidden; }
-.kit-prog-fill { height: 100%; border-radius: 9999px; background: ${KIT_EXPORT_PRIMARY}; transition: width 180ms cubic-bezier(0.32,0.72,0,1); }
+.kit-prog-fill { height: 100%; border-radius: 9999px; background: ${KIT_EXPORT_PRIMARY}; transition: width 160ms cubic-bezier(0.32,0.72,0,1); }
 .slider input[type=range] { vertical-align: middle; width: 60%; }
 .expr code { color: inherit; }
 /* Long stringified readouts (arrays from live code) must wrap, not blow the

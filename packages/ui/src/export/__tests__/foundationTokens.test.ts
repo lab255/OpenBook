@@ -18,6 +18,19 @@ function token(name: string): string {
 }
 
 describe('DSX foundation export mirrors', () => {
+  it('keeps both CSS motion declarations and export tween mirrors in parity', () => {
+    const theme = css.slice(css.indexOf('@theme'), css.indexOf('  :root {'));
+    for (const [tier, duration] of [['fast', '80ms'], ['base', '160ms'], ['slow', '240ms']]) {
+      expect(token(`motion-${tier}`)).toBe(duration);
+      expect(theme).toContain(`--motion-${tier}: ${duration};`);
+    }
+    const ease = token('ease-out-soft').replaceAll(' ', '');
+    const progress = exporter.match(/\.kit-prog-fill \{[^\n]+/)![0];
+    expect(progress).toContain(`transition: width ${token('motion-base')} ${ease};`);
+    const slide = exporter.match(/\.slide\[data-current\] \{[^}]+\}/)![0];
+    expect(slide).toContain(`animation: ob-slide-in ${token('motion-slow')} ${ease} both;`);
+  });
+
   it('mirrors table metrics, borders and header fills in both themes', () => {
     const body = parseFloat(token('obe-font-size'));
     const ratio = Number(token('obe-small-size').match(/\* ([\d.]+)/)![1]);
