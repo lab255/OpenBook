@@ -1108,6 +1108,16 @@ export const en = {
     noDatabases: 'No databases found',
   },
   meetingBlock: {
+    manage: 'Meeting actions',
+    retryAll: 'Retry failed transcriptions',
+    copyTranscript: 'Copy transcript',
+    transcriptCopied: 'Transcript copied',
+    transcriptCopyFailed: 'Could not copy transcript',
+    deleteTranscript: 'Delete transcript',
+    deleteTranscriptTitle: 'Delete transcript?',
+    deleteTranscriptBody: 'Removes the transcript text. Audio, summary and notes are kept.',
+    deleteTranscriptPending: 'Transcription still in progress may add new text.',
+
     needsAttention: 'Needs attention',
     discard: 'Discard',
     discardConfirm: 'Discard unsaved meeting audio?',
