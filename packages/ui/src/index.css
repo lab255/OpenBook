@@ -216,6 +216,14 @@
 
   :root {
     --obe-chart-ink-on-pale: #233246;
+    /* FF-1: existing block dependencies must exist without Tailwind generation. */
+    --container-content: 46rem;
+    --height-control-xs: 24px;
+    --height-control-sm: 28px;
+    --height-control-md: 32px;
+    --height-control-lg: 36px;
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
     /* DSX foundation: plain CSS tokens also travel with the standalone viewer. */
     --motion-fast: 120ms;
     --motion-base: 180ms;
