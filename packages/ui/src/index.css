@@ -593,7 +593,7 @@
    reduced motion the sweep is frozen off-screen, leaving a plain muted block. */
 .ob-skeleton {
   /* Deliberate ambient attention ping, manifest §2 exemption. */
-  --shimmer-duration: 1.6s;
+  --motion-shimmer: 1.6s;
   position: relative;
   overflow: hidden;
   background-color: hsl(var(--muted));
@@ -609,7 +609,7 @@
     hsl(var(--foreground) / 0.07),
     transparent
   );
-  animation: ob-shimmer var(--shimmer-duration) var(--ease-in-out-soft) infinite;
+  animation: ob-shimmer var(--motion-shimmer) var(--ease-in-out-soft) infinite;
 }
 @keyframes ob-shimmer {
   100% {
@@ -2230,8 +2230,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 }
 .obe-locate-flash {
   /* Deliberate locate attention ping, manifest §2 exemption. */
-  --locate-flash-duration: 1.2s;
-  animation: obe-locate-flash var(--locate-flash-duration) var(--ease-out-soft);
+  --motion-locate-flash: 1.2s;
+  animation: obe-locate-flash var(--motion-locate-flash) var(--ease-out-soft);
   border-radius: var(--radius-lg);
 }
 
@@ -2245,13 +2245,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 }
 .ob-anchor-flash {
   /* Deliberate deep-link attention ping, manifest §2 exemption. */
-  --anchor-flash-duration: 1.8s;
+  --motion-anchor-flash: 1.8s;
   border-radius: var(--radius-md);
 }
 /* Motion-safe only: the JS scroll already falls back to `auto` under
    reduced-motion, so keep the flash animation off there too. */
 @media (prefers-reduced-motion: no-preference) {
-  .ob-anchor-flash { animation: ob-anchor-flash var(--anchor-flash-duration) var(--ease-out-soft) both; }
+  .ob-anchor-flash { animation: ob-anchor-flash var(--motion-anchor-flash) var(--ease-out-soft) both; }
 }
 
 /* Inline toolbar */
@@ -3732,8 +3732,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   pointer-events: none;
   box-shadow: 0 1px 3px hsl(0 0% 0% / 0.18);
   /* Deliberate collaborator attention ping, manifest §2 exemption. */
-  --cursor-flash-duration: 2.8s;
-  animation: obe-rcursor-fade var(--cursor-flash-duration) var(--ease-in-out-soft) forwards;
+  --motion-cursor-flash: 2.8s;
+  animation: obe-rcursor-fade var(--motion-cursor-flash) var(--ease-in-out-soft) forwards;
 }
 @keyframes obe-rcursor-fade {
   0%, 65% { opacity: 1; }
