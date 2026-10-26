@@ -1,3 +1,4 @@
+import exportParity from './scripts/export-parity-stylelint.mjs';
 import designTokens from './scripts/design-token-stylelint.mjs';
 const gridPx = String.raw`-?(?:4|6|8|10|12|16|20|24|28|32|36|40|44|48|56|64|80|96|112|128|144|160|176|192|208|224|240|256|288|320|384)px`;
 const gridRem = String.raw`-?(?:0\.25|0\.375|0\.5|0\.625|0\.75|1|1\.25|1\.5|1\.75|2|2\.25|2\.5|2\.75|3|3\.5|4|5|6|7|8|9|10|11|12|13|14|15|16|18|20|24)rem`;
@@ -10,7 +11,7 @@ const percentage = String.raw`-?(?:[0-9]*\.)?[0-9]+%`;
 const spacingAtom = String.raw`(?:0|auto|${gridPx}|${gridRem}|${percentage}|${variable}|${calculation})`;
 const spacingValue = `/^${spacingAtom}(?:\\s+${spacingAtom}){0,3}$/`;
 export default {
-  plugins: [designTokens],
+  plugins: [designTokens, exportParity],
   // The package script intentionally passes only src/index.css; generated CSS
   // and component-local styles are owned by other spacing clusters.
   rules: {
@@ -22,6 +23,7 @@ export default {
     // Duration/easing combined findings 49→7: five attention timers and
     // two global reduced-motion overrides remain intentionally literal.
     'design-tokens/role-values': true,
+    'design-tokens/export-parity': true,
     'declaration-property-value-disallowed-list': [{
       '/^(transition|animation)(-duration|-delay)?$/': [
         '/(?<![\\w.-])(?!0s\\b)\\d*\\.?\\d+m?s\\b/',

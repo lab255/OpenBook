@@ -22,7 +22,14 @@ dense recipes (`py-1.5` = 6px and `px-2.5` = 10px) are deliberate members of the
 Tailwind 4px-base scale, not permission to invent decimal values. New arbitrary
 bracket spacing needs an explained, non-recipe layout constraint.
 
-Control heights use the dedicated Tailwind `--height-*` namespace added in SPC-1:
+**Amended 2026-10-27 — superseded-by-owner-ruling (FF-1):** the owner adopted
+FF's **36/28px two-step control ladder** over SPC-1's 24/28/32/36px ladder to align
+control sizing with the FF doctrine. The prior SPC-1 rule and table below survive
+as historical implementation context, not the target ladder. Component size
+migration belongs to a later card; this amendment changes no component sizes.
+Existing recipes and exceptions below describe that pre-migration implementation.
+
+Prior SPC-1 rule: control heights use the dedicated Tailwind `--height-*` namespace:
 
 | Tier | Theme token | Utility | Exact value |
 |---|---|---|---:|

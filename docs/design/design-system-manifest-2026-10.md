@@ -7,7 +7,8 @@ that follow. A family task may not invent a token, a duration, a radius or a col
 literal; if it needs one, it amends this manifest first.
 
 Format and precedent: [`spacing-manifest-2026-08.md`](./spacing-manifest-2026-08.md)
-(SPC-1, spacing + control heights — still in force and not restated here). Input:
+(SPC-1, spacing remains in force; the control ladder is amended by the 2026-10-27
+owner ruling in its §1.1). Input:
 the colour-consistency manifest (OB-375, `git show 15ee286a:docs/design/colour-consistency-manifest-2026-07.md`)
 — its data palette (`packages/sdk/src/dataColors.ts`) and sidebar model are in force and
 are not re-decided here.
@@ -25,11 +26,17 @@ call. Matching it is not a goal in itself; each row states our own reason.
 
 | # | Rule |
 |---|---|
-| G1 | **Export parity.** Core block visuals stay plain CSS in `index.css` (comment at :932-935). Every token a core block reads is a CSS custom property declared in the plain `:root` / `.dark` layer (:215-350). `@theme` may *alias* a token for Tailwind utilities; core block CSS never depends on a Tailwind-generated variable or utility. Nothing here prescribes Tailwind for core block visuals. |
+| G1 | **Export parity (amended 2026-10-27, FF-1).** FF may govern core block visuals too, not just chrome. The export-mirror question (FF-6) gates block-level FF motion. Tailwind utilities may enter core block CSS only via tokens the export mirror (FF-6) covers. Until that list is approved, core block visuals stay plain CSS with plain custom properties: the conservative lint guard rejects Tailwind-generated variables and `@apply` in `.obe-*` rules, including nested rules and indirect aliases. `@theme` may alias plain tokens for chrome. |
 | G2 | **Static exports inline light values.** `export/toHtml.ts` cannot read live variables; every token it needs is mirrored as a light-mode literal *derived from the same table in this manifest*, with a unit test asserting equality (pattern: `COLOR_EXPORT_HEX`, `dataColors` export inlining). Kit inputs: `KIT_EXPORT_PRIMARY` = `#1c79c4` (light `--primary` `207 75% 44%`, `colors.ts`, equality-tested in `colors.test.ts`). |
 | G3 | **Token namespaces.** Editor/content tokens: `--obe-*`. Motion durations: `--motion-*`. Easings: existing `--ease-*`. Radius: existing `--radius-*` (+ one new step). z-index: existing `--z-index-*`. No other new prefixes. |
 | G4 | **Mode pairs.** Any colour token that is not derived from a theme variable (`--foreground`, `--muted`, `--ring`, …) declares both a `:root` and a `.dark` value. A literal colour with no dark value is a defect. |
 | G5 | **Sequencing.** A foundation change lands first (declare tokens §1-§5, global retunes §2.4, lint guards §10 at `warn`); family tasks then migrate their own selectors. Guards flip to `error` when their baseline reaches zero. |
+
+**G1 history — superseded-by-owner-ruling, 2026-10-27 (FF-1):** the prior rule
+said “core block CSS never depends on a Tailwind-generated variable or utility”
+and “Nothing here prescribes Tailwind for core block visuals.” The owner expanded
+FF's remit to core block visuals; export parity remains the reason for the narrowed
+token-only boundary and the conservative guard pending FF-6.
 
 ---
 
@@ -57,8 +64,13 @@ DSX-2 icon role: `--obe-icon-size: calc(var(--obe-font-size) * 1.25)` (20px at b
 
 Also: `--obe-line: calc(var(--obe-font-size) * var(--obe-leading))` (the body line box, 24px),
 `--obe-heading-weight: 600`, `--obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`
-(replaces the three literal mono stacks, e.g. :1148, :1853). Uppercase eyebrows (caption
-size) use `letter-spacing: 0.04em`.
+(replaces the three literal mono stacks, e.g. :1148, :1853).
+
+**Amended 2026-10-27 — superseded-by-owner-ruling (FF-1):** the prior rule,
+“Uppercase eyebrows (caption size) use `letter-spacing: 0.04em`,” is retained here
+as history. The owner adopted FF's ban on uppercase/letter-spaced eyebrow labels
+to align typography with the FF doctrine. Migration of the approximately 25
+existing call sites belongs to a later card; this amendment changes no call sites.
 
 ### 1.2 Decisions vs today
 
@@ -408,13 +420,13 @@ Today only spacing and radius are guarded (`packages/ui/stylelint.config.mjs`;
 ships with positive/negative controls in `scripts/assert-spacing-stylelint.mjs` (or a
 sibling) / a `*.test.mjs` like the existing rules, starts at **warn** with the baseline
 recorded, and flips to **error** when the baseline is zero. Disables require a
-description (`reportDescriptionlessDisables` is already on). Custom-property declarations
-(`--*`) are never matched, so token blocks are unaffected.
+description (`reportDescriptionlessDisables` is already on). Role-value guards exclude custom-property declarations (`--*`). The export-parity guard also checks their dependencies so aliases cannot bypass G1.
 
 ### 10.1 stylelint (`src/index.css`)
 
 | Guard | Rule | Allowed | Rejected | Baseline |
 |---|---|---|---|---:|
+| Export parity (FF-1) | `design-tokens/export-parity` | plain CSS tokens, including tokens also aliased in `@theme` | Tailwind-only theme/namespace variables, `--tw-*`, indirect aliases, and `@apply` under `.obe-*` | 0 (**error**); TODO(FF-6): widen only with approved mirror token list and parity tests |
 | Motion durations | `declaration-property-value-disallowed-list` on `/^(transition|animation)(-duration|-delay)?$/` | `var(--motion-*)`, `0s` | `/\b\d*\.?\d+m?s\b/` (any literal time) | 44 |
 | Easings | same, on `transition`, `animation`, `*-timing-function` | `var(--ease-*)`, `linear`, `steps()` | `/\bease(-in|-out|-in-out)?\b/`, `/cubic-bezier\(/` | ~40 |
 | Colour literals | `declaration-property-value-disallowed-list` on `color, background, background-color, border*, outline*, fill, stroke, box-shadow, caret-color, text-decoration*, accent-color` | `hsl(var(--…) [/ a])`, `var(--…)`, `transparent`, `currentColor`, `inherit`, system colours (`Highlight`) | `/#[0-9a-f]{3,8}\b/i`, `/\b(?:hsla?|rgba?)\(\s*[0-9.]/i` | 99 |

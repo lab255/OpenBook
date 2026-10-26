@@ -42,7 +42,7 @@ for (const value of [
   'z-index: var(--z-index-menu)', 'font-size: var(--obe-small-size)',
   'font-size: .875em', 'font-size: 1em', '--motion-fast: 120ms', '--obe-code-num: hsl(28 80% 38%)',
 ]) {
-  const warnings = await warningsFor(`.obe-control { ${value}; }`);
+  const warnings = await warningsFor(`:root { --ease-out-soft: linear; --radius-lg: 8px; } .obe-control { ${value}; }`);
   if (warnings.length) throw new Error(`DSX allowed ${value}: ${JSON.stringify(warnings)}`);
 }
 for (const value of [
@@ -51,11 +51,11 @@ for (const value of [
   'color: #abcdef', 'border: 1px solid rgb(1 2 3)',
   'font-size: 14px',
 ]) {
-  const warnings = await warningsFor(`.obe-control { ${value}; }`);
+  const warnings = await warningsFor(`:root { --ease-out-soft: linear; --radius-lg: 8px; } .obe-control { ${value}; }`);
   if (!warnings.length || warnings.some(w => w.severity !== 'warning')) throw new Error(`DSX warn guard missed ${value}`);
 }
 for (const value of ['border-radius: 4px', 'border-radius: var(--anything)', 'z-index: 4']) {
-  const warnings = await warningsFor(`.obe-control { ${value}; }`);
+  const warnings = await warningsFor(`:root { --ease-out-soft: linear; --radius-lg: 8px; } .obe-control { ${value}; }`);
   if (!warnings.length || warnings.some(w => w.severity !== 'error')) throw new Error(`DSX error guard missed ${value}`);
 }
 const {readFileSync} = await import('node:fs');
@@ -65,3 +65,26 @@ if (reducedBlocks.length !== 2 || !reducedBlocks[0].includes('0.01ms !important'
   throw new Error('Reduced motion must use only the global switch and remote cursor end-state exception');
 }
 console.log('DSX stylelint controls passed');
+
+// FF-1: conservative G1 export boundary, including nested rules and aliases.
+const parityRule = 'design-tokens/export-parity';
+const parityControls = [
+  [false, '.obe-text { color: var(--foreground); }'],
+  [false, ':root { --radius-lg: 8px; } @theme { --radius-lg: 8px; } .obe-text { border-radius: var(--radius-lg); }'],
+  [false, '.chrome { color: var(--color-red-500); @apply flex; }'],
+  [true, '.obe-text { color: var(--color-red-500); }'],
+  [true, '.obe-text { transform: translateX(var(--tw-translate-x)); }'],
+  [true, '.obe-text { --local: var(--spacing); }'],
+  [true, '.obe-text { @media (width > 1px) { &:hover { color: var(--color-red-500); } } }'],
+  [true, '@theme { --custom-theme: 1; } .obe-text { opacity: var(--custom-theme); }'],
+  [true, ':root { --alias: var(--color-red-500); } .obe-text { color: var(--alias); }'],
+  [true, '.obe-text { color: var(--foreground, var(--color-red-500)); }'],
+  [true, '.obe-text { @apply text-red-500; }'],
+];
+for (const [reject, code] of parityControls) {
+  const warnings = await warningsFor(code);
+  if (warnings.some(w => w.rule === parityRule && w.severity === 'error') !== reject) {
+    throw new Error(`FF-1 export parity control failed: ${code}`);
+  }
+}
+console.log('FF-1 export parity controls passed (3 positive, 8 negative)');
