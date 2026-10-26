@@ -212,7 +212,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
             return (
               <React.Fragment key={`${it.group ?? ""}:${it.value}:${i}`}>
                 {header && (
-                  <div className="px-2 pb-0.5 pt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                  <div className="px-2 pb-0.5 pt-1.5 text-xs font-medium text-muted-foreground">
                     {it.group}
                   </div>
                 )}
