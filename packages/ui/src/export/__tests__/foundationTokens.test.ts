@@ -24,7 +24,7 @@ describe('DSX foundation export mirrors', () => {
     ['slide deck', toSlideDeck],
   ] as const)('%s emitted tween lane', (_kind, render) => {
     const html = render({editorjs: {blocks: []}, values: [], names: []}, 'Motion parity', '');
-    const mirror = html.match(/:root \{\n  --motion-fast:[\s\S]*?\n\}/)?.[0] ?? '';
+    const mirror = html.match(/:root \{\n {2}--motion-fast:[\s\S]*?\n\}/)?.[0] ?? '';
     it.each(['motion-fast', 'motion-base', 'motion-slow', 'ease-out-soft', 'ease-in-out-soft'])(
       'mirrors live --%s exactly', (name) => {
         const emitted = mirror.match(new RegExp(`--${name}: ([^;]+);`))?.[1];
