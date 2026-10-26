@@ -57,8 +57,13 @@ DSX-2 icon role: `--obe-icon-size: calc(var(--obe-font-size) * 1.25)` (20px at b
 
 Also: `--obe-line: calc(var(--obe-font-size) * var(--obe-leading))` (the body line box, 24px),
 `--obe-heading-weight: 600`, `--obe-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`
-(replaces the three literal mono stacks, e.g. :1148, :1853). Uppercase eyebrows (caption
-size) use `letter-spacing: 0.04em`.
+(replaces the three literal mono stacks, e.g. :1148, :1853).
+
+**Amended 2026-10-27 — superseded-by-owner-ruling (FF-1):** the prior rule,
+“Uppercase eyebrows (caption size) use `letter-spacing: 0.04em`,” is retained here
+as history. The owner adopted FF's ban on uppercase/letter-spaced eyebrow labels
+to align typography with the FF doctrine. Migration of the approximately 25
+existing call sites belongs to a later card; this amendment changes no call sites.
 
 ### 1.2 Decisions vs today
 

@@ -7,4 +7,7 @@
 - 2026-10-27 — Font (FF-5): ship InterVariable with `font-weight: 100 900` and `opsz` as a face-of-product decision.
 - 2026-10-27 — Loading (FF-1): use eager `motion.*` imports from `motion/react`; registry files use `motion.*`, which throws under `LazyMotion strict`, so eager loading leaves future FF installs unedited. Accept one library's bundle cost now; revisit if the bundle budget complains.
 
+- 2026-10-27 — Uppercase eyebrows: adopt FF’s ban on uppercase/letter-spaced eyebrow labels; the prior DSX sanction is superseded by owner ruling. Migration of the approximately 25 call sites belongs to a later card.
+- 2026-10-27 — Control ladder: adopt FF’s 36/28px two-step ladder over SPC-1’s 24/28/32/36px ladder; the old ladder is superseded by owner ruling. Component size migration belongs to a later card.
+
 FF skill vendored copies live in worker worktrees at `_ff-skill/`, uncommitted; fetch from github.com/mickadesign/fluid-functionalism when needed.
