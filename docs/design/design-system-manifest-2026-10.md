@@ -7,7 +7,8 @@ that follow. A family task may not invent a token, a duration, a radius or a col
 literal; if it needs one, it amends this manifest first.
 
 Format and precedent: [`spacing-manifest-2026-08.md`](./spacing-manifest-2026-08.md)
-(SPC-1, spacing + control heights — still in force and not restated here). Input:
+(SPC-1, spacing remains in force; the control ladder is amended by the 2026-10-27
+owner ruling in its §1.1). Input:
 the colour-consistency manifest (OB-375, `git show 15ee286a:docs/design/colour-consistency-manifest-2026-07.md`)
 — its data palette (`packages/sdk/src/dataColors.ts`) and sidebar model are in force and
 are not re-decided here.
@@ -30,6 +31,12 @@ call. Matching it is not a goal in itself; each row states our own reason.
 | G3 | **Token namespaces.** Editor/content tokens: `--obe-*`. Motion durations: `--motion-*`. Easings: existing `--ease-*`. Radius: existing `--radius-*` (+ one new step). z-index: existing `--z-index-*`. No other new prefixes. |
 | G4 | **Mode pairs.** Any colour token that is not derived from a theme variable (`--foreground`, `--muted`, `--ring`, …) declares both a `:root` and a `.dark` value. A literal colour with no dark value is a defect. |
 | G5 | **Sequencing.** A foundation change lands first (declare tokens §1-§5, global retunes §2.4, lint guards §10 at `warn`); family tasks then migrate their own selectors. Guards flip to `error` when their baseline reaches zero. |
+
+**G1 history — superseded-by-owner-ruling, 2026-10-27 (FF-1):** the prior rule
+said “core block CSS never depends on a Tailwind-generated variable or utility”
+and “Nothing here prescribes Tailwind for core block visuals.” The owner expanded
+FF's remit to core block visuals; export parity remains the reason for the narrowed
+token-only boundary and the conservative guard pending FF-6.
 
 ---
 
