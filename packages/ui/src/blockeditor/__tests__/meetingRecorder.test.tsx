@@ -451,6 +451,40 @@ describe('MEET-5 review regressions', () => {
 
 
 describe('app lifetime meeting sessions', () => {
+  it('uses deltas for off-page chunks while concurrent rename, data, and block edits survive', async () => {
+    const {doc, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc), names: ['before']}};
+    const savePage = vi.fn();
+    const applyPageUpdate = vi.fn(async (_id: string, update: string) => {
+      const latest = decodeSnapshot(stored.data.blockdoc);
+      setBlockProp(rootBlocks(latest).get(0), 'concurrent', 'keep');
+      Y.applyUpdate(latest, Uint8Array.from(atob(update), (c) => c.charCodeAt(0)));
+      stored = {id: 'page', name: 'Renamed', data: {blockdoc: encodeSnapshot(latest), names: ['new']}};
+      latest.destroy(); return true;
+    });
+    setMeetingSessionClient({getPage: async () => stored, savePage, applyPageUpdate} as unknown as DataClient);
+    await session.start(); stored = {...stored, data: {...stored.data, blockdoc: encodeSnapshot(doc)}};
+    session.detach(); await vi.advanceTimersByTimeAsync(2000); session.stop(); await vi.advanceTimersByTimeAsync(0);
+    const latest = decodeSnapshot(stored.data.blockdoc); const block = rootBlocks(latest).get(0);
+    expect(stored.name).toBe('Renamed'); expect(stored.data.names).toEqual(['new']);
+    expect(blockProp(block, 'concurrent')).toBe('keep');
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(applyPageUpdate).toHaveBeenCalled(); expect(savePage).not.toHaveBeenCalled();
+    latest.destroy(); session.discard();
+  });
+
+  it.each([403, 404])('stops and retains attention on a delta HTTP %s without a fallback save', async (status) => {
+    const {doc, session} = harness();
+    const savePage = vi.fn();
+    setMeetingSessionClient({getPage: async () => ({id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}}), savePage,
+      applyPageUpdate: async () => { throw Object.assign(new Error(String(status)), {status}); },
+    } as unknown as DataClient);
+    await session.start(); session.detach(); await vi.advanceTimersByTimeAsync(45000); await flush();
+    expect(session.active).toBe(false); expect(session.error).not.toBe('');
+    expect(savePage).not.toHaveBeenCalled(); session.discard();
+  });
+
   it('persists final audio and transcript after the view and doc detach', async () => {
     const {doc, block, editor} = harness();
     const unregister = registerBlockEditorDoc('away-page', doc);
@@ -509,18 +543,25 @@ describe('app lifetime meeting sessions', () => {
 
 
 describe('navigation persistence failure recovery', () => {
-  it.each(['load', 'save'] as const)('reconciles a page reopened during the stored-page %s', async (stage) => {
+  it.each(['load', 'save', 'delta'] as const)('reconciles a page reopened during the stored-page %s', async (stage) => {
     const {doc, session} = harness();
     let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const getPage = vi.fn(async () => { if (stage === 'load') await gate; return stored; });
     const savePage = vi.fn(async (page) => { if (stage === 'save') await gate; stored = page; });
-    setMeetingSessionClient({getPage, savePage} as unknown as DataClient);
+    const applyPageUpdate = stage === 'delta' ? vi.fn(async (_id: string, update: string) => {
+      await gate;
+      const latest = decodeSnapshot(stored.data.blockdoc);
+      Y.applyUpdate(latest, Uint8Array.from(atob(update), (c) => c.charCodeAt(0)));
+      stored = {...stored, data: {blockdoc: encodeSnapshot(latest)}};
+      latest.destroy(); return true;
+    }) : undefined;
+    setMeetingSessionClient({getPage, savePage, applyPageUpdate} as unknown as DataClient);
     await session.start(); await flush();
     stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
     session.detach(); session.pause(); await flush();
-    expect(getPage).toHaveBeenCalledOnce();
+    expect(getPage).toHaveBeenCalledTimes(stage === 'save' ? 2 : 1);
     if (stage === 'save') expect(savePage).toHaveBeenCalledOnce();
     const reopened = decodeSnapshot(stored.data.blockdoc);
     const block = rootBlocks(reopened).get(0);
@@ -532,7 +573,7 @@ describe('navigation persistence failure recovery', () => {
     expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
     expect(blockProp(block, 'transcript')).toHaveLength(1);
     expect(session.chunks[0].phase).toBe('done');
-    if (stage === 'load') expect(savePage).not.toHaveBeenCalled();
+    if (stage !== 'save') expect(savePage).not.toHaveBeenCalled();
     session.stop(); await flush(); unregister();
   });
 
