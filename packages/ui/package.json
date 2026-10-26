@@ -72,6 +72,7 @@
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
+    "motion": "^12.43.0",
     "node-emoji": "^2.2.0",
     "quickjs-emscripten-core": "0.32.0",
     "react-leaflet": "^5.0.0",
