@@ -1302,6 +1302,15 @@ const schemeDual = (scheme: DataColorScheme): string => `
 `;
 
 const stylesFor = (scheme: DataColorScheme): string => `
+/* DSX §2: complete export/viewer tween lane; foundationTokens.test.ts compares
+   these independent mirrors with live tokens, including emitted page/deck HTML. */
+:root {
+  --motion-fast: 80ms;
+  --motion-base: 160ms;
+  --motion-slow: 240ms;
+  --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+}
 * { box-sizing: border-box; }
 body { margin: 0; background: #fff; color: #1a1a1a; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 main { max-width: 720px; margin: 0 auto; padding: 48px 24px 120px; }

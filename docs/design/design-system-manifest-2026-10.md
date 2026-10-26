@@ -98,7 +98,9 @@ seconds does not turn a CSS tween into a spring.
 
 CSS durations are declared in both `@theme` and `:root`; TSX consumes them as
 `duration-(--motion-base)`. Easings retain their `@theme` names and plain `:root`
-mirrors for the viewer. Static export literals are parity-tested against these tokens.
+mirrors for the viewer. Static exports emit all three duration tiers and both
+CSS tween easing tuples (out-soft and in-out-soft); generated page/deck HTML and
+progress/slide literals are parity-tested against live tokens.
 
 | CSS token | Value | Role |
 |---|---:|---|
