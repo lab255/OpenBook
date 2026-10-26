@@ -24,7 +24,7 @@ describe('DSX foundation export mirrors', () => {
       expect(token(`motion-${tier}`)).toBe(duration);
       expect(theme).toContain(`--motion-${tier}: ${duration};`);
     }
-    const ease = token('ease-out-soft').replaceAll(' ', '');
+    const ease = token('ease-out-soft').replace(/ /g, '');
     const progress = exporter.match(/\.kit-prog-fill \{[^\n]+/)![0];
     expect(progress).toContain(`transition: width ${token('motion-base')} ${ease};`);
     const slide = exporter.match(/\.slide\[data-current\] \{[^}]+\}/)![0];
