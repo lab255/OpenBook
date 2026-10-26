@@ -147,7 +147,7 @@
   --z-index-toast: 100;
 
   /* ── Motion system ──────────────────────────────────────────────────────────
-     CSS = export/viewer tween lane; springs.ts = interruptible chrome lane.
+     CSS = export/viewer tween lane; springs-lane.ts = interruptible chrome lane.
      Keep these lanes separate: equal nominal durations do not make tweens springs. `--default-transition-*` are
      the Tailwind v4 theme keys every `transition`/`transition-colors` utility
      reads, so setting them here retunes existing transitions app-wide to a soft,

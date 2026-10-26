@@ -92,7 +92,7 @@ a later pass; this manifest governs the document surface.
 ### 2.1 Tokens
 
 **Amended 2026-10-27 — superseded-by-owner-ruling (FF-3):** motion has two
-lanes. CSS is the export/viewer tween lane; `lib/springs.ts` is the interruptible
+lanes. CSS is the export/viewer tween lane; `lib/springs-lane.ts` is the interruptible
 `motion/react` chrome lane. Keep their number sets separate: matching nominal
 seconds does not turn a CSS tween into a spring.
 
@@ -117,6 +117,11 @@ mirrors for the viewer. Static export literals are parity-tested against these t
 | `spring.fast` | `{type: 'spring', duration: 0.08, bounce: 0}` | `{duration: 0.06}` |
 | `spring.moderate` | `{type: 'spring', duration: 0.16, bounce: 0}` | `{duration: 0.12}` |
 | `spring.slow` | `{type: 'spring', duration: 0.24, bounce: 0.12}` | `{duration: 0.16}` |
+
+The authored `lib/springs-lane.ts` re-exports spring tokens from the pristine
+registry-owned `lib/springs.ts`. Never edit the installed registry file: import
+and wrap it. A committed upstream fixture guards byte-for-byte identity. Import
+`exitFallbackMs` from the pristine file if needed; never re-implement it.
 
 Each spring exposes its exit as `.exit`. Springs support reversal mid-flight;
 exits are shorter tweens. Import eagerly from `motion/react` (FF-1), with

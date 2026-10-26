@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import type {Transition} from 'motion/react';
-import {spring} from './springs';
+import {spring} from './springs-lane';
 
 describe('FF interruptible chrome springs', () => {
   it.each([
