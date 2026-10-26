@@ -26,7 +26,7 @@ describe('DSX foundation export mirrors', () => {
     }
     const ease = token('ease-out-soft').replace(/ /g, '');
     const progress = exporter.match(/\.kit-prog-fill \{[^\n]+/)![0];
-    expect(progress).toContain(`transition: width ${token('motion-base')} ${ease};`);
+    expect(progress, 'export progress must mirror live :root --motion-base').toContain(`transition: width ${token('motion-base')} ${ease};`);
     const slide = exporter.match(/\.slide\[data-current\] \{[^}]+\}/)![0];
     expect(slide).toContain(`animation: ob-slide-in ${token('motion-slow')} ${ease} both;`);
   });
