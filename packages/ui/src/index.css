@@ -152,7 +152,8 @@
      the Tailwind v4 theme keys every `transition`/`transition-colors` utility
      reads, so setting them here retunes existing transitions app-wide to a soft,
      decelerating ease-out (the "settles into place" feel of native UI) without
-     touching call sites. The named `ease-out-soft` utility serves entrances and exits. Static end-states are unchanged, so
+     touching call sites. The named `ease-out-soft` utility serves entrances and exits;
+     `ease-spring` remains for the separate Radix switch thumb. Static end-states are unchanged, so
      visual snapshots are unaffected; only the in-between motion is refined. */
   --motion-fast: 80ms;
   --motion-base: 160ms;
@@ -160,6 +161,7 @@
   --default-transition-duration: 80ms;
   --default-transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* Literal shadow tokens declared in @theme bake into utilities. The
@@ -231,6 +233,7 @@
     --motion-base: 160ms;
     --motion-slow: 240ms;
     --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
