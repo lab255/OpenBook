@@ -1,4 +1,5 @@
 import React from 'react';
+import {MotionConfig} from 'motion/react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import {AppErrorBoundary} from './AppErrorBoundary';
@@ -9,8 +10,10 @@ suppressNativeContextMenu(import.meta.env.PROD);
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <AppErrorBoundary>
-      <App />
-    </AppErrorBoundary>
+    <MotionConfig reducedMotion="user">
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
+    </MotionConfig>
   </React.StrictMode>
 );

@@ -243,7 +243,7 @@ export default function HomeScreen() {
     <div className="w-full px-6 pb-24 pt-16 md:px-10" data-home-screen>
       <div className="mx-auto w-full max-w-content">
         <header className="mb-10 flex items-start justify-between gap-4">
-          <div className={cn('transition-opacity duration-300', now ? 'opacity-100' : 'opacity-0')}>
+          <div className={cn('transition-opacity duration-(--motion-fast)', now ? 'opacity-100' : 'opacity-0')}>
             <h1 className="text-3xl font-semibold tracking-tight" data-home-greeting>
               {greeting}
             </h1>

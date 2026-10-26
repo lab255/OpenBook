@@ -103,7 +103,7 @@ export function PageHeaderControls({pageId}: {pageId: string}) {
       <span
         data-page-header-item="page-tools"
         className={cn(
-          'flex items-center gap-1 opacity-50 transition-opacity duration-150',
+          'flex items-center gap-1 opacity-50 transition-opacity duration-(--motion-fast)',
           'group-hover/pagehead:opacity-100 focus-within:opacity-100',
           '[&:has([data-state=open])]:opacity-100',
         )}
@@ -133,7 +133,7 @@ export function PageHeaderControls({pageId}: {pageId: string}) {
         data-page-header-meta
         className={cn(
           'flex min-w-0 flex-1 flex-nowrap items-center gap-1 supports-[not(container-type:inline-size)]:flex-wrap',
-          'opacity-0 pointer-events-none transition-opacity duration-150',
+          'opacity-0 pointer-events-none transition-opacity duration-(--motion-fast)',
           'group-hover/pagehead:opacity-100 group-hover/pagehead:pointer-events-auto',
           'focus-within:opacity-100 focus-within:pointer-events-auto',
           '[&:has([data-state=open])]:opacity-100 [&:has([data-state=open])]:pointer-events-auto',

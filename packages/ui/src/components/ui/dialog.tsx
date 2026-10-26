@@ -30,6 +30,7 @@ const DialogOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
+    data-slot="dialog-overlay"
     ref={ref}
     className={cn(
       // Blur strength is driven by the `--overlay-blur` CSS var (set from the
@@ -43,7 +44,7 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-export const DIALOG_EXIT_MS = 120; // mirrors --motion-fast; used by delayed dialog teardown
+export const DIALOG_EXIT_MS = 120; // Conservative teardown delay covers the 80ms CSS exit so Radix restores focus.
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
