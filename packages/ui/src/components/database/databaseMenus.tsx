@@ -1360,7 +1360,10 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
           </div>
           {pct !== null && (
             <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-brand transition-all" style={{width: `${pct}%`}} />
+              <div
+                className="h-full w-full origin-left bg-brand"
+                style={{transform: `scaleX(${pct / 100})`, transition: 'transform var(--motion-fast) var(--ease-out-soft)'}}
+              />
             </div>
           )}
         </button>
