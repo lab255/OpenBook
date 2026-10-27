@@ -769,3 +769,32 @@ describe('HttpDataClient.getPage — 401 vs 404', () => {
     await expect(client.getPage('p1')).rejects.toMatchObject({status: 401});
   });
 });
+
+describe('stored-page delta support', () => {
+  it('returns unavailable on old servers without attempting a page write', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      expect(url).toBe('/health');
+      return new Response('ok');
+    });
+    const client = new HttpDataClient('', undefined, {fetchImpl});
+    expect(await client.applyPageUpdate('p', 'AA==', 1)).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][0]).toBe('/health');
+  });
+
+  it.each([403, 404, 500])('propagates HTTP %s after support is advertised', async (status) => {
+    const fetchImpl = vi.fn(async (url: string) => url.endsWith('/health')
+      ? new Response('ok', {headers: {'X-OpenBook-Stored-Updates': '1'}})
+      : new Response(JSON.stringify({error: 'failed'}), {status}));
+    const client = new HttpDataClient('', undefined, {fetchImpl});
+    await expect(client.applyPageUpdate('p', 'AA==', 1)).rejects.toThrow(String(status));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('acknowledges a durable 204 without expecting a JSON body', async () => {
+  const client = new HttpDataClient('', undefined, {fetchImpl: async (url) => url.endsWith('/health')
+    ? new Response('ok', {headers: {'X-OpenBook-Stored-Updates': '1'}})
+    : new Response(null, {status: 204})});
+  expect(await client.applyPageUpdate('p', 'AA==', 1)).toBe(true);
+});

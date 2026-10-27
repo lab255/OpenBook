@@ -9,6 +9,7 @@ import {statusOf, type ExportCell} from './kit/scope';
 import type {DbChartSeriesMap} from './kit/chartData';
 import {formSchemaFromProps} from './formBlock';
 import {meetingTime} from './meetingTime';
+import {meetingTranscriptLines} from './meetingManagement';
 import {AUDIO_DATA_URI_RE, withMeetingAudioOffsets} from './meetingAudio';
 import type {MeetingAudio} from './meetingRecorder';
 
@@ -23,7 +24,7 @@ function meetingParagraphs(b: BlockJSON): string[] {
   const p = b.props ?? {};
   const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
   return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
-    ...segments.map((segment) => `[${meetingTime(segment.startMs)}] ${segment.text}`)];
+    ...meetingTranscriptLines(segments)];
 }
 
 function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions, format: 'html' | 'markdown' = 'html'): string[] {
