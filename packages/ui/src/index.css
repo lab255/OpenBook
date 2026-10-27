@@ -147,14 +147,18 @@
   --z-index-toast: 100;
 
   /* ── Motion system ──────────────────────────────────────────────────────────
-     One considered curve + tempo for the whole UI. `--default-transition-*` are
+     CSS = export/viewer tween lane; springs-lane.ts = interruptible chrome lane.
+     Keep these lanes separate: equal nominal durations do not make tweens springs. `--default-transition-*` are
      the Tailwind v4 theme keys every `transition`/`transition-colors` utility
      reads, so setting them here retunes existing transitions app-wide to a soft,
      decelerating ease-out (the "settles into place" feel of native UI) without
-     touching call sites. Named eases are exposed as `ease-out-soft` / `ease-spring`
-     utilities for entrances and emphasis. Static end-states are unchanged, so
+     touching call sites. The named `ease-out-soft` utility serves entrances and exits;
+     `ease-spring` remains for the separate Radix switch thumb. Static end-states are unchanged, so
      visual snapshots are unaffected; only the in-between motion is refined. */
-  --default-transition-duration: 120ms;
+  --motion-fast: 80ms;
+  --motion-base: 160ms;
+  --motion-slow: 240ms;
+  --default-transition-duration: 80ms;
   --default-transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -225,12 +229,12 @@
     --text-xs: 0.75rem;
     --text-sm: 0.875rem;
     /* DSX foundation: plain CSS tokens also travel with the standalone viewer. */
-    --motion-fast: 120ms;
-    --motion-base: 180ms;
+    --motion-fast: 80ms;
+    --motion-base: 160ms;
     --motion-slow: 240ms;
     --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
-    --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
@@ -588,6 +592,8 @@
    the content's space; the ::after sweeps a faint gradient left→right. Under
    reduced motion the sweep is frozen off-screen, leaving a plain muted block. */
 .ob-skeleton {
+  /* Deliberate ambient attention ping, manifest §2 exemption. */
+  --motion-shimmer: 1.6s;
   position: relative;
   overflow: hidden;
   background-color: hsl(var(--muted));
@@ -603,7 +609,7 @@
     hsl(var(--foreground) / 0.07),
     transparent
   );
-  animation: ob-shimmer 1.6s var(--ease-in-out-soft) infinite;
+  animation: ob-shimmer var(--motion-shimmer) var(--ease-in-out-soft) infinite;
 }
 @keyframes ob-shimmer {
   100% {
@@ -2222,7 +2228,12 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   0% { background: hsl(var(--primary) / 0.14); }
   100% { background: transparent; }
 }
-.obe-locate-flash { animation: obe-locate-flash 1.2s var(--ease-out-soft); border-radius: var(--radius-lg); }
+.obe-locate-flash {
+  /* Deliberate locate attention ping, manifest §2 exemption. */
+  --motion-locate-flash: 1.2s;
+  animation: obe-locate-flash var(--motion-locate-flash) var(--ease-out-soft);
+  border-radius: var(--radius-lg);
+}
 
 /* Database deep links (`?row=`/`?group=`): the targeted row/group header holds a
    soft tint + ring briefly, then fades — a transient "here it is" after scrolling
@@ -2232,11 +2243,15 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   0%, 45% { background-color: hsl(var(--primary) / 0.16); box-shadow: 0 0 0 2px hsl(var(--ring) / 0.55); }
   100% { background-color: transparent; box-shadow: 0 0 0 2px transparent; }
 }
-.ob-anchor-flash { border-radius: var(--radius-md); }
+.ob-anchor-flash {
+  /* Deliberate deep-link attention ping, manifest §2 exemption. */
+  --motion-anchor-flash: 1.8s;
+  border-radius: var(--radius-md);
+}
 /* Motion-safe only: the JS scroll already falls back to `auto` under
    reduced-motion, so keep the flash animation off there too. */
 @media (prefers-reduced-motion: no-preference) {
-  .ob-anchor-flash { animation: ob-anchor-flash 1.8s var(--ease-out-soft) both; }
+  .ob-anchor-flash { animation: ob-anchor-flash var(--motion-anchor-flash) var(--ease-out-soft) both; }
 }
 
 /* Inline toolbar */
@@ -3330,7 +3345,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: 9999px;
   background: hsl(var(--background));
   box-shadow: var(--shadow-sheet);
-  transition: transform var(--motion-base) var(--ease-spring);
+  /* Moderate 160ms soft ease-out: short travel settles precisely without overshoot. */
+  transition: transform var(--motion-base) var(--ease-out-soft);
 }
 .obe-kit-switch-on .obe-kit-knob { transform: translateX(16px); }
 
@@ -3715,7 +3731,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   /* `color` is set inline per-swatch (readableTextColor) for WCAG AA contrast. */
   pointer-events: none;
   box-shadow: 0 1px 3px hsl(0 0% 0% / 0.18);
-  animation: obe-rcursor-fade 2.8s var(--ease-in-out-soft) forwards;
+  /* Deliberate collaborator attention ping, manifest §2 exemption. */
+  --motion-cursor-flash: 2.8s;
+  animation: obe-rcursor-fade var(--motion-cursor-flash) var(--ease-in-out-soft) forwards;
 }
 @keyframes obe-rcursor-fade {
   0%, 65% { opacity: 1; }

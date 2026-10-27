@@ -91,25 +91,55 @@ a later pass; this manifest governs the document surface.
 
 ### 2.1 Tokens
 
-Durations are plain `:root` variables (Tailwind v4 has no duration theme namespace;
-TSX consumes them as `duration-(--motion-base)`). Easings keep their existing `@theme`
-names (:157-159) and are mirrored into `:root` per G1.
+**Amended 2026-10-27 — superseded-by-owner-ruling (FF-3):** motion has two
+lanes. CSS is the export/viewer tween lane; `lib/springs-lane.ts` is the interruptible
+`motion/react` chrome lane. Keep their number sets separate: matching nominal
+seconds does not turn a CSS tween into a spring.
 
-| Token | Value | Role |
+CSS durations are declared in both `@theme` and `:root`; TSX consumes them as
+`duration-(--motion-base)`. Easings retain their `@theme` names and plain `:root`
+mirrors for the viewer. Static exports emit all three duration tiers and both
+CSS tween easing tuples (out-soft and in-out-soft); generated page/deck HTML and
+progress/slide literals are parity-tested against live tokens.
+
+| CSS token | Value | Role |
 |---|---:|---|
-| `--motion-fast` | **120ms** | Hover/press chrome, reveals, all exits, tooltips |
-| `--motion-base` | **180ms** | Menus/popovers entrance, toggles, knobs, value changes |
+| `--motion-fast` | **80ms** | Hover/press chrome, reveals, CSS exits, tooltips |
+| `--motion-base` | **160ms** | Menus/popovers entrance, toggles, knobs, value changes |
 | `--motion-slow` | **240ms** | Dialogs, drawers, full-surface transitions (slides) |
-| `--ease-out-soft` | `cubic-bezier(0.32, 0.72, 0, 1)` | Default for everything that enters or changes |
-| `--ease-in-out-soft` | `cubic-bezier(0.65, 0, 0.35, 1)` | Exits and ambient loops |
-| `--ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | **Switch knobs only** (kit switch, `components/ui/switch`). Banned in the editor and on overlays. |
+| `--ease-out-soft` | `cubic-bezier(0.32, 0.72, 0, 1)` | Soft entrances, changes and exits; retained in the CSS lane |
+| `--ease-in-out-soft` | `cubic-bezier(0.65, 0, 0.35, 1)` | Existing CSS overlay exits and ambient loops |
+| `--ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | Legacy `components/ui/switch` thumb only; the kit knob uses out-soft. Retire both declarations when the last call site is migrated. Banned in the editor and on overlays. |
 
-`--default-transition-duration` (:155) is retuned **180ms → 120ms** (`= --motion-fast`):
-the 230+ bare `transition*` utilities in TSX are overwhelmingly hover colour changes
-(`transition-colors` ×156), which belong to the fast tier. 120ms is also the dominant
-literal in `index.css` today (~30 of 44), so most CSS migration is a no-op rename.
+`--default-transition-duration` is **80ms** (`= --motion-fast`): bare
+`transition*` utilities predominantly serve hover colour changes.
+
+| JS token | Enter (real spring) | Exit (duration-only tween) |
+|---|---|---|
+| `spring.fast` | `{type: 'spring', duration: 0.08, bounce: 0}` | `{duration: 0.06}` |
+| `spring.moderate` | `{type: 'spring', duration: 0.16, bounce: 0}` | `{duration: 0.12}` |
+| `spring.slow` | `{type: 'spring', duration: 0.24, bounce: 0.12}` | `{duration: 0.16}` |
+
+The authored `lib/springs-lane.ts` re-exports spring tokens from the pristine
+registry-owned `lib/springs.ts`. Never edit the installed registry file: import
+and wrap it. A committed upstream fixture guards byte-for-byte identity. Import
+`exitFallbackMs` from the pristine file if needed; never re-implement it.
+
+Each spring exposes its exit as `.exit`. Springs support reversal mid-flight;
+exits are shorter tweens. Import eagerly from `motion/react` (FF-1), with
+`MotionConfig reducedMotion="user"` at both web and desktop roots.
+
+**§2.1 history — superseded-by-owner-ruling, 2026-10-27 (FF-3):** the prior
+CSS tiers were 120/180/240ms, the default transition was 120ms, and the kit
+switch knob used `--ease-spring`. The owner retuned both CSS and JS lanes and
+removed kit-knob overshoot so short travel settles precisely. The remaining
+Radix switch call site is why the legacy easing declaration still exists.
 
 ### 2.2 Application table
+
+This table describes the existing CSS lane. The “Today” column preserves
+pre-migration audit examples, not current timing prescriptions. New interruptible
+chrome uses the separate spring tokens in §2.1.
 
 | Interaction class | Duration | Easing | Animated properties | Today (examples) |
 |---|---|---|---|---|
@@ -123,7 +153,7 @@ literal in `index.css` today (~30 of 44), so most CSS migration is a no-op renam
 | Drawer (narrow sidebar) | `--motion-slow` in / `--motion-fast` out | out-soft / in-out-soft | `transform` | Tailwind `duration-300`/`200` |
 | **Block insert / delete / convert** (Enter, paste, slash convert, remote CRDT insert) | **none** | — | — | none today — keep |
 | Toggle / collapse (accordion, toggle blocks, tabs container, tree disclosure) | chevron: `--motion-base` | `--ease-out-soft` | chevron `transform: rotate`; **content shows/hides instantly** | `0.15s ease` :791; Radix accordion `0.2s` :115-116 |
-| Switch knob / kit toggle | `--motion-base` | `--ease-spring` (knob), out-soft (track colour) | `transform`, `background-color` | `150ms` :3237/:3225 |
+| Switch knob / kit toggle (**amended FF-3**) | `--motion-base` (**160ms**) | `--ease-out-soft` for both kit knob and track | `transform`, `background-color` | Prior overshooting kit knob superseded; separate Radix switch thumb remains legacy `--ease-spring`. |
 | Value change (progress fill, meter) | `--motion-base` | `--ease-out-soft` | `width` / `transform` | `200ms ease` :3701 |
 | Drag: drop indicator, source dim, drop | **none** (indicator tracks the pointer; no settle animation) | — | — | none — keep |
 | Presentation slide enter | `--motion-slow` | `--ease-out-soft` | opacity + `translateY(16px)` → 0 | `340ms cubic-bezier(0.2,0.7,0.2,1)`, 18px :1705-1710 |
@@ -135,7 +165,9 @@ remote insert is noise (the reference editor also inserts blocks with no entranc
 **Attention signals are exempt from the scale** (they are timers, not feel): locate flash
 1.2s (:2204), anchor flash 1.8s (:2218), flow pulse 0.7s (:2197), remote-cursor label
 dwell 2.8s (:3606), skeleton shimmer 1.6s (:442). They keep their durations but must use
-an `--ease-*` token instead of `ease-out`/`ease`. Adding a new one requires a row here.
+an `--ease-*` token instead of `ease-out`/`ease`. FF-3 hoists shimmer, locate, anchor
+and cursor durations into one named `--motion-*` token beside each owner, with a
+reason comment. Adding a new one requires a row here.
 
 Select exit: **none** — nested dismissable layer.
 
@@ -143,14 +175,14 @@ Select exit: **none** — nested dismissable layer.
 
 | Rule | Decision |
 |---|---|
-| Mechanism | The global kill switch at :410-419 (all durations → 0.01ms, iteration-count 1) is the **single** mechanism. State changes become instant; nothing else is needed. |
+| Mechanism | CSS lane: the global kill switch (all durations → 0.01ms, iteration-count 1). JS spring lane (FF-3): `MotionConfig reducedMotion="user"` at both roots disables transform/layout motion while retaining gentle fades. The prior single-mechanism rule applied before JS springs. |
 | Per-component `@media (prefers-reduced-motion: reduce)` | Allowed **only** to set a non-animated end state the kill switch can't infer (e.g. `.obe-rcursor-label { opacity: 1 }` :3613). Blocks that only say `animation: none` (e.g. :2141) are redundant — delete. |
 | `no-preference` gating | Allowed for scroll-coupled attention effects (anchor flash :2216-2219 pattern). |
 | JS motion | Smooth `scrollIntoView`, drag auto-scroll easing and any rAF animation must check `matchMedia('(prefers-reduced-motion: reduce)')` and fall back to `auto`/instant. |
 
 ### 2.4 Global retunes (foundation change)
 
-1. `--default-transition-duration: 120ms` (§2.1).
+1. `--default-transition-duration: 80ms` (§2.1, amended FF-3).
 2. One shared Radix overlay class constant (entrance/exit per §2.2) replaces the
    per-file `zoom-in-95` strings in `components/ui/{dropdown-menu,context-menu,popover,select,tooltip,dialog}.tsx`.
 3. `--animate-accordion-*` (:115-116) → `--motion-base` + `--ease-out-soft`.

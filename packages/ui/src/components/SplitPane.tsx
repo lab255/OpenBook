@@ -111,7 +111,7 @@ export function SplitPane() {
       onMouseDownCapture={() => focusPane(pane.id)}
       className={cn(
         'ob-sheet relative flex shrink-0 flex-col',
-        'animate-in fade-in slide-in-from-right-4 duration-200 print:hidden',
+        'animate-in fade-in slide-in-from-right-4 duration-(--motion-slow) print:hidden',
         focused && 'ring-1 ring-inset ring-primary/15',
       )}
     >

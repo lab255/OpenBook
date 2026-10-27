@@ -99,7 +99,7 @@ describe('reactive export from a block document', () => {
     expect(html).toContain('.kit-pill.kit-on { background: #1c79c4; border-color: #1c79c4;');
     expect(html).toContain('accent-color: #1c79c4');
     expect(html).toContain('background: rgba(28,121,196,0.08); border-color: #1c79c4');
-    expect(html).toContain('border-radius: 9999px; background: #1c79c4; transition: width 180ms cubic-bezier(0.32,0.72,0,1)');
+    expect(html).toContain('border-radius: 9999px; background: #1c79c4; transition: width 160ms cubic-bezier(0.32,0.72,0,1)');
     // Only static styles: the bundled viewer also carries the out-of-scope data palette.
     const staticCss = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
     expect(staticCss).toBeTruthy();

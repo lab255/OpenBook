@@ -99,7 +99,7 @@ function PageNode({id, data}: NodeProps<GraphFlowNode>) {
       onMouseEnter={() => setHovered(id)}
       onMouseLeave={() => setHovered(null)}
       className={cn(
-        'flex w-48 items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-sm transition-opacity duration-150',
+        'flex w-48 items-center gap-2 rounded-lg border bg-card px-3 py-2 shadow-sm transition-opacity duration-(--motion-fast)',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         isCurrent ? 'border-primary ring-2 ring-primary/30' : 'border-border',
         dimmed && 'opacity-30',

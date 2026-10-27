@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {toHtml, toSlideDeck} from '../toHtml';
 // @ts-expect-error -- node:fs is available to Vitest, not the browser package.
 import {readFileSync} from 'node:fs';
 
@@ -18,6 +19,33 @@ function token(name: string): string {
 }
 
 describe('DSX foundation export mirrors', () => {
+  describe.each([
+    ['page', toHtml],
+    ['slide deck', toSlideDeck],
+  ] as const)('%s emitted tween lane', (_kind, render) => {
+    const html = render({editorjs: {blocks: []}, values: [], names: []}, 'Motion parity', '');
+    const mirror = html.match(/:root \{\n {2}--motion-fast:[\s\S]*?\n\}/)?.[0] ?? '';
+    it.each(['motion-fast', 'motion-base', 'motion-slow', 'ease-out-soft', 'ease-in-out-soft'])(
+      'mirrors live --%s exactly', (name) => {
+        const emitted = mirror.match(new RegExp(`--${name}: ([^;]+);`))?.[1];
+        expect(emitted, `emitted export mirror must equal live :root --${name}`).toBe(token(name));
+      },
+    );
+  });
+
+  it('keeps both CSS motion declarations and export tween mirrors in parity', () => {
+    const theme = css.slice(css.indexOf('@theme'), css.indexOf('  :root {'));
+    for (const [tier, duration] of [['fast', '80ms'], ['base', '160ms'], ['slow', '240ms']]) {
+      expect(token(`motion-${tier}`)).toBe(duration);
+      expect(theme).toContain(`--motion-${tier}: ${duration};`);
+    }
+    const ease = token('ease-out-soft').replace(/ /g, '');
+    const progress = exporter.match(/\.kit-prog-fill \{[^\n]+/)![0];
+    expect(progress, 'export progress must mirror live :root --motion-base').toContain(`transition: width ${token('motion-base')} ${ease};`);
+    const slide = exporter.match(/\.slide\[data-current\] \{[^}]+\}/)![0];
+    expect(slide, 'export slide must mirror live :root --motion-slow').toContain(`animation: ob-slide-in ${token('motion-slow')} ${ease} both;`);
+  });
+
   it('mirrors table metrics, borders and header fills in both themes', () => {
     const body = parseFloat(token('obe-font-size'));
     const ratio = Number(token('obe-small-size').match(/\* ([\d.]+)/)![1]);

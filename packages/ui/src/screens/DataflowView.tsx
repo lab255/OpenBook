@@ -83,7 +83,7 @@ function BlockNode({id, data}: NodeProps<FlowNodeType>) {
       onMouseEnter={() => setHovered(id)}
       onMouseLeave={() => setHovered(null)}
       className={cn(
-        'w-52 rounded-lg border bg-card px-3 py-2 shadow-sm transition-opacity duration-150',
+        'w-52 rounded-lg border bg-card px-3 py-2 shadow-sm transition-opacity duration-(--motion-fast)',
         flow.error ? 'border-destructive/50' : 'border-border',
         flow.kind === 'outlet' && 'border-dashed border-primary/40',
         dimmed && 'opacity-30',
