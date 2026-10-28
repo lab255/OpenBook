@@ -1,0 +1,101 @@
+import {expect, test} from './fixtures';
+import {SERVER} from './seed';
+import type {Page} from '@playwright/test';
+
+test.use({freshWorkspace: true});
+
+// Measurement method: per-requestAnimationFrame getBoundingClientRect().
+// The transform is ONLY a diagnostic self-check, never the position source.
+async function transit(page: Page, surface: string, rowSelector: string, reduced: boolean, keyboard = false) {
+  const rows = page.locator(rowSelector);
+  await rows.first().hover();
+  await page.waitForTimeout(500);
+  const trace = await page.evaluate(async ({surface, rowSelector, keyboard}) => {
+    const overlay = document.querySelector<HTMLElement>(`[data-fluid-hover="${surface}"]`)!;
+    const rows = [...document.querySelectorAll<HTMLElement>(rowSelector)];
+    const from = rows[0].getBoundingClientRect().toJSON();
+    const to = rows[1].getBoundingClientRect().toJSON();
+    const samples: {t: number; rect: DOMRect; transform: string; count: number; same: boolean}[] = [];
+    const start = performance.now();
+    if (keyboard) document.querySelector('[cmdk-input]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
+    else {
+      rows[1].dispatchEvent(new PointerEvent('pointermove', {bubbles: true, pointerType: 'mouse'}));
+      rows[1].focus();
+    }
+    await new Promise<void>((resolve) => {
+      const sample = () => {
+        samples.push({t: performance.now() - start, rect: overlay.getBoundingClientRect().toJSON(),
+          transform: getComputedStyle(overlay).transform,
+          count: document.querySelectorAll(`[data-fluid-hover="${surface}"]`).length,
+          same: document.querySelector(`[data-fluid-hover="${surface}"]`) === overlay});
+        if (performance.now() - start < 450) requestAnimationFrame(sample); else resolve();
+      };
+      requestAnimationFrame(sample);
+    });
+    return {from, to, samples};
+  }, {surface, rowSelector, keyboard});
+  console.log(`FF4 ${surface} reduced=${reduced} method=per-rAF getBoundingClientRect() ${JSON.stringify({from: trace.from, to: trace.to, samples: trace.samples.map(({t, rect}) => ({t, rect}))})}`);
+  const intersects = (a: typeof trace.from, b: typeof trace.from) => a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+  const overlap = trace.samples.filter(({rect}) => intersects(rect, trace.from) && intersects(rect, trace.to));
+  expect(trace.samples.every((s) => s.same && s.count === 1), `${surface}: one persistent object`).toBe(true);
+  const last = trace.samples.at(-1)!.rect;
+  expect(Math.abs(last.top - trace.to.top)).toBeLessThan(1);
+  expect(Math.abs(last.left - trace.to.left)).toBeLessThan(1);
+  expect(Math.abs(last.width - trace.to.width)).toBeLessThan(1);
+  expect(Math.abs(last.height - trace.to.height)).toBeLessThan(1);
+  for (const s of trace.samples) {
+    if (Math.abs(s.rect.top - trace.from.top) > 1 || Math.abs(s.rect.left - trace.from.left) > 1) {
+      expect(s.transform, `${surface}: sampler self-check: rect moved with absent transform`).not.toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
+    }
+  }
+  if (reduced) {
+    expect(overlap, `${surface}: reduced motion has no overlap`).toHaveLength(0);
+    const at = (rect: typeof trace.from, endpoint: typeof trace.from) =>
+      ['left', 'top', 'width', 'height'].every((key) => Math.abs(rect[key] - endpoint[key]) < 0.5);
+    expect(trace.samples.every(({rect}) => at(rect, trace.from) || at(rect, trace.to)),
+      `${surface}: reduced motion endpoint-only`).toBe(true);
+  }
+  else expect(overlap.length, `${surface}: moving rectangle overlaps both rows`).toBeGreaterThan(0);
+  // Capture-only driver: advance the browser clock 16 ms per 160 ms wall
+  // time. This slows rAF/JS springs tenfold without changing a motion token.
+  if (process.env.FF4_CAPTURE) {
+    await page.clock.pauseAt(new Date());
+    for (let i = 0; i < 4; i++) {
+      const box = (await rows.nth(i % 2).boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      for (let frame = 0; frame < 24; frame++) {
+        await page.clock.runFor(16);
+        await new Promise((resolve) => setTimeout(resolve, 160));
+      }
+    }
+    await page.clock.resume();
+  }
+}
+
+for (const reduced of [false, true]) {
+  test(`four fluid chrome surfaces; reduced=${reduced}`, async ({page, request}) => {
+    if (process.env.FF4_CAPTURE) { test.setTimeout(180_000); await page.clock.install(); }
+    await page.emulateMedia({reducedMotion: reduced ? 'reduce' : 'no-preference'});
+    const schema = {formId: 'ff4', fields: [], confirmation: {message: 'Thanks'}, submissionKey: 'abcdefghijklmnopqrstuv', enabled: true};
+    const response = await request.post(`${SERVER}/api/pages`, {data: {name: 'FF4 hover', data: {
+      editor: 'blocks', blockdoc: {blocks: [{id: 'form', type: 'form', props: {...schema, schema}}]}, editorjs: {blocks: []}, values: [], names: [],
+    }}});
+    expect(response.ok()).toBe(true);
+    const {id} = await response.json();
+    await page.goto(`/?page=${id}`);
+    await expect(page.locator('[data-form-builder]')).toBeVisible();
+    await transit(page, 'form', '[data-form-palette-kind]', reduced);
+    await page.getByRole('button', {name: 'Page actions', exact: true}).click();
+    await transit(page, 'dropdown', '[role="menuitem"]', reduced);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect(page.locator('[cmdk-input]')).toBeVisible();
+    await page.locator('[cmdk-input]').fill('New');
+    await transit(page, 'command', '[cmdk-item]:not([data-disabled="true"])', reduced, true);
+    await page.keyboard.press('Escape');
+    await page.locator('.obe-kit-form').hover();
+    await page.getByRole('button', {name: 'Block settings'}).click();
+    await page.getByRole('combobox').last().click();
+    await transit(page, 'select', '[role="option"]', reduced);
+  });
+}

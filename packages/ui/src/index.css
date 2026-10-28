@@ -3128,8 +3128,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-size: var(--text-xs);
   text-align: left;
 }
+.obe-form-palette-item[data-active] { background: var(--obe-chrome-active); }
 .obe-form-palette-item:active { cursor: grabbing; }
-.obe-form-palette-item:hover:not(:disabled) { border-color: hsl(var(--foreground) / 0.2); background: var(--obe-chrome-hover); color: var(--obe-chrome-ink-hover); }
+.obe-form-palette-item:hover:not(:disabled) { border-color: hsl(var(--foreground) / 0.2); color: var(--obe-chrome-ink-hover); }
 .obe-form-palette-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .obe-form-row-copy code {
   color: hsl(var(--muted-foreground));
