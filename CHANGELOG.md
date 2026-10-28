@@ -1,3 +1,23 @@
+## 3.26.0 (2026-10-28)
+
+### 🚀 Features
+
+- **ui:** recording survives navigation — app-level meeting sessions + floating status bubble (MTG-7) ([#419](https://github.com/lab255/OpenBook/pull/419))
+- **ui:** meeting management menu — secondary actions off the canvas (MTG-5) ([#420](https://github.com/lab255/OpenBook/pull/420))
+- **ui:** FF-1 design-system prerequisites — rulings record, manifest amendments, enforced G1 guard ([#422](https://github.com/lab255/OpenBook/pull/422))
+- **ui:** FF-3 motion unification — two-lane doctrine, retimed tokens, enforced spring+mirror parity ([#425](https://github.com/lab255/OpenBook/pull/425))
+
+### 🩹 Fixes
+
+- **server,ui:** CRDT-delta path for off-page stored writes — stop clobbering concurrent edits (MTG-8) ([#421](https://github.com/lab255/OpenBook/pull/421))
+- **ui:** animate metric progress with scale transform (FF-0) ([#423](https://github.com/lab255/OpenBook/pull/423))
+- **ui:** simplify select group heading typography (FF-0b) ([#424](https://github.com/lab255/OpenBook/pull/424))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
 ## 3.25.0 (2026-10-19)
 
 ### 🚀 Features
