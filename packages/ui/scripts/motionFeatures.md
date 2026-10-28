@@ -1,0 +1,11 @@
+# Export-viewer motion accounting
+
+The app uses eager Motion independently. The viewer provider uses non-strict LazyMotion/domAnimation and seeds the lazy renderer. `motionBoundary.mjs` checks the resolved app/viewer graphs; `motionGraph.mjs` checks the viewer's emitted modules after tree shaking. The exporter intentionally carries viewer JS as an inert raw asset in the app graph.
+
+`motionFeatures.json` records historical, ordered-integration measurements, not independent package sizes. Never sum rows to forecast a future total: shared code and minification interact. The FF-6 seed measurements can be reproduced with `pnpm exec vite build --config vite.motion-calibration.config.js --mode lazyRuntime`, then `domAnimation`, then `renderer`. Outputs and module inventories land under the web test harness's ignored `generated/calibration-*` directories. These commands never rewrite the ledger.
+
+To introduce a feature, first measure the current production bytes, then build a test-only calibration variant containing that feature. Record its ordered before/after bytes and previously unledgered emitted Motion module paths/exports in a new named row, with its introduction date/card. Preserve historical rows. Intrinsic MotionDiv/MotionButton/etc wrappers from the lazy-elements module are one renderer feature, not separate features. The production build must still fit the original 1,846,513-byte baseline plus 81,920 bytes; adding a row grants no budget exemption.
+
+The separate 2,048-byte block ceiling measures UTF-8 rendered module code, before final bundle minification. It charges a direct Motion adopter under blockeditor/components plus new non-Motion dependencies, traversing zero-code re-export facades too. Initial shared modules and separately ledgered Motion machinery are excluded. This distinguishes a small block's own code from a large new shared feature. The ordinary/layout calibration tests exercise both budgets independently.
+
+The full-chain fixture and budget controls are separate test builds. Neither their code nor their module-graph assets are shipped in the viewer script. Production fixture exclusion is checked against actual built bytes. The JSON graph sidecar is build/test evidence only and is never embedded in exported HTML.

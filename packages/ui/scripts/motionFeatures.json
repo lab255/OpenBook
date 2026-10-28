@@ -1,0 +1,1984 @@
+{
+  "measurement": "Ordered production-mode builds via vite.motion-calibration.config.js; whole-IIFE raw deltas include glue and shared/minifier effects. lazyRuntime includes hydration-gate glue relative to aea2f52c. Costs are historical introduction measurements, not independent additive package sizes.",
+  "preAdoptionCommit": "aea2f52c",
+  "preAdoptionRawBytes": 1846513,
+  "hardDeltaCeiling": 81920,
+  "blockOwnBytesCeiling": 2048,
+  "features": [
+    {
+      "name": "lazyRuntime",
+      "introducedAt": "FF-6 / 2026-10-28",
+      "beforeRawBytes": 1846513,
+      "afterRawBytes": 1847793,
+      "rawCostBytes": 1280,
+      "modules": [
+        {
+          "id": "framer-motion/dist/es/components/LazyMotion/index.mjs",
+          "exports": [
+            "LazyMotion"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/LazyContext.mjs",
+          "exports": [
+            "LazyContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/definitions.mjs",
+          "exports": [
+            "getInitializedFeatureDefinitions",
+            "initFeatureDefinitions"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/load-features.mjs",
+          "exports": [
+            "loadFeatures"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/VisualElement.mjs",
+          "exports": [
+            "getFeatureDefinitions",
+            "setFeatureDefinitions"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "domAnimation",
+      "introducedAt": "FF-6 / 2026-10-28",
+      "beforeRawBytes": 1847793,
+      "afterRawBytes": 1914981,
+      "rawCostBytes": 67188,
+      "modules": [
+        {
+          "id": "framer-motion/dist/es/events/event-info.mjs",
+          "exports": [
+            "extractEventInfo"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/gestures/focus.mjs",
+          "exports": [
+            "FocusGesture"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/gestures/hover.mjs",
+          "exports": [
+            "HoverGesture"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/gestures/press.mjs",
+          "exports": [
+            "PressGesture"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/animation/exit.mjs",
+          "exports": [
+            "ExitAnimationFeature"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/animation/index.mjs",
+          "exports": [
+            "AnimationFeature"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/animations.mjs",
+          "exports": [
+            "animations"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/gestures.mjs",
+          "exports": [
+            "gestureAnimations"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/viewport/index.mjs",
+          "exports": [
+            "InViewFeature"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/features/viewport/observers.mjs",
+          "exports": [
+            "observeIntersection"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/dom/create-visual-element.mjs",
+          "exports": [
+            "createDomVisualElement"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/dom/features-animation.mjs",
+          "exports": [
+            "domAnimation"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/dom/utils/is-svg-component.mjs",
+          "exports": [
+            "isSVGComponent"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/svg/lowercase-elements.mjs",
+          "exports": [
+            "lowercaseSVGElements"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/AsyncMotionValueAnimation.mjs",
+          "exports": [
+            "AsyncMotionValueAnimation"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/drivers/frame.mjs",
+          "exports": [
+            "frameloopDriver"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/inertia.mjs",
+          "exports": [
+            "inertia"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/keyframes.mjs",
+          "exports": [
+            "defaultEasing",
+            "keyframes"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/spring.mjs",
+          "exports": [
+            "spring"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/utils/calc-duration.mjs",
+          "exports": [
+            "calcGeneratorDuration",
+            "maxGeneratorDuration"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/utils/create-generator-easing.mjs",
+          "exports": [
+            "createGeneratorEasing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/utils/is-generator.mjs",
+          "exports": [
+            "isGenerator"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/generators/utils/velocity.mjs",
+          "exports": [
+            "getGeneratorVelocity"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/interfaces/motion-value.mjs",
+          "exports": [
+            "animateMotionValue"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/interfaces/visual-element-target.mjs",
+          "exports": [
+            "animateTarget"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/interfaces/visual-element-variant.mjs",
+          "exports": [
+            "animateVariant"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/interfaces/visual-element.mjs",
+          "exports": [
+            "animateVisualElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/JSAnimation.mjs",
+          "exports": [
+            "JSAnimation"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/DOMKeyframesResolver.mjs",
+          "exports": [
+            "DOMKeyframesResolver"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/get-final.mjs",
+          "exports": [
+            "getFinalKeyframe"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/KeyframesResolver.mjs",
+          "exports": [
+            "KeyframeResolver",
+            "flushKeyframeResolvers"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/offsets/default.mjs",
+          "exports": [
+            "defaultOffset"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/offsets/fill.mjs",
+          "exports": [
+            "fillOffset"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/offsets/time.mjs",
+          "exports": [
+            "convertOffsetToTimes"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/utils/fill-wildcards.mjs",
+          "exports": [
+            "fillWildcards"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/utils/is-none.mjs",
+          "exports": [
+            "isNone"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/utils/make-none-animatable.mjs",
+          "exports": [
+            "makeNoneKeyframesAnimatable"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/keyframes/utils/unit-conversion.mjs",
+          "exports": [
+            "isNumOrPxType",
+            "positionalValues",
+            "removeNonTranslationalTransform"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/NativeAnimation.mjs",
+          "exports": [
+            "NativeAnimation"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/NativeAnimationExtended.mjs",
+          "exports": [
+            "NativeAnimationExtended"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/optimized-appear/data-id.mjs",
+          "exports": [
+            "optimizedAppearDataAttribute",
+            "optimizedAppearDataId"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/optimized-appear/get-appear-id.mjs",
+          "exports": [
+            "getOptimisedAppearId"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/calc-child-stagger.mjs",
+          "exports": [
+            "calcChildStagger"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/can-animate.mjs",
+          "exports": [
+            "canAnimate"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/css-variables-conversion.mjs",
+          "exports": [
+            "getVariableValue",
+            "parseCSSVariable"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/default-transitions.mjs",
+          "exports": [
+            "getDefaultTransition"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/get-value-transition.mjs",
+          "exports": [
+            "getValueTransition"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/is-animatable.mjs",
+          "exports": [
+            "isAnimatable"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/is-css-variable.mjs",
+          "exports": [
+            "containsCSSVariable",
+            "isCSSVariableName",
+            "isCSSVariableToken"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/is-transition-defined.mjs",
+          "exports": [
+            "isTransitionDefined"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/make-animation-instant.mjs",
+          "exports": [
+            "makeAnimationInstant"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/replace-transition-type.mjs",
+          "exports": [
+            "replaceTransitionType"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/resolve-transition.mjs",
+          "exports": [
+            "resolveTransition"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/utils/WithPromise.mjs",
+          "exports": [
+            "WithPromise"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/easing/cubic-bezier.mjs",
+          "exports": [
+            "cubicBezierAsString"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/easing/map-easing.mjs",
+          "exports": [
+            "mapEasingToNativeEasing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/easing/supported.mjs",
+          "exports": [
+            "supportedWaapiEasing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/start-waapi-animation.mjs",
+          "exports": [
+            "startWaapiAnimation"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/supports/waapi.mjs",
+          "exports": [
+            "supportsBrowserAnimation"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/utils/accelerated-values.mjs",
+          "exports": [
+            "acceleratedValues"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/utils/apply-generator.mjs",
+          "exports": [
+            "applyGeneratorOptions"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/utils/is-browser-color.mjs",
+          "exports": [
+            "hasBrowserOnlyColors"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/utils/linear.mjs",
+          "exports": [
+            "generateLinearEasing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/waapi/utils/unsupported-easing.mjs",
+          "exports": [
+            "replaceStringEasing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/events/add-dom-event.mjs",
+          "exports": [
+            "addDomEvent"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/frameloop/batcher.mjs",
+          "exports": [
+            "createRenderBatcher"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/frameloop/frame.mjs",
+          "exports": [
+            "cancelFrame",
+            "frame",
+            "frameData"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/frameloop/microtask.mjs",
+          "exports": [
+            "microtask"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/frameloop/order.mjs",
+          "exports": [
+            "stepsOrder"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/frameloop/render-step.mjs",
+          "exports": [
+            "createRenderStep"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/frameloop/sync-time.mjs",
+          "exports": [
+            "time"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/drag/state/is-active.mjs",
+          "exports": [
+            "isDragActive",
+            "isDragging"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/hover.mjs",
+          "exports": [
+            "hover"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/press/index.mjs",
+          "exports": [
+            "press"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/press/utils/is-keyboard-accessible.mjs",
+          "exports": [
+            "isElementKeyboardAccessible"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/press/utils/keyboard.mjs",
+          "exports": [
+            "enableKeyboardPress"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/press/utils/state.mjs",
+          "exports": [
+            "isPressing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/utils/is-node-or-child.mjs",
+          "exports": [
+            "isNodeOrChild"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/utils/is-primary-pointer.mjs",
+          "exports": [
+            "isPrimaryPointer"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/gestures/utils/setup.mjs",
+          "exports": [
+            "setupGesture"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/projection/geometry/conversion.mjs",
+          "exports": [
+            "convertBoundingBoxToBox",
+            "transformBoxPoints"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/projection/geometry/models.mjs",
+          "exports": [
+            "createAxis",
+            "createBox"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/projection/styles/scale-border-radius.mjs",
+          "exports": [
+            "correctBorderRadius",
+            "pixelsToPercent"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/projection/styles/scale-box-shadow.mjs",
+          "exports": [
+            "correctBoxShadow"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/projection/styles/scale-correction.mjs",
+          "exports": [
+            "scaleCorrectors"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/projection/utils/measure.mjs",
+          "exports": [
+            "measureViewportBox"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/dom/DOMVisualElement.mjs",
+          "exports": [
+            "DOMVisualElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/dom/is-css-var.mjs",
+          "exports": [
+            "isCSSVar"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/dom/parse-transform.mjs",
+          "exports": [
+            "defaultTransformValue",
+            "parseValueFromTransform",
+            "readTransformValue"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/dom/style-set.mjs",
+          "exports": [
+            "setStyle"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/dom/utils/camel-to-dash.mjs",
+          "exports": [
+            "camelToDash"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/Feature.mjs",
+          "exports": [
+            "Feature"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/html/HTMLVisualElement.mjs",
+          "exports": [
+            "HTMLVisualElement",
+            "getComputedStyle"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/html/utils/build-styles.mjs",
+          "exports": [
+            "buildHTMLStyles"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/html/utils/build-transform.mjs",
+          "exports": [
+            "buildTransform"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/html/utils/render.mjs",
+          "exports": [
+            "renderHTML"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/html/utils/scrape-motion-values.mjs",
+          "exports": [
+            "scrapeMotionValuesFromProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/store.mjs",
+          "exports": [
+            "visualElementStore"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/SVGVisualElement.mjs",
+          "exports": [
+            "SVGVisualElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/utils/build-attrs.mjs",
+          "exports": [
+            "buildSVGAttrs"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/utils/camel-case-attrs.mjs",
+          "exports": [
+            "camelCaseAttributes"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/utils/is-svg-tag.mjs",
+          "exports": [
+            "isSVGTag"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/utils/path.mjs",
+          "exports": [
+            "buildSVGPath"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/utils/render.mjs",
+          "exports": [
+            "renderSVG"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/svg/utils/scrape-motion-values.mjs",
+          "exports": [
+            "scrapeMotionValuesFromProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/animation-state.mjs",
+          "exports": [
+            "checkVariantsDidChange",
+            "createAnimationState"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/get-variant-context.mjs",
+          "exports": [
+            "getVariantContext"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/is-animation-controls.mjs",
+          "exports": [
+            "isAnimationControls"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/is-controlling-variants.mjs",
+          "exports": [
+            "isControllingVariants",
+            "isVariantNode"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/is-forced-motion-value.mjs",
+          "exports": [
+            "isForcedMotionValue",
+            "scaleCorrectors"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/is-keyframes-target.mjs",
+          "exports": [
+            "isKeyframesTarget"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/is-variant-label.mjs",
+          "exports": [
+            "isVariantLabel"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/keys-position.mjs",
+          "exports": [
+            "positionalKeys"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/keys-transform.mjs",
+          "exports": [
+            "transformPropOrder",
+            "transformProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/motion-values.mjs",
+          "exports": [
+            "updateMotionValuesFromProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/reduced-motion/index.mjs",
+          "exports": [
+            "hasReducedMotionListener",
+            "initPrefersReducedMotion",
+            "prefersReducedMotion"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/reduced-motion/state.mjs",
+          "exports": [
+            "hasReducedMotionListener",
+            "prefersReducedMotion"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/resolve-dynamic-variants.mjs",
+          "exports": [
+            "resolveVariant"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/resolve-variants.mjs",
+          "exports": [
+            "resolveVariantFromProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/setters.mjs",
+          "exports": [
+            "setTarget"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/shallow-compare.mjs",
+          "exports": [
+            "shallowCompare"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/utils/variant-props.mjs",
+          "exports": [
+            "variantPriorityOrder",
+            "variantProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/VisualElement.mjs",
+          "exports": [
+            "VisualElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/border-radius.mjs",
+          "exports": [
+            "cornerRadiusProps"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/interpolate.mjs",
+          "exports": [
+            "interpolate"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/is-html-element.mjs",
+          "exports": [
+            "isHTMLElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/mix/color.mjs",
+          "exports": [
+            "mixColor",
+            "mixLinearColor"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/mix/complex.mjs",
+          "exports": [
+            "getMixer",
+            "mixArray",
+            "mixComplex",
+            "mixObject"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/mix/immediate.mjs",
+          "exports": [
+            "mixImmediate"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/mix/index.mjs",
+          "exports": [
+            "mix"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/mix/number.mjs",
+          "exports": [
+            "mixNumber"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/mix/visibility.mjs",
+          "exports": [
+            "invisibleValues",
+            "mixVisibility"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/resolve-elements.mjs",
+          "exports": [
+            "resolveElements"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/supports/flags.mjs",
+          "exports": [
+            "supportsFlags"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/supports/linear-easing.mjs",
+          "exports": [
+            "supportsLinearEasing"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/supports/memo.mjs",
+          "exports": [
+            "memoSupports"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/supports/scroll-timeline.mjs",
+          "exports": [
+            "supportsScrollTimeline"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/index.mjs",
+          "exports": [
+            "MotionValue",
+            "collectMotionValues",
+            "motionValue"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/auto.mjs",
+          "exports": [
+            "auto"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/color/hex.mjs",
+          "exports": [
+            "hex"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/color/hsla-to-rgba.mjs",
+          "exports": [
+            "hslaToRgba"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/color/hsla.mjs",
+          "exports": [
+            "hsla"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/color/index.mjs",
+          "exports": [
+            "color"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/color/rgba.mjs",
+          "exports": [
+            "rgbUnit",
+            "rgba"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/color/utils.mjs",
+          "exports": [
+            "isColorString",
+            "splitColor"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/complex/filter.mjs",
+          "exports": [
+            "filter"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/complex/index.mjs",
+          "exports": [
+            "analyseComplexValue",
+            "complex"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/complex/mask.mjs",
+          "exports": [
+            "mask"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/dimensions.mjs",
+          "exports": [
+            "dimensionValueTypes",
+            "findDimensionValueType"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/int.mjs",
+          "exports": [
+            "int"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/maps/defaults.mjs",
+          "exports": [
+            "defaultValueTypes",
+            "getDefaultValueType"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/maps/number.mjs",
+          "exports": [
+            "numberValueTypes"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/maps/transform.mjs",
+          "exports": [
+            "transformValueTypes"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/numbers/index.mjs",
+          "exports": [
+            "alpha",
+            "number",
+            "scale"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/numbers/units.mjs",
+          "exports": [
+            "degrees",
+            "percent",
+            "progressPercentage",
+            "px",
+            "vh",
+            "vw"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/test.mjs",
+          "exports": [
+            "testValueType"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/animatable-none.mjs",
+          "exports": [
+            "getAnimatableNone"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/color-regex.mjs",
+          "exports": [
+            "colorRegex"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/find.mjs",
+          "exports": [
+            "findValueType"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/float-regex.mjs",
+          "exports": [
+            "floatRegex"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/get-as-type.mjs",
+          "exports": [
+            "getValueAsType"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/is-nullish.mjs",
+          "exports": [
+            "isNullish"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/sanitize.mjs",
+          "exports": [
+            "sanitize"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/types/utils/single-color-regex.mjs",
+          "exports": [
+            "singleColorRegex"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/utils/is-motion-value.mjs",
+          "exports": [
+            "isMotionValue"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/will-change/add-will-change.mjs",
+          "exports": [
+            "addValueToWillChange"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/will-change/is.mjs",
+          "exports": [
+            "isWillChangeMotionValue"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/array.mjs",
+          "exports": [
+            "addUniqueItem",
+            "removeItem"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/clamp.mjs",
+          "exports": [
+            "clamp"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/anticipate.mjs",
+          "exports": [
+            "anticipate"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/back.mjs",
+          "exports": [
+            "backIn",
+            "backInOut",
+            "backOut"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/circ.mjs",
+          "exports": [
+            "circIn",
+            "circInOut",
+            "circOut"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/cubic-bezier.mjs",
+          "exports": [
+            "cubicBezier"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/ease.mjs",
+          "exports": [
+            "easeIn",
+            "easeInOut",
+            "easeOut"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/modifiers/mirror.mjs",
+          "exports": [
+            "mirrorEasing"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/modifiers/reverse.mjs",
+          "exports": [
+            "reverseEasing"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/utils/is-bezier-definition.mjs",
+          "exports": [
+            "isBezierDefinition"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/utils/is-easing-array.mjs",
+          "exports": [
+            "isEasingArray"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/utils/map.mjs",
+          "exports": [
+            "easingDefinitionToFunction"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/errors.mjs",
+          "exports": [
+            "invariant",
+            "warning"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/global-config.mjs",
+          "exports": [
+            "MotionGlobalConfig"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/is-numerical-string.mjs",
+          "exports": [
+            "isNumericalString"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/is-object.mjs",
+          "exports": [
+            "isObject"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/is-zero-value-string.mjs",
+          "exports": [
+            "isZeroValueString"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/memo.mjs",
+          "exports": [
+            "memo"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/noop.mjs",
+          "exports": [
+            "noop"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/pipe.mjs",
+          "exports": [
+            "pipe"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/progress.mjs",
+          "exports": [
+            "progress"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/subscription-manager.mjs",
+          "exports": [
+            "SubscriptionManager"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/time-conversion.mjs",
+          "exports": [
+            "millisecondsToSeconds",
+            "secondsToMilliseconds"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/velocity-per-second.mjs",
+          "exports": [
+            "velocityPerSecond"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "renderer",
+      "introducedAt": "FF-6 / 2026-10-28",
+      "beforeRawBytes": 1914981,
+      "afterRawBytes": 1922068,
+      "rawCostBytes": 7087,
+      "modules": [
+        {
+          "id": "framer-motion/dist/es/context/LayoutGroupContext.mjs",
+          "exports": [
+            "LayoutGroupContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/MotionConfigContext.mjs",
+          "exports": [
+            "MotionConfigContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/MotionContext/create.mjs",
+          "exports": [
+            "useCreateMotionContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/MotionContext/index.mjs",
+          "exports": [
+            "MotionContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/MotionContext/utils.mjs",
+          "exports": [
+            "getCurrentTreeVariants"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/PresenceContext.mjs",
+          "exports": [
+            "PresenceContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/context/SwitchLayoutGroupContext.mjs",
+          "exports": [
+            "SwitchLayoutGroupContext"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/index.mjs",
+          "exports": [
+            "createMotionComponent"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/utils/symbol.mjs",
+          "exports": [
+            "motionComponentSymbol"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/utils/use-motion-ref.mjs",
+          "exports": [
+            "useMotionRef"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/utils/use-visual-element.mjs",
+          "exports": [
+            "useVisualElement"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/utils/use-visual-state.mjs",
+          "exports": [
+            "makeUseVisualState"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/motion/utils/valid-prop.mjs",
+          "exports": [
+            "isValidMotionProp"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/components/m/create.mjs",
+          "exports": [
+            "createMinimalMotionComponent"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/components/m/elements.mjs",
+          "exports": [
+            "MotionElement"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/dom/use-render.mjs",
+          "exports": [
+            "useRender"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/dom/utils/filter-props.mjs",
+          "exports": [
+            "filterProps",
+            "loadExternalIsValidProp"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/html/use-html-visual-state.mjs",
+          "exports": [
+            "useHTMLVisualState"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/html/use-props.mjs",
+          "exports": [
+            "copyRawValuesOnly",
+            "useHTMLProps"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/html/utils/create-render-state.mjs",
+          "exports": [
+            "createHtmlRenderState"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/svg/use-props.mjs",
+          "exports": [
+            "useSVGProps"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/svg/use-svg-visual-state.mjs",
+          "exports": [
+            "useSVGVisualState"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/render/svg/utils/create-render-state.mjs",
+          "exports": [
+            "createSvgRenderState"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/utils/is-browser.mjs",
+          "exports": [
+            "isBrowser"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/utils/is-ref-object.mjs",
+          "exports": [
+            "isRefObject"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/utils/use-constant.mjs",
+          "exports": [
+            "useConstant"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/utils/use-isomorphic-effect.mjs",
+          "exports": [
+            "useIsomorphicLayoutEffect"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/value/utils/resolve-motion-value.mjs",
+          "exports": [
+            "resolveMotionValue"
+          ]
+        }
+      ]
+    }
+  ],
+  "sharedModules": [
+    "__vite-optional-peer-dep:@emotion/is-prop-valid:framer-motion",
+    "@floating-ui/core/dist/floating-ui.core.mjs",
+    "@floating-ui/dom/dist/floating-ui.dom.mjs",
+    "@floating-ui/react-dom/dist/floating-ui.react-dom.mjs",
+    "@floating-ui/utils/dist/floating-ui.utils.dom.mjs",
+    "@floating-ui/utils/dist/floating-ui.utils.mjs",
+    "@heroicons/react/24/outline/esm/PauseIcon.js",
+    "@heroicons/react/24/outline/esm/PlayIcon.js",
+    "@radix-ui/primitive/dist/index.mjs",
+    "@radix-ui/react-arrow/dist/index.mjs",
+    "@radix-ui/react-collection/dist/index.mjs",
+    "@radix-ui/react-compose-refs/dist/index.mjs",
+    "@radix-ui/react-context-menu/dist/index.mjs",
+    "@radix-ui/react-context/dist/index.mjs",
+    "@radix-ui/react-dialog/dist/index.mjs",
+    "@radix-ui/react-direction/dist/index.mjs",
+    "@radix-ui/react-dismissable-layer/dist/index.mjs",
+    "@radix-ui/react-dropdown-menu/dist/index.mjs",
+    "@radix-ui/react-focus-guards/dist/index.mjs",
+    "@radix-ui/react-focus-scope/dist/index.mjs",
+    "@radix-ui/react-icons/dist/react-icons.esm.js",
+    "@radix-ui/react-id/dist/index.mjs",
+    "@radix-ui/react-menu/dist/index.mjs",
+    "@radix-ui/react-popover/dist/index.mjs",
+    "@radix-ui/react-popper/dist/index.mjs",
+    "@radix-ui/react-portal/dist/index.mjs",
+    "@radix-ui/react-presence/dist/index.mjs",
+    "@radix-ui/react-primitive/dist/index.mjs",
+    "@radix-ui/react-primitive/dist/index.mjs",
+    "@radix-ui/react-roving-focus/dist/index.mjs",
+    "@radix-ui/react-slot/dist/index.mjs",
+    "@radix-ui/react-slot/dist/index.mjs",
+    "@radix-ui/react-switch/dist/index.mjs",
+    "@radix-ui/react-use-callback-ref/dist/index.mjs",
+    "@radix-ui/react-use-controllable-state/dist/index.mjs",
+    "@radix-ui/react-use-escape-keydown/dist/index.mjs",
+    "@radix-ui/react-use-layout-effect/dist/index.mjs",
+    "@radix-ui/react-use-previous/dist/index.mjs",
+    "@radix-ui/react-use-size/dist/index.mjs",
+    "@sindresorhus/is/dist/index.js",
+    "workspace/sdk/dist/account.js",
+    "workspace/sdk/dist/assetUpload.js",
+    "workspace/sdk/dist/blockCatalogue.js",
+    "workspace/sdk/dist/blockPropSchemas.js",
+    "workspace/sdk/dist/bookfile.js",
+    "workspace/sdk/dist/database.js",
+    "workspace/sdk/dist/databaseTools.js",
+    "workspace/sdk/dist/dataColors.js",
+    "workspace/sdk/dist/forms.js",
+    "workspace/sdk/dist/formSchema.js",
+    "workspace/sdk/dist/formula.js",
+    "workspace/sdk/dist/forwarding/encoding.js",
+    "workspace/sdk/dist/importAssets.js",
+    "workspace/sdk/dist/island.js",
+    "workspace/sdk/dist/money.js",
+    "workspace/sdk/dist/orderKeys.js",
+    "workspace/sdk/dist/pageProperties.js",
+    "workspace/sdk/dist/plugins.js",
+    "workspace/sdk/dist/provenance.js",
+    "workspace/sdk/dist/richTextInput.js",
+    "workspace/sdk/dist/sampleDocument.js",
+    "workspace/sdk/dist/tableSnapshot.js",
+    "workspace/sdk/dist/templates.js",
+    "aria-hidden/dist/es2015/index.js",
+    "char-regex/index.js",
+    "class-variance-authority/dist/index.mjs",
+    "clsx/dist/clsx.mjs",
+    "cmdk/dist/chunk-NZJY6EH4.mjs",
+    "cmdk/dist/index.mjs",
+    "emojilib/emojis.json",
+    "emojilib/index.js",
+    "emojilib/ordered.json",
+    "fflate/esm/browser.js",
+    "get-nonce/dist/es2015/index.js",
+    "lib0/array.js",
+    "lib0/binary.js",
+    "lib0/buffer.js",
+    "lib0/conditions.js",
+    "lib0/decoding.js",
+    "lib0/dom.js",
+    "lib0/encoding.js",
+    "lib0/environment.js",
+    "lib0/error.js",
+    "lib0/function.js",
+    "lib0/iterator.js",
+    "lib0/logging.common.js",
+    "lib0/logging.js",
+    "lib0/map.js",
+    "lib0/math.js",
+    "lib0/number.js",
+    "lib0/object.js",
+    "lib0/observable.js",
+    "lib0/pair.js",
+    "lib0/prng.js",
+    "lib0/promise.js",
+    "lib0/random.js",
+    "lib0/schema.js",
+    "lib0/set.js",
+    "lib0/storage.js",
+    "lib0/string.js",
+    "lib0/symbol.js",
+    "lib0/time.js",
+    "lib0/trait/equality.js",
+    "lib0/webcrypto.js",
+    "lucide-react/dist/esm/context.mjs",
+    "lucide-react/dist/esm/createLucideIcon.mjs",
+    "lucide-react/dist/esm/defaultAttributes.mjs",
+    "lucide-react/dist/esm/Icon.mjs",
+    "lucide-react/dist/esm/icons/activity.mjs",
+    "lucide-react/dist/esm/icons/alarm-clock.mjs",
+    "lucide-react/dist/esm/icons/anchor.mjs",
+    "lucide-react/dist/esm/icons/aperture.mjs",
+    "lucide-react/dist/esm/icons/app-window.mjs",
+    "lucide-react/dist/esm/icons/archive.mjs",
+    "lucide-react/dist/esm/icons/arrow-down.mjs",
+    "lucide-react/dist/esm/icons/arrow-left.mjs",
+    "lucide-react/dist/esm/icons/arrow-right.mjs",
+    "lucide-react/dist/esm/icons/arrow-up.mjs",
+    "lucide-react/dist/esm/icons/award.mjs",
+    "lucide-react/dist/esm/icons/backpack.mjs",
+    "lucide-react/dist/esm/icons/badge-check.mjs",
+    "lucide-react/dist/esm/icons/battery.mjs",
+    "lucide-react/dist/esm/icons/beaker.mjs",
+    "lucide-react/dist/esm/icons/bell.mjs",
+    "lucide-react/dist/esm/icons/bike.mjs",
+    "lucide-react/dist/esm/icons/binary.mjs",
+    "lucide-react/dist/esm/icons/bird.mjs",
+    "lucide-react/dist/esm/icons/book-open.mjs",
+    "lucide-react/dist/esm/icons/book.mjs",
+    "lucide-react/dist/esm/icons/bookmark.mjs",
+    "lucide-react/dist/esm/icons/box.mjs",
+    "lucide-react/dist/esm/icons/boxes.mjs",
+    "lucide-react/dist/esm/icons/brain.mjs",
+    "lucide-react/dist/esm/icons/briefcase.mjs",
+    "lucide-react/dist/esm/icons/brush.mjs",
+    "lucide-react/dist/esm/icons/bug.mjs",
+    "lucide-react/dist/esm/icons/building-2.mjs",
+    "lucide-react/dist/esm/icons/bus.mjs",
+    "lucide-react/dist/esm/icons/cake.mjs",
+    "lucide-react/dist/esm/icons/calculator.mjs",
+    "lucide-react/dist/esm/icons/calendar.mjs",
+    "lucide-react/dist/esm/icons/camera.mjs",
+    "lucide-react/dist/esm/icons/car.mjs",
+    "lucide-react/dist/esm/icons/carrot.mjs",
+    "lucide-react/dist/esm/icons/chart-column.mjs",
+    "lucide-react/dist/esm/icons/chart-pie.mjs",
+    "lucide-react/dist/esm/icons/check.mjs",
+    "lucide-react/dist/esm/icons/chef-hat.mjs",
+    "lucide-react/dist/esm/icons/cherry.mjs",
+    "lucide-react/dist/esm/icons/chevron-down.mjs",
+    "lucide-react/dist/esm/icons/chevron-left.mjs",
+    "lucide-react/dist/esm/icons/chevron-right.mjs",
+    "lucide-react/dist/esm/icons/chevron-up.mjs",
+    "lucide-react/dist/esm/icons/circle-check.mjs",
+    "lucide-react/dist/esm/icons/circle-question-mark.mjs",
+    "lucide-react/dist/esm/icons/circle.mjs",
+    "lucide-react/dist/esm/icons/clapperboard.mjs",
+    "lucide-react/dist/esm/icons/clipboard-paste.mjs",
+    "lucide-react/dist/esm/icons/clipboard.mjs",
+    "lucide-react/dist/esm/icons/clock.mjs",
+    "lucide-react/dist/esm/icons/cloud.mjs",
+    "lucide-react/dist/esm/icons/code-xml.mjs",
+    "lucide-react/dist/esm/icons/coffee.mjs",
+    "lucide-react/dist/esm/icons/cog.mjs",
+    "lucide-react/dist/esm/icons/coins.mjs",
+    "lucide-react/dist/esm/icons/columns-2.mjs",
+    "lucide-react/dist/esm/icons/compass.mjs",
+    "lucide-react/dist/esm/icons/copy.mjs",
+    "lucide-react/dist/esm/icons/cpu.mjs",
+    "lucide-react/dist/esm/icons/credit-card.mjs",
+    "lucide-react/dist/esm/icons/crown.mjs",
+    "lucide-react/dist/esm/icons/database.mjs",
+    "lucide-react/dist/esm/icons/diamond.mjs",
+    "lucide-react/dist/esm/icons/dog.mjs",
+    "lucide-react/dist/esm/icons/dollar-sign.mjs",
+    "lucide-react/dist/esm/icons/download.mjs",
+    "lucide-react/dist/esm/icons/droplet.mjs",
+    "lucide-react/dist/esm/icons/dumbbell.mjs",
+    "lucide-react/dist/esm/icons/earth.mjs",
+    "lucide-react/dist/esm/icons/egg.mjs",
+    "lucide-react/dist/esm/icons/ellipsis.mjs",
+    "lucide-react/dist/esm/icons/eraser.mjs",
+    "lucide-react/dist/esm/icons/external-link.mjs",
+    "lucide-react/dist/esm/icons/eye-off.mjs",
+    "lucide-react/dist/esm/icons/eye.mjs",
+    "lucide-react/dist/esm/icons/feather.mjs",
+    "lucide-react/dist/esm/icons/file-exclamation-point.mjs",
+    "lucide-react/dist/esm/icons/file-text.mjs",
+    "lucide-react/dist/esm/icons/film.mjs",
+    "lucide-react/dist/esm/icons/flag.mjs",
+    "lucide-react/dist/esm/icons/flame.mjs",
+    "lucide-react/dist/esm/icons/flask-conical.mjs",
+    "lucide-react/dist/esm/icons/flower-2.mjs",
+    "lucide-react/dist/esm/icons/folder.mjs",
+    "lucide-react/dist/esm/icons/footprints.mjs",
+    "lucide-react/dist/esm/icons/funnel.mjs",
+    "lucide-react/dist/esm/icons/gamepad-2.mjs",
+    "lucide-react/dist/esm/icons/gauge.mjs",
+    "lucide-react/dist/esm/icons/gem.mjs",
+    "lucide-react/dist/esm/icons/gift.mjs",
+    "lucide-react/dist/esm/icons/git-branch.mjs",
+    "lucide-react/dist/esm/icons/globe.mjs",
+    "lucide-react/dist/esm/icons/graduation-cap.mjs",
+    "lucide-react/dist/esm/icons/grid-3x3.mjs",
+    "lucide-react/dist/esm/icons/grip-horizontal.mjs",
+    "lucide-react/dist/esm/icons/grip-vertical.mjs",
+    "lucide-react/dist/esm/icons/hammer.mjs",
+    "lucide-react/dist/esm/icons/hand.mjs",
+    "lucide-react/dist/esm/icons/hash.mjs",
+    "lucide-react/dist/esm/icons/heading.mjs",
+    "lucide-react/dist/esm/icons/headphones.mjs",
+    "lucide-react/dist/esm/icons/heart.mjs",
+    "lucide-react/dist/esm/icons/house.mjs",
+    "lucide-react/dist/esm/icons/image-off.mjs",
+    "lucide-react/dist/esm/icons/image-plus.mjs",
+    "lucide-react/dist/esm/icons/image.mjs",
+    "lucide-react/dist/esm/icons/inbox.mjs",
+    "lucide-react/dist/esm/icons/infinity.mjs",
+    "lucide-react/dist/esm/icons/info.mjs",
+    "lucide-react/dist/esm/icons/key.mjs",
+    "lucide-react/dist/esm/icons/keyboard.mjs",
+    "lucide-react/dist/esm/icons/lamp.mjs",
+    "lucide-react/dist/esm/icons/laptop.mjs",
+    "lucide-react/dist/esm/icons/layers.mjs",
+    "lucide-react/dist/esm/icons/leaf.mjs",
+    "lucide-react/dist/esm/icons/library.mjs",
+    "lucide-react/dist/esm/icons/lightbulb.mjs",
+    "lucide-react/dist/esm/icons/link.mjs",
+    "lucide-react/dist/esm/icons/list.mjs",
+    "lucide-react/dist/esm/icons/loader-circle.mjs",
+    "lucide-react/dist/esm/icons/lock-open.mjs",
+    "lucide-react/dist/esm/icons/lock.mjs",
+    "lucide-react/dist/esm/icons/mail.mjs",
+    "lucide-react/dist/esm/icons/map-pin.mjs",
+    "lucide-react/dist/esm/icons/map.mjs",
+    "lucide-react/dist/esm/icons/maximize-2.mjs",
+    "lucide-react/dist/esm/icons/megaphone.mjs",
+    "lucide-react/dist/esm/icons/message-circle.mjs",
+    "lucide-react/dist/esm/icons/message-square.mjs",
+    "lucide-react/dist/esm/icons/mic.mjs",
+    "lucide-react/dist/esm/icons/monitor.mjs",
+    "lucide-react/dist/esm/icons/moon.mjs",
+    "lucide-react/dist/esm/icons/mountain.mjs",
+    "lucide-react/dist/esm/icons/mouse.mjs",
+    "lucide-react/dist/esm/icons/music.mjs",
+    "lucide-react/dist/esm/icons/navigation.mjs",
+    "lucide-react/dist/esm/icons/newspaper.mjs",
+    "lucide-react/dist/esm/icons/package.mjs",
+    "lucide-react/dist/esm/icons/palette.mjs",
+    "lucide-react/dist/esm/icons/panel-left.mjs",
+    "lucide-react/dist/esm/icons/panel-right.mjs",
+    "lucide-react/dist/esm/icons/panels-top-left.mjs",
+    "lucide-react/dist/esm/icons/paperclip.mjs",
+    "lucide-react/dist/esm/icons/party-popper.mjs",
+    "lucide-react/dist/esm/icons/pen-tool.mjs",
+    "lucide-react/dist/esm/icons/pencil.mjs",
+    "lucide-react/dist/esm/icons/phone.mjs",
+    "lucide-react/dist/esm/icons/piggy-bank.mjs",
+    "lucide-react/dist/esm/icons/pin.mjs",
+    "lucide-react/dist/esm/icons/plane.mjs",
+    "lucide-react/dist/esm/icons/play.mjs",
+    "lucide-react/dist/esm/icons/plug.mjs",
+    "lucide-react/dist/esm/icons/plus.mjs",
+    "lucide-react/dist/esm/icons/puzzle.mjs",
+    "lucide-react/dist/esm/icons/rabbit.mjs",
+    "lucide-react/dist/esm/icons/radio.mjs",
+    "lucide-react/dist/esm/icons/refresh-cw.mjs",
+    "lucide-react/dist/esm/icons/rocket.mjs",
+    "lucide-react/dist/esm/icons/rotate-cw.mjs",
+    "lucide-react/dist/esm/icons/ruler.mjs",
+    "lucide-react/dist/esm/icons/save.mjs",
+    "lucide-react/dist/esm/icons/scale.mjs",
+    "lucide-react/dist/esm/icons/scaling.mjs",
+    "lucide-react/dist/esm/icons/scissors.mjs",
+    "lucide-react/dist/esm/icons/search.mjs",
+    "lucide-react/dist/esm/icons/send.mjs",
+    "lucide-react/dist/esm/icons/settings-2.mjs",
+    "lucide-react/dist/esm/icons/settings.mjs",
+    "lucide-react/dist/esm/icons/share-2.mjs",
+    "lucide-react/dist/esm/icons/shield-alert.mjs",
+    "lucide-react/dist/esm/icons/shield-check.mjs",
+    "lucide-react/dist/esm/icons/shield.mjs",
+    "lucide-react/dist/esm/icons/shopping-bag.mjs",
+    "lucide-react/dist/esm/icons/shopping-cart.mjs",
+    "lucide-react/dist/esm/icons/smile.mjs",
+    "lucide-react/dist/esm/icons/snowflake.mjs",
+    "lucide-react/dist/esm/icons/sparkles.mjs",
+    "lucide-react/dist/esm/icons/speaker.mjs",
+    "lucide-react/dist/esm/icons/sprout.mjs",
+    "lucide-react/dist/esm/icons/star.mjs",
+    "lucide-react/dist/esm/icons/sticker.mjs",
+    "lucide-react/dist/esm/icons/sun.mjs",
+    "lucide-react/dist/esm/icons/sword.mjs",
+    "lucide-react/dist/esm/icons/table-cells-merge.mjs",
+    "lucide-react/dist/esm/icons/table-cells-split.mjs",
+    "lucide-react/dist/esm/icons/table.mjs",
+    "lucide-react/dist/esm/icons/tag.mjs",
+    "lucide-react/dist/esm/icons/target.mjs",
+    "lucide-react/dist/esm/icons/tent.mjs",
+    "lucide-react/dist/esm/icons/terminal.mjs",
+    "lucide-react/dist/esm/icons/thumbs-up.mjs",
+    "lucide-react/dist/esm/icons/ticket.mjs",
+    "lucide-react/dist/esm/icons/timer.mjs",
+    "lucide-react/dist/esm/icons/toggle-left.mjs",
+    "lucide-react/dist/esm/icons/trash-2.mjs",
+    "lucide-react/dist/esm/icons/tree-pine.mjs",
+    "lucide-react/dist/esm/icons/trending-up.mjs",
+    "lucide-react/dist/esm/icons/triangle-alert.mjs",
+    "lucide-react/dist/esm/icons/trophy.mjs",
+    "lucide-react/dist/esm/icons/truck.mjs",
+    "lucide-react/dist/esm/icons/tv.mjs",
+    "lucide-react/dist/esm/icons/umbrella.mjs",
+    "lucide-react/dist/esm/icons/unlink.mjs",
+    "lucide-react/dist/esm/icons/upload.mjs",
+    "lucide-react/dist/esm/icons/user.mjs",
+    "lucide-react/dist/esm/icons/users.mjs",
+    "lucide-react/dist/esm/icons/utensils.mjs",
+    "lucide-react/dist/esm/icons/video.mjs",
+    "lucide-react/dist/esm/icons/wallet.mjs",
+    "lucide-react/dist/esm/icons/wand-sparkles.mjs",
+    "lucide-react/dist/esm/icons/watch.mjs",
+    "lucide-react/dist/esm/icons/waves-horizontal.mjs",
+    "lucide-react/dist/esm/icons/wifi.mjs",
+    "lucide-react/dist/esm/icons/wind.mjs",
+    "lucide-react/dist/esm/icons/wrench.mjs",
+    "lucide-react/dist/esm/icons/x.mjs",
+    "lucide-react/dist/esm/icons/zap.mjs",
+    "lucide-react/dist/esm/shared/src/utils/hasA11yProp.mjs",
+    "lucide-react/dist/esm/shared/src/utils/mergeClasses.mjs",
+    "lucide-react/dist/esm/shared/src/utils/toCamelCase.mjs",
+    "lucide-react/dist/esm/shared/src/utils/toKebabCase.mjs",
+    "lucide-react/dist/esm/shared/src/utils/toPascalCase.mjs",
+    "marked/lib/marked.esm.js",
+    "node-emoji/lib/index.js",
+    "react-dom/cjs/react-dom-client.production.js",
+    "react-dom/cjs/react-dom.production.js",
+    "react-dom/client.js",
+    "react-dom/index.js",
+    "react-remove-scroll-bar/dist/es2015/component.js",
+    "react-remove-scroll-bar/dist/es2015/constants.js",
+    "react-remove-scroll-bar/dist/es2015/utils.js",
+    "react-remove-scroll/dist/es2015/aggresiveCapture.js",
+    "react-remove-scroll/dist/es2015/Combination.js",
+    "react-remove-scroll/dist/es2015/handleScroll.js",
+    "react-remove-scroll/dist/es2015/medium.js",
+    "react-remove-scroll/dist/es2015/sidecar.js",
+    "react-remove-scroll/dist/es2015/SideEffect.js",
+    "react-remove-scroll/dist/es2015/UI.js",
+    "react-style-singleton/dist/es2015/component.js",
+    "react-style-singleton/dist/es2015/hook.js",
+    "react-style-singleton/dist/es2015/singleton.js",
+    "react/cjs/react-jsx-runtime.production.js",
+    "react/cjs/react.production.js",
+    "react/index.js",
+    "react/jsx-runtime.js",
+    "\u0000rolldown/runtime.js",
+    "scheduler/cjs/scheduler.production.js",
+    "scheduler/index.js",
+    "skin-tone/index.js",
+    "src/blockeditor/BlockEditor.tsx",
+    "src/blockeditor/CodeBlockView.tsx",
+    "src/blockeditor/colors.ts",
+    "src/blockeditor/exportBlocks.ts",
+    "src/blockeditor/formBlock.ts",
+    "src/blockeditor/FormBlockView.tsx",
+    "src/blockeditor/FormBuilder.tsx",
+    "src/blockeditor/FormSubmissionView.tsx",
+    "src/blockeditor/highlight.ts",
+    "src/blockeditor/htmlArtifactBlock.ts",
+    "src/blockeditor/HtmlArtifactBlockView.tsx",
+    "src/blockeditor/imageBlock.ts",
+    "src/blockeditor/ImageBlockView.tsx",
+    "src/blockeditor/kit/cards.tsx",
+    "src/blockeditor/kit/chartData.ts",
+    "src/blockeditor/kit/chartLabels.ts",
+    "src/blockeditor/kit/chartMath.ts",
+    "src/blockeditor/kit/charts.tsx",
+    "src/blockeditor/kit/completion.ts",
+    "src/blockeditor/kit/evalCache.ts",
+    "src/blockeditor/kit/groupSync.ts",
+    "src/blockeditor/kit/index.ts",
+    "src/blockeditor/kit/inputs.tsx",
+    "src/blockeditor/kit/inputs2.tsx",
+    "src/blockeditor/kit/kitConfig.ts",
+    "src/blockeditor/kit/KitFrame.tsx",
+    "src/blockeditor/kit/kitPanel.ts",
+    "src/blockeditor/kit/KitSettings.tsx",
+    "src/blockeditor/kit/lock.ts",
+    "src/blockeditor/kit/options.ts",
+    "src/blockeditor/kit/OptionsEditor.tsx",
+    "src/blockeditor/kit/progress.tsx",
+    "src/blockeditor/kit/scope.ts",
+    "src/blockeditor/kit/useCachedEval.ts",
+    "src/blockeditor/LinkPicker.tsx",
+    "src/blockeditor/listMarkers.ts",
+    "src/blockeditor/marquee.ts",
+    "src/blockeditor/meetingAudio.ts",
+    "src/blockeditor/meetingAudioExport.ts",
+    "src/blockeditor/MeetingBlockView.tsx",
+    "src/blockeditor/MeetingHeader.tsx",
+    "src/blockeditor/meetingManagement.ts",
+    "src/blockeditor/MeetingManagementMenu.tsx",
+    "src/blockeditor/meetingPageContext.ts",
+    "src/blockeditor/MeetingPlayer.tsx",
+    "src/blockeditor/meetingSessions.ts",
+    "src/blockeditor/MeetingSummary.tsx",
+    "src/blockeditor/meetingSummaryBlocks.ts",
+    "src/blockeditor/MeetingTabs.tsx",
+    "src/blockeditor/meetingTime.ts",
+    "src/blockeditor/MeetingTranscript.tsx",
+    "src/blockeditor/meetingTranscriptPlayback.ts",
+    "src/blockeditor/MissingPluginBlock.tsx",
+    "src/blockeditor/model.ts",
+    "src/blockeditor/nativeContextMenu.ts",
+    "src/blockeditor/popupPosition.ts",
+    "src/blockeditor/PresentBlocks.tsx",
+    "src/blockeditor/reactiveBlocks.tsx",
+    "src/blockeditor/registry.tsx",
+    "src/blockeditor/richtext.ts",
+    "src/blockeditor/RichTextEditor.tsx",
+    "src/blockeditor/SlashMenu.tsx",
+    "src/blockeditor/staticKeep.tsx",
+    "src/blockeditor/TableColResizer.tsx",
+    "src/blockeditor/tablePaste.ts",
+    "src/blockeditor/TableRangeMenuItems.tsx",
+    "src/blockeditor/TableRangeToolbar.tsx",
+    "src/blockeditor/TextBlockView.tsx",
+    "src/blockeditor/unknownBlock.ts",
+    "src/blockeditor/useBlockEditor.ts",
+    "src/components/ArtifactOverlay.tsx",
+    "src/components/database/DatabaseCard.tsx",
+    "src/components/database/databaseCells.tsx",
+    "src/components/database/databaseColors.ts",
+    "src/components/database/databaseForm.tsx",
+    "src/components/database/DatabaseFormBlock.tsx",
+    "src/components/database/databaseRecipes.ts",
+    "src/components/IconPicker.tsx",
+    "src/components/PageIcon.tsx",
+    "src/components/SandboxedHtml.tsx",
+    "src/components/ui/badge.tsx",
+    "src/components/ui/button.tsx",
+    "src/components/ui/command.tsx",
+    "src/components/ui/context-menu.tsx",
+    "src/components/ui/dialog.tsx",
+    "src/components/ui/dropdown-menu.tsx",
+    "src/components/ui/empty-state.tsx",
+    "src/components/ui/icon-button.tsx",
+    "src/components/ui/input.tsx",
+    "src/components/ui/menu-components.tsx",
+    "src/components/ui/menu-density.tsx",
+    "src/components/ui/overlay-motion.ts",
+    "src/components/ui/popover.tsx",
+    "src/components/ui/select.tsx",
+    "src/components/ui/skeleton.tsx",
+    "src/components/ui/switch.tsx",
+    "src/components/ui/toast.tsx",
+    "src/data/DataProvider.tsx",
+    "src/i18n/index.ts",
+    "src/i18n/messages/de.ts",
+    "src/i18n/messages/en.ts",
+    "src/i18n/messages/ja.ts",
+    "src/i18n/messages/zh.ts",
+    "src/lib/aiBridge.ts",
+    "src/lib/aiFeatures.ts",
+    "src/lib/assetBridge.ts",
+    "src/lib/dataColorVars.ts",
+    "src/lib/dataScheme.ts",
+    "src/lib/download.ts",
+    "src/lib/emoji.ts",
+    "src/lib/emojiPicker.ts",
+    "src/lib/hud.ts",
+    "src/lib/iconValue.ts",
+    "src/lib/imageLightbox.ts",
+    "src/lib/lucideIcons.ts",
+    "src/lib/openDocs.ts",
+    "src/lib/pageActions.ts",
+    "src/lib/pageAppearance.ts",
+    "src/lib/pageCover.ts",
+    "src/lib/pageIcon.ts",
+    "src/lib/pageLinks.ts",
+    "src/lib/presence.ts",
+    "src/lib/shortcuts.ts",
+    "src/lib/srcdoc.ts",
+    "src/lib/statusStyles.ts",
+    "src/lib/storedPageUpdate.ts",
+    "src/lib/suggestBridge.ts",
+    "src/lib/suppressContextMenu.ts",
+    "src/lib/themes.ts",
+    "src/lib/utils.ts",
+    "src/providers/AccountProvider.tsx",
+    "src/providers/ConfirmProvider.tsx",
+    "src/providers/ForwardingProvider.tsx",
+    "src/providers/HudProvider.tsx",
+    "src/providers/I18nProvider.tsx",
+    "src/providers/LibraryProvider.tsx",
+    "src/providers/NavigationProvider.tsx",
+    "src/providers/PlatformCapabilitiesProvider.tsx",
+    "src/providers/PreferencesProvider.tsx",
+    "src/providers/ThemeProvider.tsx",
+    "src/viewer/index.tsx",
+    "src/viewer/MotionProvider.tsx",
+    "src/viewer/pluginStubs.ts",
+    "src/viewer/ViewerApp.tsx",
+    "tailwind-merge/dist/bundle-mjs.mjs",
+    "tslib/tslib.es6.mjs",
+    "unicode-emoji-modifier-base/index.js",
+    "use-callback-ref/dist/es2015/assignRef.js",
+    "use-callback-ref/dist/es2015/useMergeRef.js",
+    "use-callback-ref/dist/es2015/useRef.js",
+    "use-sidecar/dist/es2015/exports.js",
+    "use-sidecar/dist/es2015/medium.js",
+    "yjs/dist/yjs.mjs",
+    "zod/v3/errors.js",
+    "zod/v3/helpers/errorUtil.js",
+    "zod/v3/helpers/parseUtil.js",
+    "zod/v3/helpers/util.js",
+    "zod/v3/locales/en.js",
+    "zod/v3/types.js",
+    "zod/v3/ZodError.js"
+  ],
+  "calibration": {
+    "measuredAt": "FF-6 / 2026-10-28",
+    "seededProductionRawBytes": 1922068,
+    "ordinaryTransition": {
+      "rawBytes": 1922503,
+      "marginalBytes": 435,
+      "ownRenderedBytes": 489,
+      "featureLedger": "accepted"
+    },
+    "eagerLayout": {
+      "rawBytes": 1969841,
+      "marginalBytes": 47773,
+      "ownRenderedBytes": 343,
+      "featureLedger": "rejected: unledgered feature"
+    },
+    "testOnlyFixture": {
+      "rawBytes": 1923060,
+      "marginalBytes": 992
+    },
+    "unseededTestOnlyFixture": {
+      "rawBytes": 1922982,
+      "marginalBytes": 8001
+    },
+    "integrationMinificationShiftBytes": 78
+  }
+}

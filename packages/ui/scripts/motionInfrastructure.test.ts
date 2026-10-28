@@ -28,12 +28,12 @@ function assertScripts(documentHtml: string) {
 }
 
 describe('FF-6 infrastructure', () => {
-  it('bounds raw viewer delta against aea2f52c baseline at 80,000 bytes', () => {
+  it('bounds raw viewer delta against aea2f52c baseline at 81,920 bytes', () => {
     const bytes = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
-    const assertSize = (size: number) => expect(size - baseline.rawBytes, 'viewer raw delta <= 80KB').toBeLessThanOrEqual(baseline.maxDeltaBytes);
-    expect(() => assertSize(baseline.rawBytes + 80001)).toThrow('viewer raw delta');
+    const assertSize = (size: number) => expect(size - baseline.rawBytes, 'viewer raw delta <= 80KiB').toBeLessThanOrEqual(baseline.maxDeltaBytes);
+    expect(() => assertSize(baseline.rawBytes + baseline.maxDeltaBytes + 1)).toThrow('viewer raw delta');
     assertSize(bytes);
-    evidence(`SIZE baseline=${baseline.rawBytes} after=${bytes} delta=${bytes - baseline.rawBytes} bound=${baseline.maxDeltaBytes}; hypothetical +80001 RED, actual GREEN`);
+    evidence(`SIZE baseline=${baseline.rawBytes} after=${bytes} delta=${bytes - baseline.rawBytes} bound=${baseline.maxDeltaBytes}; hypothetical +81921 RED, actual GREEN`);
   });
   it('preserves four script roles and exactly authorizes emitted bytes', () => {
     expect(() => assertScripts(html + '<script>hypotheticalExtraScript()</script>')).toThrow('CSP script roles');
@@ -82,7 +82,8 @@ describe('FF-6 infrastructure', () => {
     }
   });
   it('keeps the fixture absent from the shipped viewer', () => {
-    expect(readFileSync('src/export/vendor/openbook-viewer.js', 'utf8')).not.toContain('Move fixture');
+    const artifact = readFileSync('src/export/vendor/openbook-viewer.js', 'utf8');
+    for (const marker of ['Move fixture', 'ff6/fixture', 'MotionFixture', 'fixture-entrance', 'fixture-state', 'Budget ordinary fixture', 'Budget layout fixture', 'ff6/budget-']) expect(artifact, `production fixture exclusion: ${marker}`).not.toContain(marker);
     expect(html).toContain('data-block-type="ff6/fixture"');
     expect(html).toContain('FF6 fixture');
   });
