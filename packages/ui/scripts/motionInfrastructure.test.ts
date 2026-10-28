@@ -1,3 +1,5 @@
+import ledger from './motionFeatures.json';
+import {assertViewerCeiling} from './motionGraph.mjs';
 import baseline from './viewerMotionBaseline.json';
 import {describe, expect, it} from 'vitest';
 import {readFileSync} from 'node:fs';
@@ -28,12 +30,12 @@ function assertScripts(documentHtml: string) {
 }
 
 describe('FF-6 infrastructure', () => {
-  it('bounds raw viewer delta against aea2f52c baseline at 81,920 bytes', () => {
+  it('bounds raw viewer delta against aea2f52c baseline at the transportability ceiling', () => {
     const bytes = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
-    const assertSize = (size: number) => expect(size - baseline.rawBytes, 'viewer raw delta <= 80KiB').toBeLessThanOrEqual(baseline.maxDeltaBytes);
-    expect(() => assertSize(baseline.rawBytes + baseline.maxDeltaBytes + 1)).toThrow('viewer raw delta');
+    const assertSize = (size: number) => assertViewerCeiling(size, ledger);
+    expect(() => assertSize(baseline.rawBytes + ledger.hardDeltaCeiling + 1)).toThrow('exports must stay small enough to share');
     assertSize(bytes);
-    evidence(`SIZE baseline=${baseline.rawBytes} after=${bytes} delta=${bytes - baseline.rawBytes} bound=${baseline.maxDeltaBytes}; hypothetical +81921 RED, actual GREEN`);
+    evidence(`SIZE baseline=${baseline.rawBytes} after=${bytes} delta=${bytes - baseline.rawBytes} bound=${ledger.hardDeltaCeiling}; hypothetical +${ledger.hardDeltaCeiling + 1} RED, actual GREEN`);
   });
   it('preserves four script roles and exactly authorizes emitted bytes', () => {
     expect(() => assertScripts(html + '<script>hypotheticalExtraScript()</script>')).toThrow('CSP script roles');
@@ -69,6 +71,12 @@ describe('FF-6 infrastructure', () => {
     expect(() => validateDisposition({...fixtureDispositions[0], exportedObservable: ''})).toThrow('exportedObservable');
     expect(() => validateDisposition({...fixtureDispositions[0], exportSafe: false})).toThrow('app surface');
     evidence('REGISTRY missing observable/app surface RED; recorded entries GREEN');
+  });
+  it('requires the owner-accepted snap-on-load observable for layout-class declarations', () => {
+    const entry = {...fixtureDispositions[1], layoutClass: true};
+    expect(() => validateDisposition(entry)).toThrow('present immediately');
+    validateDisposition({...entry, exportedObservable: 'Element present immediately; animates only on subsequent changes.'});
+    evidence('LAYOUT DOCTRINE missing immediate-presence observable RED; snap-on-load observable GREEN');
   });
   it('covers all CSS disposition token dependencies with emitted/live parity', () => {
     const css = readFileSync('src/index.css', 'utf8');

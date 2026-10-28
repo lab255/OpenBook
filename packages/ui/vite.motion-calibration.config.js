@@ -7,6 +7,7 @@ export default ({mode}) => mergeConfig(viewer, {
   plugins: [{
     name: 'motion-calibration', enforce: 'pre',
     transform(code, id) {
+      if (id.endsWith('/src/viewer/index.tsx') && mode === 'treeShaken') return {code: code + "\nimport {motion as unusedMotion} from 'motion/react';", map: null};
       if (id.endsWith('/src/viewer/index.tsx') && ['ordinary', 'layout'].includes(mode)) {
         const name = mode === 'ordinary' ? 'MotionBudgetOrdinary' : 'MotionBudgetLayout';
         return {code: code + `\nimport '../blockeditor/__fixtures__/${name}';`, map: null};

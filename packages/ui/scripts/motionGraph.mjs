@@ -38,6 +38,17 @@ export function assertBlockOwnBytes(graph, ledger) {
   }
 }
 
+/** 256KB chosen 2026-10-28, owner direct confirmation: protects shareability,
+ * not subset purity. The 1.92MB raw/~500KB gz viewer is already shareable;
+ * room for layout-class features (~48KB) does not change its order of magnitude.
+ * Re-evaluate when transport expectations change. The ledger owns the number.
+ */
+export function assertViewerCeiling(bytes, ledger) {
+  if (bytes - ledger.preAdoptionRawBytes > ledger.hardDeltaCeiling) {
+    throw new Error(`viewer bundle exceeds the transportability ceiling (${ledger.hardDeltaCeiling / 1024}KB raw over baseline) — exports must stay small enough to share. Actual delta: ${bytes - ledger.preAdoptionRawBytes} raw bytes.`);
+  }
+}
+
 /** Rolldown's emitted chunk modules exclude tree-shaken code. Feature identity
  * uses package-relative module paths plus rendered exports, not import spelling.
  * Own bytes are UTF-8 rendered module code plus new non-motion dependencies;
@@ -69,7 +80,7 @@ export function motionGraph() {
         assertFeatureLedger(graph, ledger);
         assertBlockOwnBytes(graph, ledger);
         const bytes = Object.values(bundle).filter(chunk => chunk.type === 'chunk').reduce((sum, chunk) => sum + Buffer.byteLength(chunk.code), 0);
-        if (bytes - ledger.preAdoptionRawBytes > ledger.hardDeltaCeiling) throw new Error(`Viewer motion hard ceiling exceeded: ${bytes - ledger.preAdoptionRawBytes} > ${ledger.hardDeltaCeiling}`);
+        assertViewerCeiling(bytes, ledger);
         this.info('feature ledger + block own-byte ceiling + hard ceiling passed');
       }
       this.emitFile({type: 'asset', fileName: 'motion-graph.json', source: JSON.stringify(graph, null, 2)});

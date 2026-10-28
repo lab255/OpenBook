@@ -2,7 +2,8 @@
   "measurement": "Ordered production-mode builds via vite.motion-calibration.config.js; whole-IIFE raw deltas include glue and shared/minifier effects. lazyRuntime includes hydration-gate glue relative to aea2f52c. Costs are historical introduction measurements, not independent additive package sizes.",
   "preAdoptionCommit": "aea2f52c",
   "preAdoptionRawBytes": 1846513,
-  "hardDeltaCeiling": 81920,
+  "hardDeltaCeiling": 262144,
+  "hardDeltaCeilingRationale": "256KB chosen 2026-10-28: owner direct confirmation \u2014 protects shareability, not subset purity; current bundle is 1.92MB raw/~500KB gz. Leaves room for layout-class features (~48KB) without changing the order of magnitude. Re-evaluate when transport expectations change.",
   "blockOwnBytesCeiling": 2048,
   "features": [
     {

@@ -1,7 +1,6 @@
 {
   "commit": "aea2f52c",
   "rawBytes": 1846513,
-  "maxDeltaBytes": 81920,
   "scriptRoles": [
     "interpreter",
     "scheme",

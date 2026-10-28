@@ -1,5 +1,9 @@
 /** Tier names describe intent. CSS is a tween; only the hydrated runtime uses springs.
  * A viewer disposition is deliberately absent from legacy exports and PDFs.
+ * Layout-class motion is export-legal: snap into place on load, animate only
+ * on subsequent changes. Owner direct confirmation 2026-10-28 accepts this
+ * intended behavior; it cannot animate before hydration and still needs a
+ * measured feature-ledger row when adopted.
  * No product block adopts a new animation in FF-6.
  */
 export interface MotionDisposition {
@@ -9,12 +13,15 @@ export interface MotionDisposition {
   reason: string;
   exportedObservable: string;
   tokens: readonly string[];
+  /** Observable must say present immediately; animates only on subsequent changes. */
+  layoutClass?: boolean;
 }
 export function validateDisposition(entry: MotionDisposition): void {
   if (!entry.name || !['load', 'pointer', 'state'].includes(entry.category) || !['css', 'viewer', false].includes(entry.exportSafe)) throw new Error('Invalid motion disposition');
   if (!entry.reason.trim()) throw new Error(`${entry.name}: reason required`);
   if (entry.exportSafe === false && !entry.reason.includes('app surface:')) throw new Error(`${entry.name}: name the app surface`);
   if (entry.exportSafe !== false && !entry.exportedObservable.trim()) throw new Error(`${entry.name}: exportedObservable required`);
+  if (entry.layoutClass && (entry.exportSafe !== 'viewer' || !/present immediately/i.test(entry.exportedObservable) || !/animates only on subsequent changes/i.test(entry.exportedObservable))) throw new Error(`${entry.name}: layout observable must say present immediately; animates only on subsequent changes`);
   if (entry.exportSafe === 'viewer' && !entry.reason.includes('absent in legacy + PDF')) throw new Error(`${entry.name}: viewer absence must be explicit`);
 }
 export const motionDispositions = [
