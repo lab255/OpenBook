@@ -1436,6 +1436,16 @@
       ]
     },
     {
+      "name": "fluidHover",
+      "kind": "chrome-size",
+      "introducedAt": "FF-4 / 877bc455 / 2026-10-29",
+      "beforeRawBytes": 1922068,
+      "afterRawBytes": 1925111,
+      "rawCostBytes": 3043,
+      "measurement": "CHROME SIZE, not feature authorization: measured at the FF-4/FF-6 seam because FF-4 shipped this integration unledgered. Reverting FF-4 call sites/CSS with the overlay omitted reproduces 1,922,068; restored integration with overlay omitted is 1,922,901 (+833); ff46-shell with the corrected local lazy renderer is 1,925,111 (+2,210). Includes surrounding chrome integration and overlay shell, not only fluid-hover.tsx; excludes the separately measured standalone API features.",
+      "modules": []
+    },
+    {
       "name": "useMotionValue",
       "introducedAt": "FF-4/FF-6 merge seam / 2026-10-29",
       "measurement": "Ordered integration: ff46-shell \u2192 ff46-values \u2192 ff46-reduced \u2192 ff46-final; test-only API removal controls, whole-IIFE raw bytes including minification interactions.",

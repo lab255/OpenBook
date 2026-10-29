@@ -86,3 +86,19 @@ it('checks the complete emitted Motion closure transitively reachable from the v
   }
   expect(productionGraph.modules.filter((module: {id: string; bytes: number}) => module.bytes > 0 && module.id.includes('/render/components/motion/'))).toEqual([]);
 });
+
+it('keeps the ordered size ledger continuous from baseline to the measured production artifact', () => {
+  const measured = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
+  const assertChain = (rows: readonly {name: string; beforeRawBytes: number; afterRawBytes: number}[]) => {
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].beforeRawBytes, 'ledger chain: baseline').toBe(ledger.preAdoptionRawBytes);
+    for (let i = 0; i < rows.length - 1; i++) {
+      expect(rows[i].afterRawBytes, `ledger chain: ${rows[i].name} -> ${rows[i + 1].name}`).toBe(rows[i + 1].beforeRawBytes);
+    }
+    expect(rows.at(-1)!.afterRawBytes, 'ledger chain: measured production artifact').toBe(measured);
+  };
+  const broken = ledger.features.map(row => row.name === 'fluidHover' ? {...row, afterRawBytes: row.afterRawBytes + 1} : row);
+  expect(() => assertChain(broken)).toThrow('ledger chain: fluidHover -> useMotionValue');
+  assertChain(ledger.features);
+  process.stdout.write(`LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline ${ledger.preAdoptionRawBytes} -> all adjacent rows -> measured ${measured} GREEN\n`);
+});
