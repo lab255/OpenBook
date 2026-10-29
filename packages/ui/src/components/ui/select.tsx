@@ -1,3 +1,4 @@
+import {FluidHover} from "./fluid-hover"
 import { OVERLAY_MOTION } from "./overlay-motion"
 import * as React from "react"
 import {Check, ChevronDown} from "lucide-react"
@@ -198,12 +199,13 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
           onCloseAutoFocus={(e) => e.preventDefault()}
           onKeyDown={onKeyDown}
           className={cn(
-            "z-50 max-h-[var(--radix-popover-content-available-height)] min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)]",
+            "relative isolate z-50 max-h-[var(--radix-popover-content-available-height)] min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)]",
             "overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover p-1 text-popover-foreground shadow-overlay outline-hidden",
             // Entrance only — no exit animation (nested dismissable layer).
             OVERLAY_MOTION.menuEnter,
           )}
         >
+          <FluidHover surface="select" selector="[role=option]" />
           {items.length === 0 && (
             <EmptyState variant="overlay" className="px-2 text-muted-foreground" title={t("common.noOptions")} />
           )}
@@ -228,7 +230,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
                   onClick={() => pick(it.value)}
                   className={cn(
                     "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden",
-                    it.value === current ? "bg-hover" : "hover:bg-hover focus:bg-hover",
+                    it.value === current && "bg-hover-strong",
                     it.disabled && "pointer-events-none opacity-50",
                   )}
                 >

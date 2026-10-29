@@ -1,3 +1,4 @@
+import {FluidHover} from "./fluid-hover"
 import { OVERLAY_MOTION } from "./overlay-motion"
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
@@ -33,7 +34,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     <DropdownMenuPrimitive.SubTrigger
       ref={ref}
       className={cn(
-        "flex cursor-pointer select-none items-center rounded-sm px-2 outline-hidden focus:bg-hover data-[state=open]:bg-hover",
+        "flex cursor-pointer select-none items-center rounded-sm px-2 outline-hidden data-[state=open]:bg-hover-strong",
         density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
         inset && "pl-8",
         className
@@ -51,20 +52,20 @@ DropdownMenuSubTrigger.displayName =
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, collisionPadding = 10, ...props }, ref) => {
+>(({ className, collisionPadding = 10, children, ...props }, ref) => {
   const density = useMenuDensity()
   return (
     <DropdownMenuPrimitive.SubContent
       ref={ref}
       collisionPadding={collisionPadding}
       className={cn(
-        "z-50 min-w-32 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-overlay",
+        "relative isolate z-50 min-w-32 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-overlay",
           OVERLAY_MOTION.menu,
         density === "compact" ? "p-0.5" : "p-1",
         className
       )}
       {...props}
-    />
+    ><FluidHover surface="dropdown" selector="[role^=menuitem]" />{children}</DropdownMenuPrimitive.SubContent>
   )
 })
 DropdownMenuSubContent.displayName =
@@ -73,7 +74,7 @@ DropdownMenuSubContent.displayName =
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 4, collisionPadding = 10, ...props }, ref) => {
+>(({ className, sideOffset = 4, collisionPadding = 10, children, ...props }, ref) => {
   const density = useMenuDensity()
   return (
     <DropdownMenuPrimitive.Portal>
@@ -86,13 +87,13 @@ const DropdownMenuContent = React.forwardRef<
           // the space below the trigger — the unified page menu (CM-2) can run
           // past the fold, and overflow-hidden would strand its last items (e.g.
           // "Move to trash") off-screen and unclickable.
-          "z-50 max-h-[min(var(--radix-dropdown-menu-content-available-height),calc(100vh-20px))] min-w-32 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover text-popover-foreground shadow-overlay",
+          "relative isolate z-50 max-h-[min(var(--radix-dropdown-menu-content-available-height),calc(100vh-20px))] min-w-32 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover text-popover-foreground shadow-overlay",
           OVERLAY_MOTION.menu,
           density === "compact" ? "p-0.5" : "p-1",
           className
         )}
         {...props}
-      />
+      ><FluidHover surface="dropdown" selector="[role^=menuitem]" />{children}</DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   )
 })
@@ -111,7 +112,7 @@ const DropdownMenuItem = React.forwardRef<
     <DropdownMenuPrimitive.Item
       ref={ref}
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-sm px-2 outline-hidden transition-colors focus:bg-hover focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
+        "relative flex cursor-pointer select-none items-center rounded-sm px-2 outline-hidden focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
         density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
         inset && "pl-8",
         className
@@ -131,7 +132,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     <DropdownMenuPrimitive.CheckboxItem
       ref={ref}
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-sm pl-8 pr-2 outline-hidden transition-colors focus:bg-hover focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
+        "relative flex cursor-pointer select-none items-center rounded-sm pl-8 pr-2 data-[state=checked]:bg-hover-strong outline-hidden focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
         density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
         className
       )}
@@ -159,7 +160,7 @@ const DropdownMenuRadioItem = React.forwardRef<
     <DropdownMenuPrimitive.RadioItem
       ref={ref}
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-sm pl-8 pr-2 outline-hidden transition-colors focus:bg-hover focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
+        "relative flex cursor-pointer select-none items-center rounded-sm pl-8 pr-2 data-[state=checked]:bg-hover-strong outline-hidden focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
         density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
         className
       )}

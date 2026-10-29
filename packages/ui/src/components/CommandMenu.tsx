@@ -179,6 +179,7 @@ export function CommandMenu() {
     return (
       <CommandItem
         key={`${scope}:${page.id}`}
+        aria-current={page.id === currentPageId ? 'page' : undefined}
         value={`${displayName(page.name)} ${path} ${page.id} ${scope}`}
         onSelect={() => run(() => selectPage(page.id))}
       >
