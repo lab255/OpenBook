@@ -58,6 +58,7 @@ import {
 import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../blockeditor/colors';
 import {kitChartRuntime, kitChartSvg} from './kitChart';
 import {formatValue} from './format';
+import {entranceCss} from '../viewer/entranceCss';
 import {inlineScriptHash, pageCsp} from './exportCsp';
 import {pageIconToText} from '@/lib/iconValue';
 import {cellValue, formatCellValue} from '@/components/database/databaseCells';
@@ -854,8 +855,9 @@ const VIEWER_BOOT = `
   var host = document.createElement('div');
   host.id = 'ob-viewer-host';
   main.parentNode.replaceChild(host, main);
+  document.documentElement.setAttribute('data-ob-hydrated', '');
   try { window.OpenBookViewer.mount(host, source, {page: pageRef, assets: assets, staticBlocks: keep, formOrigins: formOrigins}); }
-  catch (e) { if (host.parentNode) host.parentNode.replaceChild(main, host); }
+  catch (e) { document.documentElement.removeAttribute('data-ob-hydrated'); if (host.parentNode) host.parentNode.replaceChild(main, host); }
 })();
 `;
 
@@ -940,7 +942,7 @@ function document_(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <title>${escapeHtml(headTitle)}</title>
-<style>${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : schemeDual(ctx.scheme)}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
+<style>${entranceCss()}${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : schemeDual(ctx.scheme)}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
 </head>
 <body${!hydrate && rootId ? ` data-root="${escapeHtml(rootId)}"` : ''}>
 ${legacyHeader}${bodyHtml}
@@ -1064,7 +1066,7 @@ function pageIsland(rawSnapshot: PageSnapshot, title: string, icon: string, meta
 const SLIDE_STYLES = `
 .ob-deck { max-width: none; padding: 0; }
 .slide { display: none; box-sizing: border-box; min-height: 100vh; max-width: 60rem; margin: 0 auto; padding: clamp(2rem,6vh,5rem) clamp(1.5rem,6vw,5rem); }
-.slide[data-current] { display: block; animation: ob-slide-in 240ms cubic-bezier(0.32,0.72,0,1) both; }
+html:not([data-ob-hydrated]) .slide[data-current] { display: block; animation: ob-slide-in 240ms cubic-bezier(0.32,0.72,0,1) both; }
 .slide .slide-title h1 { font-size: 2.4rem; margin: 0 0 1.5rem; }
 @keyframes ob-slide-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 .deck-nav { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .6rem; padding: .3rem .6rem; border: 1px solid #e5e7eb; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 2px 10px rgba(0,0,0,.08); font: 14px system-ui, sans-serif; }

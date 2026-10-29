@@ -31,6 +31,7 @@ import {MAX_ASSET_BYTES} from '@/blockeditor/imageBlock';
 import {setAssetBridge} from '@/lib/assetBridge';
 import {applyDataColors} from '@/lib/dataColorVars';
 import {readGlobalDataScheme} from '@/lib/dataScheme';
+import {MotionProvider} from './MotionProvider';
 import {ViewerApp} from './ViewerApp';
 import type {ViewerAssetEntry, ViewerHandle, ViewerMountOptions, ViewerSource} from './types';
 import '@/index.css';
@@ -131,13 +132,14 @@ export function mount(container: HTMLElement, source: ViewerSource, opts?: Viewe
   }
   const uninstallAssets = opts?.assets && Object.keys(opts.assets).length > 0 ? installAssetPayload(opts.assets) : null;
   const root = createRoot(container);
+  container.ownerDocument.documentElement.setAttribute('data-ob-hydrated', '');
   root.render(
-    <ViewerApp
+    <MotionProvider><ViewerApp
       source={source}
       initialPage={opts?.page}
       staticBlocks={opts?.staticBlocks}
       formOrigins={opts?.formOrigins}
-    />,
+    /></MotionProvider>,
   );
   return {
     unmount(): void {

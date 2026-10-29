@@ -1,5 +1,6 @@
 // Flat config (ESLint 9). Replaces the legacy .eslintrc.js. One root config
 // lints every workspace package; `eslint .` from any package picks it up.
+import explicitMotionInitial from './eslint-rules/explicit-motion-initial.mjs';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import react from 'eslint-plugin-react';
@@ -26,6 +27,8 @@ export default tseslint.config(
       '**/test-results/**',
       '**/playwright-report/**',
       '**/blob-report/**',
+      // Generated standalone browser fixtures, including bundled vendor JS.
+      'packages/web/e2e-viewer/generated/**',
       // Rust host + generated Tauri capability schemas.
       'packages/app/src-tauri/**',
       // Vendored UMD bundles (d3 / Observable Plot) inlined into the HTML export.
@@ -41,6 +44,11 @@ export default tseslint.config(
       '**/*.config.{js,cjs,mjs,ts}',
       'eslint.config.mjs',
     ],
+  },
+  {
+    files: ['packages/ui/src/{blockeditor,viewer}/**/*.{ts,tsx}'],
+    plugins: {motion: explicitMotionInitial},
+    rules: {'motion/explicit-initial': 'error'},
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

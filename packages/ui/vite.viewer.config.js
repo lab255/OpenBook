@@ -11,6 +11,8 @@
 // the vendored d3/plot UMDs beside it. It builds BEFORE the main lib build in
 // the package's `build` script, so a future `?raw` consumer inside src always
 // sees a fresh bundle.
+import {motionGraph} from "./scripts/motionGraph.mjs";
+import {motionBoundary} from "./scripts/motionBoundary.mjs";
 import { resolve } from "path";
 import { fileURLToPath, URL } from "url";
 import { defineConfig } from "vite";
@@ -47,7 +49,7 @@ const inlineCssPlugin = () => ({
 });
 
 export default defineConfig({
-  plugins: [inlineCssPlugin()],
+  plugins: [inlineCssPlugin(), motionBoundary("viewer"), motionGraph()],
   define: {
     // Inlined React et al. read NODE_ENV; the IIFE must carry a production
     // value itself (lib builds don't substitute it by default).

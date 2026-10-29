@@ -1,0 +1,16 @@
+{
+  "commit": "aea2f52c",
+  "rawBytes": 1846513,
+  "scriptRoles": [
+    "interpreter",
+    "scheme",
+    "viewer",
+    "boot"
+  ],
+  "scriptHashes": [
+    "'sha256-NfjdU5YMiD4HAbVm8M6T6MyJESRNwrvCSQu8CSQT4aE='",
+    "'sha256-VjDqFmSHxjBkYOt6SeHt9Z8St6jQVCe8Pszgz52Kbbs='",
+    "'sha256-RlK7TzQSfJBuBDCtKQcm+/xWGMg5Is4+qE27+igMON4='",
+    "'sha256-lLxPpt40SDGVT+pFq2E2r0LYQG5SpsjOpXRWCr7yjes='"
+  ]
+}
