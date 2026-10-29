@@ -77,3 +77,50 @@ test('FF-6 single entrance and state spring in the same exported file', async ({
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }
 });
+
+for (const surface of ['Seam select', 'Standalone select']) for (const reduced of [false, true]) {
+  test(`FF-4 chrome glide survives the hydrated export seam; ${surface}; reduced=${reduced}`, async ({page}) => {
+    const html = readFileSync(resolve('e2e-viewer/generated/motion.html'), 'utf8');
+    const server = createServer((_req, res) => { res.setHeader('Content-Type', 'text/html'); res.end(html); });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('No fixture server');
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    try {
+      await page.emulateMedia({reducedMotion: reduced ? 'reduce' : 'no-preference'});
+      await page.goto(`http://127.0.0.1:${address.port}`);
+      await page.getByRole('combobox', {name: surface}).click();
+      await page.getByRole('option', {name: 'First option'}).hover();
+      await page.waitForTimeout(350);
+      const trace = await page.evaluate(async () => {
+        const overlay = document.querySelector<HTMLElement>('[data-fluid-hover="select"]')!;
+        const rows = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+        const from = rows[0].getBoundingClientRect().y;
+        const to = rows[1].getBoundingClientRect().y;
+        const samples: {t: number; y: number; transform: string}[] = [];
+        const record = () => samples.push({t: performance.now(), y: overlay.getBoundingClientRect().y, transform: getComputedStyle(overlay).transform});
+        await new Promise<void>(resolve => requestAnimationFrame(() => { record(); resolve(); }));
+        rows[1].dispatchEvent(new PointerEvent('pointermove', {bubbles: true, pointerType: 'mouse'}));
+        const start = performance.now();
+        await new Promise<void>(resolve => {
+          const frame = () => { record(); if (performance.now() - start < 350) requestAnimationFrame(frame); else resolve(); };
+          requestAnimationFrame(frame);
+        });
+        return {from, to, samples};
+      });
+      console.log(`FF46 ${surface} reduced=${reduced} per-rAF rect/transform ${JSON.stringify(trace)}`);
+      expect(errors).toEqual([]);
+      expect(trace.samples[0].y).toBeCloseTo(trace.from, 0);
+      expect(trace.samples.at(-1)!.y).toBeCloseTo(trace.to, 0);
+      const intermediate = trace.samples.filter(sample => sample.y > trace.from + .5 && sample.y < trace.to - .5);
+      if (reduced) expect(intermediate).toHaveLength(0);
+      else expect(intermediate.length).toBeGreaterThan(0);
+      for (const sample of trace.samples.filter(sample => Math.abs(sample.y - trace.from) > .5)) {
+        expect(sample.transform, 'rect-motion/identity-transform hazard').not.toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
+}

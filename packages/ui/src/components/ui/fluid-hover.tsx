@@ -1,5 +1,6 @@
 import * as React from 'react';
-import {animate, motion, useMotionValue, useReducedMotion} from 'motion/react';
+import {LazyMotion, domAnimation, animate, useMotionValue, useReducedMotion} from 'motion/react';
+import * as m from 'motion/react-m';
 import {spring} from '@/lib/springs-lane';
 
 /** One persistent object per surface; native focus/cmdk remain navigation owners. */
@@ -83,8 +84,9 @@ export function FluidHover({surface, selector, selected}: {
       parent.removeEventListener('scroll', measure);
     };
   }, [selector, selected]);
-  return <motion.div ref={ref} aria-hidden data-fluid-hover={surface}
+  // Local non-strict renderer also supports app callers without a viewer provider.
+  return <LazyMotion features={domAnimation}><m.div ref={ref} aria-hidden data-fluid-hover={surface}
     className="pointer-events-none absolute left-0 top-0 rounded-sm bg-hover"
     style={{zIndex: -1, x, y, width, height, opacity: rect ? 1 : 0}}
-    initial={false} />;
+    initial={false} /></LazyMotion>;
 }
