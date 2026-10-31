@@ -1,3 +1,18 @@
+## 3.27.0 (2026-10-31)
+
+### 🚀 Features
+
+- **ui:** FF-4 fluid hover — one highlight glides across chrome surfaces ([#426](https://github.com/lab255/OpenBook/pull/426))
+- **ui:** FF-6 export/viewer motion infrastructure — per-bundle runtime, feature ledger, hydration gates ([#427](https://github.com/lab255/OpenBook/pull/427))
+
+### 🩹 Fixes
+
+- **ui:** ledger the fluid-hover motion features in the viewer graph (FF-4×FF-6 seam) ([#428](https://github.com/lab255/OpenBook/pull/428))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.26.0 (2026-10-28)
 
 ### 🚀 Features
