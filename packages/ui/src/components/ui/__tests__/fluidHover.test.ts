@@ -35,6 +35,7 @@ function assertChrome(sidebarSource: string, glideSource: string, styles: string
   expect(sidebarSource, 'sidebar: sheet-relative hover').toContain('bg-[hsl(var(--sheet-1-foreground)/0.06)]');
   expect(glideSource, 'sidebar: glide behind persistent fills').toContain('zIndex: -1');
   expect(styles, 'sidebar: unpositioned/static fallback survives').toContain(':has(> [data-fluid-hover-ready])');
+  expect(styles, 'sidebar: active fallback cannot erase active fill').toContain('background-color: var(--color-sidebar-selection-wash)');
   expect(styles, 'sidebar: active fill survives hover').toContain('[data-sidebar-page-row]:not(.bg-sidebar-selection-wash):hover');
 }
 describe('FF-4b pairwise chrome guards', () => {
@@ -43,6 +44,7 @@ describe('FF-4b pairwise chrome guards', () => {
     expect(() => assertChrome(sections.replaceAll('SIDEBAR_HOVER,', ''), overlay, css)).toThrow('static hover fallback');
     expect(() => assertChrome(sections.replace('bg-[hsl(var(--sheet-1-foreground)/0.06)]', 'bg-hover'), overlay, css)).toThrow('sheet-relative hover');
     expect(() => assertChrome(sections, overlay.replace('zIndex: -1', 'zIndex: 1'), css)).toThrow('behind persistent fills');
+    expect(() => assertChrome(sections, overlay, css.replace('background-color: var(--color-sidebar-selection-wash)', 'background-color: transparent'))).toThrow('active fallback cannot erase');
     expect(() => assertChrome(sections, overlay, css.replace(':not(.bg-sidebar-selection-wash)', ''))).toThrow('active fill survives');
   });
   for (const mode of ['tinted', 'accent', 'accent-dark']) {

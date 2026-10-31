@@ -4201,3 +4201,7 @@ button.obe-meeting-timestamp:hover { background: var(--obe-chrome-hover); }
 [data-sidebar-rows]:has(> [data-fluid-hover-ready]) [data-sidebar-page-row]:not(.bg-sidebar-selection-wash):hover {
   background-color: transparent;
 }
+
+[data-sidebar-rows]:has(> [data-fluid-hover-ready]) [data-sidebar-page-row].bg-sidebar-selection-wash:not([data-selected]):hover {
+  background-color: var(--color-sidebar-selection-wash);
+}
