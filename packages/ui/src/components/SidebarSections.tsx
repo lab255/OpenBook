@@ -12,6 +12,7 @@ import {SIDEBAR_HOVER, SIDEBAR_SELECTED_ROW} from '@/lib/sidebarStyles';
 import {cn} from '@/lib/utils';
 import {t as bareT} from '@/i18n';
 import {MENU_WIDTH_MD} from '@/components/ui/menu-components';
+import {FluidHover} from '@/components/ui/fluid-hover';
 import {HiddenPageBadge} from '@/components/HiddenPageBadge';
 
 /**
@@ -71,7 +72,11 @@ export function SidebarSection({id, label, children}: {id: string; label: string
           )}
         />
       </button>
-      {open && children}
+      {open && <div className="relative isolate" data-sidebar-rows={id}>
+        <FluidHover surface={`sidebar-${id}`} selector="[data-sidebar-page-row]"
+          className="bg-[hsl(var(--sheet-1-foreground)/0.06)]" />
+        {children}
+      </div>}
     </div>
   );
 }
@@ -86,6 +91,8 @@ export function SidebarPageRow({page}: {page: PageMeta}) {
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
+          data-sidebar-page-row
+          data-selected={selected || undefined}
           onClick={() => selectPageInPane(page.id, 'primary')}
           className={cn(
             'relative mx-1 flex cursor-pointer items-center rounded-md py-1 pl-2 pr-1.5 text-sm text-sheet-1-foreground transition-colors',

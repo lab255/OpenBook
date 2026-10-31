@@ -55,6 +55,8 @@ export default function FavoritesNav() {
             <ContextMenu key={page.id}>
               <ContextMenuTrigger asChild>
                 <div
+                  data-sidebar-page-row
+                  data-selected={selected || undefined}
                   onClick={() => selectPageInPane(page.id, 'primary')}
                   className={cn(
                     'group/fav relative mx-1 flex cursor-pointer items-center rounded-md py-1 pl-2 pr-1.5 text-sm text-sheet-1-foreground transition-colors',

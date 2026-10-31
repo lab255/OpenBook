@@ -4,11 +4,12 @@ import * as m from 'motion/react-m';
 import {spring} from '@/lib/springs-lane';
 
 /** One persistent object per surface; native focus/cmdk remain navigation owners. */
-export function FluidHover({surface, selector, selected}: {
-  surface: string; selector: string; selected?: string;
+export function FluidHover({surface, selector, selected, className = "bg-hover"}: {
+  surface: string; selector: string; selected?: string; className?: string;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
+  const [radius, setRadius] = React.useState<string>();
   const [rect, setRect] = React.useState<{x: number; y: number; width: number; height: number} | null>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -32,6 +33,7 @@ export function FluidHover({surface, selector, selected}: {
     let target: HTMLElement | null = null;
     const measure = () => {
       if (!target?.isConnected || !parent.contains(target)) { setRect(null); return; }
+      setRadius(getComputedStyle(target).borderRadius);
       const r = target.getBoundingClientRect();
       const p = parent.getBoundingClientRect();
       // Popup entry scales an ancestor. Convert viewport rects back into
@@ -87,8 +89,8 @@ export function FluidHover({surface, selector, selected}: {
   // Bare m.* cannot drive MotionValues without LazyContext.renderer. The app
   // has no global provider; this non-strict leaf provider supplies the renderer
   // without changing the app's provider architecture or registry components.
-  return <LazyMotion features={domAnimation}><m.div ref={ref} aria-hidden data-fluid-hover={surface}
-    className="pointer-events-none absolute left-0 top-0 rounded-sm bg-hover"
-    style={{zIndex: -1, x, y, width, height, opacity: rect ? 1 : 0}}
+  return <LazyMotion features={domAnimation}><m.div ref={ref} aria-hidden data-fluid-hover={surface} data-fluid-hover-ready={rect ? '' : undefined}
+    className={`pointer-events-none absolute left-0 top-0 ${className}`}
+    style={{borderRadius: radius, zIndex: -1, x, y, width, height, opacity: rect ? 1 : 0}}
     initial={false} /></LazyMotion>;
 }
