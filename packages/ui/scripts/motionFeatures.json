@@ -1616,8 +1616,8 @@
       "kind": "chrome-size",
       "introducedAt": "FF-4b / 2026-10-31",
       "beforeRawBytes": 1932118,
-      "afterRawBytes": 1932600,
-      "rawCostBytes": 482,
+      "afterRawBytes": 1932781,
+      "rawCostBytes": 663,
       "measurement": "Same-checkout production build:viewer before (070ab4b4) and after FF-4b. Shared glide class and measured row radius plus chrome CSS integration; no newly emitted Motion modules.",
       "modules": []
     }

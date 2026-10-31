@@ -1,5 +1,6 @@
 import {expect, test} from './fixtures';
 import {SERVER} from './seed';
+import {SIDEBAR_HOVER} from '../../ui/src/lib/sidebarStyles';
 import type {Page} from '@playwright/test';
 
 test.use({freshWorkspace: true});
@@ -166,12 +167,26 @@ for (const mode of ['tinted', 'accent']) {
       // Exercise SIDEBAR_ACTIVE independently on a real row; selected-row is
       // the production navigation state below. This is an explicit state fixture.
       const original = await rows.nth(1).getAttribute('class');
-      await rows.nth(1).evaluate(el => { el.setAttribute('class', el.getAttribute('class')!.split(' ').filter(c => !c.startsWith('hover:bg-') && !c.startsWith('before:')).join(' ')); });
+      await rows.nth(1).evaluate((el, fallback) => {
+        el.setAttribute('class', el.getAttribute('class')!.split(' ').filter(c => !c.startsWith('hover:bg-') && !c.startsWith('before:')).join(' ') + ' ' + fallback);
+        el.removeAttribute('data-selected');
+      }, SIDEBAR_HOVER);
+      const activeBase = await rows.nth(1).evaluate(el => getComputedStyle(el).backgroundColor);
       expect(await rows.nth(1).getAttribute('class'), 'active fixture must actually change production classes').not.toBe(original);
       await transit(page, 'sidebar-favorites', selector, false);
       await rows.nth(1).hover(); await page.waitForTimeout(500);
       const active = await paintedFill(page, `${selector}:nth-child(2)`, 'sidebar-favorites');
-      await rows.nth(1).evaluate((el, cls) => { el.setAttribute('class', cls!); }, original);
+      const assertActive = (fill: string) => expect(fill, 'active fill survives SIDEBAR_HOVER').toBe(activeBase);
+      assertActive(active.row);
+      const broken = await page.addStyleTag({content: '[data-sidebar-page-row].bg-sidebar-selection-wash:not([data-selected]):hover { background-color: transparent !important; }'});
+      await page.waitForTimeout(500);
+      const erased = await rows.nth(1).evaluate(el => getComputedStyle(el).backgroundColor);
+      expect(() => assertActive(erased)).toThrow('active fill survives SIDEBAR_HOVER');
+      await broken.evaluate(el => el.parentNode!.removeChild(el));
+      await page.waitForTimeout(500);
+      assertActive(await rows.nth(1).evaluate(el => getComputedStyle(el).backgroundColor));
+      console.log(`FF4B ACTIVE ${mode} dark=${dark}: erased active fill RED; restored production fill GREEN`);
+      await rows.nth(1).evaluate((el, cls) => { el.setAttribute('class', cls!); el.setAttribute('data-selected', 'true'); }, original);
       expect(await rows.nth(1).getAttribute('class'), 'selected fixture restored exactly').toBe(original);
       await transit(page, 'sidebar-favorites', selector, false);
       await rows.nth(1).hover(); await page.waitForTimeout(500);
