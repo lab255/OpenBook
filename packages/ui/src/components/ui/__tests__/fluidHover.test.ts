@@ -9,6 +9,7 @@ const pairs = {
   dropdown: source('../dropdown-menu.tsx').match(/data-\[state=checked\]:bg-([\w-]+)/)![1],
   select: source('../select.tsx').match(/current && "bg-([\w-]+)"/)![1],
   command: source('../command.tsx').match(/aria-\[current=page\]:bg-([\w-]+)/)![1],
+  settings: source('../../SettingsPanel.tsx').match(/tab === id \? 'hover:bg-([\w-]+)'/)![1],
   form: css.match(/--obe-chrome-active: var\(--([\w-]+)\)/)![1],
 };
 function assertPair(surface: string, active: string) {
@@ -33,6 +34,7 @@ function assertChrome(sidebarSource: string, glideSource: string, styles: string
   expect(sidebarSource, 'sidebar: static hover fallback retained').toContain('SIDEBAR_HOVER,');
   expect(sidebarSource, 'sidebar: sheet-relative hover').toContain('bg-[hsl(var(--sheet-1-foreground)/0.06)]');
   expect(glideSource, 'sidebar: glide behind persistent fills').toContain('zIndex: -1');
+  expect(styles, 'sidebar: unpositioned/static fallback survives').toContain(':has(> [data-fluid-hover-ready])');
   expect(styles, 'sidebar: active fill survives hover').toContain('[data-sidebar-page-row]:not(.bg-sidebar-selection-wash):hover');
 }
 describe('FF-4b pairwise chrome guards', () => {
@@ -54,4 +56,10 @@ describe('FF-4b pairwise chrome guards', () => {
       expect(sidebar).toContain('hover:bg-sidebar-selection-wash-strong');
     });
   }
+});
+
+it('settings chip retains a single token-timed hover target', () => {
+  const chip = source('../../SettingsPanel.tsx').split('function ProfileChip')[1].split('export default')[0];
+  expect(chip).toContain('duration-(--motion-fast) hover:bg-hover');
+  expect(chip).not.toContain('FluidHover');
 });
