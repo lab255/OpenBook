@@ -25,6 +25,7 @@ export function validateDisposition(entry: MotionDisposition): void {
   if (entry.exportSafe === 'viewer' && !entry.reason.includes('absent in legacy + PDF')) throw new Error(`${entry.name}: viewer absence must be explicit`);
 }
 export const motionDispositions = [
+  {name: 'chrome-fluid-hover', category: 'pointer', exportSafe: 'viewer', reason: 'Shared select/menu chrome uses the real hydrated Motion runtime; absent in legacy + PDF paths.', exportedObservable: 'In a hydrated export, opening a select and moving the pointer or keyboard focus between enabled options moves one background highlight between rows. The first highlight appears in place; reduced motion snaps subsequent moves.', tokens: ['spring.moderate']},
   {name: 'legacy-progress', category: 'state', exportSafe: 'css', reason: 'Legacy reactive progress retains its CSS tween.', exportedObservable: 'Changing a legacy progress value tweens the fill width.', tokens: ['motion-base', 'ease-out-soft']},
   {name: 'slide-entrance', category: 'load', exportSafe: 'css', reason: 'Slide decks use the legacy CSS tween lane.', exportedObservable: 'The current slide fades and moves into place.', tokens: ['motion-slow', 'ease-out-soft']},
   {name: 'block-pointer-feedback', category: 'pointer', exportSafe: 'viewer', reason: 'Existing block control, chart and link CSS feedback; absent in legacy + PDF paths.', exportedObservable: 'Hovering a hydrated block control changes its paint without moving adjacent content.', tokens: ['motion-fast', 'ease-out-soft']},

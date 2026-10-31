@@ -24,7 +24,7 @@ it('calibrates actual ordinary and eager/layout additions independently of own b
     const directory = `../web/e2e-viewer/generated/calibration-${mode}`;
     const graph = readGraph(`${directory}/motion-graph.json`);
     const bytes = readFileSync(`${directory}/openbook-viewer.js`).byteLength;
-    const block = graph.modules.find((module: {adopter: boolean}) => module.adopter);
+    const block = graph.modules.find((module: {adopter: boolean}) => module.adopter && module.id.includes('MotionBudget'));
     expect(block, 'calibration block must be recognized as an adopter').toBeTruthy();
     assertBlockOwnBytes(graph, ledger);
     if (mode === 'ordinary') assertFeatureLedger(graph, ledger);
@@ -57,3 +57,48 @@ it('records the tree-shaken eager-import gap after the policy change', () => {
   expect(bytes).toBe(readFileSync('src/export/vendor/openbook-viewer.js').byteLength);
   process.stdout.write(`TREE-SHAKEN GAP unchanged: unused eager import emitted no additional bytes (${bytes}); no feature-ledger failure, intentionally recorded\n`);
 }, 30000);
+
+// Build:viewer runs before this test in verify; inspect its real bundled chrome,
+// not a synthetic graph that omits shared select/dropdown/command dependencies.
+it('checks the complete emitted Motion closure transitively reachable from the viewer entry, including chrome', () => {
+  const byId = new Map<string, {id: string; imports: string[]; bytes: number; exports: string[]}>(productionGraph.modules.map((module: {id: string}) => [module.id, module]));
+  const reached = new Set<string>();
+  function visit(id: string) {
+    if (reached.has(id)) return;
+    reached.add(id);
+    byId.get(id)?.imports.forEach(visit);
+  }
+  visit('src/viewer/index.tsx');
+  expect(reached.has('src/components/ui/fluid-hover.tsx')).toBe(true);
+  for (const module of productionGraph.modules.filter((module: {id: string; bytes: number}) => module.bytes > 0 && /^(motion|framer-motion|motion-dom|motion-utils)\//.test(module.id))) {
+    expect(reached.has(module.id), module.id).toBe(true);
+    // Every emitted module is independently covered; deleting its authorization
+    // must fail even if it arrived through an arbitrary shared-chrome helper.
+    const missing = {...ledger, features: ledger.features.map(feature => ({...feature, modules: feature.modules.filter(row => row.id !== module.id)}))};
+    expect(() => assertFeatureLedger(productionGraph, missing), module.id).toThrow('Unledgered motion feature');
+  }
+  const fluid = productionGraph.modules.find((module: {id: string}) => module.id === 'src/components/ui/fluid-hover.tsx');
+  expect(fluid.adopter).toBe(false); // Chrome infrastructure, not a block.
+  assertFeatureLedger(productionGraph, ledger);
+  for (const name of ['useMotionValue', 'useReducedMotion', 'animate']) {
+    expect(() => assertFeatureLedger(productionGraph, {...ledger, features: ledger.features.filter(feature => feature.name !== name)})).toThrow('Unledgered motion feature');
+    process.stdout.write(`CHROME SEAM ${name}: removed row RED; measured production graph GREEN\n`);
+  }
+  expect(productionGraph.modules.filter((module: {id: string; bytes: number}) => module.bytes > 0 && module.id.includes('/render/components/motion/'))).toEqual([]);
+});
+
+it('keeps the ordered size ledger continuous from baseline to the measured production artifact', () => {
+  const measured = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
+  const assertChain = (rows: readonly {name: string; beforeRawBytes: number; afterRawBytes: number}[]) => {
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].beforeRawBytes, 'ledger chain: baseline').toBe(ledger.preAdoptionRawBytes);
+    for (let i = 0; i < rows.length - 1; i++) {
+      expect(rows[i].afterRawBytes, `ledger chain: ${rows[i].name} -> ${rows[i + 1].name}`).toBe(rows[i + 1].beforeRawBytes);
+    }
+    expect(rows.at(-1)!.afterRawBytes, 'ledger chain: measured production artifact').toBe(measured);
+  };
+  const broken = ledger.features.map(row => row.name === 'fluidHover' ? {...row, afterRawBytes: row.afterRawBytes + 1} : row);
+  expect(() => assertChain(broken)).toThrow('ledger chain: fluidHover -> useMotionValue');
+  assertChain(ledger.features);
+  process.stdout.write(`LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline ${ledger.preAdoptionRawBytes} -> all adjacent rows -> measured ${measured} GREEN\n`);
+});

@@ -1434,6 +1434,182 @@
           ]
         }
       ]
+    },
+    {
+      "name": "fluidHover",
+      "kind": "chrome-size",
+      "introducedAt": "FF-4 / 877bc455 / 2026-10-29",
+      "beforeRawBytes": 1922068,
+      "afterRawBytes": 1925111,
+      "rawCostBytes": 3043,
+      "measurement": "CHROME SIZE, not feature authorization: measured at the FF-4/FF-6 seam because FF-4 shipped this integration unledgered. Reverting FF-4 call sites/CSS with the overlay omitted reproduces 1,922,068; restored integration with overlay omitted is 1,922,901 (+833); ff46-shell with the corrected local lazy renderer is 1,925,111 (+2,210). Includes surrounding chrome integration and overlay shell, not only fluid-hover.tsx; excludes the separately measured standalone API features.",
+      "modules": []
+    },
+    {
+      "name": "useMotionValue",
+      "introducedAt": "FF-4/FF-6 merge seam / 2026-10-29",
+      "measurement": "Ordered integration: ff46-shell \u2192 ff46-values \u2192 ff46-reduced \u2192 ff46-final; test-only API removal controls, whole-IIFE raw bytes including minification interactions.",
+      "beforeRawBytes": 1925111,
+      "afterRawBytes": 1925189,
+      "rawCostBytes": 78,
+      "modules": [
+        {
+          "id": "framer-motion/dist/es/value/use-motion-value.mjs",
+          "exports": [
+            "useMotionValue"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "useReducedMotion",
+      "introducedAt": "FF-4/FF-6 merge seam / 2026-10-29",
+      "measurement": "Ordered integration: ff46-shell \u2192 ff46-values \u2192 ff46-reduced \u2192 ff46-final; test-only API removal controls, whole-IIFE raw bytes including minification interactions.",
+      "beforeRawBytes": 1925189,
+      "afterRawBytes": 1925275,
+      "rawCostBytes": 86,
+      "modules": [
+        {
+          "id": "framer-motion/dist/es/utils/reduced-motion/use-reduced-motion.mjs",
+          "exports": [
+            "useReducedMotion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "animate",
+      "introducedAt": "FF-4/FF-6 merge seam / 2026-10-29",
+      "measurement": "Ordered integration: ff46-shell \u2192 ff46-values \u2192 ff46-reduced \u2192 ff46-final; test-only API removal controls, whole-IIFE raw bytes including minification interactions.",
+      "beforeRawBytes": 1925275,
+      "afterRawBytes": 1932118,
+      "rawCostBytes": 6843,
+      "modules": [
+        {
+          "id": "framer-motion/dist/es/animation/animate/index.mjs",
+          "exports": [
+            "animate",
+            "createScopedAnimate"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/animate/resolve-subjects.mjs",
+          "exports": [
+            "resolveSubjects"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/animate/sequence.mjs",
+          "exports": [
+            "animateSequence"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/animate/subject.mjs",
+          "exports": [
+            "animateSubject"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/sequence/create.mjs",
+          "exports": [
+            "createAnimationsFromSequence",
+            "getValueTransition"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/sequence/utils/calc-repeat-duration.mjs",
+          "exports": [
+            "calculateRepeatDuration"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/sequence/utils/calc-time.mjs",
+          "exports": [
+            "calcNextTime"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/sequence/utils/edit.mjs",
+          "exports": [
+            "addKeyframes",
+            "eraseKeyframes"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/sequence/utils/normalize-times.mjs",
+          "exports": [
+            "normalizeTimes"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/sequence/utils/sort.mjs",
+          "exports": [
+            "compareByTime"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/utils/create-visual-element.mjs",
+          "exports": [
+            "createDOMVisualElement",
+            "createObjectVisualElement"
+          ]
+        },
+        {
+          "id": "framer-motion/dist/es/animation/utils/is-dom-keyframes.mjs",
+          "exports": [
+            "isDOMKeyframes"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/animate/single-value.mjs",
+          "exports": [
+            "animateSingleValue"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/GroupAnimation.mjs",
+          "exports": [
+            "GroupAnimation"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/animation/GroupAnimationWithThen.mjs",
+          "exports": [
+            "GroupAnimationWithThen"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/render/object/ObjectVisualElement.mjs",
+          "exports": [
+            "ObjectVisualElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/is-svg-element.mjs",
+          "exports": [
+            "isSVGElement"
+          ]
+        },
+        {
+          "id": "motion-dom/dist/es/utils/is-svg-svg-element.mjs",
+          "exports": [
+            "isSVGSVGElement"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/easing/utils/get-easing-for-segment.mjs",
+          "exports": [
+            "getEasingForSegment"
+          ]
+        },
+        {
+          "id": "motion-utils/dist/es/wrap.mjs",
+          "exports": [
+            "wrap"
+          ]
+        }
+      ]
     }
   ],
   "sharedModules": [

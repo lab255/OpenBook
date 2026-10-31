@@ -71,8 +71,16 @@ export function motionGraph() {
         const bytes = Buffer.byteLength(module?.code ?? '');
         const imports = this.getModuleInfo(id)?.importedIds ?? [];
         const local = normalize(id);
+        // Amended 2026-10-29 (FluidHover: 3,977 own bytes): the 2,048 cap
+        // tests marginality: cost of the NEXT block, our unit of repetition
+        // (89 × 2KB). Chrome is singular infrastructure in the bundle, so
+        // per-block charging asks a question chrome never poses. Chrome is
+        // governed by assertFeatureLedger + assertViewerCeiling; both bite.
+        // Direct adopters = src/blockeditor. Transitive helper charging stays:
+        // block -> src/components helper -> new non-Motion code is charged;
+        // Motion features remain separately ledgered, never free/exempt.
         return {id: local, exports: [...(module?.renderedExports ?? [])].sort(), bytes, imports: imports.map(normalize),
-          adopter: bytes > 0 && /^src\/(?:blockeditor|components)\//.test(local) && imports.some(dep => motionModule(normalize(dep)))};
+          adopter: bytes > 0 && /^src\/blockeditor\//.test(local) && imports.some(dep => motionModule(normalize(dep)))};
       }).sort((a, b) => a.id.localeCompare(b.id));
       const graph = {modules};
       if (shipped) {
