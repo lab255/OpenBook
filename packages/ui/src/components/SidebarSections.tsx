@@ -61,7 +61,7 @@ export function SidebarSection({id, label, children}: {id: string; label: string
         aria-expanded={open}
         className="group/section flex w-full cursor-pointer items-center gap-1 px-3 pb-1 pt-1 text-left"
       >
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground-strong">
+        <span className="text-xs font-semibold text-muted-foreground-strong">
           {label}
         </span>
         <ChevronRight

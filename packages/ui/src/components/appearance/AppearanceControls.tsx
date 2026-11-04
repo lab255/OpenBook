@@ -76,7 +76,7 @@ export function AccentPicker({
         if (group_themes.length === 0) return null;
         return (
           <div key={group} className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+            <span className="text-xs font-medium text-muted-foreground">
               {t(GROUP_LABEL[group])}
             </span>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

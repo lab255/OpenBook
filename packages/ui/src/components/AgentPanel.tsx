@@ -462,7 +462,7 @@ export function AgentPanel() {
                       name, with an "external" badge so its provenance is obvious. */}
                   {item.name.startsWith('mcp__') ? (
                     <span className="flex min-w-0 items-center gap-1.5 truncate">
-                      <span className={cn('rounded-sm px-1 py-px text-[10px] font-medium uppercase tracking-wide', DATA_CHIP_CLASS.yellow)} data-agent-tool-external>
+                      <span className={cn('rounded-sm px-1 py-px text-[10px] font-medium', DATA_CHIP_CLASS.yellow)} data-agent-tool-external>
                         {t('agent.externalBadge')}
                       </span>
                       <span className="truncate">
@@ -677,7 +677,7 @@ export function AgentPanel() {
               </PopoverTrigger>
               <PopoverContent align="start" side="top" className="w-64 p-2 text-sm">
                 <div className="flex flex-col gap-0.5" data-agent-provider aria-label={t('agent.provider')}>
-                  <p className="px-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('agent.provider')}</p>
+                  <p className="px-1 pb-0.5 text-[10px] font-medium text-muted-foreground">{t('agent.provider')}</p>
                   {providerOptions.map((p) => (
                     <button
                       key={p}
@@ -695,7 +695,7 @@ export function AgentPanel() {
                 </div>
                 {presets && presets.length > 0 && (
                   <div className="mt-2 flex flex-col gap-0.5">
-                    <p className="px-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('agent.model')}</p>
+                    <p className="px-1 pb-0.5 text-[10px] font-medium text-muted-foreground">{t('agent.model')}</p>
                     {presets.map((m) => (
                       <button
                         key={m.value}
@@ -713,7 +713,7 @@ export function AgentPanel() {
                   </div>
                 )}
                 <div className="mt-2 flex flex-col gap-1">
-                  <p className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="px-1 text-[10px] font-medium text-muted-foreground">
                     {presets ? t('agent.modelCustom') : t('agent.model')}
                   </p>
                   <Input
@@ -727,7 +727,7 @@ export function AgentPanel() {
                   />
                 </div>
                 <div className="mt-2 flex flex-col gap-1">
-                  <p className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('ai.effort')}</p>
+                  <p className="px-1 text-[10px] font-medium text-muted-foreground">{t('ai.effort')}</p>
                   <div className="flex gap-1" data-agent-effort aria-label={t('ai.effort')}>
                     {EFFORTS.map((e) => (
                       <button

@@ -1351,7 +1351,7 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
     <Popover>
       <PopoverTrigger asChild>
         <button className="min-w-[110px] rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-foreground/25">
-          <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground" title={metricLabel(metric, properties)}>
+          <div className="truncate text-[10px] font-medium text-muted-foreground" title={metricLabel(metric, properties)}>
             {metricLabel(metric, properties)}
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -1540,7 +1540,7 @@ export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit:
     <div className="mb-2 flex flex-wrap items-center gap-1.5">
       {leaves.map((f, i) => (
         <React.Fragment key={f.id}>
-          {i > 0 && <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">{root.conjunction}</span>}
+          {i > 0 && <span className="text-xs font-semibold text-muted-foreground">{root.conjunction === 'and' ? 'And' : 'Or'}</span>}
           <ChipContextMenu onEdit={onEdit} onRemove={() => removeLeaf(f.id)}>
             <span className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-2 pr-1 text-xs">
               <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
