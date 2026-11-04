@@ -273,7 +273,7 @@ export function LinksPaneBody() {
           <section className="mb-4 flex flex-col gap-1.5" aria-labelledby="links-backlinks-heading">
             <h3
               id="links-backlinks-heading"
-              className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+              className="px-0.5 text-[11px] font-medium text-muted-foreground"
             >
               {t('links.backlinks')}
               {backlinks.length > 0 && ` · ${backlinks.length}`}
@@ -312,7 +312,7 @@ export function LinksPaneBody() {
           <section className="flex flex-col gap-1.5" aria-labelledby="links-mentions-heading">
             <h3
               id="links-mentions-heading"
-              className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+              className="px-0.5 text-[11px] font-medium text-muted-foreground"
             >
               {t('links.unlinkedMentions')}
               {mentions.length > 0 && ` · ${mentions.length}`}

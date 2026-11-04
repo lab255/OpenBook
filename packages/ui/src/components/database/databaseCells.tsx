@@ -70,8 +70,8 @@ export function useIdentity(): string {
 /** A person value rendered as an avatar chip. */
 export const PersonChip: React.FC<{name: string}> = ({name}) => (
   <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-muted px-2 py-0.5 text-xs">
-    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[9px] font-semibold uppercase text-brand">
-      {name.slice(0, 1) || '?'}
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-[9px] font-semibold text-brand">
+      {name.slice(0, 1).toUpperCase() || '?'}
     </span>
     <span className="truncate">{name}</span>
   </span>
