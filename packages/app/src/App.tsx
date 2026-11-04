@@ -32,6 +32,7 @@ import {createDesktopUpdates} from './data/updates';
 import {SidecarDegradedBanner, useSidecarStatus} from './SidecarStatus';
 
 import '@book.dev/ui/style.css';
+import '@book.dev/ui/app-font.css';
 
 // Tabs are in-window (a custom tab bar drawn in the titlebar by the UI), so a
 // "new tab" never opens an OS window — only "new window" does.
