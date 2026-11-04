@@ -1,0 +1,17 @@
+import type {PlaywrightTestConfig} from '@playwright/test';
+
+/**
+ * Multi-process Chromium cannot bootstrap its Mach-port rendezvous under the
+ * macOS sandbox. SINGLE_PROCESS=1 is for agent/reviewer runs, not CI: it loses
+ * parallel workers. Use --workers=1 --retries=0 and one test per --grep invocation
+ * because closing a context can terminate the single-process browser.
+ * Playwright creates its browser profile under TMPDIR; set that to a writable
+ * directory if the sandbox's default temporary directory is not writable.
+ */
+export function singleProcessConfig(): PlaywrightTestConfig {
+  return process.env.SINGLE_PROCESS === '1' ? {
+    workers: 1,
+    retries: 0,
+    use: {launchOptions: {args: ['--single-process', '--no-zygote']}},
+  } : {};
+}

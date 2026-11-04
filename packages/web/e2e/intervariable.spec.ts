@@ -6,10 +6,8 @@ import {test, expect} from './fixtures';
 // Run against the same app before/after the font entry is enabled.
 // This measures the font capability separately from production state motion.
 test.skip(process.env.CARD8_EVIDENCE !== '1', 'Opt-in font evidence: CARD8_EVIDENCE=1');
-// CARD8_SINGLE_PROCESS: sandboxed reviewer environments deny Chromium's
-// multi-process Mach-port rendezvous; single-process mode survives there but
-// only one test per invocation (drive each test via --grep).
-if (process.env.CARD8_SINGLE_PROCESS) test.use({launchOptions: {args: ['--single-process', '--no-zygote']}});
+// Sandboxed captures use SINGLE_PROCESS=1 via playwright.config.ts (one --grep
+// test per invocation); launch settings are shared with the viewer motion suite.
 
 type Shifts = {fontShifts: {value: number; hadRecentInput: boolean; t: number}[]};
 
