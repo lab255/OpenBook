@@ -360,7 +360,7 @@ const TreeRow = React.forwardRef<HTMLDivElement, TreeRowProps & React.HTMLAttrib
           >
             <ChevronRight
               className={cn(
-                "h-4 w-4 shrink-0 text-accent-foreground/75 transition-transform duration-200",
+                "h-4 w-4 shrink-0 text-accent-foreground/75 transition-transform duration-(--motion-base)",
                 isExpanded && "rotate-90",
               )}
             />

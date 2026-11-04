@@ -52,13 +52,14 @@ const req = (app: ReturnType<typeof createApp>, method: string, path: string, bo
   });
 
 describe('LGR-3 — generic mutation routes answer 403 managed on ledger rows', () => {
+  let store: PageStore;
   let app: ReturnType<typeof createApp>;
   let dbs: Record<string, string>;
   let postedId: string;
   let postingId: string;
 
   beforeEach(async () => {
-    ({app} = await freshApp());
+    ({app, store} = await freshApp());
     const init = await req(app, 'POST', API.ledger);
     // Always 200 — a 201-vs-200 split would leak whether books already existed.
     expect(init.status).toBe(200);
@@ -95,6 +96,9 @@ describe('LGR-3 — generic mutation routes answer 403 managed on ledger rows', 
   });
 
   it('page routes (PUT/PATCH/DELETE/properties) on a ledger row → 403 managed', async () => {
+    const before = await store.getPage(postedId);
+    await expectManaged(await req(app, 'POST', `${API.page(postedId)}/updates/apply`, {update: 'AAA='}));
+    expect(await store.getPage(postedId)).toEqual(before);
     await expectManaged(await req(app, 'PUT', API.page(postedId), {name: 'clobbered', data: {editorjs: {blocks: []}, values: [], names: []}}));
     await expectManaged(await req(app, 'PATCH', API.page(postedId), {name: 'renamed'}));
     await expectManaged(await req(app, 'PATCH', API.pageProperties(postedId), {properties: {lp_state: 'draft'}}));

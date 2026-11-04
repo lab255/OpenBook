@@ -1,3 +1,4 @@
+import {FluidHover} from "./fluid-hover"
 import * as React from "react"
 import { DialogProps } from "@radix-ui/react-dialog"
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons"
@@ -72,12 +73,12 @@ CommandInput.displayName = CommandPrimitive.Input.displayName
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn("relative isolate max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
     {...props}
-  />
+  ><FluidHover surface="command" selector="[cmdk-item]" selected='[cmdk-item][aria-selected="true"]' />{children}</CommandPrimitive.List>
 ))
 
 CommandList.displayName = CommandPrimitive.List.displayName
@@ -161,7 +162,7 @@ const CommandItem = React.forwardRef<
         // data-[disabled=true] (not bare data-disabled): cmdk ≥1.0 sets
         // data-disabled="false" on ENABLED items, and the presence-matching
         // variant greyed out + pointer-disabled every row.
-        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden aria-selected:bg-hover aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none",
+        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden aria-[current=page]:bg-hover-strong aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none",
         className
       )}
     />

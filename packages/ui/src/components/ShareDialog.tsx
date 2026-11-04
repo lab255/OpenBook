@@ -1161,7 +1161,7 @@ export function ShareDialogHost() {
       return;
     }
     if (retainedTarget === null) return;
-    // Keep Radix mounted through dialog.tsx's duration-200 exit animation; its
+    // Keep Radix mounted through dialog.tsx's 120ms teardown delay (DIALOG_EXIT_MS); its
     // presence/focus scope can then restore focus before the retained page clears.
     const timeout = window.setTimeout(() => setRetainedTarget(null), DIALOG_EXIT_MS);
     return () => window.clearTimeout(timeout);

@@ -1,3 +1,4 @@
+import {FluidHover} from '@/components/ui/fluid-hover';
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {
   defaultDatabaseSchema,
@@ -508,7 +509,8 @@ export const FormEditView: React.FC<{
           <strong>{t('formBlock.builder.palette')}</strong>
           <span>{t('formBlock.builder.paletteHint')}</span>
         </div>
-        <div className="obe-form-palette-grid">
+        <div className="obe-form-palette-grid relative isolate">
+          <FluidHover surface="form" selector="[data-form-palette-kind]" />
           {FORM_FIELD_KINDS.map((kind) => (
             <button
               key={kind}
@@ -516,6 +518,7 @@ export const FormEditView: React.FC<{
               draggable
               className="obe-form-palette-item"
               data-form-palette-kind={kind}
+              data-active={drag?.kind === 'palette' && drag.fieldKind === kind || undefined}
               aria-label={t('formBlock.builder.addField', {kind: fieldLabel(kind)})}
               onDragStart={(event) => {
                 event.dataTransfer?.setData('text/plain', kind);

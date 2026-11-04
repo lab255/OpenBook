@@ -30,7 +30,7 @@ export function Kbd({combo, className}: {combo: ShortcutCombo; className?: strin
     <kbd
       aria-hidden="true"
       className={cn(
-        'pointer-events-none inline-flex h-5 select-none items-center justify-center rounded border border-border/70 bg-muted px-1.5 font-sans text-[11px] font-medium leading-none text-muted-foreground transition-opacity duration-150',
+        'pointer-events-none inline-flex h-5 select-none items-center justify-center rounded border border-border/70 bg-muted px-1.5 font-sans text-[11px] font-medium leading-none text-muted-foreground transition-opacity duration-(--motion-fast)',
         held ? 'opacity-100' : 'opacity-0',
         className,
       )}

@@ -20,6 +20,9 @@ function harness(audioChunks: MeetingAudio[], readOnly = false, pageReadOnly = f
   render(<ConfirmProvider><MeetingBlockView block={block} editor={{doc, readOnly} as BlockEditorController} pageReadOnly={pageReadOnly} /></ConfirmProvider>);
   return doc;
 }
+function openMenu() {
+  fireEvent.keyDown(screen.getByRole('button', {name: t('meetingBlock.manage')}), {key: 'ArrowDown'});
+}
 beforeEach(() => {
   vi.clearAllMocks();
   getAsset.mockResolvedValue({bytes: new Uint8Array([1, 2]), mime: 'audio/webm;codecs=opus'});
@@ -28,14 +31,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); setAssetBridge(null); setLocale('en'); });
 
 describe('MEET-7 audio export', () => {
-  it('hides the affordance without chunks', () => {
+  it('disables the affordance without chunks', () => {
     harness([]);
-    expect(screen.queryByRole('button', {name: 'Export audio'})).toBeNull();
+    openMenu();
+    expect(screen.getByRole('menuitem', {name: 'Export audio'}).getAttribute('aria-disabled')).toBe('true');
+    cleanup();
+    harness([], true);
+    expect(screen.queryByRole('button', {name: 'Meeting actions'})).toBeNull();
+    expect(document.querySelector('.obe-meeting-management')).toBeNull();
   });
   it.each([[false, false], [true, false], [false, true]])('downloads a single original file, including viewer modes (%s, %s)', async (readOnly, pageReadOnly) => {
     const doc = harness([chunks[0]], readOnly, pageReadOnly);
     const before = docToJSON(doc);
-    await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Export audio'})));
+    openMenu();
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', {name: 'Export audio'})));
     expect(downloadBlob).toHaveBeenCalledWith('Team - sync-00h00m00s.webm', expect.any(Blob));
     const blob = vi.mocked(downloadBlob).mock.calls[0][1];
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(new Uint8Array([1, 2]));
@@ -62,16 +71,19 @@ describe('MEET-7 audio export', () => {
   });
   it.each(['denied', 'missing'])('surfaces %s assets without partial downloads and permits retry', async (failure) => {
     harness(chunks, true);
+    openMenu();
     if (failure === 'denied') getAsset.mockRejectedValue(new Error('403 Forbidden'));
     else setAssetBridge({getAsset: async () => null, putAsset: vi.fn()});
-    await act(async () => fireEvent.click(screen.getByRole('button', {name: 'Export audio'})));
+    await act(async () => fireEvent.click(screen.getByRole('menuitem', {name: 'Export audio'})));
     expect(screen.getByRole('alert').textContent).toBe(t('meetingBlock.exportAudioFailed'));
     expect(downloadBlob).not.toHaveBeenCalled();
-    expect((screen.getByRole('button', {name: 'Export audio'}) as HTMLButtonElement).disabled).toBe(false);
+    openMenu();
+    expect(screen.getByRole('menuitem', {name: 'Export audio'}).getAttribute('aria-disabled')).not.toBe('true');
   });
   it.each(['en', 'de', 'ja', 'zh'] as const)('has a translated accessible label and error in %s', (locale) => {
     setLocale(locale); harness(chunks, true);
-    expect(screen.getByRole('button', {name: t('meetingBlock.exportAudio')})).toBeTruthy();
+    openMenu();
+    expect(screen.getByRole('menuitem', {name: t('meetingBlock.exportAudio')})).toBeTruthy();
     expect(t('meetingBlock.exportAudioFailed')).not.toContain('meetingBlock.');
     if (locale !== 'en') expect(t('meetingBlock.exportAudio')).not.toBe('Export audio');
   });

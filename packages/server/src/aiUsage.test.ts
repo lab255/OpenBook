@@ -527,6 +527,9 @@ describe('the managed usage DB is locked against the generic page routes', () =>
     const hostId = usage.hostPage!;
     const app = appWith({ai: new AiService(db, join(dir, 'models')), aiUsage: usage});
     const owner = await idFor('owner');
+    const before = await store.getPage(hostId);
+    expect((await post(app, `/api/pages/${hostId}/updates/apply`, {update: 'AAA='}, owner)).status).toBe(403);
+    expect(await store.getPage(hostId)).toEqual(before);
 
     // owner: every mutation on a managed page (a row or the host) is a managed 403.
     expect((await del(app, `/api/pages/${rowId}`, owner)).status).toBe(403); // delete an attribution row

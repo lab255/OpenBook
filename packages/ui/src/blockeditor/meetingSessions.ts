@@ -1,10 +1,11 @@
 import * as Y from 'yjs';
 import type {DataClient, AiTranscriptionResult} from '@book.dev/sdk';
+import {saveStoredPageUpdate} from '@/lib/storedPageUpdate';
 import {assetBridge} from '@/lib/assetBridge';
 import {openDoc} from '@/lib/openDocs';
 import {getBlockEditorDoc, getPageIdForDoc} from '@/lib/aiBridge';
 import {t} from '@/i18n';
-import {blockId, decodeSnapshot, encodeSnapshot, findBlock, blockProp, setBlockProp, type BlockDocSnapshot, type BlockMap} from './model';
+import {blockId, findBlock, blockProp, setBlockProp, type BlockMap} from './model';
 import type {BlockEditorController} from './useBlockEditor';
 
 export interface MeetingAudio {assetId: string; durationMs: number; startedAtMs?: number}
@@ -36,7 +37,7 @@ export function transcriptionError(error: unknown): string {
   return t('meetingBlock.transcriptionFailed');
 }
 
-type SessionClient = Pick<DataClient, 'getPage' | 'savePage'>;
+type SessionClient = Pick<DataClient, 'getPage' | 'savePage' | 'applyPageUpdate'>;
 let client: SessionClient | null = null;
 export function setMeetingSessionClient(next: SessionClient | null): void { client = next; }
 const writes = new Map<string, Promise<void>>();
@@ -156,22 +157,22 @@ export class MeetingRecorder {
       if (current) { this.mutate(current, props); return; }
       const store = this.store;
       if (!store) throw new Error('Meeting page store unavailable');
-      const page = await store.getPage(this.pageId);
-      this.assertStore();
-      // Navigation may have mounted a fresh editor while getPage was pending.
-      const mounted = this.liveDoc();
-      if (mounted) { this.mutate(mounted, props); return; }
-      if (!page) throw new Error('Meeting page no longer exists');
-      const doc = decodeSnapshot(page.data.blockdoc as BlockDocSnapshot | undefined);
+      const appliedLive = Symbol('applied to reopened editor');
       try {
-        this.mutate(doc, props);
-        // Known limitation: off-page saves send full name/data; CRDT-delta writes are a follow-up.
-        this.assertStore();
-        await store.savePage({id: page.id, name: page.name, data: {...page.data, editor: 'blocks', blockdoc: encodeSnapshot(doc)}});
-        this.assertStore();
-        const reopened = this.liveDoc();
-        if (reopened) Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
-      } finally { doc.destroy(); }
+        const {doc, page} = await saveStoredPageUpdate(store, this.pageId, (doc) => {
+          // Navigation may mount an editor while the helper is reading the page.
+          const mounted = this.liveDoc();
+          if (mounted) { this.mutate(mounted, props); throw appliedLive; }
+          this.mutate(doc, props);
+        }, () => this.assertStore());
+        try {
+          this.assertStore();
+          const reopened = this.liveDoc();
+          if (reopened && (page.data.blockdoc as {update?: string} | undefined)?.update) {
+            Y.applyUpdate(reopened, Y.encodeStateAsUpdate(doc), 'local');
+          }
+        } finally { doc.destroy(); }
+      } catch (error) { if (error !== appliedLive) throw error; }
     };
     const pending = (writes.get(this.pageId) ?? Promise.resolve()).then(operation);
     const settled = pending.catch(() => {}).finally(() => {

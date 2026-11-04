@@ -29,7 +29,7 @@
     "test:e2e:web": "pnpm --filter @book.dev/web run test:e2e",
     "test:e2e:viewer": "pnpm --filter @book.dev/ui run build:viewer && pnpm --filter @book.dev/ui run gen:export-fixtures && pnpm --filter @book.dev/web run test:e2e:viewer",
     "check:gen": "pnpm --filter @book.dev/ui run check:gen",
-    "verify": "pnpm run test:eslint-rules && pnpm run build:libs && pnpm run check:gen && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run test:e2e",
+    "verify": "pnpm run test:eslint-rules && pnpm run build:libs && pnpm run check:gen && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run test:e2e && pnpm run test:e2e:motion",
     "chromatic": "pnpm --filter @book.dev/web run chromatic",
     "seed": "pnpm --filter @book.dev/server run seed",
     "clean": "rm -rf packages/sdk/dist packages/ui/dist packages/server/dist packages/server/assets packages/web/.next packages/app/dist packages/app/src-tauri/binaries/openbook-server-*",
@@ -40,7 +40,8 @@
     "watch-ui": "pnpm --filter @book.dev/ui run dev",
     "watch-ui-css": "pnpm --filter @book.dev/ui run dev-css",
     "watch-ui-types": "pnpm --filter @book.dev/ui run dev-types",
-    "watch-web": "pnpm --filter @book.dev/web run dev"
+    "watch-web": "pnpm --filter @book.dev/web run dev",
+    "test:e2e:motion": "node scripts/run-motion-e2e.mjs"
   },
   "author": "Eliot Lim",
   "license": "MIT",

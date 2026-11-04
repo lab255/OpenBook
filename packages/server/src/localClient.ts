@@ -313,6 +313,19 @@ export class LocalDataClient implements DataClient {
     return typeof update === 'string' && update.length > 0 ? Buffer.from(update, 'base64') : null;
   };
 
+  async applyPageUpdate(id: string, update: string, clientId: number): Promise<boolean> {
+    const bytes = Buffer.from(update, 'base64');
+    const page = await this.store.applyPageUpdate(id, bytes, localPrincipal());
+    if (page === 'stale') throw Object.assign(new Error('stale stored base'), {status: 409});
+    if (!page) throw Object.assign(new Error('page not found'), {status: 404});
+    this.hub.publishPage(page);
+    this.hub.publishPageUpdate(id, update, clientId);
+    void this.relay.ingest(id, bytes, this.loadRelayBase).catch(console.error);
+    await this.broadcastList();
+    if (page.databaseId) await this.broadcastRows(page.databaseId);
+    return true;
+  }
+
   postPageUpdate(id: string, update: string, clientId: number): Promise<void> {
     this.hub.publishPageUpdate(id, update, clientId);
     return this.relay.ingest(id, Buffer.from(update, 'base64'), this.loadRelayBase);

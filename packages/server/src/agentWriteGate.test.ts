@@ -132,6 +132,9 @@ describe('agent-PAT write gate — 403 under resolved suggest (AGED-2)', () => {
     const h = {...bearer(token), 'Content-Type': 'application/json'};
     const updates = await app().request(`/api/pages/${id}/updates`, {method: 'POST', headers: h, body: JSON.stringify({update: 'AA==', clientId: 1})});
     expect(updates.status).toBe(403);
+    const durable = await app().request(`/api/pages/${id}/updates/apply`, {method: 'POST', headers: h, body: JSON.stringify({update: 'AA==', clientId: 1})});
+    expect(durable.status).toBe(403);
+
     const rename = await app().request(`/api/pages/${id}`, {method: 'PATCH', headers: h, body: JSON.stringify({name: 'x'})});
     expect(rename.status).toBe(403);
     const props = await app().request(`/api/pages/${id}/properties`, {method: 'PATCH', headers: h, body: JSON.stringify({properties: {sys_icon: '📄'}})});

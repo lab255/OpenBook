@@ -1,4 +1,5 @@
 //vite.config.js
+import {motionBoundary} from "./scripts/motionBoundary.mjs";
 import { realpathSync } from "fs";
 import { resolve, isAbsolute } from "path";
 import { fileURLToPath, URL } from "url";
@@ -14,6 +15,7 @@ const isWatch = process.argv.includes("--watch");
 const quickJSPackageRoot = realpathSync(resolve(__dirname, "node_modules/@jitl/quickjs-wasmfile-release-sync"));
 
 export default defineConfig ({
+  plugins: [motionBoundary("app")],
   define: {
     __OB_SAFE_EXPORT_VIEWER__: 'false',
   },

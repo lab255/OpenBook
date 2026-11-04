@@ -1,3 +1,4 @@
+import {ToastHost} from '@/components/ui/toast';
 import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import React, {useEffect, useMemo, useState} from 'react';
 import {PresentBlocks} from '@/blockeditor/PresentBlocks';
@@ -135,6 +136,7 @@ export const ViewerApp: React.FC<{
     // The concrete-hex chart/map surfaces (kit charts) resolve the scheme the
     // export baked in, matching the CSS-var surfaces applyDataColors set (OB-379).
     <ConfirmProvider>
+      <ToastHost />
       <DataSchemeProvider value={readGlobalDataScheme()}>
         {/* Static renders the host document carried for blocks this bundle has no
         renderer for (ledger report tables, LX-5) — replanted rather than
