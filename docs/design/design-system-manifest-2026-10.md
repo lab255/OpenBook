@@ -42,6 +42,16 @@ token-only boundary and the conservative guard pending FF-6.
 
 ## 1. Type scale
 
+2026-11-04 — **superseded-by-owner-ruling (FF-5 / rulings 5 and 8):**
+app typography now resolves InterVariable 4.1 first, with weight 100–900 and
+optical size 14–32. The §1.2 rationale about static system fonts is retained
+below as historical context; cross-platform app weight rendering now comes
+from the self-hosted variable face. Sizes, weights, colours and spacing remain
+unchanged. The app-only `@book.dev/ui/app-font.css` entry preserves the shared
+stylesheet and standalone export viewer byte-for-byte: exported typography
+remains on its existing stack until the FF-6 mirror adopts it. Production
+state-weight animation is a separate card; loading this face does not add it.
+
 ### 1.1 Tokens (declared in `:root`, editor section)
 
 Sizes are multiples of one root variable, so a scaling context (presentation mode,
