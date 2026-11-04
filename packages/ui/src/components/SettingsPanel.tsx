@@ -249,7 +249,7 @@ export default function SettingsPanel({tab, onTabChange, mode, onModeChange, onC
         ) : (
           SETTINGS_SECTIONS.map((section) => (
             <div key={section.id} className="flex flex-col gap-0.5">
-              <span className="px-2 pb-0.5 pt-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="px-2 pb-0.5 pt-3 text-xs font-medium text-muted-foreground">
                 {t(SECTION_LABEL[section.id])}
               </span>
               {section.tabs

@@ -243,7 +243,7 @@ export default function AiUsageSettings() {
             if (modelIds.length === 0) return null;
             return (
               <div key={provider} className="flex flex-col gap-1.5">
-                <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h5 className="text-xs font-semibold text-muted-foreground">
                   {t(`ai.providerShort.${provider}` as Parameters<typeof t>[0])}
                 </h5>
                 <div className="flex flex-col gap-1 rounded-md border border-border p-2">

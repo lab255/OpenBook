@@ -594,7 +594,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
       </PopoverTrigger>
       <PopoverContent align="start" className="w-48 space-y-2 p-2.5">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">Property</span>
+          <span className="text-xs font-semibold text-muted-foreground">Property</span>
           <Select inputSize="sm" aria-label="Summary property" value={summary.propertyId} onChange={(e) => update({propertyId: e.target.value})} className={cn(fieldClass, 'mt-1')}>
             <option value={TITLE_PROPERTY_ID}>Rows (count)</option>
             {properties.map((p) => (
@@ -605,7 +605,7 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
           </Select>
         </label>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">Calculate</span>
+          <span className="text-xs font-semibold text-muted-foreground">Calculate</span>
           <Select inputSize="sm" aria-label="Summary calculation" value={summary.type} onChange={(e) => update({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1')}>
             {BOARD_CALCS.map((c) => (
               <option key={c.value} value={c.value}>

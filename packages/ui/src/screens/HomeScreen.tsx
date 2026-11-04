@@ -64,7 +64,7 @@ function PageTile({page, onOpen}: {page: PageMeta; onOpen: (id: string) => void}
 
 function WidgetHeading({icon: Icon, children}: {icon: typeof Clock; children: string}) {
   return (
-    <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+    <h2 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
       <Icon className="h-3.5 w-3.5" />
       {children}
     </h2>

@@ -106,7 +106,7 @@ export function SettingsSection({
     >
       {title &&
         (subdued ? (
-          <h5 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h5>
+          <h5 className="text-xs font-medium text-muted-foreground">{title}</h5>
         ) : (
           <h4 className="text-sm font-semibold">{title}</h4>
         ))}
