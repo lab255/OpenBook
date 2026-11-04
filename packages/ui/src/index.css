@@ -1285,6 +1285,9 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-size: var(--obe-small-size);
   line-height: var(--obe-small-leading);
 }
+/* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
+   0.04em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
+   App labels now use authored sentence case and weight for legibility. */
 .obe-notes-tag {
   display: inline-flex;
   align-items: center;
@@ -1293,9 +1296,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-size: var(--obe-caption-size);
   line-height: var(--obe-caption-leading);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: hsl(var(--primary) / 0.8);
+  color: hsl(var(--muted-foreground));
   user-select: none;
 }
 
@@ -1858,12 +1859,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 
 /* Presenter console pieces. */
 .ob-present-timer { text-align: center; font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
+   0.05em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
+   App labels now use authored sentence case and weight for legibility. */
 .ob-present-aside h2 {
   margin: 0 0 0.5rem;
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: hsl(var(--muted-foreground));
 }
 .ob-present-next-frame {
@@ -2195,18 +2197,21 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   text-align: center;
 }
 /* Category headers between groups of slash commands. */
+/* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
+   0.04em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
+   App labels now use authored sentence case and weight for legibility. */
 .obe-slash-group {
   padding: 0.5rem 0.5rem 0.25rem;
   font-size: 0.68rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: hsl(var(--muted-foreground) / 0.7);
+  color: hsl(var(--muted-foreground));
   user-select: none;
 }
 .obe-slash-group:first-child { padding-top: 0.25rem; }
-/* The ":" picker's awaiting-a-query prompt: muted + sentence case, NOT the
-   uppercase category-header look of .obe-slash-group. */
+/* The ":" picker's awaiting-a-query prompt: muted + sentence case.
+   Original distinction: NOT the uppercase category-header look of .obe-slash-group.
+   2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): category headers
+   now also use sentence case; their weight preserves the hierarchy. */
 .obe-slash-empty {
   padding: 0.375rem 0.5rem;
   font-size: 0.85rem;
@@ -2423,12 +2428,13 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   /* Nested above the toolbar, but below the lightbox's reserved z-60 tier. */
   z-index: var(--z-index-nested-menu);
 }
+/* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
+   0.04em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
+   App labels now use authored sentence case and weight for legibility. */
 .obe-tb-colors-label {
   font-size: 0.65rem;
   color: hsl(var(--muted-foreground));
   margin: 0.25rem 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .obe-tb-colors-row { display: grid; grid-template-columns: repeat(10, 1.5rem); gap: 0.25rem; }
 .obe-tb-colors-row + .obe-tb-colors-label { margin-top: 0.5rem; }
@@ -2494,7 +2500,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-ui-header > .obe-ui-title { line-height: var(--height-control-md); }
 .obe-ui-header > .obe-ui-btn[data-variant='link'] { height: var(--height-control-md); }
 .obe-ui-muted, .obe-ui-fieldset legend, .obe-ui-table caption { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); color: hsl(var(--muted-foreground)); }
-.obe-ui-eyebrow, .obe-ui-table thead th, .obe-ui-table .obe-ui-section { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: hsl(var(--muted-foreground)); }
+/* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
+   0.04em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
+   App labels now use authored sentence case and weight for legibility. */
+.obe-ui-eyebrow, .obe-ui-table thead th, .obe-ui-table .obe-ui-section { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); font-weight: 500; color: hsl(var(--muted-foreground)); }
 .obe-ui-labelled { display: flex; flex-direction: column; gap: 0.25rem; }
 .obe-ui-field { height: var(--height-control-md); padding: 0 0.625rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--background)); color: inherit; font-size: var(--obe-small-size); font-variant-numeric: tabular-nums; min-width: 0; }
 .obe-ui-field[data-size='sm'] { height: var(--height-control-sm); }
@@ -3413,7 +3422,10 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-chart-funnel-label { font-size: 11px; font-weight: 600; text-anchor: middle; pointer-events: none; }
 
 /* KPI / number tile (DASH-5) — the MetricCard look rendered in SVG. */
-.obe-chart-kpi-caption { fill: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-anchor: middle; text-transform: uppercase; }
+/* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
+   0.06em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
+   App labels now use authored sentence case and weight for legibility. */
+.obe-chart-kpi-caption { fill: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 600; text-anchor: middle; }
 .obe-chart-kpi-value { fill: hsl(var(--foreground)); font-size: 60px; font-weight: var(--obe-heading-weight); text-anchor: middle; font-variant-numeric: tabular-nums; }
 .obe-chart-kpi-sub { fill: hsl(var(--muted-foreground)); font-size: 15px; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .obe-chart-kpi-track { fill: hsl(var(--muted)); }
