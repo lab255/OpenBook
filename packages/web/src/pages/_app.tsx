@@ -1,5 +1,6 @@
 import '@/styles/globals.css';
 import '@book.dev/ui/style.css';
+import '@book.dev/ui/app-font.css';
 import {MotionConfig} from 'motion/react';
 import type {AppProps} from 'next/app';
 import {useRouter} from 'next/router';
