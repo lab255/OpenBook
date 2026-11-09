@@ -35,8 +35,9 @@ export function assertLedgerEndpoint(graph, bytes, ledger) {
   }
   const historical = ledger.features.at(-1).afterRawBytes;
   const minimum = historical - ledger.endpoint.nonMotionShrinkageBytes;
-  if (bytes < minimum || bytes > historical) {
-    throw new Error(`ledger endpoint: production bytes ${bytes} outside non-motion window ${minimum}..${historical}`);
+  const maximum = historical + ledger.endpoint.nonMotionGrowthBytes;
+  if (bytes < minimum || bytes > maximum) {
+    throw new Error(`ledger endpoint: production bytes ${bytes} outside non-motion window ${minimum}..${maximum}`);
   }
 }
 

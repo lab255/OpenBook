@@ -23,20 +23,26 @@ CARD-13 endpoint amendment (2026-11-09, option b): the former exact assertion
 Motion graph accounting and a bounded non-motion window. Historical feature rows
 and their adjacency remain intact. Clean builds on Node 24.14.1 / pnpm 10.28.2
 measure 1,932,118 B at `38e5f30c` and 1,931,612 B with FF-7e
-(`070ab4b4..daf87bf9`) applied. Both have a 974,125 B graph sidecar, 3,215,446
+(`070ab4b4..daf87bf9`) applied. A third clean build, on the FF-7a control-ladder
+branch stacked on this amendment (`f444c560`), measured 1,932,218 B in CI —
++100 B from declaring the four control heights explicitly in the `.dark` block.
+Both have a 974,125 B graph sidecar, 3,215,446
 rendered module bytes, and 211,511 rendered Motion module bytes. Generated viewer
 JS and graph files were moved out before rebuilding; SDK artifacts were built
 first. The post-FF-7e measurement used a freshly installed archive with the
 `070ab4b4..38e5f30c` changes applied, leaving worker sources untouched.
 
-The ledger now requires exactly 211,511 Motion bytes and permits only 0–506 B
-of raw shrinkage from the historical endpoint: no raw growth allowance. This is
-the observed CSS/string reduction, not a new feature discount. Trade-off: two
-measurements must be maintained; further drift requires a new explicit decision.
-The aggregate byte sum does not identify features, so module/export coverage
-remains independently mandatory. Fixtures reject a missing `animate` row even
-inside the window, altered Motion bytes, and either window boundary crossed by
-one byte. The actual eager/layout fixture still rejects unledgered Motion and
+The ledger now requires exactly 211,511 Motion bytes and permits raw bytes in
+`[lastRow.afterRawBytes − 506, lastRow.afterRawBytes + 100]`: a two-sided window
+around the historical endpoint, sized from measured non-motion changes only
+(−506 B FF-7e CSS/string shrinkage, +100 B FF-7a explicit dark ladder
+declarations). This is not a new feature discount. Trade-off: the three
+measurements must be maintained; any drift beyond the window requires a new
+explicit decision rather than a silent edit. The aggregate byte sum does not
+identify features, so module/export coverage remains independently mandatory.
+Fixtures reject a missing `animate` row even inside the window, altered Motion
+bytes, and either window boundary crossed by one byte. The actual eager/layout
+fixture still rejects unledgered Motion and
 exceeds the marginal calibration limit; the separate own-code fixture still
 rejects a 2,049 B block dependency closure. Motion machinery itself is deliberately
 excluded from own-code charging, so a new Motion feature need not fail that
