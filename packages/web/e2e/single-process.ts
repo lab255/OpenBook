@@ -7,6 +7,10 @@ import type {PlaywrightTestConfig} from '@playwright/test';
  * because closing a context can terminate the single-process browser.
  * Playwright creates its browser profile under TMPDIR; set that to a writable
  * directory if the sandbox's default temporary directory is not writable.
+ * For a private Chromium copy, set PLAYWRIGHT_BROWSERS_PATH to a writable cache
+ * containing chromium_headless_shell-1223 copied from the host Playwright cache.
+ * Run e2e/run-single-process.mjs to apply the one-test-per-invocation constraint;
+ * both environment paths are inherited by discovery and every test invocation.
  */
 export function singleProcessConfig(): PlaywrightTestConfig {
   return process.env.SINGLE_PROCESS === '1' ? {

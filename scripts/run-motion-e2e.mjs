@@ -7,4 +7,8 @@ if (process.env.CI) {
   run(['--filter', '@book.dev/web', 'exec', 'playwright', 'install', '--with-deps', 'chromium']);
 }
 run(['--filter', '@book.dev/ui', 'exec', 'vitest', 'run', 'scripts/motionFixture.test.ts']);
-run(['--filter', '@book.dev/web', 'exec', 'playwright', 'test', '--config', 'playwright.viewer.config.ts', 'motion-infrastructure.spec.ts']);
+if (process.env.SINGLE_PROCESS === '1') {
+  run(['--filter', '@book.dev/web', 'exec', 'node', 'e2e/run-single-process.mjs', '--config', 'playwright.viewer.config.ts', 'motion-infrastructure.spec.ts']);
+} else {
+  run(['--filter', '@book.dev/web', 'exec', 'playwright', 'test', '--config', 'playwright.viewer.config.ts', 'motion-infrastructure.spec.ts']);
+}
