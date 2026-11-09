@@ -237,7 +237,7 @@ export default function SettingsPanel({tab, onTabChange, mode, onModeChange, onC
                     onClick={() => openResult(entry)}
                     className={cn(
                       'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors',
-                      i === activeIndex ? 'bg-secondary' : 'hover:bg-transparent',
+                      i === activeIndex ? 'bg-secondary' : 'hover:bg-hover',
                     )}
                   >
                     <span className="flex w-full items-center gap-2">

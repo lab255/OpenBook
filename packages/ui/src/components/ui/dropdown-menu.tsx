@@ -23,6 +23,8 @@ const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 
+// App-only ladder: the export viewer retains its existing row geometry (ruling 8).
+// Compact remains py-1/text-xs; comfortable keeps padding and uses a 16px line.
 const DropdownMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
@@ -35,7 +37,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
       ref={ref}
       className={cn(
         "flex cursor-pointer select-none items-center rounded-sm px-2 outline-hidden data-[state=open]:bg-hover-strong",
-        density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
+        density === "compact" ? "py-1 text-xs" : (__OB_SAFE_EXPORT_VIEWER__ ? "py-1.5 text-sm" : "min-h-control-sm py-1.5 text-sm leading-4"),
         inset && "pl-8",
         className
       )}
@@ -99,7 +101,9 @@ const DropdownMenuContent = React.forwardRef<
 })
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
-export const menuItemClass = "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors hover:bg-hover focus-visible:bg-hover"
+export const menuItemClass = __OB_SAFE_EXPORT_VIEWER__
+  ? "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors hover:bg-hover focus-visible:bg-hover"
+  : "relative flex min-h-control-sm w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm leading-4 outline-hidden transition-colors hover:bg-hover focus-visible:bg-hover"
 
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
@@ -113,7 +117,7 @@ const DropdownMenuItem = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex cursor-pointer select-none items-center rounded-sm px-2 outline-hidden focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
-        density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
+        density === "compact" ? "py-1 text-xs" : (__OB_SAFE_EXPORT_VIEWER__ ? "py-1.5 text-sm" : "min-h-control-sm py-1.5 text-sm leading-4"),
         inset && "pl-8",
         className
       )}
@@ -133,7 +137,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex cursor-pointer select-none items-center rounded-sm pl-8 pr-2 data-[state=checked]:bg-hover-strong outline-hidden focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
-        density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
+        density === "compact" ? "py-1 text-xs" : (__OB_SAFE_EXPORT_VIEWER__ ? "py-1.5 text-sm" : "min-h-control-sm py-1.5 text-sm leading-4"),
         className
       )}
       checked={checked}
@@ -161,7 +165,7 @@ const DropdownMenuRadioItem = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex cursor-pointer select-none items-center rounded-sm pl-8 pr-2 data-[state=checked]:bg-hover-strong outline-hidden focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
-        density === "compact" ? "py-1 text-xs" : "py-1.5 text-sm",
+        density === "compact" ? "py-1 text-xs" : (__OB_SAFE_EXPORT_VIEWER__ ? "py-1.5 text-sm" : "min-h-control-sm py-1.5 text-sm leading-4"),
         className
       )}
       {...props}
