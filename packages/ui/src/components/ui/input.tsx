@@ -12,7 +12,7 @@ const inputVariants = cva(
     variants: {
       // `inputSize` (not `size`, which is a native numeric input attribute).
       inputSize: {
-        default: "flex h-control-md px-3 py-2 shadow-xs",
+        default: "flex h-control-lg px-3 py-2 shadow-xs",
         sm: "h-control-sm px-2.5 py-1.5", // compact, no shadow — for dense inline controls
       },
     },

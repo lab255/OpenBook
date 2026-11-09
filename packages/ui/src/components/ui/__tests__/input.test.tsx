@@ -15,7 +15,7 @@ describe('input control variants', () => {
   it('renders the default panel-field recipe', () => {
     render(<Input aria-label="Default input" />);
 
-    expectClasses(screen.getByRole('textbox', {name: 'Default input'}), ['h-control-md', 'px-3', 'py-2']);
+    expectClasses(screen.getByRole('textbox', {name: 'Default input'}), ['h-control-lg', 'px-3', 'py-2']);
   });
 
   it('renders the sm dense-field recipe', () => {

@@ -1356,23 +1356,24 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .kitinput { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .kit-label { font-weight: 600; font-size: .92rem; }
 .kit-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.kit-pill { font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
+.kit-pill { min-height: 28px; font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
 .kit-pill .kit-dot { display: none; }
 .kit-pill.kit-on { background: ${KIT_EXPORT_PRIMARY}; border-color: ${KIT_EXPORT_PRIMARY}; color: #fff; }
 .kit-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: .9rem; }
 .kit-check input, .kit-toggle input { accent-color: ${KIT_EXPORT_PRIMARY}; }
-.kitinput select, .kitinput input[type=text] { font: inherit; font-size: .9rem; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; padding: 4px 8px; }
+.kitinput select, .kitinput input[type=text] { height: 36px; padding-block: 0; font: inherit; font-size: .9rem; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; padding: 0 8px; }
+.kitinput select { height: 28px; }
 .kit-wide { display: block; }
 .kit-wide .kit-label { display: block; margin-bottom: 8px; }
 .kit-wide .kit-options { flex-direction: column; }
-.kit-wide .kit-pill, .kit-wide .kit-check { width: 100%; border-radius: 8px; padding: 9px 14px; display: flex; justify-content: flex-start; }
+.kit-wide .kit-pill, .kit-wide .kit-check { min-height: 36px; width: 100%; border-radius: 8px; padding: 6px 14px; display: flex; justify-content: flex-start; }
 .kit-wide .kit-pill { background: transparent; color: inherit; }
 .kit-wide .kit-pill:hover, .kit-wide .kit-check:hover { background: rgba(127,127,127,.1); }
 .kit-wide .kit-pill .kit-dot { display: inline-block; width: 13px; height: 13px; border-radius: 9999px; border: 1.5px solid rgba(127,127,127,.6); flex-shrink: 0; }
 .kit-wide .kit-pill.kit-on { background: ${hexAlpha(KIT_EXPORT_PRIMARY, 0.08)}; border-color: ${KIT_EXPORT_PRIMARY}; }
 .kit-wide .kit-pill.kit-on .kit-dot { border-color: ${KIT_EXPORT_PRIMARY}; background: radial-gradient(circle, ${KIT_EXPORT_PRIMARY} 0 38%, transparent 42%); }
-.kit-wide select { width: 100%; padding: 8px 10px; }
-.kit-btn { font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.08); color: inherit; border-radius: 8px; padding: 6px 16px; text-decoration: none; display: inline-block; }
+.kit-wide select { height: 36px; width: 100%; padding: 0 10px; }
+.kit-btn { height: 36px; align-items: center; font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.08); color: inherit; border-radius: 8px; padding: 0 16px; text-decoration: none; display: inline-flex; }
 .kit-btn:hover { background: rgba(127,127,127,.16); }
 .kitlight { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .kit-light-val { font-weight: 500; opacity: .6; font-size: .9em; }
@@ -1399,9 +1400,10 @@ figure.ob-image .ob-image-alt { padding: 24px; text-align: center; border: 1px d
 .ob-form { display: grid; gap: 12px; margin: 1.2em 0; padding: 16px; border: 1px solid rgba(127,127,127,.22); border-radius: 10px; break-inside: avoid; page-break-inside: avoid; }
 .ob-form-field { display: grid; gap: 5px; font-size: .9rem; font-weight: 600; }
 .ob-form-field input:not([type=checkbox]):not([type=range]), .ob-form-field textarea, .ob-form-field select { width: 100%; min-height: 38px; padding: 7px 9px; border: 1px solid rgba(127,127,127,.3); border-radius: 7px; background: rgba(127,127,127,.04); color: inherit; font: inherit; }
+.ob-form-field input:not([type=checkbox]):not([type=range]), .ob-form-field select:not([multiple]) { height: 36px; min-height: 36px; padding-block: 0; }
 .ob-form-field input[type=checkbox] { width: 17px; height: 17px; }
 .ob-form-field input[type=range] { width: 60%; }
-.ob-form > button { justify-self: start; padding: 7px 16px; border: 1px solid rgba(127,127,127,.3); border-radius: 7px; background: rgba(127,127,127,.12); color: inherit; font: inherit; font-weight: 600; }
+.ob-form > button { height: 36px; justify-self: start; padding: 0 16px; border: 1px solid rgba(127,127,127,.3); border-radius: 7px; background: rgba(127,127,127,.12); color: inherit; font: inherit; font-weight: 600; }
 .ob-form-empty { margin: 0; opacity: .65; font-size: .9rem; }
 .ob-form-live { font-size: .86rem; color: inherit; opacity: .75; }
 figure.ob-artifact { margin: 1.2em 0; }
