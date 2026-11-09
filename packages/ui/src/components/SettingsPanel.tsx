@@ -9,6 +9,7 @@ import {
   UpdateIcon,
 } from '@radix-ui/react-icons';
 import {ArchiveBoxIcon, CpuChipIcon, GlobeAltIcon, KeyIcon, LifebuoyIcon, PaintBrushIcon, PuzzlePieceIcon, Square3Stack3DIcon, WrenchIcon} from '@heroicons/react/24/outline';
+import {FluidHover} from '@/components/ui/fluid-hover';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import AppearanceSettings from '@/components/AppearanceSettings';
@@ -83,7 +84,7 @@ function ProfileChip({onClick}: {onClick: () => void}) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-hover"
+      className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-(--motion-fast) hover:bg-hover"
     >
       <ProfileAvatar profile={profile} className="h-7 w-7 text-[11px] [&[data-avatar-kind=emoji]]:text-base" />
       <span className="truncate text-sm font-medium">{name}</span>
@@ -192,10 +193,12 @@ export default function SettingsPanel({tab, onTabChange, mode, onModeChange, onC
     <div className="relative flex h-full min-h-0 w-full flex-col sm:flex-row">
       <nav
         className={cn(
-          'ob-accent-chrome flex max-h-64 w-full shrink-0 flex-col gap-1 overflow-y-auto bg-sheet-1 px-3 pb-4 pr-16 pt-8 text-sheet-1-foreground sm:max-h-none sm:w-[210px] sm:pr-3',
+          'ob-accent-chrome relative isolate flex max-h-64 w-full shrink-0 flex-col gap-1 overflow-y-auto bg-sheet-1 px-3 pb-4 pr-16 pt-8 text-sheet-1-foreground sm:max-h-none sm:w-[210px] sm:pr-3',
           !fullscreen && 'rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none',
         )}
       >
+        <FluidHover surface="settings" selector="[data-settings-tab]"
+          selected={searching ? '#settings-search-listbox [aria-selected="true"]' : undefined} />
         <h4 className="px-2 pb-1 text-sm font-semibold">{t('settings.title')}</h4>
         <div className="relative px-1 pb-1 pt-1">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -226,6 +229,7 @@ export default function SettingsPanel({tab, onTabChange, mode, onModeChange, onC
                   <button
                     key={`${entry.tab}:${entry.sectionId}`}
                     id={`settings-search-opt-${i}`}
+                    data-settings-tab={entry.tab}
                     type="button"
                     role="option"
                     aria-selected={i === activeIndex}
@@ -233,7 +237,7 @@ export default function SettingsPanel({tab, onTabChange, mode, onModeChange, onC
                     onClick={() => openResult(entry)}
                     className={cn(
                       'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors',
-                      i === activeIndex ? 'bg-secondary' : 'hover:bg-hover',
+                      i === activeIndex ? 'bg-secondary' : 'hover:bg-transparent',
                     )}
                   >
                     <span className="flex w-full items-center gap-2">
@@ -259,8 +263,10 @@ export default function SettingsPanel({tab, onTabChange, mode, onModeChange, onC
                   return (
                     <Button
                       key={id}
+                      data-settings-tab={id}
+                      data-active={tab === id || undefined}
                       variant={tab === id ? 'secondary' : 'ghost'}
-                      className="flex h-7 justify-start px-2 font-normal"
+                      className={cn('flex h-7 justify-start px-2 font-normal', tab === id ? 'hover:bg-secondary' : 'hover:bg-transparent')}
                       onClick={() => onTabChange(id)}
                     >
                       <Icon className="h-4 w-4 shrink-0" />

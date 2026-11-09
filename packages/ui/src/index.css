@@ -4194,3 +4194,14 @@ button.obe-meeting-timestamp:hover { background: var(--obe-chrome-hover); }
 .obe-meeting-manage:hover { background: var(--obe-chrome-hover); }
 .obe-meeting-manage:focus-visible { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
 .obe-meeting-manage[data-state="open"] { background: var(--obe-chrome-active); }
+
+/* FF-4b: the glide sits behind row fills. Keep SIDEBAR_HOVER as the static
+   fallback; only neutral rows relinquish their wash when the glide is present.
+   Selection (including its stronger hover wash and rail) still paints above it. */
+[data-sidebar-rows]:has(> [data-fluid-hover-ready]) [data-sidebar-page-row]:not(.bg-sidebar-selection-wash):hover {
+  background-color: transparent;
+}
+
+[data-sidebar-rows]:has(> [data-fluid-hover-ready]) [data-sidebar-page-row].bg-sidebar-selection-wash:not([data-selected]):hover {
+  background-color: var(--color-sidebar-selection-wash);
+}

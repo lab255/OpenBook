@@ -1617,6 +1617,16 @@
           ]
         }
       ]
+    },
+    {
+      "name": "chromeFluidHover",
+      "kind": "chrome-size",
+      "introducedAt": "FF-4b / 2026-10-31",
+      "beforeRawBytes": 1932118,
+      "afterRawBytes": 1932375,
+      "rawCostBytes": 257,
+      "measurement": "Clean production build:viewer on current main (ac880ee2: FF-7e 1,931,612 B + FF-7a +100 B = 1,932,118 B) plus FF-4b: 1,932,375 B. Shared glide class and measured row radius plus chrome CSS integration; no newly emitted Motion modules. Measured by the Manager on Node 24.14.1 / pnpm 10.28.2.",
+      "modules": []
     }
   ],
   "sharedModules": [
