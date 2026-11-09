@@ -162,7 +162,11 @@ const CommandItem = React.forwardRef<
         // data-[disabled=true] (not bare data-disabled): cmdk ≥1.0 sets
         // data-disabled="false" on ENABLED items, and the presence-matching
         // variant greyed out + pointer-disabled every row.
-        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden aria-[current=page]:bg-hover-strong aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none",
+        // CommandDialog deliberately keeps its py-3 density override; default
+        // rows use the small ladder step, without clipping multi-line content.
+        __OB_SAFE_EXPORT_VIEWER__
+          ? "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden aria-[current=page]:bg-hover-strong aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none"
+          : "relative flex min-h-control-sm cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm leading-4 outline-hidden aria-[current=page]:bg-hover-strong aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none",
         className
       )}
     />

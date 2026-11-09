@@ -229,7 +229,10 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
                   tabIndex={-1}
                   onClick={() => pick(it.value)}
                   className={cn(
-                    "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden",
+                    // A minimum preserves multi-line descriptions; the viewer stays byte-stable.
+                    __OB_SAFE_EXPORT_VIEWER__
+                      ? "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden"
+                      : "flex min-h-control-sm w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm leading-4 outline-hidden",
                     it.value === current && "bg-hover-strong",
                     it.disabled && "pointer-events-none opacity-50",
                   )}
