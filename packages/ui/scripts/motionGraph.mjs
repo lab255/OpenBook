@@ -22,6 +22,24 @@ export function assertFeatureLedger(graph, ledger) {
   }
 }
 
+/** Feature rows retain their historical whole-IIFE costs. Only the measured
+ * non-Motion shrinkage window may separate the last row from today's artifact.
+ * Exact Motion bytes and module/export coverage prevent that window from
+ * becoming an allowance for new Motion features.
+ */
+export function assertLedgerEndpoint(graph, bytes, ledger) {
+  assertFeatureLedger(graph, ledger);
+  const motionBytes = graph.modules.filter(module => motionModule(module.id)).reduce((sum, module) => sum + module.bytes, 0);
+  if (motionBytes !== ledger.endpoint.motionRenderedBytes) {
+    throw new Error(`ledger endpoint: Motion rendered bytes ${motionBytes} != ${ledger.endpoint.motionRenderedBytes}`);
+  }
+  const historical = ledger.features.at(-1).afterRawBytes;
+  const minimum = historical - ledger.endpoint.nonMotionShrinkageBytes;
+  if (bytes < minimum || bytes > historical) {
+    throw new Error(`ledger endpoint: production bytes ${bytes} outside non-motion window ${minimum}..${historical}`);
+  }
+}
+
 export function assertBlockOwnBytes(graph, ledger) {
   const shared = new Set(ledger.sharedModules);
   const modules = new Map(graph.modules.map(module => [module.id, module]));

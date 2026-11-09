@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import ledger from './motionFeatures.json';
 import baseline from './viewerMotionBaseline.json';
-import {assertFeatureLedger, assertBlockOwnBytes, assertViewerCeiling} from './motionGraph.mjs';
+import {assertFeatureLedger, assertBlockOwnBytes, assertViewerCeiling, assertLedgerEndpoint, motionModule} from './motionGraph.mjs';
 
 const readGraph = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 const productionGraph = readGraph('src/export/vendor/motion-graph.json');
@@ -12,7 +12,12 @@ it('requires a ledger row for every emitted Motion module and export', () => {
   expect(() => assertFeatureLedger(productionGraph, {...ledger, features: ledger.features.filter(feature => feature.name !== 'renderer')})).toThrow('Unledgered motion feature');
   const bytes = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
   expect(ledger.preAdoptionRawBytes).toBe(baseline.rawBytes);
+  expect(ledger.preAdoptionRawBytes).toBe(1846513);
+  expect(ledger.blockOwnBytesCeiling).toBe(2048);
+  expect(ledger.hardDeltaCeiling).toBe(262144);
+  expect(ledger.calibration.seededProductionRawBytes).toBe(1922068);
   assertViewerCeiling(bytes, ledger);
+  expect(() => assertViewerCeiling(1846513 + 262144 + 1, ledger)).toThrow('transportability ceiling');
   for (const feature of ledger.features) expect(feature.afterRawBytes - feature.beforeRawBytes).toBe(feature.rawCostBytes);
   process.stdout.write('FEATURE LEDGER removed renderer row RED; emitted module/export inventory GREEN\n');
 });
@@ -28,7 +33,12 @@ it('calibrates actual ordinary and eager/layout additions independently of own b
     expect(block, 'calibration block must be recognized as an adopter').toBeTruthy();
     assertBlockOwnBytes(graph, ledger);
     if (mode === 'ordinary') assertFeatureLedger(graph, ledger);
-    else expect(() => assertFeatureLedger(graph, ledger)).toThrow('Unledgered motion feature');
+    else {
+      expect(() => assertFeatureLedger(graph, ledger)).toThrow('Unledgered motion feature');
+      // Even if non-motion savings hid the raw growth inside the window,
+      // this genuine eager/layout build must fail feature authorization.
+      expect(() => assertLedgerEndpoint(graph, ledger.features.at(-1)!.afterRawBytes - 506, ledger)).toThrow('Unledgered motion feature');
+    }
     results[mode] = {bytes, ownBytes: block.bytes};
   }
   // Marginal calibration uses today's production bytes, not historical costs.
@@ -87,7 +97,7 @@ it('checks the complete emitted Motion closure transitively reachable from the v
   expect(productionGraph.modules.filter((module: {id: string; bytes: number}) => module.bytes > 0 && module.id.includes('/render/components/motion/'))).toEqual([]);
 });
 
-it('keeps the ordered size ledger continuous from baseline to the measured production artifact', () => {
+it('keeps historical rows continuous and bounds non-motion drift at the measured endpoint', () => {
   const measured = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
   const assertChain = (rows: readonly {name: string; beforeRawBytes: number; afterRawBytes: number}[]) => {
     expect(rows.length).toBeGreaterThan(0);
@@ -95,10 +105,29 @@ it('keeps the ordered size ledger continuous from baseline to the measured produ
     for (let i = 0; i < rows.length - 1; i++) {
       expect(rows[i].afterRawBytes, `ledger chain: ${rows[i].name} -> ${rows[i + 1].name}`).toBe(rows[i + 1].beforeRawBytes);
     }
-    expect(rows.at(-1)!.afterRawBytes, 'ledger chain: measured production artifact').toBe(measured);
   };
   const broken = ledger.features.map(row => row.name === 'fluidHover' ? {...row, afterRawBytes: row.afterRawBytes + 1} : row);
   expect(() => assertChain(broken)).toThrow('ledger chain: fluidHover -> useMotionValue');
   assertChain(ledger.features);
-  process.stdout.write(`LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline ${ledger.preAdoptionRawBytes} -> all adjacent rows -> measured ${measured} GREEN\n`);
+  assertLedgerEndpoint(productionGraph, measured, ledger);
+  process.stdout.write(`LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline ${ledger.preAdoptionRawBytes} -> all adjacent rows -> bounded measured ${measured} GREEN\n`);
+});
+
+it('accepts only the measured non-motion window, never unledgered Motion or extra Motion bytes', () => {
+  const historical = ledger.features.at(-1)!.afterRawBytes;
+  expect(ledger.endpoint.nonMotionShrinkageBytes).toBe(506);
+  for (const bytes of [historical, historical - 506]) {
+    expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).not.toThrow();
+  }
+  for (const bytes of [historical + 1, historical - 507]) {
+    expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).toThrow('outside non-motion window');
+  }
+  const changed = {modules: productionGraph.modules.map((module: {id: string; bytes: number}) =>
+    motionModule(module.id) && module.bytes > 0 ? {...module, bytes: module.bytes + 1} : module)};
+  expect(() => assertLedgerEndpoint(changed, historical - 506, ledger)).toThrow('Motion rendered bytes');
+  // Real emitted module, removed authorization: even a bundle inside the
+  // allowed window must still reject an unledgered Motion feature.
+  const missing = {...ledger, features: ledger.features.map(feature => feature.name === 'animate' ? {...feature, modules: []} : feature)};
+  expect(() => assertLedgerEndpoint(productionGraph, historical - 506, missing)).toThrow('Unledgered motion feature');
+  process.stdout.write(`ENDPOINT ${historical} and ${historical - 506} GREEN; ${historical + 1} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
 });

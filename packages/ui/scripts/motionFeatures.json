@@ -5,6 +5,12 @@
   "hardDeltaCeiling": 262144,
   "hardDeltaCeilingRationale": "256KB chosen 2026-10-28: owner direct confirmation \u2014 protects shareability, not subset purity; current bundle is 1.92MB raw/~500KB gz. Leaves room for layout-class features (~48KB) without changing the order of magnitude. Re-evaluate when transport expectations change.",
   "blockOwnBytesCeiling": 2048,
+  "endpoint": {
+    "measuredAt": "CARD-13 / 2026-11-09",
+    "motionRenderedBytes": 211511,
+    "nonMotionShrinkageBytes": 506,
+    "rationale": "Option (b): preserve ordered feature costs; require the emitted Motion module-byte sum exactly and allow only 0..506 bytes of whole-IIFE shrinkage from the final feature row. Clean Node 24.14.1 / pnpm 10.28.2 builds: 38e5f30c = 1932118 B; that tree plus FF-7e (070ab4b4..daf87bf9) = 1931612 B. Both graphs total 3215446 rendered bytes, including 211511 Motion bytes. The -506 B is non-motion CSS/string drift, not a feature saving. No positive drift is allowed. Trade-off: maintain both the Motion graph sum and the bounded raw endpoint; future changes beyond this measured window require explicit review. Module/export coverage, historical calibration seed, block-own-code and transportability guards remain independent and unchanged."
+  },
   "features": [
     {
       "name": "lazyRuntime",
