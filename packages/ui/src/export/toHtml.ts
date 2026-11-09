@@ -1356,17 +1356,17 @@ a.subpage:hover { background: rgba(127,127,127,.08); }
 .kitinput { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .kit-label { font-weight: 600; font-size: .92rem; }
 .kit-options { display: flex; flex-wrap: wrap; gap: 6px; }
-.kit-pill { min-height: 28px; font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9999px; padding: 3px 12px; display: inline-flex; align-items: center; gap: 8px; }
+.kit-pill { min-height: 28px; font: inherit; font-size: .85rem; cursor: pointer; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; border-radius: 9999px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; }
 .kit-pill .kit-dot { display: none; }
 .kit-pill.kit-on { background: ${KIT_EXPORT_PRIMARY}; border-color: ${KIT_EXPORT_PRIMARY}; color: #fff; }
 .kit-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: .9rem; }
 .kit-check input, .kit-toggle input { accent-color: ${KIT_EXPORT_PRIMARY}; }
-.kitinput select, .kitinput input[type=text] { height: 36px; padding-block: 0; font: inherit; font-size: .9rem; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; padding: 0 8px; }
+.kitinput select, .kitinput input[type=text] { height: 36px; font: inherit; font-size: .9rem; color: inherit; background: transparent; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; padding: 0 8px; }
 .kitinput select { height: 28px; }
 .kit-wide { display: block; }
 .kit-wide .kit-label { display: block; margin-bottom: 8px; }
 .kit-wide .kit-options { flex-direction: column; }
-.kit-wide .kit-pill, .kit-wide .kit-check { min-height: 36px; width: 100%; border-radius: 8px; padding: 6px 14px; display: flex; justify-content: flex-start; }
+.kit-wide .kit-pill, .kit-wide .kit-check { min-height: 36px; width: 100%; border-radius: 8px; padding: 0 14px; display: flex; justify-content: flex-start; }
 .kit-wide .kit-pill { background: transparent; color: inherit; }
 .kit-wide .kit-pill:hover, .kit-wide .kit-check:hover { background: rgba(127,127,127,.1); }
 .kit-wide .kit-pill .kit-dot { display: inline-block; width: 13px; height: 13px; border-radius: 9999px; border: 1.5px solid rgba(127,127,127,.6); flex-shrink: 0; }

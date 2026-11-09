@@ -4,6 +4,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {expect, it} from 'vitest';
 import {Button} from '../src/components/ui/button';
 import {Input} from '../src/components/ui/input';
+import {toHtml} from '../src/export/toHtml';
 
 // Opt-in artifact producer: run against both revisions with the same content.
 // FF7C_CAPTURE_PHASE=before|after pnpm exec vitest run scripts/controlPolishFixture.test.tsx
@@ -12,6 +13,13 @@ it.skipIf(!process.env.FF7C_CAPTURE_PHASE)('emits real control markup with the b
   expect(['before', 'after']).toContain(phase);
   const bundle = readFileSync('src/export/vendor/openbook-viewer.js', 'utf8');
   const css: string = JSON.parse(bundle.match(/s\.textContent=("(?:\\.|[^"\\])*");/)![1]);
+  const legacy = toHtml({editorjs: {blocks: [
+    {id: 'action', type: 'kitbutton', data: {label: 'Save changes', action: 'increment'}},
+    {id: 'text', type: 'kitinput', data: {kind: 'text', label: 'Text'}},
+    {id: 'select', type: 'kitinput', data: {kind: 'dropdown', label: 'Dropdown', options: 'One,Two'}},
+    {id: 'radio', type: 'kitinput', data: {kind: 'radio', label: 'Radio', options: 'One,Two'}},
+    {id: 'wide-radio', type: 'kitinput', data: {kind: 'radio', wide: true, label: 'Wide radio', options: 'One,Two'}},
+  ]}, values: [], names: []}, 'Export controls', '');
   const markup = renderToStaticMarkup(<main>
     <h1>Control ladder</h1>
     <section id="button"><h2>Buttons</h2>
@@ -30,5 +38,6 @@ it.skipIf(!process.env.FF7C_CAPTURE_PHASE)('emits real control markup with the b
   </main>);
   const folder = resolve('../../_captures/ff7c');
   mkdirSync(folder, {recursive: true});
+  writeFileSync(`${folder}/export-${phase}.html`, legacy);
   writeFileSync(`${folder}/${phase}.html`, `<!doctype html><html class="dark"><meta charset="utf-8"><style>${css}</style><style>body{margin:0;padding:24px;background:hsl(var(--background));color:hsl(var(--foreground));font-family:system-ui}main{max-width:600px}h1{font-size:24px;margin-bottom:20px}h2{font-size:18px;margin-bottom:12px}section{margin-bottom:24px}.sample{display:flex;align-items:center;gap:16px;margin-bottom:12px}.sample>span{width:80px;flex-shrink:0;font-size:13px}.sample>input{width:200px;flex:none}</style>${markup}</html>`);
 });

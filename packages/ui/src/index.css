@@ -1385,9 +1385,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-media-btn[data-state='open'], .obe-media-btn:active { background: var(--obe-chrome-active); }
 .obe-media-btn[aria-pressed='true'] { background: var(--obe-chrome-active); color: hsl(var(--primary)); }
 .obe-media-btn:disabled { opacity: 0.45; cursor: default; }
-.obe-media-bar /* FF-7c (2026-11-09): the 24px gear remains gutter chrome; growing it
-   independently would break the shared gutter alignment. */
-.obe-kit-gear {
+.obe-media-bar .obe-kit-gear {
   position: static;
   opacity: 1;
   pointer-events: auto;
@@ -2840,6 +2838,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* The settings gear sits at the block's top-right, invisible until the block is
    hovered/focused (or its popover is open). Same affordance for every kit block;
    the gutter context menu's "Configure" reaches the same popover. */
+/* FF-7c (2026-11-09): the 24px gear remains gutter chrome; growing it
+   independently would break the shared gutter alignment. */
 .obe-kit-gear {
   position: absolute; top: 0; right: 0;
   z-index: var(--z-index-control);

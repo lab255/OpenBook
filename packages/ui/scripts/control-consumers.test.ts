@@ -66,7 +66,7 @@ describe('FF-7c control geometry and G2 export equality', () => {
     ['.obe-kit-action', 'height', '.ob-form > button'],
     ['.obe-kit-pill', 'min-height', '.kit-pill'],
     ['.obe-kit-wide .obe-kit-pill, .obe-kit-wide .obe-kit-check', 'min-height', '.kit-wide .kit-pill, .kit-wide .kit-check'],
-    [".obe-form-field input:not([type='checkbox']):not([type='range']), .obe-form-field select:not([multiple])", 'height', '.ob-form-field input:not([type=checkbox]):not([type=range]), .ob-form-field select:not([multiple])'],
+    ['.obe-form-field input:not([type=checkbox]):not([type=range]), .obe-form-field select:not([multiple])', 'height', '.ob-form-field input:not([type=checkbox]):not([type=range]), .ob-form-field select:not([multiple])'],
   ])('mirrors %s as an export literal', (selector, prop, mirror) => {
     const px = resolve(app, value(app, selector, prop)!);
     expect(px).toMatch(/^(28|36)px$/);

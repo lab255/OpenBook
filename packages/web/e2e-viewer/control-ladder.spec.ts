@@ -25,3 +25,16 @@ for (const width of [1280, 390]) {
     writeFileSync(`${folder}/${phase}-${width}.json`, JSON.stringify({phase, width, heights}, null, 2));
   });
 }
+
+test('exported kit control heights', async ({page}) => {
+  test.skip(process.env.FF7C_CAPTURE_PHASE !== 'after', 'Opt-in generated export fixture');
+  await page.goto(pathToFileURL(resolve('../../_captures/ff7c/export-after.html')).href);
+  for (const [selector, height] of [
+    ['.kit-btn', 36], ['.kitinput input[type=text]', 36], ['.kitinput select', 28],
+    ['.kitinput:not(.kit-wide) .kit-pill', 28], ['.kit-wide .kit-pill', 36],
+  ] as const) {
+    const elements = page.locator(selector);
+    expect(await elements.count()).toBeGreaterThan(0);
+    for (const element of await elements.all()) expect(await element.evaluate(el => el.getBoundingClientRect().height)).toBe(height);
+  }
+});
