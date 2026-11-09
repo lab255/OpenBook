@@ -17,3 +17,32 @@ FF-4/FF-6 seam amendment (2026-10-29): the 2,048-byte guard is a marginality tes
 Reproduce the seam measurements with production NODE_ENV and calibration modes `ff46-before`, `ff46-shell`, `ff46-values`, `ff46-reduced`, `ff46-final`, `ff46-eager`, in that order. These test-only variants remove APIs solely to measure ordered integration; the shipped component retains all real runtime APIs. The hook rows account for new framer-motion React wrappers, not the already-ledgered motion-dom primitives. The `animate` row includes its newly emitted standalone sequence/object machinery. Never sum historical rows to predict a future total.
 
 The named transitive-closure regression checks every emitted Motion module reachable from `viewer/index.tsx`, including shared chrome; removing any module authorization must fail. CI caught the combined tree that neither branch's standalone verify contained. This closes the fixture-coverage gap; checking independently green branches cannot replace verification of their integrated tree before merging.
+
+CARD-13 endpoint amendment (2026-11-09, option b): the former exact assertion
+`lastRow.afterRawBytes === measuredProductionBytes` is superseded by separate
+Motion graph accounting and a bounded non-motion window. Historical feature rows
+and their adjacency remain intact. Clean builds on Node 24.14.1 / pnpm 10.28.2
+measure 1,932,118 B at `38e5f30c` and 1,931,612 B with FF-7e
+(`070ab4b4..daf87bf9`) applied. Both have a 974,125 B graph sidecar, 3,215,446
+rendered module bytes, and 211,511 rendered Motion module bytes. Generated viewer
+JS and graph files were moved out before rebuilding; SDK artifacts were built
+first. The post-FF-7e measurement used a freshly installed archive with the
+`070ab4b4..38e5f30c` changes applied, leaving worker sources untouched.
+
+The ledger now requires exactly 211,511 Motion bytes and permits only 0–506 B
+of raw shrinkage from the historical endpoint: no raw growth allowance. This is
+the observed CSS/string reduction, not a new feature discount. Trade-off: two
+measurements must be maintained; further drift requires a new explicit decision.
+The aggregate byte sum does not identify features, so module/export coverage
+remains independently mandatory. Fixtures reject a missing `animate` row even
+inside the window, altered Motion bytes, and either window boundary crossed by
+one byte. The actual eager/layout fixture still rejects unledgered Motion and
+exceeds the marginal calibration limit; the separate own-code fixture still
+rejects a 2,049 B block dependency closure. Motion machinery itself is deliberately
+excluded from own-code charging, so a new Motion feature need not fail that
+independent guard by itself.
+
+`preAdoptionRawBytes` (1,846,513), `blockOwnBytesCeiling` (2,048),
+`hardDeltaCeiling` (262,144), the historical `calibration.seededProductionRawBytes`
+(1,922,068), and baseline script hashes stay unchanged. The calibration test's
+local `seeded` continues to read today's production artifact by design.
