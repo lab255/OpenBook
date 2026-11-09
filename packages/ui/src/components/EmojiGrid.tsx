@@ -84,7 +84,7 @@ function Tab({active, onClick, label}: {active: boolean; onClick: () => void; la
 /** A section heading inside the scroll area. */
 function SectionLabel({children}: {children: React.ReactNode}) {
   return (
-    <div className="sticky top-0 z-10 bg-popover px-1 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+    <div className="sticky top-0 z-10 bg-popover px-1 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">
       {children}
     </div>
   );

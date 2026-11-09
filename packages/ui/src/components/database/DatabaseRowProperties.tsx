@@ -66,7 +66,7 @@ const ConfigMenu: React.FC<{db: UseDatabase; properties: DatabaseProperty[]; gro
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 space-y-3 p-3">
       <div>
-        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Properties</div>
+        <div className="mb-1 text-[11px] font-semibold text-muted-foreground">Properties</div>
         <div className="max-h-56 space-y-0.5 overflow-y-auto">
           {properties.map((p) => (
             <div key={p.id} className="flex items-center gap-1.5 rounded px-1 py-0.5 text-sm hover:bg-hover">
@@ -99,7 +99,7 @@ const ConfigMenu: React.FC<{db: UseDatabase; properties: DatabaseProperty[]; gro
 
       <div className="border-t border-border pt-2">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Groups</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">Groups</span>
           <button
             onClick={() => void db.addPropertyGroup()}
             className="flex items-center gap-1 rounded px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
@@ -183,7 +183,7 @@ export const DatabaseRowProperties: React.FC<{pageId: string; databaseId: string
   return (
     <div className="group/props mb-2 flex flex-col gap-0.5">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">Properties</span>
+        <span className="text-[11px] font-semibold text-muted-foreground">Properties</span>
         <ConfigMenu db={db} properties={schema} groups={groups} />
       </div>
 

@@ -82,6 +82,14 @@ as history. The owner adopted FF's ban on uppercase/letter-spaced eyebrow labels
 to align typography with the FF doctrine. Migration of the approximately 25
 existing call sites belongs to a later card; this amendment changes no call sites.
 
+**Amended 2026-11-04 — superseded-by-owner-ruling (FF-7e, ruling 6,
+2026-10-27):** the app call sites now use authored sentence case without
+letter-spacing; weight carries caption/group hierarchy. Shortcut glyph spacing
+remains intentional. The original DSX sanction and FF-1 staging note above are
+retained as history. Per ruling 8 (2026-11-04), exported documents retain their
+existing typography, including `CONTAINER_EYEBROW_STYLE` and `.obe-x-group-name`;
+export adoption is deferred behind the FF-6 mirror.
+
 ### 1.2 Decisions vs today
 
 | Item | Today | Decision | Reason |
