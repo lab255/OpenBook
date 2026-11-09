@@ -29,7 +29,23 @@ as historical implementation context, not the target ladder. Component size
 migration belongs to a later card; this amendment changes no component sizes.
 Existing recipes and exceptions below describe that pre-migration implementation.
 
-Prior SPC-1 rule: control heights use the dedicated Tailwind `--height-*` namespace:
+**Amended 2026-11-04 — superseded-by-owner-ruling (FF-7a, rulings 7/10):**
+Option A preserves the live values at `38e5f30c`. The existing `sm`/`lg` steps
+already implement FF's 28/36px ladder. `xs`/`md` remain deprecated compatibility
+aliases expressed as literals, not `var()` references to the new ladder: remapping
+them would enlarge existing controls by 4px. Both modes explicitly declare the
+same values; Tailwind's theme namespace matches. No consumer migrates here.
+CARD-5/FF-7b owns menu/select rows; CARD-6/FF-7c owns control consumers, including
+the exported kit. Alias removal follows migration. Export/kit rules stay unchanged.
+
+| Token | Value in both modes | Status |
+|---|---|---|
+| `--height-control-sm` | 28px | FF small step |
+| `--height-control-lg` | 36px | FF large step |
+| `--height-control-xs` | 24px | Deprecated compatibility literal (Option A) |
+| `--height-control-md` | 32px | Deprecated compatibility literal (Option A) |
+
+Prior SPC-1 rule (**superseded**, retained): control heights use the dedicated Tailwind `--height-*` namespace:
 
 | Tier | Theme token | Utility | Exact value |
 |---|---|---|---:|

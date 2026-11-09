@@ -104,10 +104,14 @@
   /* ── Spacing + control-height scale ──────────────────────────────────────
      The 4px grid is the only legal spacing grid for new work. Control heights
      use this semantic scale so components do not introduce one-off sizes. */
-  --height-control-xs: 24px;
+  /* FF-7a: FF's 36/28px ladder aligns control sizing with the doctrine.
+     2026-11-04 — ruling 7 supersedes SPC-1's four-step ladder.
+     Deprecated compatibility aliases (Option A): xs/md retain 24/32px
+     until CARD-5/6 migrate consumers; remapping now would change pixels. */
   --height-control-sm: 28px;
-  --height-control-md: 32px;
   --height-control-lg: 36px;
+  --height-control-xs: 24px;
+  --height-control-md: 32px;
 
   --radius-xl: calc(var(--radius) + 4px);
   --radius-lg: var(--radius);
@@ -222,10 +226,14 @@
     --obe-chart-ink-on-pale: #233246;
     /* FF-1: existing block dependencies must exist without Tailwind generation. */
     --container-content: 46rem;
-    --height-control-xs: 24px;
+    /* FF-7a: FF's 36/28px ladder aligns control sizing with the doctrine.
+       2026-11-04 — ruling 7 supersedes SPC-1's four-step ladder.
+       Deprecated compatibility aliases (Option A): xs/md retain 24/32px
+       until CARD-5/6 migrate consumers; remapping now would change pixels. */
     --height-control-sm: 28px;
-    --height-control-md: 32px;
     --height-control-lg: 36px;
+    --height-control-xs: 24px;
+    --height-control-md: 32px;
     --text-xs: 0.75rem;
     --text-sm: 0.875rem;
     /* DSX foundation: plain CSS tokens also travel with the standalone viewer. */
@@ -432,6 +440,14 @@
   }
 
   .dark {
+    /* FF-7a: FF's 36/28px ladder aligns control sizing with the doctrine.
+       2026-11-04 — ruling 7 supersedes SPC-1's four-step ladder.
+       Deprecated compatibility aliases (Option A): xs/md retain 24/32px
+       until CARD-5/6 migrate consumers; remapping now would change pixels. */
+    --height-control-sm: 28px;
+    --height-control-lg: 36px;
+    --height-control-xs: 24px;
+    --height-control-md: 32px;
     --data-column-tint: 35%;
     --obe-chart-ink-on-pale: #233246;
     --obe-select-wash: hsl(var(--ring) / 0.2);
