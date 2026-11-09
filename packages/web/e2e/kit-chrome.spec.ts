@@ -58,11 +58,11 @@ for (const dark of [false, true]) {
     await expect(page.locator('.obe-kit-term')).toHaveCSS('outline-offset', '2px');
     await expect(page.locator('.obe-kit-tip')).toHaveCSS('opacity', '1');
     for (const [selector, height] of [
-      ['.obe-kit-textinput', '32px'], ['.obe-kit-num', '32px'], ['.obe-kit-mini', '32px'],
-      ['.obe-kit-wide .obe-kit-dropdown-select', '32px'], ['.obe-kit-searchtrigger', '32px'],
+      ['.obe-kit-textinput', '36px'], ['.obe-kit-num', '36px'], ['.obe-kit-mini', '36px'],
+      ['.obe-kit-wide .obe-kit-dropdown-select', '36px'], ['.obe-kit-searchtrigger', '36px'],
       ['.obe-kit:not(.obe-kit-wide) .obe-kit-dropdown-select', '28px'],
-      ['.obe-kit:not(.obe-kit-wide) .obe-kit-pill', '28px'], ['.obe-kit-stepper', '28px'], ['.obe-kit-action', '32px'],
-      ['.obe-kit-richtext-btn', '24px'], ['.obe-kit-switch', '20px'],
+      ['.obe-kit:not(.obe-kit-wide) .obe-kit-pill', '28px'], ['.obe-kit-stepper', '28px'], ['.obe-kit-action', '36px'],
+      ['.obe-kit-richtext-btn', '28px'], ['.obe-kit-switch', '20px'],
       ['.obe-kit-wide .obe-kit-pill', '36px'], ['.obe-kit-wide .obe-kit-check', '36px'],
     ]) {
       expect(await page.locator(selector).count()).toBeGreaterThan(0);
@@ -131,7 +131,7 @@ for (const dark of [false, true]) {
       padding: row.querySelector('.obe-kit') ? getComputedStyle(row.querySelector('.obe-kit')!).padding : null,
     })));
     for (const row of measurements.filter((r) => r.padding !== null)) expect(row.padding).toBe('0px');
-    const caps: Record<string, number> = {textfield: 51.6, radio: 170.5, checklist: 170.5, dropdown: 84.3, toggle: 37.6, location: 51.6, actionbutton: 47.1, choicecards: 158.7, longtext: 128, richtext: 122.8, searchselect: 80.3, number: 56, slider: 65.6, tagfield: 79.2, formula: 50, statuslight: 39.1, tooltipcard: 40.6, linkcard: 101.5, progressbar: 51.2, kitchart: 330.7};
+    const caps: Record<string, number> = {textfield: 55.6, radio: 170.5, checklist: 170.5, dropdown: 88.3, toggle: 37.6, location: 55.6, actionbutton: 51.1, choicecards: 158.7, longtext: 128, richtext: 126.8, searchselect: 84.3, number: 56, slider: 65.6, tagfield: 83.2, formula: 50, statuslight: 39.1, tooltipcard: 40.6, linkcard: 101.5, progressbar: 51.2, kitchart: 330.7};
     for (const row of measurements) if (row.type && caps[row.type]) expect(row.height, row.type).toBeLessThanOrEqual(caps[row.type]);
     console.log(`Kit heights ${dark ? 'dark' : 'light'} ${JSON.stringify(measurements)}`);
     await testInfo.attach('kit-heights', {body: JSON.stringify(measurements, null, 2), contentType: 'application/json'});

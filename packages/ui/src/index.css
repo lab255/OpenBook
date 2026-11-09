@@ -2513,22 +2513,22 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-ui-frame .obe-ui-frame { background: transparent; }
 .obe-ui-title { font-size: var(--obe-small-size); line-height: var(--obe-small-leading); font-weight: 600; }
 .obe-ui-header { display: flex; align-items: flex-end; gap: 0.5rem 0.75rem; flex-wrap: wrap; }
-.obe-ui-header > .obe-ui-title { line-height: var(--height-control-md); }
-.obe-ui-header > .obe-ui-btn[data-variant='link'] { height: var(--height-control-md); }
+.obe-ui-header > .obe-ui-title { line-height: var(--height-control-lg); }
+.obe-ui-header > .obe-ui-btn[data-variant='link'] { height: var(--height-control-lg); }
 .obe-ui-muted, .obe-ui-fieldset legend, .obe-ui-table caption { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); color: hsl(var(--muted-foreground)); }
 /* 2026-11-04 — superseded-by-owner-ruling 6 (2026-10-27): uppercase +
    0.04em tracking formerly distinguished caption/group hierarchy (DSX §1.1).
    App labels now use authored sentence case and weight for legibility. */
 .obe-ui-eyebrow, .obe-ui-table thead th, .obe-ui-table .obe-ui-section { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); font-weight: 500; color: hsl(var(--muted-foreground)); }
 .obe-ui-labelled { display: flex; flex-direction: column; gap: 0.25rem; }
-.obe-ui-field { height: var(--height-control-md); padding: 0 0.625rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--background)); color: inherit; font-size: var(--obe-small-size); font-variant-numeric: tabular-nums; min-width: 0; }
+.obe-ui-field { height: var(--height-control-lg); padding: 0 0.625rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--background)); color: inherit; font-size: var(--obe-small-size); font-variant-numeric: tabular-nums; min-width: 0; }
 .obe-ui-field[data-size='sm'] { height: var(--height-control-sm); }
 .obe-ui-field:focus-visible { outline: none; border-color: hsl(var(--ring)); }
 .obe-ui-field[aria-invalid='true'] { border-color: hsl(var(--destructive)); }
 .obe-ui-field::placeholder { color: var(--obe-placeholder); }
 .obe-ui-field:disabled { border-style: dashed; border-color: hsl(var(--muted-foreground) / 0.6); background: transparent; color: hsl(var(--foreground)); cursor: not-allowed; }
 .obe-ui-field[aria-invalid='true']:disabled { border-color: hsl(var(--destructive)); }
-.obe-ui-btn, .obe-ui-file::file-selector-button { display: inline-flex; align-items: center; gap: 0.25rem; height: var(--height-control-md); padding: 0 0.75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--obe-small-size); font-weight: 400; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft); }
+.obe-ui-btn, .obe-ui-file::file-selector-button { display: inline-flex; align-items: center; gap: 0.25rem; height: var(--height-control-lg); padding: 0 0.75rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: var(--obe-small-size); font-weight: 400; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-out-soft), border-color var(--motion-fast) var(--ease-out-soft); }
 .obe-ui-btn:hover:not(:disabled):not([aria-disabled='true']), .obe-ui-file:not(:disabled)::file-selector-button:hover { background: var(--obe-chrome-hover); border-color: hsl(var(--foreground) / 0.2); }
 .obe-ui-btn:focus-visible, .obe-ui-table-wrap:focus-visible, .obe-ui-check input:focus-visible, .obe-ui-file:focus-visible { outline: var(--obe-focus-ring); outline-offset: var(--obe-focus-offset); }
 .obe-ui-btn[data-variant='primary'] { border-color: hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding-inline: 1rem; font-weight: 600; }
@@ -2542,7 +2542,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-ui-btn.obe-ui-muted { font-size: var(--obe-caption-size); line-height: var(--obe-caption-leading); color: hsl(var(--muted-foreground)); }
 .obe-ui-btn[data-size='sm'], .obe-ui-file::file-selector-button { height: var(--height-control-sm); padding-inline: 0.5rem; }
 /* stylelint-disable declaration-property-value-allowed-list -- Public compact controls and tight tables use the contracted 2px inset. */
-.obe-ui-btn[data-size='xs'] { min-height: var(--height-control-xs); height: auto; padding: 0.125rem 0.5rem; white-space: normal; text-align: left; font-size: var(--obe-caption-size); }
+.obe-ui-btn[data-size='xs'] { min-height: var(--height-control-sm); height: auto; padding: 0.125rem 0.5rem; white-space: normal; text-align: left; font-size: var(--obe-caption-size); }
 .obe-ui-fieldset { display: flex; align-items: center; gap: 0.5rem; padding: 0.125rem 0.5rem 0.25rem; border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); }
 /* stylelint-enable declaration-property-value-allowed-list */
 .obe-ui-btn[data-weight='strong'] { font-weight: 600; }
@@ -2838,6 +2838,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 /* The settings gear sits at the block's top-right, invisible until the block is
    hovered/focused (or its popover is open). Same affordance for every kit block;
    the gutter context menu's "Configure" reaches the same popover. */
+/* FF-7c (2026-11-09): the 24px gear remains gutter chrome; growing it
+   independently would break the shared gutter alignment. */
 .obe-kit-gear {
   position: absolute; top: 0; right: 0;
   z-index: var(--z-index-control);
@@ -2883,7 +2885,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   color: hsl(var(--foreground));
 }
 .obe-kit-name { width: 7rem; font-family: var(--obe-font-mono); }
-.obe-kit-num { width: 4rem; height: var(--height-control-md); font-variant-numeric: tabular-nums; }
+.obe-kit-num { width: 4rem; height: var(--height-control-lg); font-variant-numeric: tabular-nums; }
 .obe-kit-mono { font-family: var(--obe-font-mono); }
 .obe-kit-empty { font-size: var(--obe-caption-size); color: hsl(var(--muted-foreground)); font-style: italic; }
 
@@ -2927,15 +2929,15 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   background: hsl(var(--card));
   padding: 0 0.625rem;
   font-size: var(--obe-small-size);
-  height: var(--height-control-md);
+  height: var(--height-control-lg);
 }
 .obe-kit-textinput:focus { outline: none; border-color: hsl(var(--ring)); }
 .obe-kit-mini {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--height-control-md);
-  height: var(--height-control-md);
+  width: var(--height-control-lg);
+  height: var(--height-control-lg);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   background: hsl(var(--card));
@@ -3067,7 +3069,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-color: hsl(var(--destructive));
 }
 .obe-form-field input:not([type='checkbox']):not([type='range']),
-.obe-form-field select:not([multiple]) { height: var(--height-control-md); padding-block: 0; }
+.obe-form-field select:not([multiple]) { height: var(--height-control-lg); padding-block: 0; }
 .obe-form-field :is(input:not([type='checkbox']):not([type='range']), textarea, select):hover:not(:disabled):not(:focus):not([aria-invalid='true']) {
   border-color: hsl(var(--foreground) / 0.2);
 }
@@ -3347,9 +3349,11 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   width: 100%;
   padding: 0 0.75rem;
   font-size: var(--obe-small-size);
-  height: var(--height-control-md);
+  height: var(--height-control-lg);
 }
 
+/* FF-7c (2026-11-09): preserve the 20px switch track and 16px thumb.
+   They form one toggle, not a button/field box; resizing changes thumb travel. */
 /* Toggle switch */
 .obe-kit-switch {
   width: 36px;
@@ -3387,7 +3391,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   font-weight: 600;
   cursor: pointer;
   transition: opacity var(--motion-fast) var(--ease-out-soft), background-color var(--motion-fast) var(--ease-out-soft);
-  height: var(--height-control-md);
+  height: var(--height-control-lg);
 }
 .obe-kit-action:hover { background: color-mix(in srgb, hsl(var(--primary)), var(--press-ink) 4%); }
 /* Colour-only press — deepen the fill toward --press-ink (matches Button), no geometry shift. */
@@ -3669,8 +3673,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-kit-richtext { width: 100%; display: flex; flex-direction: column; gap: 0.25rem; }
 .obe-kit-richtext-bar { display: flex; gap: 0.25rem; }
 .obe-kit-richtext-btn {
-  width: var(--obe-gutter-btn);
-  height: var(--obe-gutter-btn);
+  width: var(--height-control-sm);
+  height: var(--height-control-sm);
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-md);
   background: hsl(var(--card));
@@ -3789,7 +3793,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   color: hsl(var(--foreground));
   cursor: pointer;
   transition: border-color var(--motion-fast) var(--ease-out-soft);
-  height: var(--height-control-md);
+  height: var(--height-control-lg);
 }
 .obe-kit-searchtrigger:hover:not(:disabled) { border-color: hsl(var(--foreground) / 0.2); }
 .obe-kit-search-placeholder { color: var(--obe-placeholder); }
@@ -3805,7 +3809,7 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
   border-radius: var(--radius-md);
   background: hsl(var(--card));
   padding: 0.25rem 0.5rem;
-  min-height: var(--height-control-md);
+  min-height: var(--height-control-lg);
 }
 .obe-kit-tag {
   display: inline-flex;
@@ -3826,6 +3830,8 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 }
 .obe-kit-tag-x:hover { color: var(--obe-chrome-ink-hover); background: var(--obe-chrome-hover); }
 .obe-kit-tag-entry { flex: 1; min-width: 4rem; }
+/* FF-7c (2026-11-09): tag entry and remove affordances remain content-sized
+   inside the 36px-minimum wrapping tags control; textareas/cards are multiline. */
 .obe-kit-tag-input {
   width: 100%;
   border: none;
