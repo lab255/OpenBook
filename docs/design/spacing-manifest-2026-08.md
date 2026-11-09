@@ -30,7 +30,7 @@ migration belongs to a later card; this amendment changes no component sizes.
 Existing recipes and exceptions below describe that pre-migration implementation.
 
 **Amended 2026-11-04 — superseded-by-owner-ruling (FF-7a, rulings 7/10):**
-Option A preserves the live values at `070ab4b4`. The existing `sm`/`lg` steps
+Option A preserves the live values at `38e5f30c`. The existing `sm`/`lg` steps
 already implement FF's 28/36px ladder. `xs`/`md` remain deprecated compatibility
 aliases expressed as literals, not `var()` references to the new ladder: remapping
 them would enlarge existing controls by 4px. Both modes explicitly declare the
