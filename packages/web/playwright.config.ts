@@ -1,4 +1,5 @@
 import {defineConfig, devices} from '@playwright/test';
+import {singleProcessConfig} from './e2e/single-process';
 
 /**
  * Playwright e2e for the web shell. Playwright manages one Next.js dev server
@@ -63,4 +64,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
-});
+}, singleProcessConfig());
