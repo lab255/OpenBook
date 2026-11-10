@@ -2237,6 +2237,23 @@ button.obe-callout-icon:hover { background: hsl(var(--foreground) / 0.06); }
 .obe-slash-label { font-size: 0.9rem; font-weight: 500; }
 .obe-slash-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* CARD-10: the insert palette only; mention/emoji pickers retain their layout.
+   The selected wash remains a fallback until the single glide is positioned. */
+/* Keep text at its final raster size; only the selection background moves. */
+.obe-insert-menu { isolation: isolate; animation: none; }
+.obe-insert-menu .obe-slash-item {
+  min-height: var(--height-control-sm);
+  padding-block: 0.25rem;
+}
+.obe-insert-menu .obe-slash-label {
+  line-height: 1.25rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.obe-insert-menu .obe-slash-active .obe-slash-label { font-weight: 600; }
+.obe-insert-menu .obe-slash-active .obe-slash-icon { color: hsl(var(--muted-foreground)); }
+.obe-insert-menu:has(> [data-fluid-hover-ready]) .obe-slash-active { background: transparent; }
+
 /* Dataflow view: a value chip pulses when its value changes (keyed remount). */
 @keyframes ob-flow-pulse {
   0% { background: hsl(var(--primary) / 0.3); }

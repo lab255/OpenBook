@@ -61,6 +61,7 @@ import {
   type PopupPosition,
 } from './popupPosition';
 import type {BlockEditorController} from './useBlockEditor';
+import {FluidHover} from '@/components/ui/fluid-hover';
 
 type IconComp = React.ComponentType<{className?: string}>;
 
@@ -274,6 +275,7 @@ export const SlashMenu: React.FC<{
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<PopupPosition | null>(null);
   const [index, setIndex] = useState(0);
+  const [scrollEpoch, setScrollEpoch] = useState(0);
 
   // Labels resolve through the catalog at open time (`slash.<id>` for core
   // items, `slash.custom.<type>` for registered blocks), falling back to the
@@ -361,7 +363,25 @@ export const SlashMenu: React.FC<{
     });
   }, [anchorEl, rootEl, state.anchorOffset, items.length]);
 
-  useEffect(() => setIndex(0), [state.query]);
+  useLayoutEffect(() => setIndex(0), [state.query]);
+
+  // Move only the popup's scroller: scrollIntoView can also scroll the
+  // document, whose capture listener dismisses the insertion menu.
+  useLayoutEffect(() => {
+    const menu = ref.current;
+    const row = menu?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!menu || !row || !pos) return;
+    const bounds = menu.getBoundingClientRect();
+    const item = row.getBoundingClientRect();
+    const top = bounds.top + menu.clientTop;
+    const bottom = top + menu.clientHeight;
+    const previousScroll = menu.scrollTop;
+    if (item.top < top) menu.scrollTop -= top - item.top;
+    else if (item.bottom > bottom) menu.scrollTop += item.bottom - bottom;
+    // A viewport jump (including last→first wrapping) must not animate the
+    // wash from an offscreen row. Re-seed the shared glide before paint.
+    if (menu.scrollTop !== previousScroll) setScrollEpoch((epoch) => epoch + 1);
+  }, [index, state.query, pos]);
 
   /** Keys forwarded from the text block (the caret stays in the document). */
   useEffect(() => {
@@ -402,7 +422,7 @@ export const SlashMenu: React.FC<{
   return (
     <div
       ref={ref}
-      className="obe-slash"
+      className="obe-slash obe-insert-menu"
       data-placement={pos?.placement}
       style={pos ? {left: pos.left, top: pos.top, maxHeight: pos.maxHeight} : {left: 0, top: 0, visibility: 'hidden'}}
       role="listbox"
@@ -435,6 +455,7 @@ export const SlashMenu: React.FC<{
           </React.Fragment>
         );
       })}
+      <FluidHover key={scrollEpoch} surface="slash" selector=".obe-slash-item" selected=".obe-slash-item[aria-selected=true]" className="bg-accent" />
     </div>
   );
 };
