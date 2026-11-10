@@ -138,6 +138,8 @@ for (const width of [1280, 390]) {
         fontSize: getComputedStyle(label).fontSize};
       return {...result, previous};
     });
+    await page.waitForTimeout(400);
+    const wrappedGlide = await menu.evaluate(el => el.querySelector('[data-fluid-hover]')?.getBoundingClientRect().toJSON());
     await page.screenshot({path: `${out}/long-label.png`});
     // Escape while the highlight is travelling, then reopen on a clean query.
     await page.keyboard.press('ArrowDown'); await page.keyboard.press('Escape');
@@ -183,7 +185,7 @@ for (const width of [1280, 390]) {
       samples, median: (sorted[5] + sorted[6]) / 2, min: sorted[0], max: sorted.at(-1),
       shifts: timing.shifts, cls: cls(timing.shifts),
       rawShiftSum: timing.shifts.reduce((sum, s) => sum + s.value, 0),
-      geometry, trace, scrolled, query, long, reduced, jump,
+      geometry, trace, scrolled, query, long, wrappedGlide, reduced, jump,
       shiftWindows: windows.map(w => {
         const shifts = timing.shifts.filter(s => s.t >= w.start && s.t <= w.end);
         return {...w, cls: cls(shifts),
@@ -208,6 +210,7 @@ for (const width of [1280, 390]) {
       expect(reduced.animation).toBe('none');
       expect(long.row.height).toBeGreaterThan(28);
       expect(long.whiteSpace).toBe('normal');
+      expect(Math.abs(wrappedGlide!.height - long.row.height)).toBeLessThan(0.5);
       expect(jump.every(f => f.count === 1 && f.visible)).toBe(true);
       for (const frame of jump) {
         expect(Math.abs(frame.glide!.top - frame.row.top)).toBeLessThan(0.5);
