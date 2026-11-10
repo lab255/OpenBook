@@ -33,10 +33,30 @@ first. The post-FF-7e measurement used a freshly installed archive with the
 `070ab4b4..38e5f30c` changes applied, leaving worker sources untouched.
 
 The ledger now requires exactly 211,511 Motion bytes and permits raw bytes in
-`[lastRow.afterRawBytes − 506, lastRow.afterRawBytes + 100]`: a two-sided window
+`[lastRow.afterRawBytes − 506, lastRow.afterRawBytes + 571]`: a two-sided window
 around the historical endpoint, sized from measured non-motion changes only
 (−506 B FF-7e CSS/string shrinkage, +100 B FF-7a explicit dark ladder
-declarations). This is not a new feature discount. Trade-off: the three
+declarations, +471 B CARD-10 command-palette polish). This is not a new feature
+discount.
+
+### Growth widening 2026-11-10 (CARD-10, owner ruling)
+
+`nonMotionGrowthBytes` moved 100 → 571 by owner ruling (thr_yipm6kxdnm,
+2026-11-10), precedent `9924500d`. The +471 B is the CARD-10 command-palette
+polish measured on a clean `build:viewer` with generated JS and graph deleted
+first: viewer CSS payload 223,775 → 224,246 B, while viewer JavaScript
+(1,706,571 B) is byte-identical before and after, the Motion module-byte sum is
+unchanged at 211,511, and no new emitted Motion modules exist.
+
+This widening is legal non-motion movement, not a feature discount: the window is
+sized from measured non-motion CSS only, and every independent guard still
+applies unchanged (exact Motion byte sum, module/export coverage, the 2,048 B
+block-own-code ceiling, the 262,144 B transportability ceiling, and the
+historical calibration seed). The alternative — narrowing the edit-only
+`SlashMenu` emission (7,319 B pulled into the viewer through `BlockEditor`) — was
+declined because a graph entry's bytes are not removable-code bytes: shared
+modules and adopter rules apply. It remains filed as an optional follow-up
+labelled architectural-with-no-proven-saving. Trade-off: the three
 measurements must be maintained; any drift beyond the window requires a new
 explicit decision rather than a silent edit. The aggregate byte sum does not
 identify features, so module/export coverage remains independently mandatory.
