@@ -6,11 +6,11 @@
   "hardDeltaCeilingRationale": "256KB chosen 2026-10-28: owner direct confirmation — protects shareability, not subset purity; current bundle is 1.92MB raw/~500KB gz. Leaves room for layout-class features (~48KB) without changing the order of magnitude. Re-evaluate when transport expectations change.",
   "blockOwnBytesCeiling": 2048,
   "endpoint": {
-    "measuredAt": "CARD-13 / 2026-11-09",
+    "measuredAt": "CARD-10 / 2026-11-10",
     "motionRenderedBytes": 211511,
     "nonMotionShrinkageBytes": 506,
-    "nonMotionGrowthBytes": 100,
-    "rationale": "Option (b): preserve ordered feature costs; require the emitted Motion module-byte sum exactly and allow a bounded window around the final feature row: -506 bytes (FF-7e non-motion shrinkage) .. +100 bytes (FF-7a explicit dark ladder declarations, 1932218 B measured in PR #435 CI). Clean Node 24.14.1 / pnpm 10.28.2 builds: 38e5f30c = 1932118 B; that tree plus FF-7e (070ab4b4..daf87bf9) = 1931612 B. Both graphs total 3215446 rendered bytes, including 211511 Motion bytes. The -506 B is non-motion CSS/string drift, not a feature saving. Positive drift is bounded by the measured non-motion growth, never by a Motion feature cost. Trade-off: maintain both the Motion graph sum and the bounded raw endpoint; future changes beyond this measured window require explicit review. Module/export coverage, historical calibration seed, block-own-code and transportability guards remain independent and unchanged."
+    "nonMotionGrowthBytes": 571,
+    "rationale": "Option (b) as amended 2026-11-10 by owner ruling (thr_yipm6kxdnm) for CARD-10: preserve ordered feature costs; require the emitted Motion module-byte sum exactly and allow a bounded window around the final feature row: -506 bytes (FF-7e non-motion shrinkage) .. +571 bytes (+100 FF-7a explicit dark ladder declarations from PR #435 CI, plus the measured +471 B command-palette polish of CARD-10). The +471 B is entirely embedded CSS (viewer CSS payload 223,775 -> 224,246 B) measured on a clean build:viewer with generated JS/graph deleted first; viewer JavaScript (1,706,571 B) is byte-identical before/after, the Motion module-byte sum is unchanged at 211511, and no new emitted Motion modules exist. The window absorbs legal measured non-motion movement only; it is never an allowance for a new Motion feature cost. Precedent for widening: 9924500d. Module/export coverage, historical calibration seed, block-own-code and transportability guards remain independent and unchanged."
   },
   "features": [
     {
