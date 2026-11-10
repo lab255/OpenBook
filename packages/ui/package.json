@@ -37,7 +37,7 @@
     "dev-css": "pnpm exec tailwindcss --input ./src/index.css --output ./dist/index.css --watch",
     "dev-types": "tsc --watch",
     "lint": "eslint . && pnpm run lint:css && pnpm run test:stylelint",
-    "lint:css": "stylelint src/index.css",
+    "lint:css": "stylelint src/index.css src/export/exportTokens.css src/export/exportTokensDark.css",
     "lint-fix": "eslint . --fix",
     "test:stylelint": "node scripts/assert-spacing-stylelint.mjs",
     "typecheck": "tsc --noEmit",

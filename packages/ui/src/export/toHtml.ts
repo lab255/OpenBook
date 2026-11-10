@@ -59,6 +59,8 @@ import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../bl
 import {kitChartRuntime, kitChartSvg} from './kitChart';
 import {formatValue} from './format';
 import {entranceCss} from '../viewer/entranceCss';
+import exportTokens from './exportTokens.css?raw';
+import exportTokensDark from './exportTokensDark.css?raw';
 import {inlineScriptHash, pageCsp} from './exportCsp';
 import {pageIconToText} from '@/lib/iconValue';
 import {cellValue, formatCellValue} from '@/components/database/databaseCells';
@@ -1284,7 +1286,7 @@ const SCHEME_LIGHT = `
 `;
 const schemeDual = (scheme: DataColorScheme): string => `
 :root { color-scheme: light dark; }
-@media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: dark) {${exportTokensDark}
   body { background: #18181b; color: #e7e7ea; }
   .callout { background: hsl(0 0% 18.5%); }
   :root { --obe-x-border: hsl(0 0% 22%); --obe-x-muted: hsl(0 0% 59.1%); --obe-x-head: hsl(0 0% 18.5% / 0.5); }
@@ -1312,7 +1314,7 @@ const stylesFor = (scheme: DataColorScheme): string => `
   --motion-slow: 240ms;
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
-}
+}${exportTokens}
 * { box-sizing: border-box; }
 body { margin: 0; background: #fff; color: #1a1a1a; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 main { max-width: 720px; margin: 0 auto; padding: 48px 24px 120px; }

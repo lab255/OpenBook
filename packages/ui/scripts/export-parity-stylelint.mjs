@@ -14,14 +14,17 @@ const inCore = node => inside(node, parent => parent.type === 'rule' && /\.obe-[
 
 export default stylelint.createPlugin(ruleName, enabled => (root, result) => {
   if (!enabled) return;
+  // Static mirror files are declaration-only contracts, so guard their entire
+  // dependency graph, including root declarations without an .obe-* consumer.
+  const mirror = /[/\\]exportTokens(?:Dark)?\.css$/.test(root.source?.input.file ?? '');
   const theme = new Set();
   const plain = new Map();
   root.walkDecls(/^--/, decl => {
     if (inTheme(decl)) theme.add(decl.prop);
     else plain.set(decl.prop, [...(plain.get(decl.prop) ?? []), ...variables(decl.value)]);
   });
-  // TODO(FF-6): widen with the approved export-mirror token allowlist and parity
-  // tests. Until then, no Tailwind-generated dependency (even via an alias).
+  // FF-6 mirrors plain root/dark declarations only. This deliberately does not
+  // authorize Tailwind-generated dependencies, even through a plain alias.
   function generated(name, seen = new Set()) {
     if (seen.has(name)) return false;
     seen.add(name);
@@ -34,7 +37,7 @@ export default stylelint.createPlugin(ruleName, enabled => (root, result) => {
       message: `Core block CSS must use plain export-mirrored tokens; Tailwind dependencies await FF-6: ${node.toString()}`});
   }
   root.walkDecls(decl => {
-    if (inCore(decl) && variables(decl.value).some(name => generated(name))) report(decl);
+    if ((mirror || inCore(decl)) && variables(decl.value).some(name => generated(name))) report(decl);
   });
-  root.walkAtRules('apply', node => { if (inCore(node)) report(node); });
+  root.walkAtRules('apply', node => { if (mirror || inCore(node)) report(node); });
 });

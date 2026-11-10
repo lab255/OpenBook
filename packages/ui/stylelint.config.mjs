@@ -12,8 +12,8 @@ const spacingAtom = String.raw`(?:0|auto|${gridPx}|${gridRem}|${percentage}|${va
 const spacingValue = `/^${spacingAtom}(?:\\s+${spacingAtom}){0,3}$/`;
 export default {
   plugins: [designTokens, exportParity],
-  // The package script intentionally passes only src/index.css; generated CSS
-  // and component-local styles are owned by other spacing clusters.
+  // The package script checks index.css and its independent plain export token
+  // mirrors; generated CSS and component-local styles have separate owners.
   rules: {
     // DSX warn-only baseline at foundation input: durations 44, easings ~40,
     // literal colours 99, radius 84, editor font sizes ~120, z-index 1.
