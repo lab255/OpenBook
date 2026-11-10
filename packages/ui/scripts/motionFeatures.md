@@ -72,3 +72,71 @@ independent guard by itself.
 `hardDeltaCeiling` (262,144), the historical `calibration.seededProductionRawBytes`
 (1,922,068), and baseline script hashes stay unchanged. The calibration test's
 local `seeded` continues to read today's production artifact by design.
+
+CARD-11 token-mirror policy (2026-11-10): the static exporter now carries every
+plain `index.css` root token and explicit dark override, with full inventory and
+emitted-value equality checks in `exportTokens.test.ts`. Independent declarations
+live in `export/exportTokens.css` and `export/exportTokensDark.css`; the original
+five CSS tween tokens remain in `toHtml.ts`. Only literals and closed plain-CSS
+dependency chains travel. Tailwind-only theme variables/utilities and JS spring
+presets are not part of this mirror. The conservative lint guard remains in
+force and now also checks the mirror files themselves. See the
+[export doctrine](../src/export/README.md#ff-6-plain-token-mirror-policy-card-11-2026-11-10)
+for scheme handling, compatibility tokens and deliberately deferred typography.
+
+Token availability is not motion adoption. CARD-11 adds no consuming selector
+or layout-class behavior, changes no exported observable, and does not authorize
+new Motion modules. A later layout consumer still must be present immediately
+and animate only on subsequent changes. The mirror is imported by the exporter,
+not the viewer entry: measure the clean viewer before/after, but do not add a
+feature row for inert export CSS when viewer bytes and Motion modules are
+unchanged. Export HTML growth is separately classified as an inert, cosmetic
+deferrable fork; fixed-input byte comparison must isolate only the declaration
+additions, preserving scripts, source islands and all existing CSS rules.
+
+CARD-11 worker measurement / stop (2026-11-10): clean output measured
+1,932,471 B before and 1,932,521 B after (+50 B), with byte-identical module
+graph and exactly 211,511 Motion bytes. The upper endpoint is 1,932,475 B
+(last historical row 1,932,375 + 100), so the candidate is **46 B outside the
+window and must not land**. The new guard fixture's literal `bg-red‑500` is
+picked up by Tailwind source discovery and adds an otherwise unused generated
+utility to the viewer CSS. The worker stopped under the dispatch rule; no ledger
+row, endpoint, budget or allowance was changed. Resolve that fixture leakage and
+repeat clean measurement before treating the declaration-only policy above as
+verified for this candidate. A successful build command alone is insufficient:
+call `assertLedgerEndpoint` against the final emitted file as the ledger test does.
+
+Diagnostic spelling note (2026-11-10): the utility name above uses a non-breaking hyphen before 500; its original runtime spelling joins `bg`, `red`, and `500` with ASCII hyphens. The literal is encoded so Tailwind’s scanner cannot see it.
+
+2026-11-10 — **superseded-by-owner-ruling (Manager relay, CARD-11):** the stop
+above is retained as measurement history. The Manager clarified that correcting
+our own test-source pollution is in scope, not a feature-budget exception. The
+negative `@apply` fixture now constructs its utility name from separate strings;
+the diagnostic documents encode that name so they do not regenerate the utility.
+The assertion still rejects `@apply`. With generated JS/graph and CSS-bearing
+dist/Next outputs removed, the final viewer is **1,932,471 B**, byte-identical to
+the dispatch-base artifact, with **211,511 Motion bytes** and **4 B headroom**.
+The final-file endpoint assertion passes. No ledger row or window change is needed.
+
+Separate export-payload accounting: the mirror adds **6,215 B** to light-only
+hydrated HTML and **9,231 B** to dual-scheme legacy/deck HTML. Five fixed-input
+comparisons recover the original HTML exactly after removing only those added
+declaration blocks. For the 262,144 B shareability allowance, measuring the
+`aea2f52c` exporter with the same inputs and viewer isolates envelope growth:
+6,985 B for hydrated page/site/ledger, 9,874 B legacy, 9,903 B deck. Add the
+independently recorded viewer growth of 85,958 B to hydrated paths: **92,943 B**
+accounted growth, **169,201 B** below the allowance. This is component accounting
+against the historical exporter and recorded viewer baseline, not a replay of
+the original historical viewer binary. Document content and assets are held fixed.
+
+Source-discovery residual (separate build-scope card): this repo has no explicit
+Tailwind `content` glob. `src/index.css` imports Tailwind v4 without `source(...)`
+and `postcss.config.js` supplies empty options. The plugin defaults to
+`base=process.cwd()` and an automatic `**/*` scan. Under the package command,
+that base is `packages/ui`; the scanner's dependency report includes
+`scripts/motionFeatures.md` and Markdown/TS glob entries under `scripts` and
+`src`. Thus tests and documentation in that package can affect generated CSS.
+The worktree-root report is **not scanned in this invocation**, but changing
+the build working directory could widen discovery. This is the automatic-glob
+equivalent of broad content scanning, not an explicit Markdown import. Encoding
+the local evidence fixes this card; scanner configuration is deliberately unchanged.

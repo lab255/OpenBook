@@ -57,5 +57,8 @@ export default defineConfig ({
   test: {
     environment: 'happy-dom',
     globals: true,
+    // Export CSS is a raw string payload. Vitest otherwise stubs CSS imports
+    // to an empty string, hiding missing token transport in emitted-HTML tests.
+    css: {include: [/exportTokens(?:Dark)?\.css/]},
   },
 });
