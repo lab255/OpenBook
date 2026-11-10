@@ -1,3 +1,25 @@
+## 3.28.0 (2026-11-10)
+
+### 🚀 Features
+
+- **ui:** ship InterVariable as an app-only variable face (FF-5) ([#432](https://github.com/lab255/OpenBook/pull/432))
+- **ui:** sentence-case eyebrow labels (FF-7e, rebased) ([#436](https://github.com/lab255/OpenBook/pull/436))
+- **ui:** pixel-neutral FF control ladder tokens (FF-7a, Option A) ([#435](https://github.com/lab255/OpenBook/pull/435))
+- **ui:** FF-4b fluid hover in chrome — sidebar rows + settings rail ([#430](https://github.com/lab255/OpenBook/pull/430))
+- **ui:** control consumers and exported kit onto the FF ladder (FF-7c) ([#437](https://github.com/lab255/OpenBook/pull/437))
+- **ui:** menu, select and command rows on the 28px ladder step (FF-7b) ([#438](https://github.com/lab255/OpenBook/pull/438))
+
+### 🩹 Fixes
+
+- **ui:** bound non-motion drift at the viewer ledger endpoint (CARD-13) ([#434](https://github.com/lab255/OpenBook/pull/434))
+- **ui:** size the ledger endpoint window from both measured non-motion changes ([9924500d](https://github.com/lab255/OpenBook/commit/9924500d))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 5.5
+- Eliot Lim @eliotlim
+
 ## 3.27.0 (2026-10-31)
 
 ### 🚀 Features
