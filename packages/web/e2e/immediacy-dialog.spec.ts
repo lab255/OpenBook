@@ -120,6 +120,44 @@ for (const width of [1280, 390]) {
     writeFileSync(testInfo.outputPath('summary.json'), JSON.stringify(summary, null, 2));
     writeFileSync(testInfo.outputPath('filmstrip.html'), `<!doctype html><meta charset="utf-8"><title>Command dialog ${width}</title><style>body{font:16px system-ui}.frames{display:flex;gap:8px}figure{margin:0}img{width:250px;image-rendering:auto}figcaption{font-size:12px}</style><h1>Command dialog ${width} — review the first visible row in every run</h1><p>JPEG ink detection is provisional until these pairs are visually reviewed. Times come from matching compositor presentation records, never screenshot capture timestamps.</p>${filmstrip.join('')}`);
     console.log(JSON.stringify({width, lower: summary.lower, upper: summary.upper}));
+    // Functional motion checks AFTER timing ends; these rAF samples are never
+    // used to calculate the presentation gate.
+    const motion = [];
+    for (const reduced of [false, true]) {
+      await page.emulateMedia({reducedMotion: reduced ? 'reduce' : 'no-preference'});
+      await page.evaluate(() => {
+        const samples: {opacity: string; transform: string; duration: string}[] = [];
+        Object.assign(window, {ffMotion: samples});
+        document.addEventListener('keydown', function start(e) {
+          if (e.key.toLowerCase() !== 'k') return;
+          document.removeEventListener('keydown', start, true);
+          const until = performance.now() + 300;
+          function sample() {
+            const dialog = document.querySelector('[role="dialog"]');
+            if (dialog) {
+              const style = getComputedStyle(dialog);
+              samples.push({opacity: style.opacity, transform: style.transform, duration: style.animationDuration});
+            }
+            if (performance.now() < until) requestAnimationFrame(sample);
+          }
+          requestAnimationFrame(sample);
+        }, true);
+      });
+      await page.keyboard.press('ControlOrMeta+k');
+      await page.waitForTimeout(350);
+      const samples = await page.evaluate(() => (window as unknown as {
+        ffMotion: {opacity: string; transform: string; duration: string}[];
+      }).ffMotion);
+      motion.push({reduced, samples});
+      expect(samples.length).toBeGreaterThan(2);
+      expect(samples.every(s => s.opacity === '1'), 'Entry exposes row content throughout').toBe(true);
+      if (reduced) expect(samples.every(s => parseFloat(s.duration) <= 0.00006)).toBe(true);
+      else expect(new Set(samples.map(s => s.transform)).size, 'Visible scale entry remains').toBeGreaterThan(2);
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[cmdk-input]')).toHaveCount(0);
+      await page.waitForTimeout(150);
+    }
+    writeFileSync(testInfo.outputPath('entry-motion.json'), JSON.stringify(motion, null, 2));
     expect(summary.upper.gate, 'Every sample must be <=50ms; filmstrip review is additionally required').toBe('PASS');
   });
 }

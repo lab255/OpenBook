@@ -19,7 +19,17 @@ export function presentedFrames(events) {
   }
   return events.filter(e => e.name === 'Screenshot').map((e, index) => {
     const key = `${e.args.source_id}:${e.args.frame_sequence}`;
-    const times = presentations.get(key) ?? [];
+    let times = presentations.get(key) ?? [];
+    // AnimationFrame::Presentation carries the ACTUAL presented begin-frame
+    // ID, unlike a forked reporter's original work sequence. When present,
+    // require its timestamp to corroborate a presented pipeline endpoint.
+    const direct = [...new Set(events.filter(p => p.name === 'AnimationFrame::Presentation'
+      && p.args?.begin_frame_id?.source_id === e.args.source_id
+      && p.args?.begin_frame_id?.sequence_number === e.args.frame_sequence).map(p => p.ts))];
+    if (direct.length === 1) {
+      if (!times.includes(direct[0])) throw new Error(`Uncorroborated presentation for ${key}`);
+      times = direct;
+    }
     return {index, key, snapshot: e.args.snapshot,
       // Ambiguous forked frames retain their entire interval; never choose the
       // favorable endpoint or silently use an estimated/callback timestamp.

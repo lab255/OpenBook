@@ -36,8 +36,11 @@ or Settings or reuse their historical numbers.
    begin/end pairs. Ignore dropped/no-update records. **End = presentation `ts`
    of the matched presented frame**. `Screenshot.ts` is a capture callback;
    `expected_display_time` is an estimate. Neither is used as the measurement.
-   Forked reporters can give two endpoints for one sequence; preserve the full
-   interval and use its upper endpoint for the gate. Never pick the faster one.
+   `AnimationFrame::Presentation` carries the actual presented begin-frame ID;
+   when it matches the screenshot, require its timestamp to equal a presented
+   pipeline endpoint. Otherwise forked reporters can give two endpoints for one
+   original work sequence: preserve the full interval and use its upper endpoint
+   for the gate. Never pick the faster one without that direct corroboration.
 4. After tracing ends, inspect the pixels in the first row's text rectangle,
    padded 6 CSS pixels for entry scale. Subtract the closed frame's horizontal
    local contrast to exclude the underlying document's placeholder. The first

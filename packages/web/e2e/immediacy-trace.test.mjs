@@ -17,6 +17,14 @@ test('dropped, unmatched and foreign-source frames cannot fabricate presentation
   const frames = presentedFrames([begin('STATE_DROPPED', 'a', 10), end('a', 20), shot(), shot(8)]);
   assert.ok(frames.every(f => f.earliestUs === null && f.latestUs === null));
 });
+test('actual presented frame ID disambiguates original-work fork sequences', () => {
+  const events = [begin('STATE_PRESENTED_PARTIAL', 'a', 10), end('a', 20),
+    begin('STATE_PRESENTED_ALL', 'b', 10), end('b', 35), shot(),
+    {name: 'AnimationFrame::Presentation', ts: 20, args: {begin_frame_id: {source_id: 9, sequence_number: 7}}}];
+  assert.equal(presentedFrames(events)[0].latestUs, 20);
+  events.at(-1).ts = 12;
+  assert.throws(() => presentedFrames(events), /Uncorroborated/);
+});
 test('keydown is the event enclosing capture listener, excluding modifier and keyup', () => {
   const event = {name: 'EventTiming', ph: 'b', ts: 1000, args: {data: {type: 'keydown', timeStamp: 1, processingStart: 2, processingEnd: 3}}};
   assert.equal(keydownForRun([event, {name: 'ff-input-0', ts: 2500}], 0), 1000);
