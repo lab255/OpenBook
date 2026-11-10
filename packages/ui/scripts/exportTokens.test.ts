@@ -94,7 +94,9 @@ describe('FF-6 full plain-CSS export token mirror (G2)', () => {
   });
 
   it.each(['exportTokens.css', 'exportTokensDark.css'])('keeps the Tailwind guard active throughout %s', async file => {
-    for (const declaration of ['color: var(--tw-shadow-color)', '--alias: var(--color-red-500)', '--alias: var(--font-sans)', '@apply bg-red-500']) {
+    // A real utility written literally here would be scanned into viewer CSS.
+    const utility = ['bg', 'red', '500'].join('-');
+    for (const declaration of ['color: var(--tw-shadow-color)', '--alias: var(--color-red-500)', '--alias: var(--font-sans)', `@apply ${utility}`]) {
       const result = await stylelint.lint({
         code: `:root { ${declaration}; }`, codeFilename: `src/export/${file}`,
         config: {plugins: [exportParity], rules: {'design-tokens/export-parity': true}},
