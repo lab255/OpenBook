@@ -72,3 +72,36 @@ independent guard by itself.
 `hardDeltaCeiling` (262,144), the historical `calibration.seededProductionRawBytes`
 (1,922,068), and baseline script hashes stay unchanged. The calibration test's
 local `seeded` continues to read today's production artifact by design.
+
+CARD-11 token-mirror policy (2026-11-10): the static exporter now carries every
+plain `index.css` root token and explicit dark override, with full inventory and
+emitted-value equality checks in `exportTokens.test.ts`. Independent declarations
+live in `export/exportTokens.css` and `export/exportTokensDark.css`; the original
+five CSS tween tokens remain in `toHtml.ts`. Only literals and closed plain-CSS
+dependency chains travel. Tailwind-only theme variables/utilities and JS spring
+presets are not part of this mirror. The conservative lint guard remains in
+force and now also checks the mirror files themselves. See the
+[export doctrine](../src/export/README.md#ff-6-plain-token-mirror-policy-card-11-2026-11-10)
+for scheme handling, compatibility tokens and deliberately deferred typography.
+
+Token availability is not motion adoption. CARD-11 adds no consuming selector
+or layout-class behavior, changes no exported observable, and does not authorize
+new Motion modules. A later layout consumer still must be present immediately
+and animate only on subsequent changes. The mirror is imported by the exporter,
+not the viewer entry: measure the clean viewer before/after, but do not add a
+feature row for inert export CSS when viewer bytes and Motion modules are
+unchanged. Export HTML growth is separately classified as an inert, cosmetic
+deferrable fork; fixed-input byte comparison must isolate only the declaration
+additions, preserving scripts, source islands and all existing CSS rules.
+
+CARD-11 worker measurement / stop (2026-11-10): clean output measured
+1,932,471 B before and 1,932,521 B after (+50 B), with byte-identical module
+graph and exactly 211,511 Motion bytes. The upper endpoint is 1,932,475 B
+(last historical row 1,932,375 + 100), so the candidate is **46 B outside the
+window and must not land**. The new guard fixture's literal `bg-red-500` is
+picked up by Tailwind source discovery and adds an otherwise unused generated
+utility to the viewer CSS. The worker stopped under the dispatch rule; no ledger
+row, endpoint, budget or allowance was changed. Resolve that fixture leakage and
+repeat clean measurement before treating the declaration-only policy above as
+verified for this candidate. A successful build command alone is insufficient:
+call `assertLedgerEndpoint` against the final emitted file as the ledger test does.
