@@ -140,3 +140,38 @@ The worktree-root report is **not scanned in this invocation**, but changing
 the build working directory could widen discovery. This is the automatic-glob
 equivalent of broad content scanning, not an explicit Markdown import. Encoding
 the local evidence fixes this card; scanner configuration is deliberately unchanged.
+
+FF-GUTTER-HANDLE prototype measurement (2026-11-10; base `51b988ac`,
+opt-in app surface, owner decision pending):
+
+| Surface | Viewer raw before → after | Motion module bytes before → after | Measured viewer cost |
+| --- | --- | --- | --- |
+| Shared gutter paint, `?gutterHandle=shared` | 1,932,471 → 1,932,471 B | 211,511 → 211,511 B | 0 B |
+
+This is an app Motion spring, **not pure CSS**. `BlockPageDocument` imports the
+app-owned component and stylesheet; the export viewer imports neither. Existing
+row controls still own hit testing, drag, menus and keyboard focus. The moving
+paint is layout-adjacent but absent from hydrated, legacy and PDF exports:
+`editor-shared-gutter-prototype` has `exportSafe: false` and an empty
+`exportedObservable`. No exporter or mirror literal changes.
+
+Both generated vendor files were deleted before the measurement, and the SDK
+was provisioned first. The regenerated viewer JS and graph sidecar are each
+byte-identical to the base artifacts (including module identities/exports).
+No new viewer Motion module or byte is emitted, so the historical feature rows
+and endpoint window remain unchanged; the remaining non-motion headroom is 4 B.
+This zero-cost measurement does not by itself grant adoption approval. Reproduce
+with the committed `shared-gutter-prototype.spec.ts` driver and compare clean
+vendor artifacts before/after.
+
+**2026-11-10 — ADOPTED by owner ruling (thr_yipm6kxdnm), superseding the "owner
+decision pending" framing above.** The shared gutter handle is adopted (narrowed,
+conditional); the block-wide traveling fill remains declined. Conditions in
+force: fine-pointer only; the pre-existing nested-column divider conflict must be
+resolved before any default flip; focus-suppression policy ratified as
+implemented. The handle therefore ships **gated behind `?gutterHandle=shared`**
+so no default is flipped. Residuals accepted as-is: the 204 px long-block anchor
+is declared orthogonal (the native gutter anchors identically today) and the
+menu-exit transient is accepted as cosmetic (it recovers without misaction).
+Post-rebase clean rebuild measured non-motion headroom of **475 B**, not 4 B.
+4e22000e (test(ui): record shared gutter evidence and unresolved divider conflict)
