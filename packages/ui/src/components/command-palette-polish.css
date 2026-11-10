@@ -1,0 +1,13 @@
+/* App-only palette policy. Shared cmdk/FF primitives and exports stay intact. */
+[data-command-palette-list] {
+  /* Reserve the existing maximum, so filtering and async results cannot
+     recenter the dialog underneath the input or the traveling highlight. */
+  height: min(420px, 60vh);
+  /* Keep keyboard targets above the existing 20px bottom fade. */
+  scroll-padding-block: 20px;
+}
+
+[data-command-palette-list] [cmdk-item][aria-selected='true'] {
+  font-weight: var(--font-weight-medium, 500);
+  color: inherit;
+}

@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/command';
 import React from 'react';
 import './command-menu.css';
+import './command-palette-polish.css';
 import type {AiSearchResult, PageMeta} from '@book.dev/sdk';
 import {FileText} from 'lucide-react';
 import {useData} from '@/data';
@@ -58,6 +59,7 @@ export function CommandMenu() {
   // Controlled query so AI features set to "enabled" surface only while the
   // user is searching (disabled ones never; recommended ones always).
   const [search, setSearch] = React.useState('');
+  const listRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!open) setSearch('');
   }, [open]);
@@ -123,6 +125,18 @@ export function CommandMenu() {
     }, 180);
     return () => clearTimeout(timer);
   }, [search, open, searchRows, client]);
+
+  // cmdk can retain a scroll offset while restoring/reordering filtered groups.
+  // Reconcile after its layout effects, including async result arrival, so the
+  // selected row and its glide return to the visible portion of this list.
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]')
+        ?.scrollIntoView({block: 'nearest'});
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, search, async_]);
 
   // Favourites + recents live in localStorage; bump on change so the palette
   // reflects a pin/visit made while it's open.
@@ -208,6 +222,8 @@ export function CommandMenu() {
       {/* App-owned entry policy; the installed CommandDialog stays untouched. */}
       <CommandInput data-command-palette-input="" placeholder={t('command.placeholder')} value={search} onValueChange={setSearch} />
       <CommandList
+        ref={listRef}
+        data-command-palette-list=""
         className="max-h-[min(420px,60vh)] pb-3 [mask-image:linear-gradient(to_bottom,black_calc(100%-20px),transparent)]"
         onContextMenu={suppressContextMenu}
       >
