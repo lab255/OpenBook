@@ -1,0 +1,48 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui
+
+ ✓ src/blockeditor/canvas/simplify.test.ts > preserves endpoints, corners and pressure extrema without hard truncation 4ms
+ ✓ src/blockeditor/canvas/relay.test.ts > actual relay queue delivers structural undo/redo bytes exactly once without echo 11ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > winning move undo/redo and losing undo; client ids 101/202 15ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > token/value pairing unequal lengths, x-only vs x/y, inverse reuse 101/202 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > winning move undo/redo and losing undo; client ids 202/101 3ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > token/value pairing unequal lengths, x-only vs x/y, inverse reuse 202/101 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > concurrent inverse token reuse vs new move 101/202 8ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > concurrent inverse token reuse vs new move 202/101 3ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > token lineage: two edits, two undos, two redos 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > redo after remote move partially skips 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > remote erase before undo never resurrects 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > append + pressure undo/redo is atomic and projects offsets 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > erase restores complete geometry after semantic edits 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > grouped multi-selection one history entry 1ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > cancel unpublished preview preserves remote geometry 1ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > interleaved page/canvas history and new edit clears both redos 2ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > root no-op cannot skip across semantic entry 4ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > raw undo bytes use recognized local origin, remote updates never echo 1ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > read-only command/structural/history guards 0ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > invalid/fallback docs are quarantined and immutable projection survives edits 1ms
+ ✓ src/blockeditor/canvas/history.test.ts > D3 required proof > erase versus concurrent edit and append converges delete-wins 2ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — connectPageRelay > propagates a local edit to another doc 148ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — connectPageRelay > coalesces a burst into one POST and never re-relays a remote update (no loop) 144ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — connectPageRelay > keeps at most one POST in flight (backpressure) and coalesces the rest 356ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — connectPageRelay > converges concurrent edits from both docs (CRDT union) 175ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — late-joiner handshake > converges a client that joins after edits were already relayed 267ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > the runtime registry and the catalogue kit entries match exactly 1ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > core types are all catalogued and never collide with registered custom blocks 1ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > meeting container notes and structured props survive the UI model round trip 3ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > the model's nature sets ARE the catalogue's 0ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > kit-value support mirrors the scope INPUT_TYPES 0ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > every scope input type has a value reader 2ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > bundled plugin manifest ↔ source drift guard > every bundled plugin declares exactly the blocks its source registers 0ms
+ ✓ src/blockeditor/registryCatalogue.test.tsx > bundled plugin manifest ↔ source drift guard > the ledger plugin declares its journal-entry block (list_block_types depends on it) 0ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T7 — reconnect re-handshake > re-syncs exactly the ops missed during a disconnect (tight, not snapshot-rate) 206ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T7 — reconnect re-handshake > coalesces a flap of reconnect signals into at most one follow-up sync (no storm) 215ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T7 — reconnect re-handshake > does not re-handshake after disconnect (unsubscribed from the reconnect signal) 63ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — origin discipline + snapshot backstop > isRemoteOrigin flags exactly the non-local origins 0ms
+ ✓ src/blockeditor/__tests__/relay.test.ts > Collab T2 — origin discipline + snapshot backstop > degrades to the snapshot backstop when the relay delivers nothing (tunnel poll-mode) 105ms
+
+ Test Files  5 passed (5)
+      Tests  39 passed (39)
+   Start at  21:06:40
+   Duration  2.59s (transform 1.58s, setup 0ms, import 2.36s, tests 1.76s, environment 1.09s)
+

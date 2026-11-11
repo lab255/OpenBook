@@ -1,0 +1,27 @@
+
+> @book.dev/server@3.29.0 build /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/server
+> tsup
+
+CLI Building entry: {"bin":"src/bin.ts","index":"src/index.ts","browser":"src/browser.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/server/tsup.config.ts
+CLI Target: node18
+CLI Cleaning output folder
+ESM Build start
+ESM dist/bin.js                215.00 B
+ESM dist/browser.js            30.97 KB
+ESM dist/index.js              552.00 B
+ESM dist/chunk-OMCUXMZ6.js     429.78 KB
+ESM dist/chunk-JK4JCWIB.js     442.23 KB
+ESM dist/bin.js.map            556.00 B
+ESM dist/browser.js.map        62.85 KB
+ESM dist/index.js.map          71.00 B
+ESM dist/chunk-JK4JCWIB.js.map 830.53 KB
+ESM dist/chunk-OMCUXMZ6.js.map 1.00 MB
+ESM ⚡️ Build success in 54ms
+DTS Build start
+DTS ⚡️ Build success in 1988ms
+DTS dist/index.d.ts        69.69 KB
+DTS dist/browser.d.ts      13.63 KB
+DTS dist/hub-WfPltPyg.d.ts 136.85 KB

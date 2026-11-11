@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   BlockEditor,
+  newCanvas,
   connectBroadcast,
   registerReactiveBlocks,
   registerArtifactKit,
@@ -30,7 +31,7 @@ export default function EditorLab() {
     return createSeededBlockDoc([
       {type: 'heading', text: 'Editor lab', props: {level: 1}},
       {type: 'paragraph', text: 'A scratch document for the new editor. Type “/” for blocks, select text to format, drag the ⠿ handle — drop a block beside another to make columns.'},
-      {type: 'todo', text: 'Open this page in a second window to watch live sync'},
+      newCanvas(),
     ]);
   }, []);
 
@@ -53,7 +54,10 @@ export default function EditorLab() {
     };
     doc.on('update', onUpdate);
     const conn = connectBroadcast(doc, 'editor-lab', `Tab ${String(doc.clientID).slice(-3)}`);
+    conn.setPresence(null);
     const offPeers = conn.onPeers(setPeers);
+    // Local evidence harness inspects live state; it does not simulate transport.
+    Object.assign(window, {canvas5Doc: doc});
     return () => {
       doc.off('update', onUpdate);
       offPeers();
@@ -67,7 +71,7 @@ export default function EditorLab() {
       <div style={{maxWidth: '44rem', margin: '0 auto', padding: '3rem 1.5rem 0'}}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem'}}>
           <span style={{fontSize: 12, color: 'hsl(var(--muted-foreground))'}}>editor lab · synced across tabs</span>
-          <span style={{display: 'flex', gap: 6}}>
+          <span data-peer-count={peers.length} style={{display: 'flex', gap: 6, height: 18}}>
             {peers.map((p) => (
               <span
                 key={p.clientId}
@@ -78,7 +82,7 @@ export default function EditorLab() {
           </span>
         </div>
       </div>
-      <BlockEditor doc={doc} ariaLabel="Editor lab document" />
+      <BlockEditor readOnly={new URLSearchParams(window.location.search).has('readonly')} doc={doc} ariaLabel="Editor lab document" />
     </div>
   );
 }

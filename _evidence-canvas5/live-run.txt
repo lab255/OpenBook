@@ -1,0 +1,1 @@
+{"samples":12,"cls":{"value":0,"shifts":[],"supported":true},"errors":[],"queued":[1,1],"winner":"B"}

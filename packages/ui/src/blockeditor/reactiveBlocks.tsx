@@ -1,3 +1,4 @@
+import {registerCanvasBlock} from './canvas/CanvasBlock';
 import React from 'react';
 import {blockProp, setBlockProp} from './model';
 import {formatValue} from './kit/scope';
@@ -94,6 +95,7 @@ const FormulaBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
 
 /** Register the built-in reactive blocks (idempotent enough for app startup). */
 export function registerReactiveBlocks(): void {
+  registerCanvasBlock(); // CANVAS-5 prototype registration and catalogue parity.
   registerCustomBlock({
     type: 'slider',
     render: SliderBlock,

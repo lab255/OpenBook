@@ -89,6 +89,7 @@ const CATALOGUE_LITERAL = [
   {type: 'accordion', category: 'core', nature: 'container', props: {name: 'string', gated: 'boolean'}, hint: '{name?,gated?} → accordionsection children'},
   {type: 'accordionsection', category: 'core', nature: 'container', parent: 'accordion', props: {label: 'string', collapsed: 'boolean'}, hint: '{label,collapsed?}'},
   // ── Kit inputs (publish a named value into the reactive scope) ─────────────
+  {type: 'canvas', category: 'kit', nature: 'void', props: {canvasVersion: 'number', height: 'number', background: 'string', shapes: 'object'}, hint: 'canvas prototype'},
   {type: 'slider', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', value: 'number', min: 'number', max: 'number', step: 'number'}, hint: '{name,label?,value,min,max,step?}'},
   {type: 'number', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', value: 'number', min: 'number', max: 'number', step: 'number'}, hint: '{name,label?,value,min?,max?,step?}'},
   {type: 'textfield', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', value: 'string', placeholder: 'string'}, hint: '{name,label?,value?,placeholder?}'},
