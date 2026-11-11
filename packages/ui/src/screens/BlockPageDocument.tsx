@@ -1,3 +1,4 @@
+import {SharedGutter} from '@/blockeditor/SharedGutter';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import * as Y from 'yjs';
 import type {PageSnapshot} from '@book.dev/sdk';
@@ -667,6 +668,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
                 />
               </FormOriginContext.Provider>
             )}
+            {doc && canWrite && <SharedGutter key={pageId} containerRef={editorWrapRef} />}
             {/* Inline review affordances (provider-aware, portaled into the
                 editor wrapper since the editor's own root is provider-less). */}
             {pageId && doc && <BlockReviewMarkers pageId={pageId} containerRef={editorWrapRef} />}

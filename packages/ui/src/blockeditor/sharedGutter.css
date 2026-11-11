@@ -1,0 +1,25 @@
+/* App-only paint. Original row controls keep native hit testing and tab order. */
+.obe-shared-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: var(--obe-gutter-btn);
+  display: flex;
+  align-items: center;
+  gap: var(--obe-gutter-gap);
+  pointer-events: none;
+  z-index: var(--z-index-local-overlay);
+}
+.obe-shared-handle { width: var(--obe-handle-w); }
+.obe-shared-hot { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.obe-root[data-shared-gutter-active] .obe-row > .obe-gutter:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+.obe-root[data-shared-gutter-active] .obe-row[data-shared-gutter-target] > .obe-gutter {
+  pointer-events: auto;
+}
+@media (pointer: coarse) {
+  .obe-shared-gutter { display: none; }
+}
