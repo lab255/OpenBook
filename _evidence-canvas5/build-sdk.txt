@@ -1,0 +1,4 @@
+
+> @book.dev/sdk@3.29.0 build /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/sdk
+> tsc -p tsconfig.build.json
+

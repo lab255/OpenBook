@@ -1,0 +1,2 @@
+TypeError: Cannot read properties of undefined (reading 'x')
+    at /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/_evidence-canvas5/live-session.cjs:58:183

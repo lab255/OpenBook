@@ -1,0 +1,42 @@
+
+> @book.dev/web@3.29.0 dev /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/web
+> next dev --hostname 127.0.0.1 --port 3105
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://127.0.0.1:3105
+- Network:       http://127.0.0.1:3105
+✓ Ready in 918ms
+
+○ Compiling /editor-lab ...
+ GET /editor-lab 200 in 10.5s (next.js: 10.5s, application-code: 24ms)
+✓ Compiled in 1487ms
+ GET /editor-lab 200 in 367ms (next.js: 350ms, application-code: 17ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 218ms (next.js: 203ms, application-code: 15ms)
+ GET /editor-lab 304 in 7ms (next.js: 2ms, application-code: 5ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 19ms (next.js: 2ms, application-code: 17ms)
+✓ Compiled in 40ms
+✓ Compiled in 17ms
+✓ Compiled in 1309ms
+✓ Compiled in 1782ms
+ GET /editor-lab 200 in 474ms (next.js: 465ms, application-code: 9ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 146ms (next.js: 134ms, application-code: 12ms)
+ GET /editor-lab?readonly=1 200 in 6ms (next.js: 1683µs, application-code: 5ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 9ms (next.js: 1739µs, application-code: 7ms)
+ GET /editor-lab 200 in 14ms (next.js: 5ms, application-code: 9ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 14ms (next.js: 5ms, application-code: 9ms)
+ GET /editor-lab 304 in 5ms (next.js: 1970µs, application-code: 3ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 10ms (next.js: 1489µs, application-code: 9ms)
+✓ Compiled in 1375ms
+ GET /editor-lab 200 in 658ms (next.js: 653ms, application-code: 5ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 124ms (next.js: 116ms, application-code: 8ms)
+ GET /editor-lab 304 in 9ms (next.js: 6ms, application-code: 3ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 7ms (next.js: 2ms, application-code: 5ms)
+✓ Compiled in 1677ms
+ GET /editor-lab 200 in 674ms (next.js: 666ms, application-code: 8ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 133ms (next.js: 121ms, application-code: 12ms)
+ GET /editor-lab?readonly=1 200 in 7ms (next.js: 1520µs, application-code: 5ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 10ms (next.js: 3ms, application-code: 7ms)
+ GET /editor-lab 200 in 8ms (next.js: 3ms, application-code: 5ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 16ms (next.js: 4ms, application-code: 12ms)
+ GET /editor-lab 304 in 5ms (next.js: 1389µs, application-code: 4ms)
+ GET /api/auth/oauth2/authorize/able?probe=1 404 in 12ms (next.js: 1204µs, application-code: 11ms)

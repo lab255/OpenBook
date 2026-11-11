@@ -1,0 +1,29 @@
+vite v8.0.14 building client environment for production...
+[2Ktransforming...✓ 394 modules transformed.
+rendering chunks...
+[plugin openbook-motion-boundary-app] app motion module boundary passed
+computing gzip size...
+dist/style.css                         224.33 kB │ gzip:  35.49 kB
+dist/rolldown-runtime-Dy4uBu1J.js        0.24 kB │ gzip:   0.21 kB
+dist/emoji-Bmft6RPl.js                   0.30 kB │ gzip:   0.23 kB
+dist/colors-beU6ij1T.js                  1.77 kB │ gzip:   0.68 kB
+dist/databaseMapLeaflet-8LYcHcR6.js      2.70 kB │ gzip:   1.37 kB
+dist/pageCover-DObu7yqU.js               3.06 kB │ gzip:   1.27 kB
+dist/chartData-OkabEqlg.js               3.41 kB │ gzip:   1.44 kB
+dist/exportSite-Dr_bgRKF.js              5.19 kB │ gzip:   2.14 kB
+dist/toPdf-J0nvYxQl.js                   5.98 kB │ gzip:   2.55 kB
+dist/themes-DmyCL_Dj.js                  9.86 kB │ gzip:   2.99 kB
+dist/quickjsVm-BLKBOeOk.js              10.75 kB │ gzip:   3.58 kB
+dist/EmojiGrid-DEPUBd5e.js              10.81 kB │ gzip:   4.34 kB
+dist/exportBlocks-Ba_sgR9S.js           41.29 kB │ gzip:  11.33 kB
+dist/lucideIcons-C9cHyGjR.js            84.92 kB │ gzip:  26.34 kB
+dist/pageIcon-Dv9b9zAq.js              382.02 kB │ gzip: 118.34 kB
+dist/scope-BWcdc6qu.js                 792.09 kB │ gzip: 331.23 kB
+dist/openbook-viewer-BXsA9Sa0.js     1,949.00 kB │ gzip: 552.72 kB
+dist/index.js                        3,073.67 kB │ gzip: 845.85 kB
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/plugins/index.ts is dynamically imported by src/screens/BlockPageDocument.tsx but also statically imported by src/blockeditor/MissingPluginBlock.tsx, src/components/ExtensionsSettings.tsx, src/components/PluginBoot.tsx, src/components/useAppCommands.ts, src/screens/BlockPageDocument.tsx, dynamic import will not move module into another chunk.
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0msrc/export/toHtml.ts is dynamically imported by src/screens/BlockPageDocument.tsx but also statically imported by src/index.ts, dynamic import will not move module into another chunk.
+
+✓ built in 696ms

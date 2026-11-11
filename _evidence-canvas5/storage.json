@@ -1,0 +1,113 @@
+{
+  "note": "Synthetic corpus distribution; not a population median. Fractional coordinates, random UUIDs, UTF-8 names, pressure and retained history included. No time-flushed publication in prototype.",
+  "rows": [
+    {
+      "strokes": 10,
+      "pointsPerStroke": 10,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 10582,
+      "base64Bytes": 14112,
+      "fullSnapshotBytes": 22372,
+      "trafficIncludingMoveEraseUndo": 15653,
+      "rawAfterEraseWithUndoRetention": 10586,
+      "rawAfterEraseUndo": 15689,
+      "journalEntries": 11
+    },
+    {
+      "strokes": 25,
+      "pointsPerStroke": 25,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 34053,
+      "base64Bytes": 45404,
+      "fullSnapshotBytes": 77059,
+      "trafficIncludingMoveEraseUndo": 50063,
+      "rawAfterEraseWithUndoRetention": 34057,
+      "rawAfterEraseUndo": 49948,
+      "journalEntries": 26
+    },
+    {
+      "strokes": 50,
+      "pointsPerStroke": 50,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 93656,
+      "base64Bytes": 124876,
+      "fullSnapshotBytes": 226926,
+      "trafficIncludingMoveEraseUndo": 139898,
+      "rawAfterEraseWithUndoRetention": 93660,
+      "rawAfterEraseUndo": 139532,
+      "journalEntries": 51
+    },
+    {
+      "strokes": 100,
+      "pointsPerStroke": 50,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 187724,
+      "base64Bytes": 250300,
+      "fullSnapshotBytes": 454190,
+      "trafficIncludingMoveEraseUndo": 281313,
+      "rawAfterEraseWithUndoRetention": 187728,
+      "rawAfterEraseUndo": 280447,
+      "journalEntries": 101
+    },
+    {
+      "strokes": 100,
+      "pointsPerStroke": 100,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 307163,
+      "base64Bytes": 409552,
+      "fullSnapshotBytes": 777842,
+      "trafficIncludingMoveEraseUndo": 460867,
+      "rawAfterEraseWithUndoRetention": 307168,
+      "rawAfterEraseUndo": 459970,
+      "journalEntries": 101
+    },
+    {
+      "strokes": 100,
+      "pointsPerStroke": 250,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 647072,
+      "base64Bytes": 862764,
+      "fullSnapshotBytes": 1717754,
+      "trafficIncludingMoveEraseUndo": 970201,
+      "rawAfterEraseWithUndoRetention": 647078,
+      "rawAfterEraseUndo": 969264,
+      "journalEntries": 101
+    },
+    {
+      "strokes": 500,
+      "pointsPerStroke": 50,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 947020,
+      "base64Bytes": 1262696,
+      "fullSnapshotBytes": 2281586,
+      "trafficIncludingMoveEraseUndo": 1418442,
+      "rawAfterEraseWithUndoRetention": 947026,
+      "rawAfterEraseUndo": 1413201,
+      "journalEntries": 501
+    },
+    {
+      "strokes": 500,
+      "pointsPerStroke": 100,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 1551064,
+      "base64Bytes": 2068088,
+      "fullSnapshotBytes": 3908978,
+      "trafficIncludingMoveEraseUndo": 2323827,
+      "rawAfterEraseWithUndoRetention": 1551070,
+      "rawAfterEraseUndo": 2318531,
+      "journalEntries": 501
+    },
+    {
+      "strokes": 500,
+      "pointsPerStroke": 1000,
+      "pressure": "packed <=64 pairs per metadata batch, one pointerup transaction",
+      "rawBeforeErase": 11882876,
+      "base64Bytes": 15843836,
+      "fullSnapshotBytes": 32457226,
+      "trafficIncludingMoveEraseUndo": 17820764,
+      "rawAfterEraseWithUndoRetention": 11882882,
+      "rawAfterEraseUndo": 17815406,
+      "journalEntries": 501
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+
+> @book.dev/mcp@3.29.0 build /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/mcp
+> tsup
+
+CLI Building entry: {"bin":"src/bin.ts","index":"src/index.ts"}
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/mcp/tsup.config.ts
+CLI Target: node18
+CLI Cleaning output folder
+ESM Build start
+ESM dist/index.js              136.00 B
+ESM dist/chunk-R46UB53S.js     98.71 KB
+ESM dist/bin.js                2.40 KB
+ESM dist/index.js.map          71.00 B
+ESM dist/chunk-R46UB53S.js.map 181.48 KB
+ESM dist/bin.js.map            6.65 KB
+ESM ⚡️ Build success in 12ms
+DTS Build start
+DTS ⚡️ Build success in 687ms
+DTS dist/index.d.ts 1.84 KB

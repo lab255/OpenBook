@@ -1,0 +1,4 @@
+
+> @book.dev/ui@3.29.0 typecheck /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui
+> tsc --noEmit
+

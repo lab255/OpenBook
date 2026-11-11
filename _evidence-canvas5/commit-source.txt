@@ -1,0 +1,34 @@
+[STARTED] Backing up original state...
+[COMPLETED] Backed up original state in git stash (c060d9e6)
+[STARTED] Running tasks for staged files...
+[STARTED] lint-staged.config.mjs — 16 files
+[STARTED] *.{ts,tsx} — 16 files
+[STARTED] eslint --fix "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/sdk/src/blockCatalogue.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/sdk/src/blockPropSchemas.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/scripts/canvas5-storage.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/CanvasBlock.tsx" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/history.test.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/history.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/relay.test.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/simplify.test.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/simplify.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/state.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/model.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/reactiveBlocks.tsx" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/relay.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/useBlockEditor.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/index.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/web/src/components/EditorLab.tsx"
+[COMPLETED] eslint --fix "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/sdk/src/blockCatalogue.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/sdk/src/blockPropSchemas.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/scripts/canvas5-storage.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/CanvasBlock.tsx" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/history.test.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/history.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/relay.test.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/simplify.test.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/simplify.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/canvas/state.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/model.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/reactiveBlocks.tsx" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/relay.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/blockeditor/useBlockEditor.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/ui/src/index.ts" "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook/packages/web/src/components/EditorLab.tsx"
+[STARTED] pnpm --filter @book.dev/sdk run --if-present typecheck
+[COMPLETED] pnpm --filter @book.dev/sdk run --if-present typecheck
+[STARTED] pnpm --filter @book.dev/ui run --if-present typecheck
+[COMPLETED] pnpm --filter @book.dev/ui run --if-present typecheck
+[STARTED] pnpm --filter @book.dev/web run --if-present typecheck
+[COMPLETED] pnpm --filter @book.dev/web run --if-present typecheck
+[COMPLETED] *.{ts,tsx} — 16 files
+[COMPLETED] lint-staged.config.mjs — 16 files
+[COMPLETED] Running tasks for staged files...
+[STARTED] Staging changes from tasks...
+[COMPLETED] Staging changes from tasks...
+[STARTED] Cleaning up temporary files...
+[COMPLETED] Cleaning up temporary files...
+
+> open-book@0.0.0-workspace commitlint /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_j2risipqaq-1/OpenBook
+> commitlint --edit /Users/eliot/Workspaces/OpenBook/.git/worktrees/OpenBook4/COMMIT_EDITMSG
+
+[bb/prototype-canvas-block-with-sync-thr_j2risipqaq 5f0455ce] feat(canvas): prototype drawing and conditional collaborative undo
+ 16 files changed, 451 insertions(+), 13 deletions(-)
+ create mode 100644 packages/ui/scripts/canvas5-storage.ts
+ create mode 100644 packages/ui/src/blockeditor/canvas/CanvasBlock.tsx
+ create mode 100644 packages/ui/src/blockeditor/canvas/history.test.ts
+ create mode 100644 packages/ui/src/blockeditor/canvas/history.ts
+ create mode 100644 packages/ui/src/blockeditor/canvas/relay.test.ts
+ create mode 100644 packages/ui/src/blockeditor/canvas/simplify.test.ts
+ create mode 100644 packages/ui/src/blockeditor/canvas/simplify.ts
+ create mode 100644 packages/ui/src/blockeditor/canvas/state.ts

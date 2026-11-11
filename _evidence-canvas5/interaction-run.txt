@@ -1,0 +1,12 @@
+[
+  'touch never starts ink even without a pen',
+  'pen-active touch inking suppressed',
+  'unverified constant pen pressure uses constant width',
+  'pointercancel leaves no shared mark',
+  'capture loss cancels unpublished gesture',
+  'stroke resize uses visible bounds (60x40 → 120x80)',
+  'Delete + root erase undo restores stroke',
+  'Escape clears selection then exits canvas focus',
+  'keyboard pen path Enter/arrows/Space/Enter',
+  'pageReadOnly blocks pointer creation, keyboard creation, nudge, Delete and undo'
+]
