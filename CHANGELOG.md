@@ -1,3 +1,17 @@
+## 3.29.0 (2026-11-11)
+
+### 🚀 Features
+
+- **ui:** production ≤50ms gate for command-dialog open (FF-IMMEDIACY) ([#439](https://github.com/lab255/OpenBook/pull/439))
+- **ui:** command palette continuity and precision polish (CARD-9/POL-1) ([#442](https://github.com/lab255/OpenBook/pull/442))
+- **ui:** carry the full plain-CSS token list into the export mirror (FF-6) ([#443](https://github.com/lab255/OpenBook/pull/443))
+- **ui:** polish slash insert palette continuity and precision (FF-7d/CARD-10) ([#441](https://github.com/lab255/OpenBook/pull/441))
+- **ui:** shared gutter handle prototype behind opt-in (FF-GUTTER-HANDLE) ([#444](https://github.com/lab255/OpenBook/pull/444))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.28.0 (2026-11-10)
 
 ### 🚀 Features
