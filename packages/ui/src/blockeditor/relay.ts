@@ -1,3 +1,4 @@
+import {isLocalHistoryOrigin} from './canvas/history';
 import * as Y from 'yjs';
 import type {DataClient} from '@book.dev/sdk';
 
@@ -163,7 +164,7 @@ export function connectPageRelay(doc: Y.Doc, pageId: string, client: DataClient)
   };
 
   const onUpdate = (update: Uint8Array, origin: unknown): void => {
-    if (origin !== 'local') return; // only relay genuine local edits (no echo loops)
+    if (origin !== 'local' && !isLocalHistoryOrigin(origin)) return; // only relay genuine local edits (no echo loops)
     pending.push(update);
     if (!timer && !posting) timer = setTimeout(flush, RELAY_FLUSH_MS);
   };

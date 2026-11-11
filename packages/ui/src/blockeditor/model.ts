@@ -1,3 +1,4 @@
+import {projectCanvas} from './canvas/state';
 import * as Y from 'yjs';
 import {
   CONTAINER_BLOCK_TYPES,
@@ -2198,7 +2199,7 @@ export function blockToJSON(b: BlockMap): BlockJSON {
     }));
   }
   const props = b.get('props') as Y.Map<unknown> | undefined;
-  if (props && props.size > 0) json.props = Object.fromEntries(props.entries());
+  if (props && props.size > 0) json.props = b.get('type') === 'canvas' ? projectCanvas(props) : Object.fromEntries(props.entries());
   const children = blockChildren(b);
   if (children) json.children = blockType(b) === 'table' ? tableChildrenToJSON(b) : children.map(blockToJSON);
   return json;

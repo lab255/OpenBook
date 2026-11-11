@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import * as Y from 'yjs';
+import {CanvasHistory} from './canvas/history';
 import {
   blockChildren,
   blockProp,
@@ -107,12 +108,9 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
   // would otherwise destroy a useMemo-created instance and leave the editor
   // holding a dead manager (undoStack frozen at 0). The controller exposes a
   // stable wrapper that always talks to the live instance.
-  const undoRef = useRef<Y.UndoManager | null>(null);
+  const undoRef = useRef<CanvasHistory | null>(null);
   useEffect(() => {
-    const manager = new Y.UndoManager(rootBlocks(doc), {
-      trackedOrigins: new Set(['local']),
-      captureTimeout: 400,
-    });
+    const manager = new CanvasHistory(doc, rootBlocks(doc));
     undoRef.current = manager;
     return () => {
       manager.destroy();
@@ -121,11 +119,11 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
   }, [doc]);
   const undo = useMemo(
     () => ({
-      undo: () => undoRef.current?.undo(),
-      redo: () => undoRef.current?.redo(),
+      undo: () => undoRef.current?.undo(readOnly),
+      redo: () => undoRef.current?.redo(readOnly),
       stopCapturing: () => undoRef.current?.stopCapturing(),
     }),
-    [],
+    [readOnly],
   );
 
   const pendingCaret = useRef<CaretRequest | null>(null);

@@ -52,3 +52,7 @@ export {toHtml, toSlideDeck, toHtmlSite} from './export/toHtml';
 export * from './lib/statusStyles';
 
 export {stopAllMeetingSessions} from './blockeditor/meetingSessions';
+
+// CANVAS-5 local prototype; never merge.
+export {registerCanvasBlock} from './blockeditor/canvas/CanvasBlock';
+export {newCanvas} from './blockeditor/canvas/state';
