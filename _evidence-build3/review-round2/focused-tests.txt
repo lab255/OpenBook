@@ -1,0 +1,25 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui
+
+ ✓ src/blockeditor/canvas/d3-gate.test.ts (2 tests) 53ms
+ ✓ src/blockeditor/canvas/integration.test.ts (2 tests) 45ms
+ ✓ src/blockeditor/canvas/core.test.ts (66 tests) 1404ms
+   ✓ Required proof: relay delivery of scalar and raw root undo/redo uses two connected providers exactly once without echo  623ms
+ ✓ src/blockeditor/__tests__/relay.test.ts (10 tests) 1723ms
+     ✓ keeps at most one POST in flight (backpressure) and coalesces the rest  366ms
+ ✓ src/blockeditor/__tests__/saver.test.ts (9 tests) 4669ms
+     ✓ lets only the elected (lowest-clientID) saver persist a shared edit burst  736ms
+     ✓ hands over to the next writer when the saver leaves — no gap  749ms
+     ✓ immediately persists a dirty doc on becoming saver (dirty-on-election closes the gap)  586ms
+     ✓ keeps the last writer standing (present, but alone) saving  344ms
+     ✓ never lets a viewer save, even as the lowest clientID  406ms
+     ✓ republishes canWrite:false when a client flips writer→viewer — no stale election leak  550ms
+     ✓ re-derives the saver on reconnect: prunes a silently-departed saver, then dirty-on-election saves (Collab T7)  527ms
+     ✓ falls back to saving its own edits when the saver never confirms (degraded relay / stalled saver)  567ms
+
+ Test Files  5 passed (5)
+      Tests  89 passed (89)
+   Start at  00:36:49
+   Duration  7.01s (transform 4.88s, setup 0ms, import 6.86s, tests 7.89s, environment 2.59s)
+
+JSON report written to /tmp/build3-round2-tests.json

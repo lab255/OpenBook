@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import {findBlock, rootBlocks} from '../model';
+import {findBlock, rootBlocks, walkBlocks} from '../model';
 import {registerLocalHistory} from '../localHistoryOrigin';
 import {canvasDefaults, fixedFields, isEditableCanvas, isEditableShape, resolvePressureBatch, scalarValue, shapeDefaults, type Scalar} from './schema';
 
@@ -16,10 +16,9 @@ export interface ErasedShape {
   readonly blockId: string; readonly shapeId: string;
   readonly scalars: Readonly<Record<string, Scalar>>;
   readonly tokens: Readonly<Record<string, string>>;
-  readonly pressure: readonly {readonly batchId: string; readonly pointOffset: number; readonly q: readonly number[]}[];
 }
 type Entry = {kind: 'scalar'; label: string; fields: readonly Field[]; applied: readonly Field[]} | {kind: 'root'; label: string; item: StackItem | null; erased: readonly ErasedShape[]};
-export interface HistoryResult {label: string; appliedKeys: string[]; skippedKeys: string[]; reason: 'applied' | 'adjusted' | 'no-op' | 'read-only'}
+export interface HistoryResult {label: string; appliedKeys: string[]; skippedKeys: string[]; reason: 'applied' | 'adjusted' | 'no-op' | 'read-only'; diagnostics?: readonly string[]}
 const fieldName = (f: Field) => `${f.blockId}/${f.shapeId ?? '@canvas'}/${f.key}`;
 
 /** One session-local journal over the existing root scope and semantic scalars. */
@@ -32,6 +31,8 @@ export class CanvasHistory {
   private disposed = false;
   private rootLabel = 'Edit page';
   private erased: readonly ErasedShape[] = [];
+  private repairDiagnostics: string[] = [];
+  get diagnostics(): readonly string[] { return Object.freeze([...this.repairDiagnostics]); }
   constructor(readonly doc: Y.Doc, private readonly canWrite: () => boolean = () => true) {
     this.manager = new Y.UndoManager(rootBlocks(doc), {
       trackedOrigins: new Set(['local']), captureTimeout: 400,
@@ -91,16 +92,9 @@ export class CanvasHistory {
       scalars[key] = scalarValue(key, target.get(key));
       tokens[key] = target.get(`op:${key}`) as string | undefined ?? SEED_TOKEN;
     }
-    const points = target.get('points') as Y.Array<number>;
-    const pressure: ErasedShape['pressure'][number][] = [];
-    for (const [batchId, value] of target.get('pressureBatches') as Y.Map<unknown>) {
-      const batch = resolvePressureBatch(points, value);
-      // Preserve already-degraded data as-is; only valid pre-erase metadata has
-      // a trustworthy offset for identity recovery. Never invent pressure.
-      if (batch) pressure.push(Object.freeze({batchId, pointOffset: batch.offset, q: Object.freeze(batch.q)}));
-    }
-    return Object.freeze({blockId, shapeId, scalars: Object.freeze(scalars), tokens: Object.freeze(tokens), pressure: Object.freeze(pressure)});
+    return Object.freeze({blockId, shapeId, scalars: Object.freeze(scalars), tokens: Object.freeze(tokens)});
   }
+
   private restoredShape(snapshot: ErasedShape): Y.Map<unknown> | null {
     const props = findBlock(this.doc, snapshot.blockId)?.block.get('props');
     if (!isEditableCanvas(props)) return null;
@@ -108,38 +102,66 @@ export class CanvasHistory {
     return shape instanceof Y.Map ? shape : null;
   }
   private repairRestored(erased: readonly ErasedShape[]): void {
-    const missing: {shape: Y.Map<unknown>; key: string; value: Scalar; token: string}[] = [];
-    const reanchor: {points: Y.Array<number>; metadata: Y.Map<unknown>; batch: ErasedShape['pressure'][number]}[] = [];
+    const missing: {shape: Y.Map<unknown>; snapshot: ErasedShape; key: string; value: Scalar; token: string}[] = [];
     for (const snapshot of erased) {
       const shape = this.restoredShape(snapshot);
       if (!shape) continue;
       for (const [key, value] of Object.entries(snapshot.scalars)) {
-        if (!shape.has(key)) missing.push({shape, key, value, token: snapshot.tokens[key]});
+        if (!shape.has(key)) missing.push({shape, snapshot, key, value, token: snapshot.tokens[key]});
       }
-      const points = shape.get('points'), metadata = shape.get('pressureBatches');
-      for (const batch of snapshot.pressure) {
-        if (!(points instanceof Y.Array) || !(metadata instanceof Y.Map) || (batch.pointOffset + batch.q.length) * 2 > points.length) {
-          throw new Error(`Cannot restore pressure batch ${snapshot.shapeId}/${batch.batchId}`);
+    }
+    const reanchor: {metadata: Y.Map<unknown>; batchId: string; context: string; value: unknown}[] = [];
+    // Any root undo OR redo can recreate a points type, including page-level
+    // block deletion. Recover from the LIVE batch via local redo pointers;
+    // an old erase snapshot cannot know batches added between history legs.
+    // This scan runs once per root dispatch, never in scalar command/replay.
+    for (const {block} of walkBlocks(rootBlocks(this.doc))) {
+      if (block.get('type') !== 'canvas') continue;
+      const props = block.get('props');
+      const shapes = props instanceof Y.Map ? props.get('shapes') : null;
+      if (!(shapes instanceof Y.Map)) continue;
+      for (const [shapeId, shape] of shapes) {
+        if (!(shape instanceof Y.Map)) continue;
+        const points = shape.get('points'), metadata = shape.get('pressureBatches');
+        if (!(metadata instanceof Y.Map)) {
+          this.repairDiagnostics.push(`Canvas ${block.get('id')} shape ${shapeId} batch <map>: missing pressure metadata map`);
+          continue;
         }
-        // Local Yjs redo pointers can make stale anchors appear valid only on
-        // the undoing replica. They are not transmitted: check strict identity
-        // so the repaired anchors also resolve on peers without those pointers.
-        if (!resolvePressureBatch(points, metadata.get(batch.batchId), false)) reanchor.push({points, metadata, batch});
+        for (const [batchId, value] of metadata) {
+          const context = `Canvas ${block.get('id')} shape ${shapeId} batch ${batchId}`;
+          if (!(points instanceof Y.Array)) {
+            this.repairDiagnostics.push(`${context}: missing points type; pressure repair skipped`);
+            continue;
+          }
+          if (resolvePressureBatch(points, value, false)) continue;
+          const batch = resolvePressureBatch(points, value, true);
+          if (!batch) {
+            this.repairDiagnostics.push(`${context}: anchor or batch is invalid; pressure repair skipped`);
+            continue;
+          }
+          try {
+            reanchor.push({metadata, batchId, context, value: {
+              anchor: Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(points, batch.offset * 2)),
+              count: batch.q.length, q: batch.q,
+            }});
+          } catch {
+            this.repairDiagnostics.push(`${context}: cannot create anchor; pressure repair skipped`);
+          }
+        }
       }
     }
     if (!missing.length && !reanchor.length) return;
     this.doc.transact(transaction => {
       transaction.meta.set(SEMANTIC_CANVAS, true);
-      for (const {shape, key, value, token} of missing) {
-        shape.set(key, value); shape.set(`op:${key}`, token);
+      for (const {shape, snapshot, key, value, token} of missing) {
+        try { shape.set(key, value); shape.set(`op:${key}`, token); }
+        catch { this.repairDiagnostics.push(`Canvas ${snapshot.blockId} shape ${snapshot.shapeId} scalar ${key}: restore failed`); }
       }
-      for (const {points, metadata, batch} of reanchor) {
-        // Erase undo creates new Y types. Recovery may replace an existing
-        // batch value; normal appends still never rewrite earlier metadata.
-        metadata.set(batch.batchId, {
-          anchor: Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(points, batch.pointOffset * 2)),
-          count: batch.q.length, q: [...batch.q],
-        });
+      for (const {metadata, batchId, context, value} of reanchor) {
+        // Recovery may replace values for existing IDs. Normal append still
+        // never rewrites earlier batches. Diagnostics must not abort cleanup.
+        try { metadata.set(batchId, value); }
+        catch { this.repairDiagnostics.push(`${context}: cannot write anchor; pressure repair skipped`); }
       }
     }, 'local');
   }
@@ -185,12 +207,22 @@ export class CanvasHistory {
     const result: HistoryResult = {label: entry?.label ?? '', appliedKeys: [], skippedKeys: [], reason: 'no-op'};
     if (this.disposed || !this.canWrite()) return {...result, reason: 'read-only'};
     if (!entry) return result;
+    this.repairDiagnostics = [];
     this.manager.stopCapturing(); this.replay = entry;
     try {
       if (entry.kind === 'root') {
         const stack = redo ? this.manager.redoStack : this.manager.undoStack;
         if (entry.item) {
           if (stack[stack.length - 1] !== entry.item) throw new Error('Canvas history root stack mismatch');
+          if (redo && entry.erased.length) {
+            // Redo is a NEW erase of the current shared shape: refresh scalar
+            // baselines before it deletes peer edits made since the last undo.
+            entry.erased = entry.erased.flatMap(snapshot => {
+              const fresh = this.captureErase(snapshot.blockId, snapshot.shapeId);
+              if (!fresh && this.restoredShape(snapshot)) this.repairDiagnostics.push(`Canvas ${snapshot.blockId} shape ${snapshot.shapeId}: invalid pre-erase scalar snapshot; skipped`);
+              return fresh ? [fresh] : [];
+            });
+          }
           const older = stack.splice(0, stack.length - 1);
           entry.item = null;
           // Yjs has restored the root item at beforeObserverCalls, but has not
@@ -200,7 +232,9 @@ export class CanvasHistory {
           // include this repair too (tested individually on a second provider).
           const erased = redo ? [] : entry.erased.filter(snapshot => !this.restoredShape(snapshot));
           const repair = (transaction: Y.Transaction): void => {
-            if (transaction.origin === this.manager && this.manager.undoing) this.repairRestored(erased);
+            if (transaction.origin !== this.manager) return;
+            try { this.repairRestored(erased); }
+            catch { this.repairDiagnostics.push('Canvas root restoration: repair interrupted; inspect scene diagnostics'); }
           };
           this.doc.on('beforeObserverCalls', repair);
           try {
@@ -228,6 +262,7 @@ export class CanvasHistory {
       }
       source.pop(); destination.push(entry);
       result.reason = result.appliedKeys.length ? result.skippedKeys.length ? 'adjusted' : 'applied' : 'no-op';
+      if (this.repairDiagnostics.length) result.diagnostics = this.diagnostics;
       return result;
     } finally { this.replay = null; this.manager.stopCapturing(); }
   }

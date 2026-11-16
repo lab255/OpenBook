@@ -2,7 +2,7 @@
 
 Audited at: 6b6106fabbade7d77bd10797ed89f5b2f4d1e394
 
-PR: https://github.com/lab255/OpenBook/pull/448. Reviewed head: 38035434faedad6047b32ad1d6b6deba5b886dc9. Manager: thr_yu4up34sb7. Card: OB-1081. This report supersedes the prior partial/stop reports; historical evidence is retained.
+PR: https://github.com/lab255/OpenBook/pull/448. Latest reviewed head: 9adc3567115801e5a9f15c8b5b5b89705652ba17. Manager: thr_yu4up34sb7. Card: OB-1081. This report supersedes the prior partial/stop reports; historical evidence is retained.
 
 ## Result
 
@@ -14,9 +14,9 @@ The review fix round repairs the erase/concurrent-edit race, preserves token-eli
 
 The known D3 race was reproduced against 38035434 in both client-ID orders: A erases s, B concurrently commits x=55, replicas exchange, then A undoes erase. Both replicas lacked x/op:x despite an applied result. Baseline seeds/operations/states are in `review-round/known-erase-race-before.jsonl`.
 
-Erase now records validated scalar/token pairs and pressure batches projected to point offsets. A temporary, canvas-scoped beforeObserverCalls hook repairs a restored erase before type observers, afterTransaction handlers or update consumers see it. All scalar and pressure writes share ONE history-excluded local transaction. Pinned Yjs 13.6.31 encodes the original update from the live store; tests independently deliver every update to the other replica, checking complete geometry and pressure on every observed transaction. No manager-wide ignoreRemoteMapChanges flag is changed.
+Erase records validated scalar/token pairs and refreshes them before redo re-erases. Pressure recovery now resolves LIVE batches at restoration time, not a captured batch inventory (fix round 2). A temporary, canvas-scoped beforeObserverCalls hook repairs a restored erase before type observers, afterTransaction handlers or update consumers see it. All scalar and pressure writes share ONE history-excluded local transaction. Pinned Yjs 13.6.31 encodes the original update from the live store; tests independently deliver every update to the other replica, checking complete geometry and pressure on every observed transaction. No manager-wide ignoreRemoteMapChanges flag is changed.
 
-The pressure stop was classified by the manager as an **explained recovery gap, not a reopened D3 anomaly**. The proof now demonstrates the exact distinction: restored points have a new type identity; old anchors resolve to the original points before erase; strict resolution does not address the restored type after undo. Default Yjs resolution can follow local redone pointers on A, while B receives no such pointers and cannot follow them. The repair explicitly disables following undone deletions when checking old anchors, then creates fresh relative anchors from captured point offsets against the restored points. Existing batch IDs and quantized pressures are retained. This recovery-only replacement is authorized by the manager; normal appends never rewrite prior batches.
+The pressure stop was classified by the manager as an **explained recovery gap, not a reopened D3 anomaly**. The proof now demonstrates the exact distinction: restored points have a new type identity; old anchors resolve to the original points before erase; strict resolution does not address the restored type after undo. Default Yjs resolution can follow local redone pointers on A, while B receives no such pointers and cannot follow them. The repair explicitly disables following undone deletions when checking old anchors, then recovers the live offset through local redo pointers and creates fresh relative anchors against the restored points. Existing batch IDs and quantized pressures are retained. This recovery-only replacement is authorized by the manager; normal appends never rewrite prior batches.
 
 The two pressure-race tests assert distinct identities, local/default versus strict/remote resolution, identical reconstructed widths from two pressure batches on BOTH replicas, editable=true, paired scalar tokens, redo erase, and a second undo with valid pressure. The additional seed races verify explicit seed tokens in both client-ID orders. The move→erase→undo→undo→redo→redo test verifies token lineage across restored maps. Semantic replay uses token eligibility, not the old CRDT object identity.
 
@@ -47,11 +47,11 @@ An intermediate build picked up an unused selection CSS utility from a benchmark
 ## Validation
 
 - SDK was built after provisioning in the initial round; SDK sources/dependencies are unchanged.
-- **5 focused files / 48 tests passed**: canvas proof suite, low-level D3 preflight, registration/StrictMode lifecycle, existing relay and saver suites.
+- **5 focused files / 89 tests passed** (latest fix round 2): canvas proof suite, low-level D3 preflight, registration/StrictMode lifecycle, existing relay and saver suites.
 - **7/7 ledger/fence tests passed**; viewer build passed.
 - UI TypeScript and targeted ESLint passed. Node-only diagnostic capture follows the repository's Vitest-only import convention; no browser Node dependency is introduced.
 - Geometry invariants now cover x/y/w/h, start/end X/Y, basisW/basisH positivity, even point-pair length and finite point values, including every observed structural-race transaction.
-- Final outputs are in `_evidence-build3/review-round/{focused-tests,ledger,typecheck,lint,viewer-build}.txt`.
+- Latest outputs are in `_evidence-build3/review-round2/{focused-tests,ledger,typecheck,lint,viewer-build}.txt`; the exact 32 matrix names and outcomes are in `review-round2/matrix.json`. Fix-round-1 measurements and logs remain in `review-round/`.
 
 ## Architecture proof mapping
 
@@ -88,4 +88,35 @@ Review-specific tests are named `Review D3 race…`, `Review D3 seed race…` (e
 - Canonical fallback recovery authority is not invented. Fallback data is safely diagnosed/read; only valid integrated targets are mutable.
 - Pointerup-only publication remains the policy. The headless cancellation test proves no publication, remote rewind or history change. **Actual UI preview discard is explicitly a placeholder pending renderer/F3 work**, not claimed as automated UI coverage; early-published stroke cancellation remains disabled.
 - Tests cover bounded concurrency cases, not exhaustive verification. Deliberately throwing raw-manager operations are not injected. Full repository tests and hardware/UI/export acceptance were not run.
-- The original reported geometry defect is fixed in named race tests. The pressure result and initial over-strong identity assertion are explained and proven; diagnostic captures are retained in `review-anomaly.json`, `review-round/race-tests.txt` and `pressure-identity-assertion.txt`. **No new unexplained undo result occurred after the manager-authorized repair; the historical D3 anomaly gate remains closed per the manager ruling.**
+- The original reported geometry defect is fixed in named race tests. The pressure result and initial over-strong identity assertion are explained and proven; the original failing logs remain in `review-round/race-tests.txt` and `pressure-identity-assertion.txt`. The stale `review-anomaly.json` dump was removed in fix round 2, and future failure traces go to a uniquely named OS temporary directory. **No new unexplained undo result occurred after the manager-authorized repair; the historical D3 anomaly gate remains closed per the manager ruling.**
+
+
+## Fix round 2 — generalized restoration model and complete erase matrix
+
+**Root-cause model:** Yjs root undo/redo can recreate point items or their containing types, while stored relative anchors still name earlier identities and may resolve only through the undoing replica's local redo pointers. Recover every stale live anchor-bearing batch at restoration time; erase snapshots are authoritative only for scalars at their latest capture, never for the inventory of pressure batches that may have changed between history legs.
+
+**One pressure mechanism closes both HIGH findings.** The same beforeObserverCalls repair runs for root undo AND redo, traverses live canvas batches once per root dispatch, and checks strict identity. If strict resolution fails but following local undone deletions yields a valid offset, it creates a fresh portable anchor against the live restored points type. This handles original erase races, remote appends after a restore, later redo/undo cycles, whole-canvas page deletion, and root redo of a newly created pressure stroke. There are no shape-erase versus page-delete pressure special cases. The scan is outside scalar command/replay; the target-only scalar performance fix remains unchanged.
+
+**Snapshot choice: both generalized re-anchoring and recapture-on-redo-re-erase.** Pressure offsets/quantized values come from the live restored batch, so new remote batches cannot be omitted by a stale erase snapshot. Before a redo re-erases a shape, scalar snapshots are captured again from current validated geometry/tokens. Named concurrent re-erase tests prove that x=80 (the latest baseline), not original x=20 or a later losing x=99, is restored in both client-ID orders.
+
+**Diagnostics, not cleanup exceptions.** An invalid pressure batch is skipped and reported with canvas, shape and batch ID through `HistoryResult.diagnostics` and `CanvasHistory.diagnostics`; repair no longer aborts beforeObserverCalls. A named invalid-batch test proves normal afterTransaction observers and update delivery still run, both peers agree, and the preexisting degraded state is explicitly diagnosed. Recovery writes remain one excluded local transaction before observers; the same raw-update propagation mechanism is retained.
+
+The complete erase matrix ran green in one suite on the first generalized repair:
+
+| Dimension | Values |
+| --- | --- |
+| Erase level | Shape; whole canvas page block |
+| Client IDs | A=10/B=20; A=20/B=10 |
+| History | Serial erase/undo; erase/undo followed by TWO redo/undo cycles |
+| Remote changes | None; append; scalar edit; append + scalar edit |
+| Delivery and final check | Every update delivered independently; both replicas checked; third replica loaded from final binary state in EVERY case |
+
+This is **32 named matrix cases**, enumerated with passed outcomes in `_evidence-build3/review-round2/matrix.json`. Remote changes occur before the initial erase and between each restoration and re-erase. Both separately named HIGH reproductions are retained in both client-ID orders. Existing concurrent erase/edit races, new concurrent scalar-recapture races, and root-REDO restoration cases also pass. The fixture now resolves the live block after page restoration, so it cannot silently inspect a detached old shapes map.
+
+Latest validation: **89/89 focused tests, 7/7 ledger/fence tests, UI typecheck and lint pass**. Viewer remains **1,933,102 B**, coordinate **727 B**, total seam **+160 B**, fix-round-2 delta **0 B** and the same SHA-256 as before. Fix-round-1 before/after scalar benchmarks above remain on record; this round did not change that scalar path or claim new root-history timing measurements.
+
+**Hygiene:** the stale committed `_evidence-build3/review-anomaly.json` is removed. Test failure capture uses `mkdtempSync(tmpdir())`, prints the evidence path, and preserves seeds/update bytes/states outside the repository.
+
+**Decision owed to the UI card:** `readCanvas` marks the entire scene `editable=false` when any shape is quarantined, while mutation APIs validate only addressed targets and can still edit healthy shapes. This asymmetry is intentional to record, not silently adjudicated here: the UI card must decide between board-wide edit gating and per-shape affordances, and surface history repair diagnostics. Page write permission continues to gate either path.
+
+**Anomaly watch / iteration cap:** one generalized mechanism closes both findings with a green full matrix. No third repair round was started and no new unexplained undo result occurred. No permanent fidelity degradation is being accepted for valid restored batches.
