@@ -1,0 +1,36 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui
+
+ ❯ src/blockeditor/canvas/core.test.ts (17 tests | 1 failed) 678ms
+   × Order keys: deterministic ties and balanced placement, concurrent reorder/rebalance and long keys 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/blockeditor/canvas/core.test.ts > Order keys: deterministic ties and balanced placement, concurrent reorder/rebalance and long keys
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/blockeditor/canvas/core.test.ts:204:34
+    202|   move(b,{ord:'z'});exchange(a,b); // concurrent rebalance versus reor…
+    203|   expect(readCanvas(a.props).shapes.map(s=>s.id)).toEqual(readCanvas(b…
+    204|   expect(key > 'F' && key < 'V').toBe(true);
+       |                                  ^
+    205|   a.history.commitCanvasCommand('Long key',[{blockId:'canvas',shapeId:…
+    206|   const ordered=readCanvas(a.props).shapes;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 passed (17)
+   Start at  23:34:36
+   Duration  1.24s (transform 278ms, setup 0ms, import 359ms, tests 678ms, environment 106ms)
+
+undefined
+/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/blockeditor/canvas/core.test.ts

@@ -1,0 +1,74 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui
+
+FEATURE LEDGER removed renderer row RED; emitted module/export inventory GREEN
+CALIBRATION seeded=1939670; ordinary=1940284 marginal=614 own=489; eager/layout=1987673 marginal=48003 own=343; ordinary ledger GREEN, eager/layout unledgered RED
+BLOCK OWN BYTES 2048 GREEN; imported helper raises total to 2049 RED
+ENDPOINT 1931869 and 1936471 GREEN; 1936472 and 1931868 RED; changed Motion bytes RED; unledgered animate within window RED
+ ❯ scripts/motionFeatureLedger.test.ts (7 tests | 3 failed) 4569ms
+   × records the tree-shaken eager-import gap after the policy change 1285ms
+   × checks the complete emitted Motion closure transitively reachable from the viewer entry, including chrome 2ms
+   × keeps historical rows continuous and bounds non-motion drift at the measured endpoint 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  scripts/motionFeatureLedger.test.ts > records the tree-shaken eager-import gap after the policy change
+AssertionError: expected 1940051 to be 1939670 // Object.is equality
+
+- Expected
++ Received
+
+- 1939670
++ 1940051
+
+ ❯ scripts/motionFeatureLedger.test.ts:67:17
+     65|   assertFeatureLedger(graph, ledger);
+     66|   const bytes = readFileSync(`${directory}/openbook-viewer.js`).byteLe…
+     67|   expect(bytes).toBe(readFileSync('src/export/vendor/openbook-viewer.j…
+       |                 ^
+     68|   process.stdout.write(`TREE-SHAKEN GAP unchanged: unused eager import…
+     69| }, 30000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  scripts/motionFeatureLedger.test.ts > checks the complete emitted Motion closure transitively reachable from the viewer entry, including chrome
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ scripts/motionFeatureLedger.test.ts:86:109
+     84|   expect(reached.has('src/blockeditor/reactiveCore.tsx')).toBe(true);
+     85|   expect(productionGraph.modules.some((module: {id: string}) =>
+     86|     module.id === 'src/blockeditor/reactiveBlocks.tsx' || module.id.st…
+       |                                                                                                             ^
+     87|   for (const module of productionGraph.modules.filter((module: {id: st…
+     88|     expect(reached.has(module.id), module.id).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  scripts/motionFeatureLedger.test.ts > keeps historical rows continuous and bounds non-motion drift at the measured endpoint
+Error: ledger endpoint: production bytes 1939670 outside non-motion window 1931869..1936471
+ ❯ assertLedgerEndpoint scripts/motionGraph.mjs:40:11
+     38|   const maximum = historical + ledger.endpoint.nonMotionGrowthBytes;
+     39|   if (bytes < minimum || bytes > maximum) {
+     40|     throw new Error(`ledger endpoint: production bytes ${bytes} outsid…
+       |           ^
+     41|   }
+     42| }
+ ❯ scripts/motionFeatureLedger.test.ts:116:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 4 passed (7)
+   Start at  23:35:26
+   Duration  4.88s (transform 42ms, setup 0ms, import 57ms, tests 4.57s, environment 123ms)
+
+undefined
+/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run scripts/motionFeatureLedger.test.ts
