@@ -2,7 +2,7 @@
 
 Audited at: 2c45cb1ce767ff0b19ab16a21e33e2e4bad7688e
 
-Implemented on `bb/execute-build-1-canvas-brief-thr_k2hsx22ruq` under Amendments 1 and 2 and the manager ruling permitting module-identity accounting movement when ruled coordinates remain unchanged. PR publication pending final committed-build verification.
+Implemented on `bb/execute-build-1-canvas-brief-thr_k2hsx22ruq` under Amendments 1 and 2 and the manager ruling permitting module-identity accounting movement when ruled coordinates remain unchanged. PR: https://github.com/lab255/OpenBook/pull/447 (against main). Implementation commit `a4f9262064bdd71b43ab89c10021dace33b3ec3b` was pushed and verified with `git ls-remote`. Plain `git push` reported no upstream; explicit `git push origin HEAD:refs/heads/bb/execute-build-1-canvas-brief-thr_k2hsx22ruq` succeeded. The clean committed build reproduced the identical IIFE hash and ledger 7/7 PASS; see `committed-build.log` and `committed-ledger.log`.
 
 ## Changes prepared
 
