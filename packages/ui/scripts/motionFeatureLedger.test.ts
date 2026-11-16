@@ -117,7 +117,7 @@ it('keeps historical rows continuous and bounds non-motion drift at the measured
   process.stdout.write(`LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline ${ledger.preAdoptionRawBytes} -> all adjacent rows -> bounded measured ${measured} GREEN\n`);
 });
 
-it('accepts only the measured non-motion window, never unledgered Motion or extra Motion bytes', () => {
+it('accepts only the authorized non-motion window, never unledgered Motion or extra Motion bytes', () => {
   const historical = ledger.features.at(-1)!.afterRawBytes;
   expect(ledger.endpoint.nonMotionShrinkageBytes).toBe(506);
   expect(ledger.endpoint.nonMotionGrowthBytes).toBe(4096);

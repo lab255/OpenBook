@@ -201,3 +201,5 @@ The viewer imports `reactiveCore`; the app imports the `reactiveBlocks`
 registration wrapper. Future editing registrations belong in that wrapper.
 The emitted viewer graph assertion rejects the app wrapper and canvas editing
 modules. No editing canvas implementation is included in BUILD-1.
+
+`sharedModules` retains the pre-fence `reactiveBlocks.tsx` entry as a known-stale record; re-pointing it to `reactiveCore.tsx` changes block-own-code accounting and belongs to a future ruled change.

@@ -43,3 +43,9 @@ git diff --check
 ```
 
 Rendered-code audit: clean before/after production builds used the same deletion and `NODE_ENV=production` build commands above, with a temporary generateBundle dump only. `before-rendered.js` and `after-rendered.js` retain the exact emitted code; `debug-before-build.log` and `debug-after-build.log` retain the build output. The production source extraction is byte-identical to the original registration implementation.
+
+## Opus review dispositions
+
+Review verdict on PR #447: CLEAR, no blocking findings. Applied the two pre-endorsed wording edits: the boundary test now says “authorized non-motion window,” and endpoint.measuredAt separates CANVAS-7 / 59c49f80 measurement provenance from R1 authorization. Documented the known-stale pre-fence reactiveBlocks.tsx sharedModules entry and deferred any accounting-changing replacement to a future ruled change; sharedModules itself is unchanged.
+
+Clean review rebuild: 1,932,942 B, SHA-256 `08e3a52fc3248105a6cea4c4399995dcc1a0f2b7f200b78300e658508f772ffe`, graph byte-identical, ledger 7/7 PASS. Same cleanup/build/test commands as above; logs: `review-build.log`, `review-ledger.log` in the evidence directory.

@@ -6,7 +6,7 @@
   "hardDeltaCeilingRationale": "256KB chosen 2026-10-28: owner direct confirmation — protects shareability, not subset purity; current bundle is 1.92MB raw/~500KB gz. Leaves room for layout-class features (~48KB) without changing the order of magnitude. Re-evaluate when transport expectations change.",
   "blockOwnBytesCeiling": 2048,
   "endpoint": {
-    "measuredAt": "BUILD-1 / R1 owner ruling 2026-11-12 via PM² relay",
+    "measuredAt": "measured CANVAS-7 at 59c49f80; authorized 4,096 B by R1 owner ruling 2026-11-12 via PM² relay",
     "motionRenderedBytes": 211511,
     "nonMotionShrinkageBytes": 506,
     "nonMotionGrowthBytes": 4096,
