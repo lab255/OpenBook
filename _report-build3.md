@@ -1,49 +1,61 @@
-# BUILD-3 — PARTIAL, stopped at viewer boundary
+# BUILD-3 — headless core and review fix round
 
 Audited at: 6b6106fabbade7d77bd10797ed89f5b2f4d1e394
 
-Branch: bb/execute-build-3-canvas-task-thr_6mveyr65s7
-Manager: thr_yu4up34sb7. Card OB-1081.
+PR: https://github.com/lab255/OpenBook/pull/448. Reviewed head: 38035434faedad6047b32ad1d6b6deba5b886dc9. Manager: thr_yu4up34sb7. Card: OB-1081. This report supersedes the prior partial/stop reports; historical evidence is retained.
 
 ## Result
 
-Headless BUILD-3 implementation complete under the manager's integration ruling. The app wrapper synchronously registers a generic history factory; shared editor modules contain no canvas imports or canvas-specific types. The unregistered viewer path still constructs its original root UndoManager. The extension owns the same root scope in the existing effect lifecycle.
+Headless v1 nested schema, validated scalar and structural commands, SDK fractional ordering, immutable defensive scene reads, anchored pressure batches, and a chronological page/canvas journal are implemented. No canvas renderer, toolbar, or owner-facing surface is registered. The manager-authorized synchronous generic history extension is installed only by reactiveBlocks, the fenced app wrapper. Shared editor modules contain no canvas imports or canvas-specific types. With no extension, the viewer constructs the same root UndoManager as before; effect ownership and StrictMode cleanup remain intact.
 
-Clean baseline build at the audited base: **1,932,942 B**, nonMotionGrowthBytes **567 B**. Implementation viewer: **1,933,102 B**, coordinate **727 B**. **Measured seam delta +160 B**, below the manager's +300 B stop threshold. The 4,096 B guard and ledger are unchanged. The complete ledger suite passes, and the emitted viewer graph contains neither canvas modules nor the app wrapper. Artifact SHA-256 comparison is preserved in `_evidence-build3/viewer-comparison.json`; the PR records the base/head commit comparison.
+The review fix round repairs the erase/concurrent-edit race, preserves token-eligible semantic history after root restoration, validates only command targets, and expands the proof suite. Missing required scalars are never rendered from defaults: the reader names shape/key in diagnostics and quarantines the shape. Restore repair supplies captured valid values before any scene observation.
 
-The earlier direct-import fence failure was stopped and reported. The manager explicitly authorized app-wrapper injection, superseding the brief's no-app-registration restriction for this generic history seam. Historical failing evidence is retained in `ledger-failure.log`, `viewer-fence.json`, and `core-tests.log`; it is not the current acceptance result. No visual canvas block registration, renderer, toolbar, or owner-facing surface was added.
+## Review findings and mechanism
 
-## Implementation
+The known D3 race was reproduced against 38035434 in both client-ID orders: A erases s, B concurrently commits x=55, replicas exchange, then A undoes erase. Both replicas lacked x/op:x despite an applied result. Baseline seeds/operations/states are in `review-round/known-erase-race-before.jsonl`.
 
-- D2 nested schema, explicit defaults, scalar validation, negative extent clamping, immutable defensive scene projection and safe JSON fallback reading. Invalid/fallback input is mutation-gated, not independently rehydrated.
-- Existing SDK keyBetween/keysBetween with deterministic (ord,id) ties and full-axis balancing when tied placement or >48-character keys require it.
-- Semantic command capture of actual commit-time before values/tokens; per-field UUID tokens, paired writes, metadata exclusion from the root UndoManager, explicit seed token, conditional inverse and redo subset.
-- One chronological journal, root event integration, bounded raw stack dispatch with detach/restore in finally; root structural insertion/erase/append transactions.
-- Pressure batches anchored to the points Y.Array, <=64 pairs, quantized pressure, defensive pressure reader.
-- Registered known-local history origins feed the existing relay queue and saver backstop; no remote echo, no second queue.
-- Synchronous app-wrapper registration through historyExtension.ts; effect-owned hook dispatch, generic availability and history access, and a live read-only predicate. Canvas remains excluded from the viewer graph.
+Erase now records validated scalar/token pairs and pressure batches projected to point offsets. A temporary, canvas-scoped beforeObserverCalls hook repairs a restored erase before type observers, afterTransaction handlers or update consumers see it. All scalar and pressure writes share ONE history-excluded local transaction. Pinned Yjs 13.6.31 encodes the original update from the live store; tests independently deliver every update to the other replica, checking complete geometry and pressure on every observed transaction. No manager-wide ignoreRemoteMapChanges flag is changed.
 
-## Decisions within the spec
+The pressure stop was classified by the manager as an **explained recovery gap, not a reopened D3 anomaly**. The proof now demonstrates the exact distinction: restored points have a new type identity; old anchors resolve to the original points before erase; strict resolution does not address the restored type after undo. Default Yjs resolution can follow local redone pointers on A, while B receives no such pointers and cannot follow them. The repair explicitly disables following undone deletions when checking old anchors, then creates fresh relative anchors from captured point offsets against the restored points. Existing batch IDs and quantized pressures are retained. This recovery-only replacement is authorized by the manager; normal appends never rewrite prior batches.
 
-- Pointerup-only publication. Cancellation discards local preview; early-published stroke streaming and its conditional F3 cancellation path remain disabled.
-- Rebalance the complete deterministic axis, which includes the tied run, using existing keysBetween. This is O(k), is journaled semantically, and is not described as a 25 B operation.
-- Explicit seed token is `canvas:seed`; forward writes use fresh crypto.randomUUID tokens. No timestamp ordering.
-- Replaced nested map identities cause semantic history no-ops, in accordance with §3; history does not resurrect a replaced shape.
-- Fallback recovery authority is not invented. The reader permits safe inspection; mutations require a valid integrated v1 tree.
-- Raw undo origin is recognized through an effect-lifetime registration, rather than emitting duplicate update events or changing transaction origin.
+The two pressure-race tests assert distinct identities, local/default versus strict/remote resolution, identical reconstructed widths from two pressure batches on BOTH replicas, editable=true, paired scalar tokens, redo erase, and a second undo with valid pressure. The additional seed races verify explicit seed tokens in both client-ID orders. The move→erase→undo→undo→redo→redo test verifies token lineage across restored maps. Semantic replay uses token eligibility, not the old CRDT object identity.
 
-## Validation and evidence
+## Performance precondition
 
-Provisioned with CI=true pnpm install and SDK build. Base HEAD equals fetched origin/main at 6b6106fa. Install had non-blocking shared-git husky configuration and missing server/mcp binary warnings; those artifacts are unnecessary for these checks.
+Resolution caches are scoped to one synchronous command/replay. Each addressed canvas is found once; each addressed shape and its points are validated once. The command path does not materialize, sort or copy the whole scene for each field. Cache lifetime ends before any subsequent remote update can make it stale.
 
-- **5 focused test files / 40 tests passed**: canvas core, initial D3 gate, registration/StrictMode integration, existing relay and saver suites. `_evidence-build3/tests.log`.
-- Final canvas-only recheck after removing a live source reference from the immutable reader result: `_evidence-build3/canvas-tests.log`.
-- TypeScript and targeted ESLint: exit 0. Empty success logs in `_evidence-build3/typecheck.log` and `lint.log`.
-- Baseline and implementation viewer builds: success; respective logs in `_evidence-build3/baseline-viewer-build.log` and `viewer-build.log`.
-- **All 7 ledger/fence tests passed**, including explicit exclusion of canvas/app wrapper, endpoint bound, and complete Motion closure. `_evidence-build3/ledger.log`.
-- Baseline clean build was made from git archive of the audited base, with the same installed dependency artifacts. `_evidence-build3/viewer-comparison.json` records exact bytes and artifact SHA-256 values.
+Five trials per workload, 500 strokes, 50 or 1,000 point pairs per stroke, fractional coordinates i/10, x/y move then undo and redo. Timings are headless command costs, excluding rendering/network observers. All samples and redo timings are retained in `review-round/performance-*.jsonl`; scripts/canvasHistoryBench.ts reproduces the method. Baseline processes briefly overlapped; after runs were sequential. These local measurements are not hardware/UI latency acceptance.
 
-All test names below live in `packages/ui/src/blockeditor/canvas/core.test.ts` unless otherwise specified. Each peer fixture checks finite x/y/w/h after every observed transaction.
+| Workload | Operation | Before median / worst (ms) | After median / worst (ms) |
+| --- | --- | ---: | ---: |
+| 500 × 50 pairs | Single move | 2.68 / 10.00 | 0.14 / 1.53 |
+| 500 × 50 pairs | Move all 500 | 836.86 / 839.10 | 7.48 / 24.39 |
+| 500 × 50 pairs | Undo all 500 | 1,709.31 / 1,819.21 | 8.44 / 12.79 |
+| 500 × 1000 pairs | Single move | 14.63 / 23.98 | 0.19 / 0.33 |
+| 500 × 1000 pairs | Move all 500 | 6,132.49 / 7,955.76 | 12.39 / 21.90 |
+| 500 × 1000 pairs | Undo all 500 | 12,621.09 / 13,609.72 | 5.97 / 34.97 |
+
+
+The dense workload's unfixed **12,621.09 ms median / 13,609.72 ms worst undo** remains visible: after the fix it measures **5.97 ms median / 34.97 ms worst**. This comparison satisfies the manager's requirement to measure the worst workload rather than hide it behind standard-board averages.
+
+## Viewer byte discipline
+
+Clean audited baseline: **1,932,942 B**, coordinate **567 B**. Previous PR and fixed build: **1,933,102 B**, coordinate **727 B**. Total seam delta **+160 B**, fix-round delta **0 B**, below the +300 B stop threshold. Artifact SHA-256 remains `5c78d33fbe54ad95397b47db03887877670ffe9a0e5104b3f77b3df84b838dc7`. No canvas modules/app wrapper enter the emitted viewer graph; all 7 ledger/fence tests pass. The 4,096 B coordinate guard and feature ledger remain unchanged.
+
+An intermediate build picked up an unused selection CSS utility from a benchmark comment (+52 B). Removing that incidental utility restored the exact prior artifact; no guard or product implementation was contorted to meet the threshold. Final comparison: `review-round/viewer-comparison.json`.
+
+## Validation
+
+- SDK was built after provisioning in the initial round; SDK sources/dependencies are unchanged.
+- **5 focused files / 48 tests passed**: canvas proof suite, low-level D3 preflight, registration/StrictMode lifecycle, existing relay and saver suites.
+- **7/7 ledger/fence tests passed**; viewer build passed.
+- UI TypeScript and targeted ESLint passed. Node-only diagnostic capture follows the repository's Vitest-only import convention; no browser Node dependency is introduced.
+- Geometry invariants now cover x/y/w/h, start/end X/Y, basisW/basisH positivity, even point-pair length and finite point values, including every observed structural-race transaction.
+- Final outputs are in `_evidence-build3/review-round/{focused-tests,ledger,typecheck,lint,viewer-build}.txt`.
+
+## Architecture proof mapping
+
+All names below are in `packages/ui/src/blockeditor/canvas/core.test.ts`.
 
 | Spec proof item | Automated test name |
 | --- | --- |
@@ -57,19 +69,23 @@ All test names below live in `packages/ui/src/blockeditor/canvas/core.test.ts` u
 | Append+pressure undo | Required proof: append+pressure undo and redo across replicas |
 | Erase restore after semantic edits | Required proof: erase restore after semantic edits |
 | Grouped multi-selection | Required proof: grouped multi-selection captures actual commit baselines and one journal entry |
-| Cancellation | Required proof: cancellation discards local preview and preserves remote geometry and history |
+| Cancellation | Required proof: cancellation preserves pointerup-only document/history contract (UI preview-discard placeholder pending F3) |
 | Interleaved history, bounded root dispatch | Required proof: interleaved page/canvas history and bounded no-op root dispatch |
 | Cross-provider relay undo | Required proof: relay delivery of scalar and raw root undo/redo uses two connected providers exactly once without echo |
 | Invalid/fallback docs | Required proof: invalid/fallback docs remain readable without mutation and reject editing |
 | Every observed scene complete/finite | Required proof: every observed post-transaction scene has complete finite geometry |
-| Decisive D3 example | Decisive D3 example: B wins 40, undo restores seed 0, redo restores 40, losing A and later remote move are preserved |
+| Decisive D3 example | Decisive D3 example: seed inverse, winner redo, losing undo and later remote move (A=%i, B=%i) |
 
-Additional tests cover ordering/rebalance, history lifecycle and read-only behavior, canvas-level scalars, and clearing both redo paths. `d3-gate.test.ts` contains the initial low-level erase-restore and concurrency preflight.
 
-## Remaining coverage and limitations
 
-No §3 required-proof item is intentionally omitted from the automated headless suite. These are bounded scenarios, not exhaustive concurrency verification. React StrictMode registration/cleanup, permission changes and document replacement now have explicit integration tests. The root adapter's successful/no-op detach/restore is exercised; a deliberately throwing raw manager operation is not injected. Early-published stroke cancellation is not implemented or tested because that publication mode is disabled; pointerup cancellation is covered. Conditional fallback authority, canonical recovery publication, renderer/export recovery integration, and owner-facing UI belong to subsequent work. No fallback authority ruling or hardware acceptance is implied. The full repository suite was not run; the focused suites cover the modified history, relay, saver and viewer-boundary paths.
+Review-specific tests are named `Review D3 race…`, `Review D3 seed race…` (each client-ID order), `Review token lineage…`, `Review diagnostics…`, and `Review order ties…`. Equal ord values, deterministic (ord,id) sorting and the actual rebalance branch are asserted explicitly. The decisive example is parameterized for both client-ID orders; the original B-wins-40 outcome remains the A=10/B=20 case.
 
-## Anomaly watch
+## Decisions, limits and anomaly watch
 
-**No unexplained undo result observed; no absent geometry observed in the executed undo tests.** The recorded historical anomaly remains recorded-not-resolved; this run does not close it. One non-undo ordering test initially asserted hard-coded bounds F..V incorrectly; inspection of existing keysBetween showed it balances two entries to V..l. The assertion was corrected to use actual returned neighbor bounds, and the test passed. This was a test expectation error, not an undo anomaly. The initial viewer fence/byte failure was resolved by the explicit manager-authorized injection seam; all final ledger/fence checks pass.
+- Per manager ruling, the app-registration seam is authorized; no asynchronous installation or second visible history is introduced.
+- Full-axis balancing through keysBetween includes tied runs and costs O(k); it is not claimed to be a 25 B operation.
+- Forward scalar writes use fresh UUID tokens; inverse replay restores captured token lineage, with explicit canvas:seed for seeds. Restored maps are eligible by token, not old object identity.
+- Canonical fallback recovery authority is not invented. Fallback data is safely diagnosed/read; only valid integrated targets are mutable.
+- Pointerup-only publication remains the policy. The headless cancellation test proves no publication, remote rewind or history change. **Actual UI preview discard is explicitly a placeholder pending renderer/F3 work**, not claimed as automated UI coverage; early-published stroke cancellation remains disabled.
+- Tests cover bounded concurrency cases, not exhaustive verification. Deliberately throwing raw-manager operations are not injected. Full repository tests and hardware/UI/export acceptance were not run.
+- The original reported geometry defect is fixed in named race tests. The pressure result and initial over-strong identity assertion are explained and proven; diagnostic captures are retained in `review-anomaly.json`, `review-round/race-tests.txt` and `pressure-identity-assertion.txt`. **No new unexplained undo result occurred after the manager-authorized repair; the historical D3 anomaly gate remains closed per the manager ruling.**

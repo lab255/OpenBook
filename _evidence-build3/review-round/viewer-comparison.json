@@ -1,0 +1,14 @@
+{
+  "auditedBase": "6b6106fabbade7d77bd10797ed89f5b2f4d1e394",
+  "reviewedHead": "38035434faedad6047b32ad1d6b6deba5b886dc9",
+  "baselineBytes": 1932942,
+  "previousPrBytes": 1933102,
+  "fixedBytes": 1933102,
+  "fixRoundDeltaBytes": 0,
+  "totalSeamDeltaBytes": 160,
+  "nonMotionGrowthBytes": 727,
+  "seamStopThresholdBytes": 300,
+  "guardBytes": 4096,
+  "sha256": "5c78d33fbe54ad95397b47db03887877670ffe9a0e5104b3f77b3df84b838dc7",
+  "canvasModules": []
+}

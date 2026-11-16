@@ -1,9 +1,37 @@
 import * as Y from 'yjs';
-import {expect, test} from 'vitest';
+import {beforeEach, expect, onTestFailed, test} from 'vitest';
+// @ts-expect-error -- node:fs is available to Vitest, not the browser package.
+import {mkdirSync, writeFileSync} from 'node:fs';
 import {rootBlocks} from '../model';
-import {CanvasHistory} from './history';
+import {CanvasHistory, SEMANTIC_CANVAS} from './history';
 import {createCanvasProps, createShape, readCanvas, readPressure} from './schema';
 import {appendPoints, eraseShape} from './commands';
+
+const traces: {clientID: number; seed: number[]; states: unknown[]; updates: number[][]}[] = [];
+beforeEach(() => {
+  traces.length = 0;
+  onTestFailed(({task}) => {
+    const directory = new URL('../../../../../_evidence-build3/', import.meta.url);
+    mkdirSync(directory, {recursive: true});
+    const name = `review-anomaly-${task.name.replace(/[^a-z0-9]+/gi, '-')}.json`;
+    writeFileSync(new URL(name, directory), JSON.stringify({test: task.name, replicas: traces}, null, 2));
+  });
+});
+function assertGeometry(shapes: Y.Map<Y.Map<unknown>>): void {
+  for (const shape of shapes.values()) {
+    for (const key of ['x','y','w','h','startX','startY','endX','endY','basisW','basisH']) {
+      expect(Number.isFinite(shape.get(key)), `${shape.get('id')}/${key}: ${JSON.stringify(shape.toJSON())}`).toBe(true);
+    }
+    expect(Number(shape.get('w'))).toBeGreaterThanOrEqual(0);
+    expect(Number(shape.get('h'))).toBeGreaterThanOrEqual(0);
+    expect(Number(shape.get('basisW'))).toBeGreaterThan(0);
+    expect(Number(shape.get('basisH'))).toBeGreaterThan(0);
+    const points = shape.get('points') as Y.Array<number>;
+    expect(points).toBeInstanceOf(Y.Array);
+    expect(points.length % 2).toBe(0);
+    expect(points.toArray().every(Number.isFinite)).toBe(true);
+  }
+}
 
 function seed() {
   const doc = new Y.Doc(); doc.clientID = 1;
@@ -20,9 +48,12 @@ function peer(bytes: Uint8Array, id: number) {
   const shapes = props.get('shapes') as Y.Map<Y.Map<unknown>>;
   const history = new CanvasHistory(doc);
   const states: unknown[] = [];
+  const updates: number[][] = [];
+  traces.push({clientID: id, seed: Array.from(bytes), states, updates});
+  doc.on('update', update => updates.push(Array.from(update)));
   doc.on('afterTransaction', () => {
     const state = shapes.toJSON(); states.push(state);
-    for (const shape of shapes.values()) for (const k of ['x','y','w','h']) expect(Number.isFinite(shape.get(k)), JSON.stringify(state)).toBe(true);
+    assertGeometry(shapes);
   });
   return {doc,props,shapes,history,states};
 }
@@ -55,17 +86,19 @@ test('Required proof: erase restore after semantic edits', () => {
   expect(readCanvas(a.props).editable).toBe(true);
 });
 
-test('Decisive D3 example: B wins 40, undo restores seed 0, redo restores 40, losing A and later remote move are preserved', () => {
-  const bytes=seed(),a=peer(bytes,10),b=peer(bytes,20);
+test.each([[10,20], [20,10]])('Decisive D3 example: seed inverse, winner redo, losing undo and later remote move (A=%i, B=%i)', (aId,bId) => {
+  const bytes=seed(),a=peer(bytes,aId),b=peer(bytes,bId);
   move(a,{x:20}); move(b,{x:40}); exchange(a,b);
-  expect(a.shapes.get('s')!.get('x')).toBe(40);
-  expect(b.history.undo().appliedKeys).toHaveLength(1); exchange(a,b);
+  const winner = aId > bId ? a : b, loser = winner === a ? b : a;
+  const won = winner === a ? 20 : 40;
+  expect(a.shapes.get('s')!.get('x')).toBe(won);
+  expect(winner.history.undo().appliedKeys).toHaveLength(1); exchange(a,b);
   expect(a.shapes.get('s')!.get('x')).toBe(0);
-  expect(a.history.undo().reason).toBe('no-op'); exchange(a,b);
-  b.history.redo(); exchange(a,b);
-  expect(a.shapes.get('s')!.get('x')).toBe(40);
-  move(a,{x:60}); exchange(a,b);
-  expect(b.history.undo().reason).toBe('no-op'); exchange(a,b);
+  expect(loser.history.undo().reason).toBe('no-op'); exchange(a,b);
+  winner.history.redo(); exchange(a,b);
+  expect(a.shapes.get('s')!.get('x')).toBe(won);
+  move(loser,{x:60}); exchange(a,b);
+  expect(winner.history.undo().reason).toBe('no-op'); exchange(a,b);
   expect(b.shapes.get('s')!.get('x')).toBe(60);
 });
 test('Required proof: token/value winners stay paired with different operation lengths and inverse token reuse in both client-id orders', () => {
@@ -132,10 +165,14 @@ test('Required proof: grouped multi-selection captures actual commit baselines a
   expect(a.history.undo().appliedKeys).toHaveLength(2);exchange(a,b);
   expect(a.shapes.get('s')!.get('x')).toBe(7);expect(a.shapes.get('t')!.get('x')).toBe(0);
 });
-test('Required proof: cancellation discards local preview and preserves remote geometry and history', () => {
+test('Required proof: cancellation preserves pointerup-only document/history contract (UI preview-discard placeholder pending F3)', () => {
   const bytes=seed(),a=peer(bytes,10),b=peer(bytes,20);
-  const preview={x:90};move(b,{x:25});exchange(a,b);
-  a.history.cancelPreview();expect(preview.x).toBe(90);
+  // Preview ownership/discard is a UI responsibility, not implemented by this
+  // headless API. This checks only that cancellation publishes/rewinds nothing.
+  move(b,{x:25});exchange(a,b);
+  const before = Y.encodeStateAsUpdate(a.doc);
+  a.history.cancelPreview();
+  expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);
   expect(a.history.availability.undo).toBeNull();expect(readCanvas(a.props).shapes[0].scalars.x).toBe(25);
 });
 test('Required proof: interleaved page/canvas history and bounded no-op root dispatch', () => {
@@ -200,7 +237,7 @@ test('Order keys: deterministic ties and balanced placement, concurrent reorder/
   expect(readCanvas(a.props).shapes.map(s=>s.id)).toEqual(['s','t']);
   const key=placementKey(a.history,'canvas','s','t');
   expect(key > String(a.shapes.get('s')!.get('ord')) && key < String(a.shapes.get('t')!.get('ord'))).toBe(true);
-  move(b,{ord:'z'});exchange(a,b); // concurrent rebalance versus reorder
+  move(b,{ord:'z'});exchange(a,b); // peer reorder concurrent with local placement preparation; explicit tied-run branch tested below
   expect(readCanvas(a.props).shapes.map(s=>s.id)).toEqual(readCanvas(b.props).shapes.map(s=>s.id));
   a.history.commitCanvasCommand('Long key',[{blockId:'canvas',shapeId:'s',values:{ord:'z'.repeat(49)}}]);
   const ordered=readCanvas(a.props).shapes;
@@ -219,4 +256,134 @@ test('History lifecycle, read-only guard, new edit clears both redo paths, and c
   expect(history.undo().reason).toBe('read-only');
   writable=true;history.commitCanvasCommand('Allowed',[{blockId:'canvas',shapeId:'s',values:{x:44}}]);
   history.undo();expect(a.shapes.get('s')!.get('x')).toBe(10);history.destroy();
+});
+
+
+test.each([[10,20], [20,10]])('Review D3 race: erase versus concurrent same-shape edit, undo and redo (A=%i, B=%i)', (aId,bId) => {
+  const bytes=seed(),a=peer(bytes,aId),b=peer(bytes,bId);
+  appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
+  appendPoints(a.history,'canvas','s',[5,6,7,8],[0.4,1]); exchange(a,b);
+  const original = [a,b].map(p => {
+    const shape = p.shapes.get('s')!;
+    const points = shape.get('points') as Y.Array<number>;
+    const batches = shape.get('pressureBatches') as Y.Map<{anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]}>;
+    const anchors = [...batches.values()].map(batch => batch.anchor);
+    for (const anchor of anchors) expect(Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(anchor), p.doc)?.type).toBe(points);
+    return {points, anchors, batchIds: [...batches.keys()].sort()};
+  });
+  const widths = (shape: Y.Map<unknown>) => readPressure(shape).batches.sort((a,b)=>a.offset-b.offset)
+    .flatMap(batch=>batch.q.map(q=>Number(shape.get('strokeWidth'))*(0.5+q/255)));
+  const expectedWidths = widths(a.shapes.get('s')!);
+  move(a,{x:20, startX:0.2}); exchange(a,b);
+  const token = a.shapes.get('s')!.get('op:x');
+  eraseShape(a.history,'canvas','s');
+  move(b,{x:55, startX:0.9});
+  exchange(a,b);
+  expect(a.shapes.has('s')).toBe(false);
+  // Observe raw types too, and deliver EVERY update independently. No merged
+  // snapshot or reader default can conceal an incomplete intermediate scene.
+  a.shapes.observeDeep(() => assertGeometry(a.shapes));
+  b.shapes.observeDeep(() => assertGeometry(b.shapes));
+  const repairs: Y.Transaction[] = [];
+  a.doc.on('afterTransaction', transaction => {
+    if (transaction.origin === 'local' && transaction.meta.has(SEMANTIC_CANVAS)) repairs.push(transaction);
+  });
+  for (const p of [a,b]) p.doc.on('afterTransaction', () => {
+    const shape = p.shapes.get('s');
+    if (shape) expect(readPressure(shape).degraded).toBe(false);
+  });
+  const deliver = (update: Uint8Array) => Y.applyUpdate(b.doc, update, 'net');
+  a.doc.on('update', deliver);
+  try {
+    expect(a.history.undo().reason).toBe('applied');
+    expect(repairs).toHaveLength(1);
+    expect([...repairs[0].changed.keys()]).toContain(a.shapes.get('s')!);
+    expect([...repairs[0].changed.keys()]).toContain(a.shapes.get('s')!.get('pressureBatches'));
+    expect(a.history.availability).toEqual({undo:'Move',redo:'Erase shape'});
+    for (const [index,p] of [a,b].entries()) {
+      const shape = p.shapes.get('s')!;
+      const restoredPoints = shape.get('points') as Y.Array<number>;
+      expect(restoredPoints).not.toBe(original[index].points);
+      // Mechanism proof: old anchors name the original type. Local redo
+      // pointers can follow them on A, but are not encoded in updates to B.
+      for (const anchor of original[index].anchors) {
+        const relative = Y.createRelativePositionFromJSON(anchor);
+        expect(Y.createAbsolutePositionFromRelativePosition(relative, p.doc, false)?.type).not.toBe(restoredPoints);
+        if (index === 0) expect(Y.createAbsolutePositionFromRelativePosition(relative,p.doc)?.type).toBe(restoredPoints);
+        else expect(Y.createAbsolutePositionFromRelativePosition(relative,p.doc)?.type).not.toBe(restoredPoints);
+        expect(Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(restoredPoints,0)).type).not.toEqual(anchor.type);
+      }
+      const batches = shape.get('pressureBatches') as Y.Map<{anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]}>;
+      expect([...batches.keys()].sort()).toEqual(original[index].batchIds);
+      for (const batch of batches.values()) expect(Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(batch.anchor),p.doc)?.type).toBe(restoredPoints);
+      assertGeometry(p.shapes);
+      expect(shape.get('x')).toBe(20);
+      expect(shape.get('op:x')).toBe(token);
+      expect(shape.get('startX')).toBe(0.2);
+      expect(typeof shape.get('op:startX')).toBe('string');
+      expect(readCanvas(p.props)).toMatchObject({editable:true, diagnostics:[]});
+      expect(readPressure(shape).degraded).toBe(false);
+      expect(widths(shape)).toEqual(expectedWidths);
+    }
+    expect(a.history.redo().reason).toBe('applied');
+    expect(a.shapes.has('s')).toBe(false); expect(b.shapes.has('s')).toBe(false);
+    expect(a.history.undo().reason).toBe('applied');
+    expect(a.shapes.get('s')!.get('x')).toBe(20);
+    expect(b.shapes.get('s')!.get('x')).toBe(20);
+    for (const p of [a,b]) {
+      expect(readPressure(p.shapes.get('s')!).degraded).toBe(false);
+      expect(widths(p.shapes.get('s')!)).toEqual(expectedWidths);
+    }
+  } finally { a.doc.off('update', deliver); }
+});
+
+test.each([[10,20], [20,10]])('Review D3 seed race: erased seed geometry gets explicit seed tokens after concurrent edit (A=%i, B=%i)', (aId,bId) => {
+  const bytes=seed(),a=peer(bytes,aId),b=peer(bytes,bId);
+  eraseShape(a.history,'canvas','s');move(b,{x:55});exchange(a,b);
+  a.history.undo();exchange(a,b);
+  for (const p of [a,b]) {
+    expect(p.shapes.get('s')!.get('x')).toBe(0);
+    expect(p.shapes.get('s')!.get('op:x')).toBe('canvas:seed');
+    expect(readCanvas(p.props)).toMatchObject({editable:true,diagnostics:[]});
+  }
+  a.history.redo();exchange(a,b);expect(a.shapes.has('s')).toBe(false);
+});
+
+test('Review token lineage: move → erase → undo → undo returns to seed, then full redo chain', () => {
+  const bytes=seed(),a=peer(bytes,10),b=peer(bytes,20);
+  move(a,{x:20});exchange(a,b);
+  eraseShape(a.history,'canvas','s');exchange(a,b);
+  a.history.undo();exchange(a,b);
+  expect(a.history.undo().reason).toBe('applied');exchange(a,b);
+  expect(a.shapes.get('s')!.get('x')).toBe(0);
+  expect(a.history.redo().reason).toBe('applied');exchange(a,b);
+  expect(a.shapes.get('s')!.get('x')).toBe(20);
+  expect(a.history.redo().reason).toBe('applied');exchange(a,b);
+  expect(a.shapes.has('s')).toBe(false);
+});
+
+test('Review diagnostics: missing required scalar names shape/key and is never drawn with a default', () => {
+  const {props}=peer(seed(),10);
+  const malformed = props.toJSON(); delete malformed.shapes.s.x;
+  const scene = readCanvas(malformed);
+  expect(scene.editable).toBe(false);
+  expect(scene.shapes).toHaveLength(0);
+  expect(scene.diagnostics).toContain('Shape s: missing required scalar x');
+});
+
+test('Review order ties: equal-ord rebalance and lexicographic (ord,id) sorting are explicit', async () => {
+  const {insertShape,placementKey}=await import('./commands');
+  const bytes=seed(),a=peer(bytes,10),b=peer(bytes,20);
+  const tied = String(a.shapes.get('s')!.get('ord'));
+  insertShape(a.history,'canvas',{id:'a',ord:tied});
+  exchange(a,b);
+  expect(readCanvas(a.props).shapes.map(s=>[s.scalars.ord,s.id])).toEqual([[tied,'a'],[tied,'s']]);
+  const key = placementKey(a.history,'canvas','a','s');
+  expect(a.history.availability.undo).toBe('Rebalance shapes');
+  expect(a.shapes.get('a')!.get('ord')).not.toBe(a.shapes.get('s')!.get('ord'));
+  expect(key > String(a.shapes.get('a')!.get('ord')) && key < String(a.shapes.get('s')!.get('ord'))).toBe(true);
+  // This time the peer really reorders while the local tied-run rebalance is
+  // unexchanged. Their concurrent writes converge without unique-key rules.
+  move(b,{ord:'z'});exchange(a,b);
+  expect(readCanvas(a.props).shapes.map(s=>s.id)).toEqual(readCanvas(b.props).shapes.map(s=>s.id));
 });

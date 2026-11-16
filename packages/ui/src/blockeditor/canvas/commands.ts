@@ -2,12 +2,12 @@ import * as Y from 'yjs';
 import {keyBetween, keysBetween, ORDER_KEY_REBALANCE_LENGTH} from '@book.dev/sdk';
 import {findBlock} from '../model';
 import {CanvasHistory} from './history';
-import {createShape, readCanvas} from './schema';
+import {createShape, isEditableCanvas, isEditableShape, readCanvas} from './schema';
 
 function writableShapes(history: CanvasHistory, blockId: string): Y.Map<Y.Map<unknown>> {
   if (!history.writable) throw new Error('Read-only canvas');
   const props = findBlock(history.doc, blockId)?.block.get('props');
-  if (!readCanvas(props).editable || !(props instanceof Y.Map)) throw new Error('Canvas requires recovery');
+  if (!isEditableCanvas(props)) throw new Error('Canvas requires recovery');
   return props.get('shapes') as Y.Map<Y.Map<unknown>>;
 }
 export function insertShape(history: CanvasHistory, blockId: string, input: Record<string, unknown>): string {
@@ -20,11 +20,15 @@ export function insertShape(history: CanvasHistory, blockId: string, input: Reco
 }
 export function eraseShape(history: CanvasHistory, blockId: string, shapeId: string): void {
   const shapes = writableShapes(history, blockId);
-  if (shapes.has(shapeId)) history.structural('Erase shape', () => shapes.delete(shapeId));
+  if (!shapes.has(shapeId)) return;
+  const snapshot = history.captureErase(blockId, shapeId);
+  if (!snapshot) throw new Error('Shape requires recovery');
+  history.structural('Erase shape', () => shapes.delete(shapeId), [snapshot]);
 }
 export function appendPoints(history: CanvasHistory, blockId: string, shapeId: string, values: readonly number[], pressures?: readonly number[]): void {
   const shape = writableShapes(history, blockId).get(shapeId);
   if (!shape) return;
+  if (!isEditableShape(shape, shapeId)) throw new Error('Shape requires recovery');
   if (shape.get('kind') !== 'stroke' || values.length === 0 || values.length % 2 || values.length > 128 || !values.every(Number.isFinite)) throw new TypeError('Invalid point batch');
   const variable = shape.get('pressureMode') === 'variable';
   if (variable && (!pressures || pressures.length * 2 !== values.length || !pressures.every(Number.isFinite))) throw new TypeError('Invalid pressure batch');

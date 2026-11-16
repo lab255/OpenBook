@@ -57,6 +57,29 @@ export const get = (object: unknown, key: string): unknown => object instanceof 
 const entries = (object: unknown): [string, unknown][] => object instanceof Y.Map ? [...object.entries()] : object && typeof object === 'object' && !Array.isArray(object) ? Object.entries(object) : [];
 export interface SceneShape {readonly id: string; readonly scalars: Readonly<Record<string, Scalar>>; readonly points: readonly number[]}
 export interface Scene {readonly shapes: readonly SceneShape[]; readonly diagnostics: readonly string[]; readonly editable: boolean}
+/** Mutation validation touches only the addressed canvas/shape, never builds a scene. */
+export function isEditableCanvas(props: unknown): props is Y.Map<unknown> {
+  if (!(props instanceof Y.Map) || !(props.get('shapes') instanceof Y.Map)) return false;
+  try {
+    for (const key of Object.keys(canvasDefaults)) scalarValue(key, props.get(key), true);
+    return true;
+  } catch { return false; }
+}
+export function isEditableShape(shape: unknown, id: string): shape is Y.Map<unknown> {
+  if (!(shape instanceof Y.Map) || shape.get('id') !== id) return false;
+  try {
+    for (const key of Object.keys(shapeDefaults)) {
+      scalarValue(key, shape.get(key));
+      const token = shape.get(`op:${key}`);
+      if (token !== undefined && typeof token !== 'string') return false;
+    }
+    const points = shape.get('points');
+    if (!(points instanceof Y.Array) || points.length % 2 || !(shape.get('pressureBatches') instanceof Y.Map)) return false;
+    let finite = true;
+    points.forEach(value => { if (typeof value !== 'number' || !Number.isFinite(value)) finite = false; });
+    return finite;
+  } catch { return false; }
+}
 /** Defensive, non-mutating reader. Malformed objects remain in source for recovery. */
 export function readCanvas(props: unknown): Scene {
   const diagnostics: string[] = [];
@@ -64,23 +87,36 @@ export function readCanvas(props: unknown): Scene {
   let editable = props instanceof Y.Map && get(props, 'shapes') instanceof Y.Map && get(props, 'canvasVersion') === 1;
   if (!editable) diagnostics.push('Canvas requires a common v1 binary identity before editing');
   for (const key of Object.keys(canvasDefaults)) {
-    try { scalarValue(key, get(props, key) ?? canvasDefaults[key], true); } catch { editable = false; diagnostics.push(`Invalid canvas ${key}`); }
+    try { scalarValue(key, get(props, key), true); } catch { editable = false; diagnostics.push(`Invalid canvas ${key}`); }
   }
   for (const [id, source] of entries(get(props, 'shapes'))) {
     try {
       const scalars: Record<string, Scalar> = {};
-      for (const [key, fallback] of Object.entries(shapeDefaults)) scalars[key] = scalarValue(key, get(source, key) ?? fallback);
+      const missing = Object.keys(shapeDefaults).filter(key => get(source, key) === undefined);
+      for (const key of missing) diagnostics.push(`Shape ${id}: missing required scalar ${key}`);
+      if (missing.length) throw new TypeError('Missing required scalars');
+      for (const key of Object.keys(shapeDefaults)) scalars[key] = scalarValue(key, get(source, key));
       if (get(source, 'id') !== id || get(source, 'shapeVersion') !== 1) throw new TypeError('Identity/version');
       const raw = get(source, 'points');
       const points: unknown = raw instanceof Y.Array ? raw.toArray() : raw;
       if (!Array.isArray(points) || points.length % 2 || !points.every(p => typeof p === 'number' && Number.isFinite(p))) throw new TypeError('Points');
       if (!(source instanceof Y.Map) || !(raw instanceof Y.Array) || !(get(source, 'pressureBatches') instanceof Y.Map)) editable = false;
-      for (const key of Object.keys(shapeDefaults)) if (get(source, key) === undefined) editable = false;
       shapes.push(Object.freeze({id, scalars: Object.freeze(scalars), points: Object.freeze(points.slice() as number[])}));
     } catch { editable = false; diagnostics.push(`Quarantined shape ${id}`); }
   }
   shapes.sort((a,b) => String(a.scalars.ord) < String(b.scalars.ord) ? -1 : String(a.scalars.ord) > String(b.scalars.ord) ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   return Object.freeze({shapes: Object.freeze(shapes), diagnostics: Object.freeze(diagnostics), editable});
+}
+
+/** Validate a batch only when its anchor resolves against this exact points type. */
+export function resolvePressureBatch(points: Y.Array<number>, value: unknown, followUndoneDeletions = true): {offset: number; q: number[]} | null {
+  if (!points.doc) return null;
+  try {
+    const {anchor, count, q} = value as {anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]; count: number; q: number[]};
+    const position = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(anchor), points.doc, followUndoneDeletions);
+    if (!position || position.type !== points || position.index % 2 || !Number.isInteger(count) || count < 1 || count > 64 || position.index + count * 2 > points.length || !Array.isArray(q) || q.length !== count || !q.every(p => Number.isInteger(p) && p >= 0 && p <= 255)) return null;
+    return {offset: position.index / 2, q: q.slice()};
+  } catch { return null; }
 }
 
 /** Resolve pressure against the same points identity, never a parallel index array. */
@@ -90,12 +126,9 @@ export function readPressure(shape: Y.Map<unknown>): {batches: {offset: number; 
   let degraded = false;
   if (!(points instanceof Y.Array) || !(metadata instanceof Y.Map) || !points.doc) return {batches, degraded: true};
   for (const value of metadata.values()) {
-    try {
-      const {anchor, count, q} = value as {anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]; count: number; q: number[]};
-      const position = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(anchor), points.doc);
-      if (!position || position.type !== points || position.index % 2 || !Number.isInteger(count) || count < 1 || count > 64 || position.index + count * 2 > points.length || !Array.isArray(q) || q.length !== count || !q.every(p => Number.isInteger(p) && p >= 0 && p <= 255)) throw new TypeError('Pressure batch');
-      batches.push({offset: position.index / 2, q: q.slice()});
-    } catch { degraded = true; }
+    const batch = resolvePressureBatch(points, value);
+    if (batch) batches.push(batch);
+    else degraded = true;
   }
   if (shape.get('pressureMode') === 'variable' && batches.reduce((sum,b) => sum + b.q.length,0) * 2 !== points.length) degraded = true;
   return {batches, degraded};
