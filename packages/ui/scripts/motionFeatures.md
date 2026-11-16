@@ -175,3 +175,29 @@ is declared orthogonal (the native gutter anchors identically today) and the
 menu-exit transient is accepted as cosmetic (it recovers without misaction).
 Post-rebase clean rebuild measured non-motion headroom of **475 B**, not 4 B.
 4e22000e (test(ui): record shared gutter evidence and unresolved divider conflict)
+
+### R1 window widening (BUILD-1, owner 2026-11-12 via PM² relay)
+
+The superseded 571 B window came from CARD-10: +100 B FF-7a explicit dark
+ladder declarations from PR #435 CI and +471 B command-palette polish, following precedent
+`9924500d`. R1 authorizes **4,096 B** for `endpoint.nonMotionGrowthBytes`.
+This is a ruled widening of a measured window for the canvas live-but-inert
+viewer slice, not a new Motion feature row.
+
+CANVAS-7 at `59c49f80e17deedc67f6cf8d5f16835bdd5e0534` measured
+**3,159 B** in that coordinate: 1,935,534 B raw IIFE minus the historical
+1,932,375 B row endpoint. Its **2,981 B raw slice net cost** over the fenced
+floor is a different quantity. The measured coordinate widened by 2,588 B
+over 571 B; the authorized window includes a deliberate bounded allowance of
+937 B above 3,159 B, not slack. Growth past 4,096 B requires a NEW owner decision.
+
+The measurement contract is a clean production whole-IIFE UTF-8 byteLength,
+including injected CSS, plus inspection of the emitted dependency graph.
+The endpoint fixture accepts historical +4,096 and rejects +4,097. The
+−506/−507 lower boundary, exact Motion byte count, module/export coverage,
+262,144 B aggregate ceiling and 2,048 B block-own-code ceiling remain unchanged.
+
+The viewer imports `reactiveCore`; the app imports the `reactiveBlocks`
+registration wrapper. Future editing registrations belong in that wrapper.
+The emitted viewer graph assertion rejects the app wrapper and canvas editing
+modules. No editing canvas implementation is included in BUILD-1.
