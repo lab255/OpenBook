@@ -1,7 +1,9 @@
 import * as Y from 'yjs';
-import {findBlock, rootBlocks, walkBlocks} from '../model';
+import {findBlock, rootBlocks} from '../model';
 import {registerLocalHistory} from '../localHistoryOrigin';
 import {canvasDefaults, fixedFields, isEditableCanvas, isEditableShape, resolvePressureBatch, scalarValue, shapeDefaults, type Scalar} from './schema';
+
+import {CanvasRootCapture, mergeScope, type CanvasScope, type RootCapture} from './rootCapture';
 
 export const SEMANTIC_CANVAS = Symbol('semantic-canvas');
 export const SEED_TOKEN = 'canvas:seed';
@@ -17,7 +19,7 @@ export interface ErasedShape {
   readonly scalars: Readonly<Record<string, Scalar>>;
   readonly tokens: Readonly<Record<string, string>>;
 }
-type Entry = {kind: 'scalar'; label: string; fields: readonly Field[]; applied: readonly Field[]} | {kind: 'root'; label: string; item: StackItem | null; erased: readonly ErasedShape[]};
+type Entry = {kind: 'scalar'; label: string; fields: readonly Field[]; applied: readonly Field[]} | {kind: 'root'; label: string; item: StackItem | null; erased: readonly ErasedShape[]; scope: CanvasScope};
 export interface HistoryResult {label: string; appliedKeys: string[]; skippedKeys: string[]; reason: 'applied' | 'adjusted' | 'no-op' | 'read-only'; diagnostics?: readonly string[]}
 const fieldName = (f: Field) => `${f.blockId}/${f.shapeId ?? '@canvas'}/${f.key}`;
 
@@ -32,8 +34,13 @@ export class CanvasHistory {
   private rootLabel = 'Edit page';
   private erased: readonly ErasedShape[] = [];
   private repairDiagnostics: string[] = [];
+  private rootCapture: CanvasRootCapture;
+  private captured: RootCapture = {scope:new Map(), erased:[]};
+  private inspectRoot = (transaction: Y.Transaction): void => { this.captured = this.rootCapture.inspect(transaction); };
   get diagnostics(): readonly string[] { return Object.freeze([...this.repairDiagnostics]); }
   constructor(readonly doc: Y.Doc, private readonly canWrite: () => boolean = () => true) {
+    this.rootCapture = new CanvasRootCapture(doc);
+    this.doc.on('afterTransaction', this.inspectRoot);
     this.manager = new Y.UndoManager(rootBlocks(doc), {
       trackedOrigins: new Set(['local']), captureTimeout: 400,
       captureTransaction: transaction => !transaction.meta.has(SEMANTIC_CANVAS),
@@ -43,14 +50,19 @@ export class CanvasHistory {
     this.manager.on('stack-item-updated', this.onRoot);
   }
   private onRoot = ({stackItem}: {stackItem: StackItem}): void => {
-    if (this.replay?.kind === 'root') { this.replay.item = stackItem; return; }
+    if (this.replay?.kind === 'root') {
+      this.replay.item = stackItem; this.replay.erased = this.captured.erased;
+      mergeScope(this.replay.scope, this.captured.scope); return;
+    }
     if (this.replay) return;
     this.future = [];
     const last = this.past[this.past.length - 1];
-    if (last?.kind === 'root' && last.item === stackItem) return;
+    if (last?.kind === 'root' && last.item === stackItem) {
+      mergeScope(last.scope,this.captured.scope); last.erased = [...last.erased,...this.captured.erased]; return;
+    }
     const label = String(stackItem.meta.get('label') ?? this.rootLabel);
     stackItem.meta.set('label', label);
-    this.past.push({kind: 'root', label, item: stackItem, erased: this.erased});
+    this.past.push({kind: 'root', label, item: stackItem, erased: [...this.erased,...this.captured.erased], scope:this.captured.scope});
   };
   get writable(): boolean { return !this.disposed && this.canWrite(); }
   get availability(): {undo: string | null; redo: string | null} {
@@ -101,7 +113,7 @@ export class CanvasHistory {
     const shape = (props.get('shapes') as Y.Map<unknown>).get(snapshot.shapeId);
     return shape instanceof Y.Map ? shape : null;
   }
-  private repairRestored(erased: readonly ErasedShape[]): void {
+  private repairRestored(erased: readonly ErasedShape[], scope: CanvasScope): void {
     const missing: {shape: Y.Map<unknown>; snapshot: ErasedShape; key: string; value: Scalar; token: string}[] = [];
     for (const snapshot of erased) {
       const shape = this.restoredShape(snapshot);
@@ -115,13 +127,18 @@ export class CanvasHistory {
     // block deletion. Recover from the LIVE batch via local redo pointers;
     // an old erase snapshot cannot know batches added between history legs.
     // This scan runs once per root dispatch, never in scalar command/replay.
-    for (const {block} of walkBlocks(rootBlocks(this.doc))) {
-      if (block.get('type') !== 'canvas') continue;
+    for (const [blockId, shapeIds] of scope) {
+      const block = findBlock(this.doc,blockId)?.block;
+      if (!block || block.get('type') !== 'canvas') continue;
       const props = block.get('props');
       const shapes = props instanceof Y.Map ? props.get('shapes') : null;
       if (!(shapes instanceof Y.Map)) continue;
-      for (const [shapeId, shape] of shapes) {
+      for (const shapeId of shapeIds) {
+        const shape = shapes.get(shapeId);
         if (!(shape instanceof Y.Map)) continue;
+        for (const key of Object.keys(shapeDefaults)) if (!shape.has(key)) {
+          this.repairDiagnostics.push(`Canvas ${blockId} shape ${shapeId}: missing required scalar ${key}${missing.some(m => m.shape === shape && m.key === key) ? '; restoring captured value' : '; no valid snapshot'}`);
+        }
         const points = shape.get('points'), metadata = shape.get('pressureBatches');
         if (!(metadata instanceof Y.Map)) {
           this.repairDiagnostics.push(`Canvas ${block.get('id')} shape ${shapeId} batch <map>: missing pressure metadata map`);
@@ -133,8 +150,11 @@ export class CanvasHistory {
             this.repairDiagnostics.push(`${context}: missing points type; pressure repair skipped`);
             continue;
           }
-          if (resolvePressureBatch(points, value, false)) continue;
+          const strict = resolvePressureBatch(points, value, false);
           const batch = resolvePressureBatch(points, value, true);
+          // Strict resolution may land on a tombstone inside the live array.
+          // Portability requires agreement with the local redo-following offset.
+          if (batch && strict && batch.offset === strict.offset) continue;
           if (!batch) {
             this.repairDiagnostics.push(`${context}: anchor or batch is invalid; pressure repair skipped`);
             continue;
@@ -214,15 +234,6 @@ export class CanvasHistory {
         const stack = redo ? this.manager.redoStack : this.manager.undoStack;
         if (entry.item) {
           if (stack[stack.length - 1] !== entry.item) throw new Error('Canvas history root stack mismatch');
-          if (redo && entry.erased.length) {
-            // Redo is a NEW erase of the current shared shape: refresh scalar
-            // baselines before it deletes peer edits made since the last undo.
-            entry.erased = entry.erased.flatMap(snapshot => {
-              const fresh = this.captureErase(snapshot.blockId, snapshot.shapeId);
-              if (!fresh && this.restoredShape(snapshot)) this.repairDiagnostics.push(`Canvas ${snapshot.blockId} shape ${snapshot.shapeId}: invalid pre-erase scalar snapshot; skipped`);
-              return fresh ? [fresh] : [];
-            });
-          }
           const older = stack.splice(0, stack.length - 1);
           entry.item = null;
           // Yjs has restored the root item at beforeObserverCalls, but has not
@@ -230,10 +241,10 @@ export class CanvasHistory {
           // A normal post-undo repair would expose incomplete geometry first.
           // 13.6.31 emits the original update from the live store, so its bytes
           // include this repair too (tested individually on a second provider).
-          const erased = redo ? [] : entry.erased.filter(snapshot => !this.restoredShape(snapshot));
+          const erased = entry.erased.filter(snapshot => !this.restoredShape(snapshot));
           const repair = (transaction: Y.Transaction): void => {
             if (transaction.origin !== this.manager) return;
-            try { this.repairRestored(erased); }
+            try { if (entry.scope.size) this.repairRestored(erased, entry.scope); }
             catch { this.repairDiagnostics.push('Canvas root restoration: repair interrupted; inspect scene diagnostics'); }
           };
           this.doc.on('beforeObserverCalls', repair);
@@ -270,6 +281,7 @@ export class CanvasHistory {
   cancelPreview(): void { /* Caller discards its local preview and rereads readCanvas. */ }
   destroy(): void {
     this.disposed = true; this.unregister();
+    this.doc.off('afterTransaction', this.inspectRoot);
     this.manager.off('stack-item-added', this.onRoot); this.manager.off('stack-item-updated', this.onRoot);
     this.manager.destroy(); this.past = []; this.future = [];
   }

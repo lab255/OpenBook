@@ -120,3 +120,13 @@ Latest validation: **89/89 focused tests, 7/7 ledger/fence tests, UI typecheck a
 **Decision owed to the UI card:** `readCanvas` marks the entire scene `editable=false` when any shape is quarantined, while mutation APIs validate only addressed targets and can still edit healthy shapes. This asymmetry is intentional to record, not silently adjudicated here: the UI card must decide between board-wide edit gating and per-shape affordances, and surface history repair diagnostics. Page write permission continues to gate either path.
 
 **Anomaly watch / iteration cap:** one generalized mechanism closes both findings with a green full matrix. No third repair round was started and no new unexplained undo result occurred. No permanent fidelity degradation is being accepted for valid restored batches.
+
+## Round 3 — stopped unpushed on new append composition
+
+At head 76cbe78c, uncommitted round-3 changes implement strict/follow agreement, overlapping-range degradation, scoped root repair and page-deletion scalar capture. The combined core suite passed 94/98 tests, including all 58 erase-matrix variants. All four append variants pass the first undo/redo, explicit tombstone proof and reload, then fail on the second undo: repaired metadata remains after its points are undone. Both replicas report degraded; geometry remains finite. Per the manager's iteration cap, no further repair was attempted and nothing was pushed.
+
+Root-cause model: root restoration creates new Yjs identities; strict resolution can succeed on tombstone positions, so portable anchors require strict/follow agreement. Captured scalars are authoritative only at capture time; preimages are refreshed on subsequent deletion (including redo). The newly demonstrated lifecycle hole is that history-excluded replacement pressure values can outlive the root-managed points on later undo. The new overlap hardening makes this observed miss honest-degraded, never healthy-and-wrong; it does not clear the fidelity gate.
+
+The local exact database hide-column E2E passed 1/1 using supported single-process Chromium after multiprocess startup failed under the sandbox. This does not explain the three CI failures or constitute a bisect. Remaining DoD checks paused at the required stop.
+
+Full reproduction, mechanism analysis, logs, seed/update/state captures and uncommitted patch: [round-3 stop report](/Users/eliot/.bb/thread-storage/canvas-build/build3-round3-stop/report.md). Owner/PM² storage/history decision required; no round 4 begun.

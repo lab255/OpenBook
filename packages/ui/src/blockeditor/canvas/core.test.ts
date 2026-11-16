@@ -6,7 +6,7 @@ import {mkdtempSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {findBlock, removeBlock, rootBlocks} from '../model';
 import {CanvasHistory, SEMANTIC_CANVAS} from './history';
-import {createCanvasProps, createShape, readCanvas, readPressure} from './schema';
+import {createCanvasProps, createShape, readCanvas, readPressure, resolvePressureBatch} from './schema';
 import {appendPoints, eraseShape} from './commands';
 
 const traces: {clientID: number; seed: number[]; states: unknown[]; updates: number[][]}[] = [];
@@ -535,4 +535,96 @@ test.each([[10,20],[20,10]])('Round 2 root redo restoration: newly created press
     a.history.undo();expect(a.shapes.has('t')).toBe(false);expect(b.shapes.has('t')).toBe(false);
     a.history.redo();assertReloadEquivalent(a,b,expected,'t');
   } finally { disconnect(); }
+});
+
+
+test('Round 3 hardening: overlapping pressure ranges are degraded even when total count matches', () => {
+  const a=peer(seed(),10);
+  appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
+  appendPoints(a.history,'canvas','s',[5,6,7,8],[0.4,1]);
+  const shape=a.shapes.get('s')!, batches=shape.get('pressureBatches') as Y.Map<unknown>;
+  const [first,second]=[...batches.keys()];
+  a.doc.transact(()=>batches.set(second,batches.get(first)),'net');
+  const pressure=readPressure(shape);
+  expect(pressure.batches.reduce((n,b)=>n+b.q.length,0)).toBe(4);
+  expect(pressure.degraded).toBe(true);
+});
+
+const appendMatrix = [[10,20],[20,10]].flatMap(ids => ['before undo','between undo and redo'].map(timing=>({ids,timing,
+  name:`Append composition matrix: tombstone, remote ${timing}, A=${ids[0]}/B=${ids[1]}, reload`,
+})));
+test.each(appendMatrix)('$name',({ids,timing})=>{
+  const a=peer(seed(),ids[0]),b=peer(seed(),ids[1]),disconnect=wirePressurePeers(a,b);
+  const resolutions: {strict:number|null;follow:number|null}[]=[];
+  const inspect=(tx:Y.Transaction)=>{
+    if(tx.origin!==a.history.manager) return;
+    const shape=a.shapes.get('s')!,points=shape.get('points') as Y.Array<number>;
+    const metadata=shape.get('pressureBatches') as Y.Map<unknown>;
+    for(const value of metadata.values()) resolutions.push({strict:resolvePressureBatch(points,value,false)?.offset??null,follow:resolvePressureBatch(points,value,true)?.offset??null});
+  };
+  try {
+    appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
+    if(timing==='before undo') appendPoints(b.history,'canvas','s',[5,6,7,8],[0.4,1]);
+    a.history.undo();
+    if(timing==='between undo and redo') appendPoints(b.history,'canvas','s',[5,6,7,8],[0.4,1]);
+    // This hook precedes the dispatch repair: inspect the live array while its
+    // original deleted point item still resolves strictly at a tombstone slot.
+    a.doc.on('beforeObserverCalls',inspect);
+    a.history.redo();a.doc.off('beforeObserverCalls',inspect);
+    expect(resolutions).toContainEqual({strict:2,follow:0});
+    const expected={batchCount:2,widths:[51,204,102,255].map(q=>3*(0.5+q/255))};
+    assertReloadEquivalent(a,b,expected);
+    a.history.undo();a.history.redo();assertReloadEquivalent(a,b,expected);
+  } finally { a.doc.off('beforeObserverCalls',inspect);disconnect(); }
+});
+
+const concurrentEraseMatrix=(['shape','page'] as const).flatMap(scope=>[[10,20],[20,10]].flatMap(ids=>
+  [0,2].flatMap(cycles=>['append','edit','append+edit'].map(remote=>({scope,ids,cycles,remote,
+    name:`Erase composition matrix: CONCURRENT ${scope}, A=${ids[0]}/B=${ids[1]}, cycles=${cycles}, remote=${remote}, reload`,
+  })))));
+test.each(concurrentEraseMatrix)('$name',({scope,ids,cycles,remote})=>{
+  const bytes=seed(),a=peer(bytes,ids[0]),b=peer(bytes,ids[1]);
+  appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);exchange(a,b);
+  let disconnect=()=>{};
+  try {
+    for(let leg=0;leg<=cycles;leg++) {
+      const expected=pressureView(a),x=a.shapes.get('s')!.get('x');
+      if(leg) a.history.redo();
+      else if(scope==='shape') eraseShape(a.history,'canvas','s');
+      else { a.history.stopCapturing();removeBlock(a.doc,'canvas');a.history.stopCapturing(); }
+      if(remote.includes('append')) appendPoints(b.history,'canvas','s',[5,6,7,8],[0.4,1]);
+      if(remote.includes('edit')) move(b,{x:55+leg});
+      exchange(a,b);
+      disconnect=wirePressurePeers(a,b);
+      const result=a.history.undo();
+      if(remote.includes('edit')) expect(result.diagnostics).toContain('Canvas canvas shape s: missing required scalar x; restoring captured value');
+      expect(a.shapes.get('s')!.get('x')).toBe(x);
+      assertReloadEquivalent(a,b,expected);
+      if(leg<cycles) { move(b,{x:80+leg}); }
+      disconnect();
+    }
+  } finally {disconnect();}
+});
+
+test.each([[10,20],[20,10]])('Erase composition matrix: simultaneous peer erase/undo, interleaved redo/undo, reload (A=%i, B=%i)',(aId,bId)=>{
+  const bytes=seed(),a=peer(bytes,aId),b=peer(bytes,bId);
+  appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);exchange(a,b);
+  const expected=pressureView(a);
+  eraseShape(a.history,'canvas','s');eraseShape(b.history,'canvas','s');exchange(a,b);
+  a.history.undo();b.history.undo();exchange(a,b);assertReloadEquivalent(a,b,expected);
+  a.history.redo();exchange(a,b);b.history.redo();exchange(a,b);
+  b.history.undo();exchange(a,b);a.history.undo();exchange(a,b);assertReloadEquivalent(a,b,expected);
+});
+
+test('Round 3 scope: unrelated page/shape undo does not re-report degraded batches',()=>{
+  const a=peer(seed(),10);
+  appendPoints(a.history,'canvas','s',[1,2],[0.5]);
+  const shape=a.shapes.get('s')!,metadata=shape.get('pressureBatches') as Y.Map<unknown>;
+  a.doc.transact(()=>metadata.set([...metadata.keys()][0],{anchor:{},count:1,q:[128]}),'net');
+  a.history.structural('Other shape',()=>a.shapes.set('t',createShape({id:'t'})));
+  expect(a.history.undo().diagnostics).toBeUndefined();
+  expect(a.history.redo().diagnostics).toBeUndefined();
+  a.history.structural('Other page row',()=>{const row=new Y.Map<unknown>();row.set('id','other');row.set('type','paragraph');rootBlocks(a.doc).push([row]);});
+  expect(a.history.undo().diagnostics).toBeUndefined();
+  expect(a.history.redo().diagnostics).toBeUndefined();
 });

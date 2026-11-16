@@ -130,6 +130,14 @@ export function readPressure(shape: Y.Map<unknown>): {batches: {offset: number; 
     if (batch) batches.push(batch);
     else degraded = true;
   }
+  // A valid total count does not prove coverage: tombstone anchors can make
+  // distinct batches overlap while leaving an equally sized gap elsewhere.
+  const ranges = [...batches].sort((a, b) => a.offset - b.offset);
+  let end = 0;
+  for (const batch of ranges) {
+    if (batch.offset < end) degraded = true;
+    end = Math.max(end, batch.offset + batch.q.length);
+  }
   if (shape.get('pressureMode') === 'variable' && batches.reduce((sum,b) => sum + b.q.length,0) * 2 !== points.length) degraded = true;
   return {batches, degraded};
 }
