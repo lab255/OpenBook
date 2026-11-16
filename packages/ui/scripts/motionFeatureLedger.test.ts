@@ -80,6 +80,10 @@ it('checks the complete emitted Motion closure transitively reachable from the v
   }
   visit('src/viewer/index.tsx');
   expect(reached.has('src/components/ui/fluid-hover.tsx')).toBe(true);
+  // Editing registrations belong to the app wrapper, never the viewer graph.
+  expect(reached.has('src/blockeditor/reactiveCore.tsx')).toBe(true);
+  expect(productionGraph.modules.some((module: {id: string}) =>
+    module.id === 'src/blockeditor/reactiveBlocks.tsx' || module.id.startsWith('src/blockeditor/canvas/'))).toBe(false);
   for (const module of productionGraph.modules.filter((module: {id: string; bytes: number}) => module.bytes > 0 && /^(motion|framer-motion|motion-dom|motion-utils)\//.test(module.id))) {
     expect(reached.has(module.id), module.id).toBe(true);
     // Every emitted module is independently covered; deleting its authorization
@@ -113,14 +117,14 @@ it('keeps historical rows continuous and bounds non-motion drift at the measured
   process.stdout.write(`LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline ${ledger.preAdoptionRawBytes} -> all adjacent rows -> bounded measured ${measured} GREEN\n`);
 });
 
-it('accepts only the measured non-motion window, never unledgered Motion or extra Motion bytes', () => {
+it('accepts only the authorized non-motion window, never unledgered Motion or extra Motion bytes', () => {
   const historical = ledger.features.at(-1)!.afterRawBytes;
   expect(ledger.endpoint.nonMotionShrinkageBytes).toBe(506);
-  expect(ledger.endpoint.nonMotionGrowthBytes).toBe(571);
-  for (const bytes of [historical, historical - 506, historical + 571]) {
+  expect(ledger.endpoint.nonMotionGrowthBytes).toBe(4096);
+  for (const bytes of [historical, historical - 506, historical + 4096]) {
     expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).not.toThrow();
   }
-  for (const bytes of [historical + 572, historical - 507]) {
+  for (const bytes of [historical + 4097, historical - 507]) {
     expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).toThrow('outside non-motion window');
   }
   const changed = {modules: productionGraph.modules.map((module: {id: string; bytes: number}) =>
@@ -130,5 +134,5 @@ it('accepts only the measured non-motion window, never unledgered Motion or extr
   // allowed window must still reject an unledgered Motion feature.
   const missing = {...ledger, features: ledger.features.map(feature => feature.name === 'animate' ? {...feature, modules: []} : feature)};
   expect(() => assertLedgerEndpoint(productionGraph, historical - 506, missing)).toThrow('Unledgered motion feature');
-  process.stdout.write(`ENDPOINT ${historical - 506} and ${historical + 571} GREEN; ${historical + 572} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
+  process.stdout.write(`ENDPOINT ${historical - 506} and ${historical + 4096} GREEN; ${historical + 4097} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
 });

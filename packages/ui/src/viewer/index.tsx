@@ -23,7 +23,7 @@
  * `</script>` is the writer's own).
  */
 import {createRoot} from 'react-dom/client';
-import {registerReactiveBlocks} from '@/blockeditor/reactiveBlocks';
+import {registerReactiveBlocks} from '@/blockeditor/reactiveCore';
 import {registerArtifactKit} from '@/blockeditor/kit';
 import {registerFormBlock} from '@/blockeditor/FormBlockView';
 import {registerDatabaseFormBlock} from '@/components/database/DatabaseFormBlock';
