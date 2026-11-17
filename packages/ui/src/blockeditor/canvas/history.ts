@@ -128,6 +128,7 @@ export class CanvasHistory {
         if (!shape.has(key)) missing.push({shape, snapshot, key, value, token: snapshot.tokens[key]});
       }
     }
+    // CanvasRootCapture populates this scope only from canvas block rows.
     for (const [blockId, shapeIds] of scope) {
       const props = findBlock(this.doc,blockId)?.block.get('props');
       const shapes = props instanceof Y.Map ? props.get('shapes') : null;

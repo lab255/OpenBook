@@ -18,7 +18,7 @@ function touch(scope: CanvasScope, shape: TrackedShape): void {
 /** Retain validated preimages while types are live. Deleted nested maps cannot
  * be read in afterTransaction. Refresh only changed shapes, before the root
  * manager records that transaction; remote and semantic edits update this cache
- * too. The cache is session-local and never carries pressure anchor authority. */
+ * too. The cache is session-local and retains scalar preimages only. */
 export class CanvasRootCapture {
   private shapes = new Map<Y.Map<unknown>, TrackedShape>();
   constructor(private readonly doc: Y.Doc) { this.refresh(new Map(), new Set()); }

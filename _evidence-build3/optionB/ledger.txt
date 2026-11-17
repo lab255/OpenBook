@@ -1,3 +1,8 @@
+EVIDENCE ATTRIBUTION CORRECTION: This earlier run used the held-size viewer artifact
+(seed=1,933,102 B, coordinate 727 B). It is NOT the final option-B ledger run.
+Final B evidence: focused.txt, seeded=1933140, motionFeatureLedger.test.ts 7/7 PASS
+(viewer 1,933,140 B, coordinate 765 B). Original earlier output retained below.
+
 
  RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui
 
