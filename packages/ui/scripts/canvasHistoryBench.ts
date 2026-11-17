@@ -15,9 +15,10 @@ for (const selectedCount of process.argv.includes('--single-only') ? [1] : [1, 5
     block.set('id', 'canvas'); block.set('type', 'canvas'); block.set('props', props);
     rootBlocks(doc).push([block]);
     const shapes = props.get('shapes') as Y.Map<Y.Map<unknown>>;
-    const points = Array.from({length: pairs * 2}, (_, i) => i / 10);
+    const pressure = process.argv.includes('--pressure');
+    const points = pressure ? Array.from({length:pairs},(_,i)=>[i*2/10,(i*2+1)/10,i%256]).flat() : Array.from({length: pairs * 2}, (_, i) => i / 10);
     doc.transact(() => {
-      for (let i = 0; i < 500; i++) shapes.set(String(i), createShape({id:String(i),kind:'stroke',points}));
+      for (let i = 0; i < 500; i++) shapes.set(String(i), createShape({id:String(i),kind:'stroke',pressureMode:pressure ? 'variable' : 'constant',points}));
     });
     const history = new CanvasHistory(doc);
     const changes = [...shapes.keys()].slice(0,selectedCount).map(shapeId => ({blockId:'canvas',shapeId,values:{x:20,y:30}}));
@@ -43,5 +44,5 @@ for (const selectedCount of process.argv.includes('--single-only') ? [1] : [1, 5
     const values = samples.map(s=>s[key]).sort((a,b)=>a-b);
     return [key, {medianMs:values[2],worstMs:values[4]}];
   }));
-  process.stdout.write(JSON.stringify({shapes:500,selectedCount,pairsPerShape:pairs,trials:5,samples,summary})+'\n');
+  process.stdout.write(JSON.stringify({pressureMode:process.argv.includes('--pressure') ? 'variable' : 'constant',shapes:500,selectedCount,pairsPerShape:pairs,trials:5,samples,summary})+'\n');
 }

@@ -1,17 +1,22 @@
 import * as Y from 'yjs';
-import {beforeEach, expect, onTestFailed, test} from 'vitest';
+import {afterEach, beforeEach, expect, onTestFailed, test} from 'vitest';
 // @ts-expect-error -- node:fs is available to Vitest, not the browser package.
 import {mkdtempSync, writeFileSync} from 'node:fs';
 // @ts-expect-error -- node:os is available to Vitest, not the browser package.
 import {tmpdir} from 'node:os';
-import {findBlock, removeBlock, rootBlocks} from '../model';
+import {findBlock, removeBlock, rootBlocks, encodeSnapshot, registerPropsProjection} from '../model';
 import {CanvasHistory, SEMANTIC_CANVAS} from './history';
-import {createCanvasProps, createShape, readCanvas, readPressure, resolvePressureBatch} from './schema';
+import {createCanvasProps, createShape, readCanvas, readPressure, projectCanvas} from './schema';
 import {appendPoints, eraseShape} from './commands';
 
+const observerErrors: unknown[] = [];
+const checked = <Args extends unknown[]>(check: (...args: Args) => void) => (...args: Args): void => {
+  try { check(...args); } catch (error) { observerErrors.push(error); }
+};
+afterEach(() => { expect(observerErrors).toEqual([]); });
 const traces: {clientID: number; seed: number[]; states: unknown[]; updates: number[][]}[] = [];
 beforeEach(() => {
-  traces.length = 0;
+  traces.length = 0; observerErrors.length = 0;
   onTestFailed(({task}) => {
     const directory = mkdtempSync(`${tmpdir()}/openbook-canvas-evidence-`);
     const name = `review-anomaly-${task.name.replace(/[^a-z0-9]+/gi, '-')}.json`;
@@ -30,7 +35,7 @@ function assertGeometry(shapes: Y.Map<Y.Map<unknown>>): void {
     expect(Number(shape.get('basisH'))).toBeGreaterThan(0);
     const points = shape.get('points') as Y.Array<number>;
     expect(points).toBeInstanceOf(Y.Array);
-    expect(points.length % 2).toBe(0);
+    expect(points.length % (shape.get('pressureMode') === 'variable' ? 3 : 2)).toBe(0);
     expect(points.toArray().every(Number.isFinite)).toBe(true);
   }
 }
@@ -55,11 +60,11 @@ function peer(bytes: Uint8Array, id: number) {
   const updates: number[][] = [];
   traces.push({clientID: id, seed: Array.from(bytes), states, updates});
   doc.on('update', update => updates.push(Array.from(update)));
-  doc.on('afterTransaction', () => {
+  doc.on('afterTransaction', checked(() => {
     const shapes = liveShapes();
     states.push(shapes?.toJSON() ?? {canvasAbsent:true});
     if (shapes) assertGeometry(shapes);
-  });
+  }));
   return {doc, get props() { return live()!; }, get shapes() { return liveShapes()!; }, history, states};
 }
 type Peer = ReturnType<typeof peer>;
@@ -67,19 +72,25 @@ function exchange(a: Peer,b: Peer) {
   const au = Y.encodeStateAsUpdate(a.doc), bu = Y.encodeStateAsUpdate(b.doc);
   Y.applyUpdate(a.doc, bu, 'net'); Y.applyUpdate(b.doc, au, 'net');
   expect(a.shapes?.toJSON()).toEqual(b.shapes?.toJSON());
+  const reload=new Y.Doc();Y.applyUpdate(reload,Y.encodeStateAsUpdate(a.doc));
+  const props=findBlock(reload,'canvas')?.block.get('props');
+  expect(readCanvas(props)).toEqual(readCanvas(a.props));
+  const shapes=props instanceof Y.Map ? props.get('shapes') : null;
+  if(shapes instanceof Y.Map) for(const [id,shape] of shapes) expect(readPressure(shape)).toEqual(readPressure(a.shapes.get(id)!));
+  reload.destroy();
 }
 const move = (p: Peer, values: Record<string, unknown>) => p.history.commitCanvasCommand('Move', [{blockId:'canvas',shapeId:'s',values}]);
 
 test('Required proof: append+pressure undo and redo across replicas', () => {
   const bytes = seed(), a = peer(bytes,10), b = peer(bytes,20);
   appendPoints(a.history,'canvas','s',[0,0,2,3],[0.2,0.8]); exchange(a,b);
-  expect(readPressure(a.shapes.get('s')!)).toEqual({batches:[{offset:0,q:[51,204]}],degraded:false});
+  expect(readPressure(a.shapes.get('s')!)).toEqual({q:[51,204],degraded:false,diagnostics:[]});
   a.history.undo(); exchange(a,b);
   expect(a.shapes.get('s')!.get('points')).toBeInstanceOf(Y.Array);
   expect((a.shapes.get('s')!.get('points') as Y.Array<number>).length).toBe(0);
   a.history.redo(); exchange(a,b);
   const evidence = {seed: Array.from(bytes), operations:['append [0,0,2,3] pressure [.2,.8]', 'exchange','undo','exchange','redo','exchange'], a:a.shapes.toJSON(),b:b.shapes.toJSON(), observedA:a.states,observedB:b.states};
-  expect(readPressure(a.shapes.get('s')!),JSON.stringify(evidence)).toEqual({batches:[{offset:0,q:[51,204]}],degraded:false});
+  expect(readPressure(a.shapes.get('s')!),JSON.stringify(evidence)).toEqual({q:[51,204],degraded:false,diagnostics:[]});
 });
 test('Required proof: erase restore after semantic edits', () => {
   const bytes=seed(),a=peer(bytes,10),b=peer(bytes,20);
@@ -198,7 +209,7 @@ test('Required proof: invalid/fallback docs remain readable without mutation and
   const bytes=seed(),a=peer(bytes,10);
   expect(()=>move(a,{x:Infinity})).toThrow();expect(a.shapes.get('s')!.get('x')).toBe(0);
   move(a,{w:-8});expect(a.shapes.get('s')!.get('w')).toBe(0);
-  const fallback=a.props.toJSON();expect(readCanvas(fallback).editable).toBe(false);expect(readCanvas(fallback).shapes).toHaveLength(1);
+  const fallback=projectCanvas(a.props) as {shapes:Record<string,Record<string,unknown>>};expect(readCanvas(fallback).editable).toBe(false);expect(readCanvas(fallback).shapes).toHaveLength(1);
   fallback.shapes.s.x=NaN;expect(readCanvas(fallback).shapes).toHaveLength(0);
   const doc=new Y.Doc(),block=new Y.Map<unknown>();block.set('id','canvas');block.set('props',fallback);rootBlocks(doc).push([block]);
   const history=new CanvasHistory(doc);expect(history.commitCanvasCommand('Move',[{blockId:'canvas',shapeId:'s',values:{x:2}}]).reason).toBe('no-op');
@@ -268,16 +279,8 @@ test.each([[10,20], [20,10]])('Review D3 race: erase versus concurrent same-shap
   const bytes=seed(),a=peer(bytes,aId),b=peer(bytes,bId);
   appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
   appendPoints(a.history,'canvas','s',[5,6,7,8],[0.4,1]); exchange(a,b);
-  const original = [a,b].map(p => {
-    const shape = p.shapes.get('s')!;
-    const points = shape.get('points') as Y.Array<number>;
-    const batches = shape.get('pressureBatches') as Y.Map<{anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]}>;
-    const anchors = [...batches.values()].map(batch => batch.anchor);
-    for (const anchor of anchors) expect(Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(anchor), p.doc)?.type).toBe(points);
-    return {points, anchors, batchIds: [...batches.keys()].sort()};
-  });
-  const widths = (shape: Y.Map<unknown>) => readPressure(shape).batches.sort((a,b)=>a.offset-b.offset)
-    .flatMap(batch=>batch.q.map(q=>Number(shape.get('strokeWidth'))*(0.5+q/255)));
+  const original = [a,b].map(p => p.shapes.get('s')!.get('points'));
+  const widths = (shape: Y.Map<unknown>) => readPressure(shape).q.map(q=>Number(shape.get('strokeWidth'))*(0.5+q/255));
   const expectedWidths = widths(a.shapes.get('s')!);
   move(a,{x:20, startX:0.2}); exchange(a,b);
   const token = a.shapes.get('s')!.get('op:x');
@@ -287,40 +290,30 @@ test.each([[10,20], [20,10]])('Review D3 race: erase versus concurrent same-shap
   expect(a.shapes.has('s')).toBe(false);
   // Observe raw types too, and deliver EVERY update independently. No merged
   // snapshot or reader default can conceal an incomplete intermediate scene.
-  a.shapes.observeDeep(() => assertGeometry(a.shapes));
-  b.shapes.observeDeep(() => assertGeometry(b.shapes));
+  a.shapes.observeDeep(checked(() => assertGeometry(a.shapes)));
+  b.shapes.observeDeep(checked(() => assertGeometry(b.shapes)));
   const repairs: Y.Transaction[] = [];
   a.doc.on('afterTransaction', transaction => {
     if (transaction.origin === 'local' && transaction.meta.has(SEMANTIC_CANVAS)) repairs.push(transaction);
   });
-  for (const p of [a,b]) p.doc.on('afterTransaction', () => {
+  for (const p of [a,b]) p.doc.on('afterTransaction', checked(() => {
     const shape = p.shapes.get('s');
     if (shape) expect(readPressure(shape).degraded).toBe(false);
-  });
+  }));
   const deliver = (update: Uint8Array) => Y.applyUpdate(b.doc, update, 'net');
   a.doc.on('update', deliver);
   try {
     expect(a.history.undo().reason).toBe('applied');
     expect(repairs).toHaveLength(1);
     expect([...repairs[0].changed.keys()]).toContain(a.shapes.get('s')!);
-    expect([...repairs[0].changed.keys()]).toContain(a.shapes.get('s')!.get('pressureBatches'));
+    expect([...repairs[0].changed.keys()]).toEqual([a.shapes.get('s')!]);
     expect(a.history.availability).toEqual({undo:'Move',redo:'Erase shape'});
     for (const [index,p] of [a,b].entries()) {
       const shape = p.shapes.get('s')!;
       const restoredPoints = shape.get('points') as Y.Array<number>;
-      expect(restoredPoints).not.toBe(original[index].points);
-      // Mechanism proof: old anchors name the original type. Local redo
-      // pointers can follow them on A, but are not encoded in updates to B.
-      for (const anchor of original[index].anchors) {
-        const relative = Y.createRelativePositionFromJSON(anchor);
-        expect(Y.createAbsolutePositionFromRelativePosition(relative, p.doc, false)?.type).not.toBe(restoredPoints);
-        if (index === 0) expect(Y.createAbsolutePositionFromRelativePosition(relative,p.doc)?.type).toBe(restoredPoints);
-        else expect(Y.createAbsolutePositionFromRelativePosition(relative,p.doc)?.type).not.toBe(restoredPoints);
-        expect(Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(restoredPoints,0)).type).not.toEqual(anchor.type);
-      }
-      const batches = shape.get('pressureBatches') as Y.Map<{anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]}>;
-      expect([...batches.keys()].sort()).toEqual(original[index].batchIds);
-      for (const batch of batches.values()) expect(Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(batch.anchor),p.doc)?.type).toBe(restoredPoints);
+      expect(restoredPoints).not.toBe(original[index]);
+      expect(restoredPoints.toArray()).toEqual([1,2,51,3,4,204,5,6,102,7,8,255]);
+      expect(shape.has('pressureBatches')).toBe(false);
       assertGeometry(p.shapes);
       expect(shape.get('x')).toBe(20);
       expect(shape.get('op:x')).toBe(token);
@@ -393,20 +386,20 @@ test('Review order ties: equal-ord rebalance and lexicographic (ord,id) sorting 
   expect(readCanvas(a.props).shapes.map(s=>s.id)).toEqual(readCanvas(b.props).shapes.map(s=>s.id));
 });
 
-function pressureView(p: Peer, shapeId = 's'): {batchCount: number; widths: number[]} {
+function pressureView(p: Peer, shapeId = 's'): {pointCount: number; widths: number[]} {
   const shape = p.shapes.get(shapeId)!;
   const pressure = readPressure(shape);
   expect(pressure.degraded).toBe(false);
   expect(readCanvas(p.props)).toMatchObject({editable:true,diagnostics:[]});
   return {
-    batchCount: pressure.batches.length,
-    widths: pressure.batches.sort((a,b)=>a.offset-b.offset).flatMap(batch=>batch.q.map(q=>Number(shape.get('strokeWidth'))*(0.5+q/255))),
+    pointCount: pressure.q.length,
+    widths: pressure.q.map(q=>Number(shape.get('strokeWidth'))*(0.5+q/255)),
   };
 }
 /** Apply each emitted update separately in both directions; never let a final
  * snapshot hide a transient geometry or fidelity failure. */
 function wirePressurePeers(a: Peer, b: Peer): () => void {
-  const observe = (p: Peer) => () => { if (p.shapes?.has('s')) pressureView(p); };
+  const observe = (p: Peer) => checked(() => { if (p.shapes?.has('s')) pressureView(p); });
   const observeA = observe(a), observeB = observe(b);
   const toB = (update: Uint8Array, origin: unknown) => { if (origin !== 'net') Y.applyUpdate(b.doc, update, 'net'); };
   const toA = (update: Uint8Array, origin: unknown) => { if (origin !== 'net') Y.applyUpdate(a.doc, update, 'net'); };
@@ -431,7 +424,7 @@ test.each([[10,20],[20,10]])('Round 2 HIGH-1: erase/undo/remote append/redo/undo
     appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
     eraseShape(a.history,'canvas','s'); a.history.undo();
     appendPoints(b.history,'canvas','s',[5,6,7,8],[0.4,1]);
-    const expected=pressureView(b); expect(expected.batchCount).toBe(2);
+    const expected=pressureView(b); expect(expected.pointCount).toBe(4);
     a.history.redo(); expect(a.shapes.has('s')).toBe(false); expect(b.shapes.has('s')).toBe(false);
     a.history.undo(); assertReloadEquivalent(a,b,expected);
   } finally { disconnect(); }
@@ -453,7 +446,7 @@ const eraseMatrix = (['shape','page'] as const).flatMap(scope => [[10,20],[20,10
     scope, ids, cycles, remote,
     name: `Erase composition matrix: ${scope}, A=${ids[0]}/B=${ids[1]}, redo/undo cycles=${cycles}, remote=${remote}, reload`,
   })))));
-test.each(eraseMatrix)('$name', ({scope,ids,cycles,remote}) => {
+test.each(eraseMatrix.map(row => [row.name,row] as const))('%s', (_name,{scope,ids,cycles,remote}) => {
   const bytes=seed(),a=peer(bytes,ids[0]),b=peer(bytes,ids[1]),disconnect=wirePressurePeers(a,b);
   const mutateRemote = (leg: number) => {
     if (remote === 'append' || remote === 'append+edit') appendPoints(b.history,'canvas','s',[leg+4,leg+5,leg+6,leg+7],[0.4,0.9]);
@@ -499,37 +492,14 @@ test.each([[10,20],[20,10]])('Round 2 scalar recapture: re-erase race restores t
   } finally { disconnect(); }
 });
 
-test('Round 2 invalid batch: repair diagnoses shape/batch and does not interrupt observers or update delivery', () => {
-  const bytes=seed(),a=peer(bytes,10),b=peer(bytes,20);
-  appendPoints(a.history,'canvas','s',[1,2],[0.5]); exchange(a,b);
-  const metadata=a.shapes.get('s')!.get('pressureBatches') as Y.Map<unknown>;
-  const batchId=[...metadata.keys()][0];
-  a.doc.transact(()=>metadata.set(batchId,{anchor:{},count:999,q:[128]}),'net'); exchange(a,b);
-  a.history.stopCapturing(); removeBlock(a.doc,'canvas'); a.history.stopCapturing(); exchange(a,b);
-  let observed=0,updates=0;
-  a.doc.on('afterTransaction',()=>{observed++;});
-  a.doc.on('update',update=>{updates++;Y.applyUpdate(b.doc,update,'net');});
-  const result=a.history.undo();
-  expect(observed).toBeGreaterThan(0);expect(updates).toBeGreaterThan(0);
-  expect(result.diagnostics).toContain(`Canvas canvas shape s batch ${batchId}: anchor or batch is invalid; pressure repair skipped`);
-  expect(a.history.diagnostics).toEqual(result.diagnostics);
-  expect(a.shapes.toJSON()).toEqual(b.shapes.toJSON());
-  expect(readPressure(a.shapes.get('s')!).degraded).toBe(true);
-  expect(readPressure(b.shapes.get('s')!).degraded).toBe(true);
-});
-
-
 test.each([[10,20],[20,10]])('Round 2 root redo restoration: newly created pressure stroke survives undo/redo/reload (A=%i, B=%i)', (aId,bId) => {
   const bytes=seed(),a=peer(bytes,aId),b=peer(bytes,bId),disconnect=wirePressurePeers(a,b);
-  for (const p of [a,b]) p.doc.on('afterTransaction',()=>{ if(p.shapes.has('t')) pressureView(p,'t'); });
+  for (const p of [a,b]) p.doc.on('afterTransaction',checked(()=>{ if(p.shapes.has('t')) pressureView(p,'t'); }));
   try {
     a.history.structural('Create pressure stroke',()=>{
       a.shapes.set('t',createShape({id:'t',kind:'stroke',pressureMode:'variable'}));
       const shape=a.shapes.get('t')!, points=shape.get('points') as Y.Array<number>;
-      points.push([1,2,3,4]);
-      (shape.get('pressureBatches') as Y.Map<unknown>).set('created-batch',{
-        anchor:Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(points,0)),count:2,q:[51,204],
-      });
+      points.push([1,2,51,3,4,204]);
     });
     const expected=pressureView(a,'t');
     a.history.undo();expect(a.shapes.has('t')).toBe(false);expect(b.shapes.has('t')).toBe(false);
@@ -538,51 +508,36 @@ test.each([[10,20],[20,10]])('Round 2 root redo restoration: newly created press
 });
 
 
-test('Round 3 hardening: overlapping pressure ranges are degraded even when total count matches', () => {
-  const a=peer(seed(),10);
-  appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
-  appendPoints(a.history,'canvas','s',[5,6,7,8],[0.4,1]);
-  const shape=a.shapes.get('s')!, batches=shape.get('pressureBatches') as Y.Map<unknown>;
-  const [first,second]=[...batches.keys()];
-  a.doc.transact(()=>batches.set(second,batches.get(first)),'net');
-  const pressure=readPressure(shape);
-  expect(pressure.batches.reduce((n,b)=>n+b.q.length,0)).toBe(4);
-  expect(pressure.degraded).toBe(true);
-});
-
 const appendMatrix = [[10,20],[20,10]].flatMap(ids => ['before undo','between undo and redo'].map(timing=>({ids,timing,
   name:`Append composition matrix: tombstone, remote ${timing}, A=${ids[0]}/B=${ids[1]}, reload`,
 })));
-test.each(appendMatrix)('$name',({ids,timing})=>{
+test.each(appendMatrix.map(row => [row.name,row] as const))('%s',(_name,{ids,timing})=>{
   const a=peer(seed(),ids[0]),b=peer(seed(),ids[1]),disconnect=wirePressurePeers(a,b);
-  const resolutions: {strict:number|null;follow:number|null}[]=[];
-  const inspect=(tx:Y.Transaction)=>{
-    if(tx.origin!==a.history.manager) return;
-    const shape=a.shapes.get('s')!,points=shape.get('points') as Y.Array<number>;
-    const metadata=shape.get('pressureBatches') as Y.Map<unknown>;
-    for(const value of metadata.values()) resolutions.push({strict:resolvePressureBatch(points,value,false)?.offset??null,follow:resolvePressureBatch(points,value,true)?.offset??null});
-  };
   try {
     appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);
     if(timing==='before undo') appendPoints(b.history,'canvas','s',[5,6,7,8],[0.4,1]);
     a.history.undo();
     if(timing==='between undo and redo') appendPoints(b.history,'canvas','s',[5,6,7,8],[0.4,1]);
-    // This hook precedes the dispatch repair: inspect the live array while its
-    // original deleted point item still resolves strictly at a tombstone slot.
-    a.doc.on('beforeObserverCalls',inspect);
-    a.history.redo();a.doc.off('beforeObserverCalls',inspect);
-    expect(resolutions).toContainEqual({strict:2,follow:0});
-    const expected={batchCount:2,widths:[51,204,102,255].map(q=>3*(0.5+q/255))};
+    // Same former tombstone construction: points and q share one array and
+    // no pressure map/anchor can remain healthy at a different point offset.
+    a.history.redo();
+    for (const p of [a,b]) {
+      const shape=p.shapes.get('s')!;
+      expect(shape.has('pressureBatches')).toBe(false);
+      expect((shape.get('points') as Y.Array<number>).toArray()).toEqual([1,2,51,3,4,204,5,6,102,7,8,255]);
+    }
+    const expected={pointCount:4,widths:[51,204,102,255].map(q=>3*(0.5+q/255))};
     assertReloadEquivalent(a,b,expected);
-    a.history.undo();a.history.redo();assertReloadEquivalent(a,b,expected);
-  } finally { a.doc.off('beforeObserverCalls',inspect);disconnect(); }
+    a.history.undo();assertReloadEquivalent(a,b,{pointCount:2,widths:[102,255].map(q=>3*(0.5+q/255))});
+    a.history.redo();assertReloadEquivalent(a,b,expected);
+  } finally { disconnect(); }
 });
 
 const concurrentEraseMatrix=(['shape','page'] as const).flatMap(scope=>[[10,20],[20,10]].flatMap(ids=>
   [0,2].flatMap(cycles=>['append','edit','append+edit'].map(remote=>({scope,ids,cycles,remote,
     name:`Erase composition matrix: CONCURRENT ${scope}, A=${ids[0]}/B=${ids[1]}, cycles=${cycles}, remote=${remote}, reload`,
   })))));
-test.each(concurrentEraseMatrix)('$name',({scope,ids,cycles,remote})=>{
+test.each(concurrentEraseMatrix.map(row => [row.name,row] as const))('%s',(_name,{scope,ids,cycles,remote})=>{
   const bytes=seed(),a=peer(bytes,ids[0]),b=peer(bytes,ids[1]);
   appendPoints(a.history,'canvas','s',[1,2,3,4],[0.2,0.8]);exchange(a,b);
   let disconnect=()=>{};
@@ -616,15 +571,91 @@ test.each([[10,20],[20,10]])('Erase composition matrix: simultaneous peer erase/
   b.history.undo();exchange(a,b);a.history.undo();exchange(a,b);assertReloadEquivalent(a,b,expected);
 });
 
-test('Round 3 scope: unrelated page/shape undo does not re-report degraded batches',()=>{
-  const a=peer(seed(),10);
-  appendPoints(a.history,'canvas','s',[1,2],[0.5]);
-  const shape=a.shapes.get('s')!,metadata=shape.get('pressureBatches') as Y.Map<unknown>;
-  a.doc.transact(()=>metadata.set([...metadata.keys()][0],{anchor:{},count:1,q:[128]}),'net');
+test('Option B scope: unrelated page/shape undo does not inspect quarantined shapes',()=>{
+  const doc=new Y.Doc();Y.applyUpdate(doc,seed());
+  const props=findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>;
+  const shapes=props.get('shapes') as Y.Map<Y.Map<unknown>>;
+  (shapes.get('s')!.get('points') as Y.Array<number>).push([1,2,999]);
+  const a={doc,shapes,history:new CanvasHistory(doc)};
+  expect(readCanvas(props).diagnostics.join(' ')).toContain('pressure q');
   a.history.structural('Other shape',()=>a.shapes.set('t',createShape({id:'t'})));
   expect(a.history.undo().diagnostics).toBeUndefined();
   expect(a.history.redo().diagnostics).toBeUndefined();
   a.history.structural('Other page row',()=>{const row=new Y.Map<unknown>();row.set('id','other');row.set('type','paragraph');rootBlocks(a.doc).push([row]);});
   expect(a.history.undo().diagnostics).toBeUndefined();
   expect(a.history.redo().diagnostics).toBeUndefined();
+});
+
+test('Option B JSON: mixed canvas has per-shape pointArity; binary has none; default-2 is unchanged',()=>{
+  const a=peer(seed(),10);
+  a.history.structural('Constant stroke',()=>a.shapes.set('c',createShape({id:'c',kind:'stroke',points:[1,2,3,4]})));
+  appendPoints(a.history,'canvas','s',[1,2],[0.5]);
+  const projection=projectCanvas(a.props) as {shapes:Record<string,Record<string,unknown>>};
+  expect(projection.shapes.s.pointArity).toBe(3);expect(projection.shapes.c.pointArity).toBe(2);
+  expect(a.shapes.get('s')!.has('pointArity')).toBe(false);expect(a.props.has('pointArity')).toBe(false);
+  expect(readCanvas(projection).shapes).toEqual(readCanvas(a.props).shapes);
+  const old={...projection,shapes:{c:{...projection.shapes.c}}};delete old.shapes.c.pointArity;
+  const explicit={...projection,shapes:{c:projection.shapes.c}};
+  expect(JSON.stringify(readCanvas(old))).toBe(JSON.stringify(readCanvas(explicit)));
+  expect(old.shapes.c.points).toEqual([1,2,3,4]);
+});
+
+test.each([
+  {points:[1,2],pointArity:3,reason:'arity 3'},
+  {points:[1,2,128],pointArity:2,reason:'pointArity'},
+  {points:[1,2,256],pointArity:3,reason:'pressure q'},
+  {points:[1,2,0.5],pointArity:3,reason:'pressure q'},
+  {points:[1,Infinity,128],pointArity:3,reason:'Non-finite'},
+])('Option B quarantine: $reason',({points,pointArity,reason})=>{
+  const a=peer(seed(),10), projection=projectCanvas(a.props) as {shapes:Record<string,Record<string,unknown>>};
+  Object.assign(projection.shapes.s,{points,pointArity});
+  const scene=readCanvas(projection);
+  expect(scene.shapes).toHaveLength(0);expect(scene.editable).toBe(false);
+  expect(scene.diagnostics.join(' ')).toContain('shape s');expect(scene.diagnostics.join(' ')).toContain(reason);
+});
+
+test.each([[10,20],[20,10]])('Option B mixed-canvas acceptance: pair and triplet undo/redo/reload (A=%i, B=%i)',(aId,bId)=>{
+  const a=peer(seed(),aId),b=peer(seed(),bId),disconnect=wirePressurePeers(a,b);
+  const verify=(constant:number[],pressure:number[])=>{
+    const reload=peer(Y.encodeStateAsUpdate(a.doc),30);
+    for(const p of [a,b,reload]) {
+      expect(readCanvas(p.props).editable).toBe(true);
+      const c=p.shapes.get('c')!,s=p.shapes.get('s')!;
+      expect(c.get('pressureMode')).toBe('constant');expect(s.get('pressureMode')).toBe('variable');
+      expect((c.get('points') as Y.Array<number>).toArray()).toEqual(constant);
+      expect(readPressure(c)).toEqual({q:[],degraded:false,diagnostics:[]});
+      expect(readPressure(s)).toEqual({q:pressure,degraded:false,diagnostics:[]});
+      expect(pressureView(p).widths).toEqual(pressure.map(q=>3*(0.5+q/255)));
+    }
+    reload.history.destroy();reload.doc.destroy();
+  };
+  try {
+    a.history.structural('Create constant stroke',()=>a.shapes.set('c',createShape({id:'c',kind:'stroke'})));
+    appendPoints(a.history,'canvas','c',[1,2,3,4]);
+    appendPoints(a.history,'canvas','s',[5,6,7,8],[0.2,0.8]);verify([1,2,3,4],[51,204]);
+    a.history.undo();verify([1,2,3,4],[]);
+    a.history.undo();verify([],[]);
+    a.history.redo();verify([1,2,3,4],[]);
+    a.history.redo();verify([1,2,3,4],[51,204]);
+    const projected=projectCanvas(a.props) as {shapes:Record<string,Record<string,unknown>>};
+    projected.shapes.c.pointArity=3;
+    const scene=readCanvas(projected);
+    expect(scene.shapes.map(shape=>shape.id)).toEqual(['s']);
+    expect(scene.diagnostics.join(' ')).toContain('shape c: pointArity disagrees with pressureMode');
+  } finally {disconnect();}
+});
+
+
+test('Option B persisted projection: generic app codec writes per-shape arity without changing binary state',()=>{
+  const a=peer(seed(),10);
+  appendPoints(a.history,'canvas','s',[1,2],[0.5]);
+  a.history.structural('Constant',()=>a.shapes.set('c',createShape({id:'c',kind:'stroke',points:[3,4]})));
+  const before=Y.encodeStateAsUpdate(a.doc),unregister=registerPropsProjection('canvas',projectCanvas);
+  try {
+    const snapshot=JSON.parse(JSON.stringify(encodeSnapshot(a.doc)));
+    expect(snapshot.blocks[0].props.shapes.s.pointArity).toBe(3);
+    expect(snapshot.blocks[0].props.shapes.c.pointArity).toBe(2);
+    expect(readCanvas(snapshot.blocks[0].props).shapes).toEqual(readCanvas(a.props).shapes);
+    expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);
+  } finally {unregister();}
 });

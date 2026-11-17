@@ -1,0 +1,7 @@
+src/blockeditor/canvas/rootCapture.ts(59,41): error TS2352: Conversion of type 'AbstractType<YEvent<any>>' to type 'YMap<unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'AbstractType<YEvent<any>>' is missing the following properties from type 'YMap<unknown>': _prelimContent, size, keys, values, and 8 more.
+src/blockeditor/canvas/rootCapture.ts(61,23): error TS2352: Conversion of type 'AbstractType<YEvent<any>>' to type 'YMap<unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'AbstractType<YEvent<any>>' is missing the following properties from type 'YMap<unknown>': _prelimContent, size, keys, values, and 8 more.
+undefined
+/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 2: tsc --noEmit

@@ -1,3 +1,7 @@
+/** Pressure shares each point's lifecycle: constant strokes store x,y pairs;
+ * variable strokes store x,y,q triplets. Future decimation must retain each
+ * selected point's q and pressure extrema (architecture §7). Binary arity is
+ * derived from creation-fixed pressureMode; JSON alone carries pointArity. */
 import * as Y from 'yjs';
 import {isOrderKey, keyBetween} from '@book.dev/sdk';
 
@@ -36,15 +40,14 @@ export function createShape(input: Record<string, unknown> = {}): Y.Map<unknown>
   const shape = new Y.Map<unknown>();
   for (const [key, value] of Object.entries({...shapeDefaults, id: crypto.randomUUID(), ...input})) {
     if (key in shapeDefaults) shape.set(key, scalarValue(key, value));
-    else if (key !== 'points' && key !== 'pressureBatches' && !key.startsWith('op:')) shape.set(key, value);
+    else if (key !== 'points' && key !== 'pointArity' && !key.startsWith('op:')) shape.set(key, value);
   }
   const points = new Y.Array<number>();
   const values = input.points ?? [];
-  if (!Array.isArray(values) || values.length % 2 || !values.every(v => typeof v === 'number' && Number.isFinite(v))) throw new TypeError('Invalid points');
-  if (values.length && (input.kind ?? 'rect') !== 'stroke') throw new TypeError('Only strokes have points');
-  if (values.length && input.pressureMode === 'variable') throw new TypeError('Append pressure points with their metadata after insertion');
-  points.push(values);
-  shape.set('points', points); shape.set('pressureBatches', new Y.Map());
+  validatePointValues(values, input.pressureMode ?? 'constant', input.pointArity);
+  if ((values as number[]).length && (input.kind ?? 'rect') !== 'stroke') throw new TypeError('Only strokes have points');
+  points.push(values as number[]);
+  shape.set('points', points);
   return shape;
 }
 export function createCanvasProps(): Y.Map<unknown> {
@@ -74,10 +77,9 @@ export function isEditableShape(shape: unknown, id: string): shape is Y.Map<unkn
       if (token !== undefined && typeof token !== 'string') return false;
     }
     const points = shape.get('points');
-    if (!(points instanceof Y.Array) || points.length % 2 || !(shape.get('pressureBatches') instanceof Y.Map)) return false;
-    let finite = true;
-    points.forEach(value => { if (typeof value !== 'number' || !Number.isFinite(value)) finite = false; });
-    return finite;
+    if (!(points instanceof Y.Array)) return false;
+    validatePointValues(points.toArray(), shape.get('pressureMode'), shape.get('pointArity'));
+    return true;
   } catch { return false; }
 }
 /** Defensive, non-mutating reader. Malformed objects remain in source for recovery. */
@@ -99,45 +101,45 @@ export function readCanvas(props: unknown): Scene {
       if (get(source, 'id') !== id || get(source, 'shapeVersion') !== 1) throw new TypeError('Identity/version');
       const raw = get(source, 'points');
       const points: unknown = raw instanceof Y.Array ? raw.toArray() : raw;
-      if (!Array.isArray(points) || points.length % 2 || !points.every(p => typeof p === 'number' && Number.isFinite(p))) throw new TypeError('Points');
-      if (!(source instanceof Y.Map) || !(raw instanceof Y.Array) || !(get(source, 'pressureBatches') instanceof Y.Map)) editable = false;
-      shapes.push(Object.freeze({id, scalars: Object.freeze(scalars), points: Object.freeze(points.slice() as number[])}));
-    } catch { editable = false; diagnostics.push(`Quarantined shape ${id}`); }
+      validatePointValues(points, scalars.pressureMode, source instanceof Y.Map ? get(source, 'pointArity') : get(source, 'pointArity') ?? 2);
+      if (!(source instanceof Y.Map) || !(raw instanceof Y.Array)) editable = false;
+      shapes.push(Object.freeze({id, scalars: Object.freeze(scalars), points: Object.freeze((points as number[]).slice())}));
+    } catch (error) { editable = false; diagnostics.push(`Quarantined shape ${id}: ${error instanceof Error ? error.message : 'invalid shape'}`); }
   }
   shapes.sort((a,b) => String(a.scalars.ord) < String(b.scalars.ord) ? -1 : String(a.scalars.ord) > String(b.scalars.ord) ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   return Object.freeze({shapes: Object.freeze(shapes), diagnostics: Object.freeze(diagnostics), editable});
 }
 
-/** Validate a batch only when its anchor resolves against this exact points type. */
-export function resolvePressureBatch(points: Y.Array<number>, value: unknown, followUndoneDeletions = true): {offset: number; q: number[]} | null {
-  if (!points.doc) return null;
-  try {
-    const {anchor, count, q} = value as {anchor: Parameters<typeof Y.createRelativePositionFromJSON>[0]; count: number; q: number[]};
-    const position = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(anchor), points.doc, followUndoneDeletions);
-    if (!position || position.type !== points || position.index % 2 || !Number.isInteger(count) || count < 1 || count > 64 || position.index + count * 2 > points.length || !Array.isArray(q) || q.length !== count || !q.every(p => Number.isInteger(p) && p >= 0 && p <= 255)) return null;
-    return {offset: position.index / 2, q: q.slice()};
-  } catch { return null; }
+/** Shared binary/JSON validation: never interpret malformed triplets as pairs. */
+function validatePointValues(values: unknown, mode: unknown, projectedArity?: unknown): asserts values is number[] {
+  if (mode !== 'constant' && mode !== 'variable') throw new TypeError('Invalid pressureMode');
+  const arity = mode === 'variable' ? 3 : 2;
+  if (projectedArity !== undefined && projectedArity !== arity) throw new TypeError('pointArity disagrees with pressureMode');
+  if (!Array.isArray(values) || values.length % arity) throw new TypeError(`Points length must be divisible by arity ${arity}`);
+  for (let i = 0; i < values.length; i++) {
+    if (typeof values[i] !== 'number' || !Number.isFinite(values[i])) throw new TypeError(`Non-finite point value at ${i}`);
+    if (arity === 3 && i % 3 === 2 && (!Number.isInteger(values[i]) || values[i] < 0 || values[i] > 255)) throw new TypeError(`Invalid pressure q at ${i}`);
+  }
 }
-
-/** Resolve pressure against the same points identity, never a parallel index array. */
-export function readPressure(shape: Y.Map<unknown>): {batches: {offset: number; q: number[]}[]; degraded: boolean} {
-  const points = shape.get('points'), metadata = shape.get('pressureBatches');
-  const batches: {offset: number; q: number[]}[] = [];
-  let degraded = false;
-  if (!(points instanceof Y.Array) || !(metadata instanceof Y.Map) || !points.doc) return {batches, degraded: true};
-  for (const value of metadata.values()) {
-    const batch = resolvePressureBatch(points, value);
-    if (batch) batches.push(batch);
-    else degraded = true;
+/** Malformed pressure quarantines the shape; there is no constant-width default. */
+export function readPressure(shape: Y.Map<unknown>): {q: number[]; degraded: boolean; diagnostics: string[]} {
+  try {
+    const points = shape.get('points');
+    if (!(points instanceof Y.Array)) throw new TypeError('Missing points type');
+    const values = points.toArray();
+    validatePointValues(values, shape.get('pressureMode'), shape.get('pointArity'));
+    return {q: shape.get('pressureMode') === 'variable' ? values.filter((_,i) => i % 3 === 2) : [], degraded:false, diagnostics:[]};
+  } catch (error) {
+    return {q:[], degraded:true, diagnostics:[`Shape ${String(shape.get('id'))}: ${error instanceof Error ? error.message : 'invalid points'}`]};
   }
-  // A valid total count does not prove coverage: tombstone anchors can make
-  // distinct batches overlap while leaving an equally sized gap elsewhere.
-  const ranges = [...batches].sort((a, b) => a.offset - b.offset);
-  let end = 0;
-  for (const batch of ranges) {
-    if (batch.offset < end) degraded = true;
-    end = Math.max(end, batch.offset + batch.q.length);
+}
+/** Additive per-shape marker for defensive JSON/fallback readers. Binary data
+ * stores no pointArity key; mixed canvases freely contain both representations. */
+export function projectCanvas(props: Y.Map<unknown>): Record<string, unknown> {
+  const projection = props.toJSON();
+  const shapes = props.get('shapes');
+  if (shapes instanceof Y.Map) for (const [id, shape] of shapes) {
+    if (shape instanceof Y.Map) projection.shapes[id].pointArity = shape.get('pressureMode') === 'variable' ? 3 : 2;
   }
-  if (shape.get('pressureMode') === 'variable' && batches.reduce((sum,b) => sum + b.q.length,0) * 2 !== points.length) degraded = true;
-  return {batches, degraded};
+  return projection;
 }

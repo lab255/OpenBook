@@ -1,0 +1,43 @@
+[2m[WebServer] [22m(node:11922) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:12015) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:12041) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+[2m[WebServer] [22mWatchpack Error (watcher): Error: EMFILE: too many open files, watch
+
+Running 1 test using 1 worker
+
+(node:12701) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12701) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/database-context-menu.spec.ts:84:5 › column header context menu: hide column @database (2.1s)
+
+  1 passed (24.7s)

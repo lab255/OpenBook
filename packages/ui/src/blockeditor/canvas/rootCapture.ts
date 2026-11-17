@@ -55,7 +55,7 @@ export class CanvasRootCapture {
     const scope: CanvasScope = new Map(), changed = new Set<Y.Map<unknown>>();
     let topology = false;
     for (const type of transaction.changed.keys()) {
-      let parent: Y.AbstractType<unknown> | null = type;
+      let parent: typeof type | null = type;
       while (parent && !this.shapes.has(parent as Y.Map<unknown>)) parent = parent.parent;
       if (parent) {
         const shape = parent as Y.Map<unknown>;

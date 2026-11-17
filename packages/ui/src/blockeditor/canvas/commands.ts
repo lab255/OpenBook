@@ -34,15 +34,8 @@ export function appendPoints(history: CanvasHistory, blockId: string, shapeId: s
   if (variable && (!pressures || pressures.length * 2 !== values.length || !pressures.every(Number.isFinite))) throw new TypeError('Invalid pressure batch');
   if (!variable && pressures) throw new TypeError('Constant stroke has no pressure metadata');
   const points = shape.get('points') as Y.Array<number>;
-  const metadata = shape.get('pressureBatches') as Y.Map<unknown>;
-  history.structural('Append points', () => {
-    const start = points.length;
-    points.push([...values]);
-    if (variable) metadata.set(crypto.randomUUID(), {
-      anchor: Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(points, start)),
-      count: values.length / 2, q: pressures!.map(p => Math.round(255 * Math.min(1, Math.max(0, p)))),
-    });
-  });
+  const stored = variable ? pressures!.flatMap((p,i) => [values[i*2], values[i*2+1], Math.round(255 * Math.min(1, Math.max(0, p)))]) : [...values];
+  history.structural('Append points', () => points.push(stored));
 }
 /** Place between adjacent entries in deterministic (ord,id) order. */
 export function placementKey(history: CanvasHistory, blockId: string, beforeId: string | null, afterId: string | null): string {
