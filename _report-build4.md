@@ -10,7 +10,7 @@ Canvas now registers through the app wrapper and supports immediate Canvas2d pen
 - 213 UI focused tests pass, including actual BlockEditor input-boundary regressions, catalogue drift, slash insertion, two-replica/reload advisories, canvas history and relay.
 - 57 SDK catalogue/validation tests pass without weakening the full canvas validation checks.
 - 8 ledger/fence tests pass, with deliberate forbidden-module/endpoint controls.
-- Changed TS/TSX ESLint passes. The final automatic fixes were indentation and `let` → `const` only.
+- Full CI command `pnpm run lint` passes across the workspace, including UI `eslint . && pnpm run lint:css && pnpm run test:stylelint`. Changed TS/TSX ESLint also passes. The final automatic fixes were indentation and `let` → `const` only.
 - Production graph inspection: viewer excludes canvas editor, remote batching and measurement harness; app includes editor and remote batching, excludes harness. Configs/fs allow-lists unchanged.
 - Six deterministic schema encodings byte-identical to audited base; deliberate persisted pointArity adds 18 B. This is the DOCUMENT axis, not viewer-code savings.
 
@@ -156,3 +156,10 @@ The server binds **127.0.0.1:5184 only**. No exposure command. Harness sources a
 Implementation commit `b75eaeb56900b9a2e904945b46823e082524fc2d` rebuilt successfully: **852 B**, raw **1,933,227 B**, identical SHA-256 `67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198`. `committed-viewer.json` and `committed-build.log` preserve this post-commit check. The follow-up commit adds this provenance and ignored-by-default validation logs only; no product or measurement source changes.
 
 Evidence-only commit `91d22c51e24387bb5c76076777de60934a9d4bec` also rebuilt at **852 B** with the identical raw viewer hash. The subsequent paint-counter evidence change adds only a measurement script, raw counts and this report; product source is unchanged.
+
+
+## CI lint correction and local DoD checklist
+
+CI on b589c05e exposed a gap in the earlier changed-TS/TSX lint check: measurement `.mjs` drivers run browser callbacks but inherited only Node globals. Added one narrow flat-config override for `packages/ui/scripts/canvas-measure/**/*.mjs`; browser globals are not widened outside the harness. No rule is disabled. Runtime/product code is unchanged.
+
+Required local DoD now includes **full-package lint beside full build**. Run CI's exact root `pnpm run lint` (recursive package scripts), not a changed-file list, plus `pnpm --filter @book.dev/ui build`, focused suites, ledger/fence and per-commit coordinate measurement. Both exact full-workspace lint and full production UI build pass for this correction; see `full-workspace-lint.log`, `lint-fix-build.log` and `lint-fix-viewer.json`. Viewer remains **852 B**, raw **1,933,227 B**, identical hash **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**; correction delta **0 B**.

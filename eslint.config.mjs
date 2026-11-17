@@ -89,6 +89,12 @@ export default tseslint.config(
     languageOptions: {globals: {...globals.node}},
   },
   {
+    // Playwright measurement drivers run Node orchestration and browser callbacks.
+    // Keep browser globals confined to this non-product harness directory.
+    files: ['packages/ui/scripts/canvas-measure/**/*.mjs'],
+    languageOptions: {globals: {...globals.browser}},
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     plugins: {react},
     languageOptions: {
