@@ -56,11 +56,15 @@ export class CanvasRootCapture {
     let topology = false;
     for (const type of transaction.changed.keys()) {
       let parent: typeof type | null = type;
-      while (parent && !this.shapes.has(parent as Y.Map<unknown>)) parent = parent.parent;
-      if (parent) {
-        const shape = parent as Y.Map<unknown>;
-        touch(scope,this.shapes.get(shape)!); changed.add(shape);
-      } else topology = true;
+      while (parent && (!(parent instanceof Y.Map) || !this.shapes.has(parent))) parent = parent.parent;
+      if (parent instanceof Y.Map) {
+        touch(scope,this.shapes.get(parent)!); changed.add(parent);
+      } else {
+        // Root arrays and untracked/malformed types have no tracked shape map.
+        // Refresh membership without interpreting them as shapes; readCanvas
+        // quarantines malformed entries with a shape-named diagnostic.
+        topology = true;
+      }
     }
     if (topology) return {scope, erased:this.refresh(scope,changed)};
     for (const shape of changed) {

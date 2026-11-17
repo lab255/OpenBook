@@ -659,3 +659,21 @@ test('Option B persisted projection: generic app codec writes per-shape arity wi
     expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);
   } finally {unregister();}
 });
+
+
+test('Root capture narrowing: non-map shape is quarantined and array changes never throw',()=>{
+  const doc=new Y.Doc();Y.applyUpdate(doc,seed());
+  const props=findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>;
+  const shapes=props.get('shapes') as Y.Map<unknown>;
+  const malformed=new Y.Array<number>();
+  doc.transact(()=>shapes.set('broken',malformed),'net');
+  const history=new CanvasHistory(doc);
+  try {
+    expect(()=>doc.transact(()=>malformed.push([1,2]),'net')).not.toThrow();
+    const scene=readCanvas(props);
+    expect(scene.shapes.map(shape=>shape.id)).toEqual(['s']);
+    expect(scene.diagnostics.join(' ')).toContain('Quarantined shape broken');
+    expect(scene.editable).toBe(false);
+    expect(history.availability).toEqual({undo:null,redo:null});
+  } finally {history.destroy();doc.destroy();}
+});

@@ -219,3 +219,12 @@ Root-cause model: root restoration creates new Yjs identities; strict resolution
 The local exact database hide-column E2E passed 1/1 using supported single-process Chromium after multiprocess startup failed under the sandbox. This does not explain the three CI failures or constitute a bisect. Remaining DoD checks paused at the required stop.
 
 Full reproduction, mechanism analysis, logs, seed/update/state captures and uncommitted patch: [round-3 stop report](/Users/eliot/.bb/thread-storage/canvas-build/build3-round3-stop/report.md). Owner/PM² storage/history decision required; no round 4 begun.
+
+
+## CI build follow-up — root-capture type narrowing
+
+The d2a76749 CI build rejected two direct AbstractType-to-Y.Map casts in rootCapture. Replaced both with runtime `instanceof Y.Map` narrowing. Untracked/non-map ancestors refresh membership without being interpreted as shape maps; the existing reader quarantines malformed shape entries with a named diagnostic. No double cast or compiler suppression added. A malformed Y.Array shape test proves that its later transactions do not throw and that the valid shape remains readable.
+
+Verified **`pnpm --filter @book.dev/ui build` exit 0**, including Vite and declaration-emitting tsc; **129/129 focused canvas + relay/saver tests PASS**; changed-file ESLint exit 0. Fresh viewer remains **1,933,140 B / coordinate 765 B**, SHA-256 `44d87567e3040a6788d4efdba2daa06752ab94c116379f43c823d5f2178110bf`. No new undo anomaly. Logs: `_evidence-build3/optionB-buildfix/`.
+
+Local DoD checklist henceforth requires the full **`pnpm --filter @book.dev/ui build`** to complete with a verified exit code, in addition to focused suites, lint, and viewer/ledger checks. A typecheck-only result or Vite's intermediate success line is insufficient.
