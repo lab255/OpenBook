@@ -49,7 +49,11 @@
 .ob-canvas-color button i { position:absolute; inset:6px; border:1px solid hsl(var(--muted-foreground)); border-radius:2px; }
 .ob-canvas-color button[aria-pressed=true] { outline:2px solid hsl(var(--ring)); outline-offset:-2px; }
 .ob-canvas-color input { width:72px; }
-.ob-canvas-tools button[aria-pressed=true]:focus-visible { outline-color:hsl(var(--primary-foreground)); }
-.ob-canvas-empty { color:hsl(var(--foreground)); }
+.ob-canvas-tools button[aria-pressed=true]:focus-visible { outline-color:hsl(var(--primary)); box-shadow:inset 0 0 0 4px hsl(var(--primary-foreground)); }
+.ob-canvas-hint { display:flex; flex-direction:column; align-items:center; gap:8px; padding:8px; border-radius:4px; color:hsl(var(--foreground)); background:hsl(var(--background)); }
 
 .ob-canvas-history { display:flex; gap:8px; }
+
+.ob-canvas button[aria-disabled=true] { cursor:default; color:hsl(var(--muted-foreground)); background:transparent; outline:1px solid hsl(var(--muted-foreground)); outline-offset:-1px; }
+.ob-canvas-color button span:not(:empty) { position:absolute; right:1px; bottom:1px; width:12px; height:12px; font-size:10px; line-height:12px; border-radius:2px; color:hsl(var(--foreground)); background:hsl(var(--background)); }
+.ob-canvas-properties input[type=number],.ob-canvas-properties select { width:64px; }

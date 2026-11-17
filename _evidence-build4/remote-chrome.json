@@ -8,7 +8,7 @@
         "bytes": 10
       },
       "before": {
-        "height": 584,
+        "height": 548,
         "viewport": {
           "x": 150,
           "y": 124,
@@ -19,10 +19,10 @@
           "bottom": 484,
           "left": 150
         },
-        "stripHeight": 116,
+        "stripHeight": 80,
         "stripVisibility": "visible",
-        "footerTop": 600,
-        "belowTop": 672,
+        "footerTop": 564,
+        "belowTop": 636,
         "focus": "Send to back",
         "fieldInert": false,
         "announcement": "1 object selected",
@@ -30,7 +30,7 @@
         "editable": true
       },
       "after": {
-        "height": 584,
+        "height": 548,
         "viewport": {
           "x": 150,
           "y": 124,
@@ -41,10 +41,10 @@
           "bottom": 484,
           "left": 150
         },
-        "stripHeight": 116,
+        "stripHeight": 80,
         "stripVisibility": "hidden",
-        "footerTop": 600,
-        "belowTop": 672,
+        "footerTop": 564,
+        "belowTop": 636,
         "focus": "Arrange",
         "fieldInert": true,
         "announcement": "Selected object removed",
@@ -57,7 +57,7 @@
       },
       "cls": 0,
       "shifts": [],
-      "negativeControl": 0.06859564237415477,
+      "negativeControl": 0.06534184823441021,
       "focusEvents": [
         {
           "type": "blur",
@@ -94,7 +94,7 @@
         "bytes": 27
       },
       "before": {
-        "height": 584,
+        "height": 548,
         "viewport": {
           "x": 150,
           "y": 124,
@@ -105,10 +105,10 @@
           "bottom": 484,
           "left": 150
         },
-        "stripHeight": 116,
+        "stripHeight": 80,
         "stripVisibility": "visible",
-        "footerTop": 600,
-        "belowTop": 672,
+        "footerTop": 564,
+        "belowTop": 636,
         "focus": "Width",
         "fieldInert": false,
         "announcement": "1 object selected",
@@ -116,7 +116,7 @@
         "editable": true
       },
       "after": {
-        "height": 584,
+        "height": 548,
         "viewport": {
           "x": 150,
           "y": 124,
@@ -127,10 +127,10 @@
           "bottom": 484,
           "left": 150
         },
-        "stripHeight": 116,
+        "stripHeight": 80,
         "stripVisibility": "hidden",
-        "footerTop": 600,
-        "belowTop": 672,
+        "footerTop": 564,
+        "belowTop": 636,
         "focus": "Canvas, 1 objects, view only",
         "fieldInert": true,
         "announcement": "View only",
@@ -143,7 +143,7 @@
       },
       "cls": 0,
       "shifts": [],
-      "negativeControl": 0.06962885048835461,
+      "negativeControl": 0.06634259954921111,
       "focusEvents": [
         {
           "type": "blur",

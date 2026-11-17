@@ -1,7 +1,7 @@
 {
   "label": "Chromium synthetic/local, Canvas2d; rAF raster-availability estimate, not physical presentation",
   "inputBoundary": "Both input classes use synthetic mouse PointerEvents. Trackpad-class denotes the browser pointer path, not a physical trackpad measurement.",
-  "time": "2026-11-17T05:08:16.985Z",
+  "time": "2026-11-17T05:12:37.047Z",
   "immediacy": [],
   "cacheFidelity": {
     "rows": [
@@ -73,9 +73,9 @@
           }
         ],
         "original": {
-          "id": "36d75a2d-7b35-4e5e-a058-95bb5745f3e5",
+          "id": "f2afb2fe-3b14-401b-af02-73d81e5e5d2f",
           "scalars": {
-            "id": "36d75a2d-7b35-4e5e-a058-95bb5745f3e5",
+            "id": "f2afb2fe-3b14-401b-af02-73d81e5e5d2f",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -107,9 +107,9 @@
           "points": []
         },
         "localDuringOutage": {
-          "id": "36d75a2d-7b35-4e5e-a058-95bb5745f3e5",
+          "id": "f2afb2fe-3b14-401b-af02-73d81e5e5d2f",
           "scalars": {
-            "id": "36d75a2d-7b35-4e5e-a058-95bb5745f3e5",
+            "id": "f2afb2fe-3b14-401b-af02-73d81e5e5d2f",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -159,7 +159,7 @@
           "f": 0
         },
         "selection": [
-          "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+          "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
         ],
         "focus": "Drawing viewport",
         "x": 340,
@@ -185,22 +185,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
-          ],
-          "focus": "Drawing viewport",
-          "x": 340,
-          "y": 141,
-          "stroke": "#111111"
-        },
-        {
-          "camera": {
-            "a": 1,
-            "d": 1,
-            "e": 0,
-            "f": 0
-          },
-          "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -215,7 +200,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -230,7 +215,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -245,7 +230,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -260,7 +245,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -275,7 +260,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -290,7 +275,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -305,7 +290,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -320,7 +305,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -335,7 +320,7 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -350,7 +335,22 @@
             "f": 0
           },
           "selection": [
-            "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
+          ],
+          "focus": "Drawing viewport",
+          "x": 348,
+          "y": 141,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -366,7 +366,7 @@
           "f": 0
         },
         "selection": [
-          "36d75a2d-7b35-4e5e-a058-95bb5745f3e5"
+          "f2afb2fe-3b14-401b-af02-73d81e5e5d2f"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -397,9 +397,9 @@
           }
         ],
         "original": {
-          "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+          "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
           "scalars": {
-            "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+            "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -431,9 +431,9 @@
           "points": []
         },
         "localDuringOutage": {
-          "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+          "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
           "scalars": {
-            "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+            "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -483,7 +483,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 340,
@@ -509,22 +509,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
-          ],
-          "focus": "Drawing viewport",
-          "x": 348,
-          "y": 141,
-          "stroke": "#111111"
-        },
-        {
-          "camera": {
-            "a": 1,
-            "d": 1,
-            "e": 0,
-            "f": 0
-          },
-          "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -539,7 +524,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -554,7 +539,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -569,7 +554,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -584,7 +569,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -599,7 +584,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -614,7 +599,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -629,7 +614,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -644,7 +629,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -659,7 +644,7 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -674,7 +659,22 @@
             "f": 0
           },
           "selection": [
-            "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
+          ],
+          "focus": "Drawing viewport",
+          "x": 348,
+          "y": 141,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -690,7 +690,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -722,9 +722,9 @@
         }
       ],
       "original": {
-        "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+        "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
         "scalars": {
-          "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+          "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
           "kind": "rect",
           "shapeVersion": 1,
           "name": "",
@@ -756,9 +756,9 @@
         "points": []
       },
       "localDuringOutage": {
-        "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+        "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
         "scalars": {
-          "id": "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e",
+          "id": "e1eaa0c2-b7e7-46df-8683-f88f8080dc98",
           "kind": "rect",
           "shapeVersion": 1,
           "name": "",
@@ -808,7 +808,7 @@
         "f": 0
       },
       "selection": [
-        "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+        "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
       ],
       "focus": "Drawing viewport",
       "x": 340,
@@ -834,22 +834,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
-        ],
-        "focus": "Drawing viewport",
-        "x": 348,
-        "y": 141,
-        "stroke": "#111111"
-      },
-      {
-        "camera": {
-          "a": 1,
-          "d": 1,
-          "e": 0,
-          "f": 0
-        },
-        "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -864,7 +849,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -879,7 +864,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -894,7 +879,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -909,7 +894,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -924,7 +909,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -939,7 +924,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -954,7 +939,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -969,7 +954,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -984,7 +969,7 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -999,7 +984,22 @@
           "f": 0
         },
         "selection": [
-          "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
+        ],
+        "focus": "Drawing viewport",
+        "x": 348,
+        "y": 141,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -1015,7 +1015,7 @@
         "f": 0
       },
       "selection": [
-        "87c1ad0f-abaa-4b72-b1c4-11f107a8e15e"
+        "e1eaa0c2-b7e7-46df-8683-f88f8080dc98"
       ],
       "focus": "Drawing viewport",
       "x": 348,
@@ -1177,5 +1177,5 @@
     ]
   },
   "browserErrors": [],
-  "completed": "2026-11-17T05:08:21.719Z"
+  "completed": "2026-11-17T05:12:41.878Z"
 }

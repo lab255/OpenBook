@@ -25,7 +25,7 @@ function CoordinateField({value,onChange,...props}:Omit<React.InputHTMLAttribute
 const swatches=[['Ink','#111111'],['Red','#b91c1c'],['Blue','#1d4ed8']] as const;
 function ColorControl({name,value,onChange,tab,fill=false}:{name:string;value:string;onChange:(value:string)=>void;tab:number;fill?:boolean}) {
   return <div className="ob-canvas-color" role="group" aria-label={name}>
-    <span>{name}</span>{[...(fill?[['None','none']]:[]),...swatches].map(([label,color])=><button type="button" key={label} tabIndex={tab} aria-label={`${name}: ${label}`} aria-pressed={value===color} title={label} onClick={()=>onChange(color)}><i style={{background:color==='none'?'transparent':color}}/>{color==='none'?'∅':value===color?'✓':null}</button>)}
+    <span>{name}</span>{[...(fill?[['None','none']]:[]),...swatches].map(([label,color])=><button type="button" key={label} tabIndex={tab} aria-label={`${name}: ${label}`} aria-pressed={value===color} title={label} onClick={()=>onChange(color)}><i style={{background:color==='none'?'transparent':color}}/><span>{color==='none'?'∅':value===color?'✓':null}</span></button>)}
     <input tabIndex={tab} aria-label={fill?'Fill color or none':'Stroke color value'} value={value} onChange={e=>onChange(e.target.value)}/>
   </div>;
 }
@@ -352,7 +352,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       onDoubleClick={e=>{if(readOnly)return;const p=world(pointerPosition(e),camera),s=[...scene.shapes].reverse().find(s=>hit(s,p,camera.zoom));if(s?.scalars.kind==='text')startText(p,s);}}
       onWheel={e=>{if(!active)return;e.preventDefault();e.stopPropagation();if(e.ctrlKey||e.metaKey)zoom(camera.zoom*Math.exp(-e.deltaY*.01),pointerPosition(e));else setCamera({...camera,x:camera.x-e.deltaX,y:camera.y-e.deltaY});}}>
       <canvas ref={canvas} aria-hidden="true" style={{width:'100%',height:'100%'}} />
-      {!scene.shapes.length&&!g&&!keyboardPath&&!textEdit&&<div className="ob-canvas-empty"><strong>{readOnly?'Empty canvas · View only':'Draw here, or choose a shape'}</strong>{!readOnly&&<span>Pen P · Select V</span>}</div>}
+      {!scene.shapes.length&&!g&&!keyboardPath&&!textEdit&&<div className="ob-canvas-empty"><div className="ob-canvas-hint"><strong>{readOnly?'Empty canvas · View only':'Draw here, or choose a shape'}</strong>{!readOnly&&<span>Pen P · Select V</span>}</div></div>}
       {outline&&<div className="ob-canvas-outline" style={boxStyle(outline)} aria-hidden="true" />}
       {outline&&!readOnly&&tool==='select'&&chosen.length>0&&(chosen.length===1&&chosen[0].scalars.kind==='arrow'?['start','end']:Math.hypot(outline.w,outline.h)*camera.zoom<28?['nw']:outline.w*camera.zoom<56||outline.h*camera.zoom<56?['nw','se']:['nw','n','ne','e','se','s','sw','w']).map(handle=>{
         const endpoint=handle==='start'||handle==='end',p=endpoint?screen(endpoints(visibleShapes[0]??chosen[0])[handle==='start'?0:1],camera):screen({x:outline.x+(handle.includes('w')?0:handle.includes('e')?outline.w:outline.w/2),y:outline.y+(handle.includes('n')?0:handle.includes('s')?outline.h:outline.h/2)},camera);
