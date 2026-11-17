@@ -53,7 +53,7 @@ test.each(parity)('keyboard parity enumeration: %s',action=>{
     if(action.endsWith('creation')){
       const kind=action.split(' ')[0],shortcut=({stroke:'p',rectangle:'r',ellipse:'o',arrow:'a',text:'t'})[kind]!;
       a.tool(shortcut);
-      if(keyboard)a.key('Enter');else {pointer(a.viewport,'down',320,180);if(kind!=='text'&&kind!=='stroke')pointer(a.viewport,'up',320,180);}
+      if(keyboard)a.key('Enter');else {const x=kind==='text'?220:kind==='stroke'?320:260,y=kind==='text'?130:kind==='arrow'||kind==='stroke'?180:140;pointer(a.viewport,'down',x,y);if(kind!=='text'&&kind!=='stroke')pointer(a.viewport,'up',x,y);}
       if(kind==='stroke'){if(keyboard){a.key('ArrowRight',{shiftKey:true});a.key('ArrowDown',{shiftKey:true});a.key(' ');a.key('Enter');}else {pointer(a.viewport,'move',330,190);pointer(a.viewport,'up',330,190);}}
       if(kind==='text'){a.field('Canvas text','Hello\nWorld');fireEvent.keyDown(screen.getByLabelText('Canvas text'),{key:'Enter',ctrlKey:true});}
       expect(a.shapes()).toHaveLength(1);result=equivalentScene(a);
@@ -78,7 +78,7 @@ test.each(parity)('keyboard parity enumeration: %s',action=>{
         if(action==='style'){if(!keyboard)fireEvent.click(screen.getByLabelText('Stroke color value'));a.field('Stroke color value','#b91c1c');expect(a.shapes()[0].scalars.stroke).toBe('#b91c1c');}
         if(action==='erase'){if(keyboard)a.key('Delete');else{a.tool('e');pointer(a.viewport,'down',130,100);expect(a.view.container.querySelector('.ob-canvas-erase')).not.toBeNull();pointer(a.viewport,'up',130,100);}expect(a.shapes()).toHaveLength(0);}
         if(action==='duplicate'){if(keyboard)a.key('d',{ctrlKey:true});else fireEvent.click(screen.getByRole('button',{name:'Duplicate'}));expect(a.shapes()).toHaveLength(2);expect(bounds(a.shapes()[1])).toMatchObject({x:110,y:90});}
-        if(action==='order'){if(keyboard)a.key(']',{ctrlKey:true,shiftKey:true});else fireEvent.click(screen.getByRole('button',{name:'Bring to front'}));expect(a.shapes()[1].scalars.kind).toBe('rect');}
+        if(action==='order'){if(keyboard)a.key('}',{ctrlKey:true,shiftKey:true});else {fireEvent.click(screen.getByRole('button',{name:'Arrange'}));fireEvent.click(screen.getByRole('menuitem',{name:'Bring to front'}));}expect(a.shapes()[1].scalars.kind).toBe('rect');}
         if(action==='undo'||action==='redo'){
           a.key('ArrowRight');if(keyboard)a.key('z',{ctrlKey:true});else fireEvent.click(screen.getByRole('button',{name:'Undo move'}));
           if(action==='redo'){if(keyboard)a.key('z',{ctrlKey:true,shiftKey:true});else fireEvent.click(screen.getByRole('button',{name:'Redo move'}));}
@@ -143,7 +143,7 @@ test('parity detail: marquee and list range both select two; grouped resize and 
 });
 
 test.each([['back','{',true,'Send to back'],['backward','[',false,'Send backward'],['forward',']',false,'Bring forward'],['front','}',true,'Bring to front']])('parity detail: %s order control and shortcut',(_direction,key,shift,label)=>{
-  const run=(keyboard:boolean)=>{const a=setup();a.seed();a.seed('ellipse',300);a.select();if(keyboard)a.key(String(key),{ctrlKey:true,shiftKey:shift});else fireEvent.click(screen.getByRole('button',{name:String(label)}));const result=a.shapes().map(s=>s.scalars.kind);cleanup();return result;};expect(run(true)).toEqual(run(false));
+  const run=(keyboard:boolean)=>{const a=setup();a.seed();a.seed('ellipse',300);a.select();if(keyboard)a.key(String(key),{ctrlKey:true,shiftKey:shift});else {fireEvent.click(screen.getByRole('button',{name:'Arrange'}));fireEvent.click(screen.getByRole('menuitem',{name:String(label)}));}const result=a.shapes().map(s=>s.scalars.kind);cleanup();return result;};expect(run(true)).toEqual(run(false));
 });
 
 test('parity detail: existing text is editable through Objects Enter; box width never changes font size',()=>{
@@ -264,7 +264,8 @@ test.each(['forward','backward','front','back'] as const)('arrange %s writes onl
   const selected=direction==='forward'||direction==='front'?ids[0]:ids[2];a.tool('v');
   const x=direction==='forward'||direction==='front'?130:530;pointer(a.viewport,'down',x,100);pointer(a.viewport,'up',x,100);
   const h=controller.history!() as CanvasHistory,commit=vi.spyOn(h,'commitCanvasCommand');
-  fireEvent.click(screen.getByRole('button',{name:({forward:'Bring forward',backward:'Send backward',front:'Bring to front',back:'Send to back'})[direction]}));
+  fireEvent.click(screen.getByRole('button',{name:'Arrange'}));
+  fireEvent.click(screen.getByRole('menuitem',{name:({forward:'Bring forward',backward:'Send backward',front:'Bring to front',back:'Send to back'})[direction]}));
   expect(commit).toHaveBeenCalledTimes(1);expect(commit.mock.calls[0][1]).toEqual([{blockId:'canvas',shapeId:selected,values:{ord:expect.any(String)}}]);
   let undo:ReturnType<CanvasHistory['undo']>|undefined;act(()=>{undo=h.undo();});expect(undo?.appliedKeys).toEqual([`canvas/${selected}/ord`]);equivalentScene(a);
 });
@@ -298,4 +299,41 @@ test.each(['bc-remote','net'] as const)('%s continuous remote burst paints each 
     }
     equivalentScene(a);expect(readCanvas(findBlock(peer,'canvas')!.block.get('props')).shapes).toEqual(a.shapes());
   } finally {queue.close();disable();vi.unstubAllGlobals();}
+});
+
+test('design: tools use named icons and hints; Undo and Redo stay in the header',()=>{
+  const a=setup();
+  for(const button of within(screen.getByRole('toolbar',{name:'Canvas tools'})).getAllByRole('button')){expect(button.querySelector('svg')).not.toBeNull();expect(button.textContent).toBe('');expect(button.title).toBe(button.getAttribute('aria-label'));}
+  a.tool('r');a.key('Enter');const undo=screen.getByRole('button',{name:'Undo rectangle'});expect(undo.closest('.ob-canvas-header')).not.toBeNull();
+  fireEvent.click(undo);expect(screen.getByRole('button',{name:'Redo rectangle'}).closest('.ob-canvas-header')).not.toBeNull();
+});
+test.each(['pointer','keyboard'])('design: %s finished pen leaves no selection and keeps Pen',input=>{
+  const a=setup();if(input==='pointer'){pointer(a.viewport,'down',20,20);pointer(a.viewport,'move',40,40);pointer(a.viewport,'up',40,40);}else {a.key('Enter');a.key('ArrowRight');a.key(' ');a.key('Enter');}
+  expect(a.shapes()).toHaveLength(1);expect(screen.getByRole('button',{name:'Pen (P)'}).getAttribute('aria-pressed')).toBe('true');expect(a.view.container.querySelector('.ob-canvas-outline')).toBeNull();expect(screen.getByRole('button',{name:'Undo stroke'})).toBeTruthy();equivalentScene(a);
+});
+test.each(['r','o','a','t'])('design: keyboard %s centers the whole shape in world coordinates',tool=>{
+  const a=setup();a.tool('h');a.key('ArrowRight');a.key('+');a.tool(tool);a.key('Enter');if(tool==='t'){a.field('Canvas text','Centered');fireEvent.keyDown(screen.getByLabelText('Canvas text'),{key:'Enter',ctrlKey:true});}
+  const b=bounds(a.shapes()[0]);expect(b.x+b.w/2).toBeCloseTo(280);expect(b.y+b.h/2).toBeCloseTo(180);equivalentScene(a);
+});
+test('design: inactive controls hide; active properties follow the tool and selection',()=>{
+  const a=setup();act(()=>screen.getByRole('button',{name:'After canvas'}).focus());expect(screen.queryByLabelText('Stroke color value')).toBeNull();expect(screen.queryByLabelText('Zoom percentage')).toBeNull();expect(screen.queryByRole('separator')).toBeNull();
+  act(()=>screen.getByRole('region').focus());a.tool('v');expect(screen.queryByLabelText('Stroke color value')).toBeNull();a.seed();a.select();expect(screen.getByLabelText('Width')).toBeTruthy();
+  a.tool('h');expect(screen.queryByLabelText('Width')).toBeNull();expect(screen.queryByLabelText('Stroke color value')).toBeNull();expect(screen.getByLabelText('Zoom percentage')).toBeTruthy();
+});
+test('design: named color swatches and editable value both change the selection',()=>{
+  const a=setup();a.seed();a.select();fireEvent.click(screen.getByRole('button',{name:'Stroke: Red'}));expect(a.shapes()[0].scalars.stroke).toBe('#b91c1c');a.field('Stroke color value','#123456');expect(a.shapes()[0].scalars.stroke).toBe('#123456');fireEvent.click(screen.getByRole('button',{name:'Fill: Blue'}));expect(a.shapes()[0].scalars.fill).toBe('#1d4ed8');equivalentScene(a);
+});
+test('design: coordinate display rounds only while unfocused, without rewriting exact geometry',()=>{
+  const a=setup();a.seed();a.select();a.field('X','100.123456789');const field=screen.getByLabelText('X') as HTMLInputElement;expect(field.value).toBe('100.123456789');act(()=>a.viewport.focus());expect(field.value).toBe('100.12');expect(a.shapes()[0].scalars.x).toBe(100.123456789);act(()=>field.focus());expect(field.value).toBe('100.123456789');equivalentScene(a);
+});
+test('design: Arrange menu opens, roves, commits and closes; Help and Objects anchor at triggers',()=>{
+  const a=setup();a.seed();a.seed('ellipse',300);a.select();const trigger=screen.getByRole('button',{name:'Arrange'});fireEvent.click(trigger);expect(document.activeElement).toBe(screen.getByRole('menuitem',{name:'Send to back'}));fireEvent.keyDown(document.activeElement!,{key:'End'});expect(document.activeElement).toBe(screen.getByRole('menuitem',{name:'Bring to front'}));fireEvent.click(document.activeElement!);expect(screen.queryByRole('menu')).toBeNull();expect(a.shapes()[1].scalars.kind).toBe('rect');
+  fireEvent.click(screen.getByRole('button',{name:'Objects'}));expect(screen.getByRole('listbox').closest('.ob-canvas-popup-anchor')?.querySelector('button')?.textContent).toBe('Objects');
+  fireEvent.click(screen.getByRole('button',{name:'Help (?)'}));expect(screen.queryByRole('listbox')).toBeNull();expect(screen.getByRole('dialog',{name:'Canvas help'}).closest('.ob-canvas-popup-anchor')?.querySelector('button')?.getAttribute('aria-label')).toBe('Help (?)');
+});
+
+test('design: pending slash insertion focuses and scrolls its named region into view',()=>{
+  const a=setup(),scroll=vi.spyOn(HTMLElement.prototype,'scrollIntoView').mockImplementation(()=>{});
+  act(()=>{controller.pendingCaret.current={blockId:'canvas',offset:0};});a.seed();
+  expect(document.activeElement).toBe(screen.getByRole('region'));expect(controller.pendingCaret.current).toBeNull();expect(scroll).toHaveBeenCalledWith({block:'nearest'});expect(screen.getByRole('toolbar',{name:'Canvas tools'})).toBeTruthy();
 });

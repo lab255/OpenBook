@@ -7,7 +7,7 @@ Canvas now registers through the app wrapper and supports immediate Canvas2d pen
 ## Final validation
 
 - SDK build and full `pnpm --filter @book.dev/ui build` pass (production viewer + app + TypeScript).
-- 252 UI focused tests pass, including actual BlockEditor input-boundary regressions, catalogue drift, slash insertion, two-replica/reload advisories, canvas history and relay.
+- 264 UI focused tests pass, including actual BlockEditor input-boundary regressions, catalogue drift, slash insertion, two-replica/reload advisories, canvas history and relay.
 - 588 full SDK tests pass, including all 57 catalogue/validation tests, without weakening the full canvas validation checks.
 - 8 ledger/fence tests pass, with deliberate forbidden-module/endpoint controls.
 - Full CI command `pnpm run lint` passes across the workspace, including UI `eslint . && pnpm run lint:css && pnpm run test:stylelint`. Changed TS/TSX ESLint also passes. The final automatic fixes were indentation and `let` → `const` only.
@@ -24,7 +24,12 @@ Evidence lives in `_evidence-build4/`; historical failed runs are retained and s
 | BUILD-3 merge 22992760 | 765 B | +38 B | Option-B projection seam; `viewer-before.json` |
 | BUILD-4 constructor checkpoint (uncommitted) | 780 B | +15 B | Generic props constructor; `viewer-seam.json`, `production-graphs-780.json` |
 | BUILD-4 full-catalogue checkpoint (uncommitted, rejected) | 1,176 B | +396 B | Data +264 raw B, validation +132 raw B; `catalogue-byte-stop.json`, `catalogue-ablation.json` |
-| This BUILD-4 implementation endpoint | **852 B** | **−324 B** | Minimal known-type viewer entry; full canvas metadata/validation stay SDK/server/app-side; `production-graphs.json` |
+| Implementation b75eaeb56900b9a2e904945b46823e082524fc2d | **852 B** | **−324 B vs rejected checkpoint** | Minimal known-type viewer entry; full canvas metadata/validation stay SDK/server/app-side; `production-graphs.json` |
+| Evidence-only 91d22c51e24387bb5c76076777de60934a9d4bec | **852 B** | **0 B** | Full production rebuild, identical raw viewer hash |
+| Paint-counter evidence b589c05ed3567ffdd90819bacc5a6a7a8d5223d5 | **852 B** | **0 B** | Full production rebuild, identical raw viewer hash; product source unchanged |
+| Harness-only lint fix d3bb22767a794c92662ec9e3b901fc3900ced9f3 | **852 B** | **0 B** | Scoped ESLint browser globals; full-package lint + full production rebuild |
+| Consolidated review fix ecb39d1acdbe9a5c9fcc0b2c43625f57c6d771aa | **852 B** | **0 B** | Quarantine-safe clone, input/transport corrections; full committed production rebuild, identical viewer hash |
+| Design corrections (this commit; hash attached after committed rebuild) | **852 B** | **0 B** | Theme tokens, icons, contextual controls and paint-only swatch selection; unchanged viewer hash |
 
 The intermediate BUILD-4 values are working-tree measurements, not fabricated commits. The PR attaches this endpoint to the actual implementation commit; subsequent commits must be measured separately. Final raw viewer = **1,933,227 B**. Compared with 765, total shared growth = **87 B**, under the 300 B seam limit. Canvas catalogue cost over 780 = **72 B**, meeting the bounded ≤100 B target. Authorized ceiling = 4,096 B; current margin **3,244 B**. The prior measured F1 slice estimate ~2,588 B projects **~3,440 B**, leaving **~656 B**. F1 is not shipped or measured anew here.
 
@@ -101,22 +106,23 @@ Raw counts: `_evidence-build4/paint-work-after.json`; original counts: `diagnosi
 
 | Measurement | Result | Deliberate violation control |
 |---|---|---|
-| Join/saving/saved/save-failed CLS | 0 each | Unsized canvas mount: 0.07765289256198346 |
+| Join/saving/saved/save-failed CLS | 0 each | Unsized canvas mount: 0.06307107438016528 (design refresh) |
 | Real provider reconnect CLS, single and multi transaction | 0 each | Same unsized canvas control |
 | Off-token durations | 0 | 123ms: 1 |
 | Opacity-derived text colors | 0 | rgba(0,0,0,.4), element opacity 1: 1 |
 | Selection alignment, 100/200/400% | 0 CSS px each | 2px planted displacement: 2px |
 | Drift, 20 zoom cycles | 0 CSS px | 2px planted displacement: 2px |
-| Six text roles | 8.49:1 minimum; 16.29–17.93:1 others | Nonzero contrast measurements |
-| Focus/selection and field boundaries | 6.70:1 / 4.74:1 | Nonzero contrast measurements |
+| Six light-theme roles | 4.58:1 pressed control; 11.85:1 body; 12.91:1 others | Computed RGB (design refresh) |
+| Pressed fill vs chrome / field boundaries | light 4.58:1 / 5.01:1; dark 6.14:1 / 5.51:1 | Computed RGB, explicitly separate from focus ring |
+| Chrome hex literals | 0 | Planted hex color: 1 |
 
-`browser-checks.json` preserves computed values, frames and control data. Expanded-view cycles are deferred to BUILD-5. Text-role measurement is numeric computed-style evidence, not a visual or screen-reader certification. Opacity meter resolves text color into RGBA and tests alpha separately from element opacity; its original broken control is explicitly superseded.
+`design-browser-checks.json` and `design-polish.json` preserve current computed values, frames and controls; `browser-checks.json` retains the pre-design run. Expanded-view cycles are deferred to BUILD-5. Text-role measurement is numeric computed-style evidence, not a visual or screen-reader certification. Opacity meter resolves text color into RGBA and tests alpha separately from element opacity; its original broken control is explicitly superseded.
 
 Reconnect uses **two real production BroadcastChannel providers**. A localhost-only fault wrapper buffers actual update packets during outage, proves zero delivered bytes, releases unchanged native packets, then checks live and fresh-replica agreement, camera, focus and selection. One geometry+color command generates **one 156 B packet**, all 12 frame samples show both together. Separate Move and Style commands generate **80 B and 91 B packets**; the intermediate frame matches the complete first transaction, then the second. Concurrent local Y movement remains visible. Sampling reads scene state at frame boundaries with canvas camera/DOM selection; it is not physical presentation certification or an SSE/server outage test.
 
 **Atomicity boundary: one Yjs transaction.** No frame may expose part of a transaction. A multi-transaction sequence may display complete intermediate states in order. While visible, remote updates received before rAF are applied in one outer transaction, retaining each Y.applyUpdate and its origin; hidden documents apply immediately and visibility changes flush. Local input bypasses this queue. This contract is a successor handoff, not a stronger arbitrary-backlog atomicity promise.
 
-Reconnect CLS was attributed to selection outline/handles moving via left/top. Fixed-origin transforms eliminated the measured shifts without filtering them out. Capture loss, pointercancel, Escape, focus interruption and permission loss share contact teardown: preview discarded, announcement issued, penDown reset, resting contacts quarantined; only fresh touch-down resumes navigation. Five regressions prove inert resting touches and a fresh 40px pan. Interruptions at start/mid/end preserve shared geometry. Remote deletion restores focus to a surviving object/region.
+Reconnect CLS was attributed to selection outline/handles moving via left/top. Fixed-origin transforms eliminated the measured shifts without filtering them out. Capture loss, pointercancel, Escape, focus interruption and permission loss share contact teardown: preview discarded, announcement issued, penDown reset, resting contacts quarantined; only fresh touch-down resumes navigation. The complete 11-route regression enumeration below proves inert resting touches and a fresh 40px pan. Interruptions at start/mid/end preserve shared geometry. Remote deletion restores focus to a surviving object/region.
 
 ## Advisory dispositions and deferred affordances
 
@@ -221,3 +227,58 @@ The canvas SDK validation case set is **unchanged** by the lean split. Full SDK 
 ### Review-round final gates
 
 **252 UI focused tests, 588 full SDK tests, 8 ledger/fence tests, 216 exact raster cases**, exact `pnpm run lint`, full UI production build, graph exclusion and six deterministic document-byte comparisons pass. Viewer remains **852 B**, raw **1,933,227 B**, hash **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**, delta **0 B** for both lint and review corrections. Artifacts: `review-*.log`, `review-validation.json`, `sustained-ink.json`; raster/pre-review data are retained. The separate harness is stopped; no visual capture or public exposure occurred.
+
+
+## Design-review correction round (reviewed base b589c05e)
+
+The push was interrupted in its pre-push hook when the design review arrived, so lint, code-review and design corrections ship together. No hooks were bypassed. Missing generated MCP/server dist dependencies were built locally before the hook; no dependency source changed.
+
+| Finding | Final behavior | Regression / measurement |
+|---|---|---|
+| F1 palette affordances | Lucide tool icons, accessible names and shortcut title hints | `design: tools use named icons and hints; Undo and Redo stay in the header` |
+| D1 pressed state | Primary-token filled state and a 2px underline; distinct from focus ring | `design-polish.json`: boundary 4.58:1 light / 6.14:1 dark; icon 4.58:1 / 6.33:1 |
+| D2 theme / color tokens | Canvas chrome uses existing app theme variables; no hex literals in canvas.css | Light/dark computed styles; hex 0/control 1; opacity-derived text color 0/control 1 each theme |
+| D3 properties / arrangement | Only active tool or selection properties appear; strips/grip absent outside canvas focus. Controls wrap with even 8px padding. Arrange opens a keyboard-operable menu | `design: inactive controls hide; active properties follow the tool and selection`; `design: Arrange menu opens, roves, commits and closes; Help and Objects anchor at triggers`; default 800px: no horizontal overflow or clipped controls |
+| F2 color swatches | Named Ink/Red/Blue, plus None for fill, alongside editable values | `design: named color swatches and editable value both change the selection` |
+| F3 slash icon | App registration supplies Lucide PenTool | SlashMenu `renders an icon for each command (#3)` now asserts the canvas icon |
+| F4 Undo / Redo | Icon controls with actual action names are in the header, above the viewport | Header regression above |
+| I1 pen completion | Pen remains active; finishing a stroke does not select the new stroke | `design: %s finished pen leaves no selection and keeps Pen` for pointer and keyboard |
+| I2 undo vocabulary | Creation journal labels are Stroke / Rectangle / Ellipse / Arrow / Text | Header regression asserts Undo rectangle / Redo rectangle; pen regressions assert Undo stroke |
+| I3 keyboard placement | Whole shape centered in world coordinates at the viewport center, including after pan/zoom | `design: keyboard %s centers the whole shape in world coordinates`, R/O/A/T; parity inventory uses equivalent pointer placement |
+| I4 coordinates | Display rounded to two decimals outside focus; exact persisted numeric value on focus | `design: coordinate display rounds only while unfocused, without rewriting exact geometry` |
+| D4 toolbar focus | Inset 2px focus outline, including contrasting outline on a pressed tool | Native browser Tab focus-visible geometry contained in scrollable toolbar, both themes |
+| D5 panels | Help and Objects use position-relative trigger anchors | Regression above; measured Help top = trigger bottom +4px |
+| D6 Help target | At least 28px | 32×28px measured in both themes |
+| H1 duplicate status | Removed Saved/Saving/save-failed duplication from canvas header; page shell retains save status. Reserved canvas status slot stays empty unless View only; no invented reconnect signal | Save transitions still produce CLS 0; no second save-status subscription |
+| Slash arrival | Pending insertion focuses its named region and scrolls it into view | `design: pending slash insertion focuses and scrolls its named region into view` |
+
+Properties remain below the sheet so activating them cannot move the drawing viewport under an existing pointer contact; Undo/Redo are above the sheet. The 36px palette remains visible on inactive blocks; only contextual properties/view controls/grip hide. Content ink colors, named swatch values and persisted paper background remain document values, distinct from themed chrome.
+
+### Design-round CLS regression caught before push
+
+The strict reconnect remeasurement caught a regression introduced by this design round: **0.0000014104683195592288** CLS. Attribution names two color-swatch `I` chips changing **10×10 ↔ 16×16** because the pressed selector changed `inset:6px` to `inset:9px`. The worker stopped; the manager approved fixed geometry with paint-only selection marks. Removing the pressed inset rule keeps all chips at 16×16; selection uses an inset outline/checkmark without changing layout. This was caught at authoring time by the existing CLS discipline, not accepted as rounding noise.
+
+The identical genuine withheld-update test now reads **CLS 0** for both one-transaction geometry+color delivery and the multiple-transaction sequence. Live replicas and fresh reload agree; camera, focus, selection and transaction-complete frame assertions pass. Join and shell-save transitions remain **0**; the deliberately unsized canvas mount still fires at **0.06307107438016528** under the new chrome geometry. No sources are excluded and no tolerance was introduced. `design-swatch-cls-before.json` preserves the failing attribution; `design-browser-checks.json` is the corrected rerun. The original outline/handle CLS mechanism and its earlier control remain separately documented.
+
+### Current design evidence (supersedes pre-design chrome numbers)
+
+| Measurement | Light | Dark | Control / method |
+|---|---:|---:|---|
+| Pressed fill vs chrome | 4.58:1 | 6.14:1 | Computed RGB; not the focus-ring measurement |
+| Pressed icon vs fill | 4.58:1 | 6.33:1 | Computed RGB |
+| Field boundary vs background | 5.01:1 | 5.51:1 | Computed RGB |
+| Chrome foreground vs background | 12.91:1 | 10.54:1 | Computed RGB |
+| Chrome stylesheet hex literals | 0 | 0 | Planted `color:#123456`: 1 |
+| Opacity-derived text colors | 0 | 0 | Planted rgba(0,0,0,.4), element opacity1: 1 |
+| Default-width clipped controls | 0 | 0 | DOM rectangles at 800px; planted 1000px field displacement detects 1 clipped control |
+| Focus ring | contained | contained | Focus-visible, 2px solid, −2px inset |
+
+The existing duration meter remains 0 with 123ms control1; alignment at 100/200/400% and 20-cycle drift remain0 with 2px control2. The six light-theme role samples now read 4.58:1 (pressed icon control), 11.85:1 (body button) and 12.91:1 (remaining roles). These replace the old hard-coded 6.70/4.74 boundary claim and pre-token text colors.
+
+Reproduce with the isolated localhost harness, then `node packages/ui/scripts/canvas-measure/measureDesign.mjs` and `node packages/ui/scripts/canvas-measure/measure.mjs --checks-only`. The harness directory, separate config and serve command are unchanged. Numeric theme evidence is in `design-polish.json`; this is not screenshot certification.
+
+**Capture reference: pending manager refresh after push.** Required captures: dark theme; Tab-focused tool with unclipped ring; actual post-slash-insert state showing palette and region focus; before/after slash pair at the same menu scroll state. No worker screenshots, video or public exposure were produced. Visual acceptance, physical IME, screen reader and hardware remain honest PARTIAL.
+
+### Design-round gates
+
+Full root `pnpm run lint`, full production UI build, **264 UI focused tests**, **8 ledger/fence tests**, **216 exact raster cases against the unoptimized reference**, graph exclusion and all six document-byte comparisons pass. The full SDK suite remains **588/588** from the code round, with no SDK changes in this round. Viewer remains **852 B**, raw **1,933,227 B**, SHA-256 **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**, design delta **0 B**. Margin remains 4,096−852 = **3,244 B**; with prior F1 estimate2,588, projected3,440 leaves **656 B**. Paint path is unchanged by the design correction; the accepted dense and sustained-input timings/counters remain scoped to their recorded runs.

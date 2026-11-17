@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 const require=createRequire(new URL('../../../web/package.json',import.meta.url));
 const {chromium}=require('@playwright/test');
 const checksOnly=process.argv.includes('--checks-only'),inkOnly=process.argv.includes('--ink-only');
-const output=fileURLToPath(new URL(`../../../../_evidence-build4/${checksOnly?'browser-checks':inkOnly?'browser-measurements-after':'browser-measurements'}.json`,import.meta.url));
+const output=fileURLToPath(new URL(`../../../../_evidence-build4/${checksOnly?'design-browser-checks':inkOnly?'browser-measurements-after':'browser-measurements'}.json`,import.meta.url));
 const result={label:'Chromium synthetic/local, Canvas2d; rAF raster-availability estimate, not physical presentation',inputBoundary:'Both input classes use synthetic mouse PointerEvents. Trackpad-class denotes the browser pointer path, not a physical trackpad measurement.',time:new Date().toISOString(),immediacy:[]};
 const save=()=>writeFileSync(output,JSON.stringify(result,null,2)+'\n');
 const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
@@ -118,7 +118,7 @@ try {
         if([...el.childNodes].some(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim())){pixelContext.clearRect(0,0,1,1);pixelContext.fillStyle=style.color;pixelContext.fillRect(0,0,1,1);if(pixelContext.getImageData(0,0,1,1).data[3]<255)opacityDerivedTextColors++;}
       }return {offTokenDurations,opacityDerivedTextColors};
     };
-    const observed=meter(),button=root.querySelector('button');button.style.transitionProperty='none';button.style.transitionDuration='123ms';button.style.color='rgba(0,0,0,.4)';await new Promise(requestAnimationFrame);const plantedComputedColor=getComputedStyle(button).color,elementOpacity=getComputedStyle(button).opacity,negativeControl=meter();button.style.transitionDuration='';button.style.color='';button.style.transitionProperty='';return {observed,negativeControl,plantedComputedColor,elementOpacity,method:'Resolve computed text colors to RGBA pixels; count color alpha below 255, independently of element opacity'};
+    const observed=meter(),button=root.querySelector('.ob-canvas-title');button.style.transitionProperty='none';button.style.transitionDuration='123ms';button.style.color='rgba(0,0,0,.4)';await new Promise(requestAnimationFrame);const plantedComputedColor=getComputedStyle(button).color,elementOpacity=getComputedStyle(button).opacity,negativeControl=meter();button.style.transitionDuration='';button.style.color='';button.style.transitionProperty='';return {observed,negativeControl,plantedComputedColor,elementOpacity,method:'Resolve computed text colors to RGBA pixels; count color alpha below 255, independently of element opacity'};
   });
   if(result.restraint.negativeControl.offTokenDurations<=0||result.restraint.negativeControl.opacityDerivedTextColors<=0)throw new Error('Restraint negative control failed');save();
   result.legibility=await page.evaluate(()=>{
@@ -131,7 +131,8 @@ try {
       while(background==='rgba(0, 0, 0, 0)'&&ancestor.parentElement){ancestor=ancestor.parentElement;background=getComputedStyle(ancestor).backgroundColor;}
       rows.push({role,selector,font:s.fontFamily,size:s.fontSize,weight:s.fontWeight,color:s.color,background,contrast:ratio(s.color,background)});
     }
-    return {textRoles:rows,boundaries:[{role:'focus and selection',contrast:ratio('rgb(29,78,216)','rgb(255,255,255)')},{role:'field boundary',contrast:ratio('rgb(115,115,115)','rgb(255,255,255)')}]};
+    const root=getComputedStyle(document.querySelector('.ob-canvas')),pressed=getComputedStyle(document.querySelector('.ob-canvas-tools [aria-pressed=true]')),field=getComputedStyle(document.querySelector('.ob-canvas input'));
+    return {textRoles:rows,boundaries:[{role:'pressed tool fill against chrome',contrast:ratio(pressed.backgroundColor,root.backgroundColor)},{role:'pressed tool icon against fill',contrast:ratio(pressed.color,pressed.backgroundColor)},{role:'field boundary',contrast:ratio(field.borderTopColor,field.backgroundColor)}]};
   });
   }
   result.browserErrors=errors;result.completed=new Date().toISOString();save();

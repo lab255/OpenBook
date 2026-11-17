@@ -1,7 +1,6 @@
-import {useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent} from 'react';
+import {useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent} from 'react';
+import {MousePointer2, Pencil, RectangleHorizontal, Circle, MoveUpRight, Type, Eraser, Hand, Undo2, Redo2, HelpCircle} from 'lucide-react';
 import {keysBetween} from '@book.dev/sdk';
-import {getPageIdForDoc} from '@/lib/aiBridge';
-import {pageSaveStatus, pageSaveStatusVersion, subscribePageSaveStatus} from '@/lib/pageSaveStatus';
 import type {CustomBlockProps} from '../registry';
 import {CanvasHistory, type HistoryResult} from './history';
 import {eraseShapes, insertShapes, placementKey} from './commands';
@@ -12,21 +11,31 @@ import './canvas.css';
 
 type Tool='select'|'stroke'|'rect'|'ellipse'|'arrow'|'text'|'erase'|'pan';
 const tools:readonly [Tool,string,string][]=[['select','Select','V'],['stroke','Pen','P'],['rect','Rectangle','R'],['ellipse','Ellipse','O'],['arrow','Arrow','A'],['text','Text','T'],['erase','Erase','E'],['pan','Pan','H']];
+const toolIcons={select:MousePointer2,stroke:Pencil,rect:RectangleHorizontal,ellipse:Circle,arrow:MoveUpRight,text:Type,erase:Eraser,pan:Hand};
 const names:Record<string,string>={stroke:'Stroke',rect:'Rectangle',ellipse:'Ellipse',arrow:'Arrow',text:'Text'};
 interface Gesture {kind:'create'|'move'|'resize'|'endpoint'|'marquee'|'erase'|'pan'|'height';pointer:number;start:Point;at:Point;camera:Camera;shapes:SceneShape[];preview:SceneShape[];ids:Set<string>;handle?:string;from?:Bounds;height?:number}
 interface TextEdit {id?:string;x:number;y:number;w:number;h:number;text:string}
 const makePreview=(kind:string,values:Record<string,Scalar>,points:number[]=[],arity:2|3=2):SceneShape=>({id:'preview',scalars:{...shapeDefaults,kind,...values},points,pointArity:arity});
 const label=(s:SceneShape,i=0)=>String(s.scalars.name||s.scalars.text||`${names[String(s.scalars.kind)]} ${i+1}`);
 const editableTarget=(target:EventTarget|null)=>target instanceof HTMLElement&&!!target.closest('input, textarea, select, [contenteditable="true"]');
+function CoordinateField({value,onChange,...props}:Omit<React.InputHTMLAttributes<HTMLInputElement>,'value'|'onChange'> & {value:number;onChange:(value:number)=>void}) {
+  const [focused,setFocused]=useState(false);
+  return <input {...props} type="number" step="any" value={focused?value:Math.round(value*100)/100} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} onChange={e=>{if(e.target.value!==''&&Number.isFinite(Number(e.target.value)))onChange(Number(e.target.value));}}/>;
+}
+const swatches=[['Ink','#111111'],['Red','#b91c1c'],['Blue','#1d4ed8']] as const;
+function ColorControl({name,value,onChange,tab,fill=false}:{name:string;value:string;onChange:(value:string)=>void;tab:number;fill?:boolean}) {
+  return <div className="ob-canvas-color" role="group" aria-label={name}>
+    <span>{name}</span>{[...(fill?[['None','none']]:[]),...swatches].map(([label,color])=><button type="button" key={label} tabIndex={tab} aria-label={`${name}: ${label}`} aria-pressed={value===color} title={label} onClick={()=>onChange(color)}><i style={{background:color==='none'?'transparent':color}}/>{color==='none'?'∅':value===color?'✓':null}</button>)}
+    <input tabIndex={tab} aria-label={fill?'Fill color or none':'Stroke color value'} value={value} onChange={e=>onChange(e.target.value)}/>
+  </div>;
+}
 export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   const id=String(block.get('id')),props=block.get('props');
-  useSyncExternalStore(subscribePageSaveStatus,pageSaveStatusVersion,pageSaveStatusVersion);
-  const saveStatus=pageSaveStatus(getPageIdForDoc(editor.doc));
   const scene=useMemo(()=>readCanvas(props),[props,editor.version]),readOnly=pageReadOnly||!scene.editable;
   const [tool,setTool]=useState<Tool>('stroke'),[active,setActive]=useState(false),[selected,setSelected]=useState<Set<string>>(new Set());
   const [camera,setCamera]=useState<Camera>({x:0,y:0,zoom:1}),[width,setWidth]=useState(640),[heightPreview,setHeightPreview]=useState<number|null>(null);
   const height=heightPreview??Number(get(props,'height')??360);
-  const [objects,setObjects]=useState(false),[help,setHelp]=useState(false),[listFocus,setListFocus]=useState(0),[toolbarFocus,setToolbarFocus]=useState<Tool>('stroke');
+  const [objects,setObjects]=useState(false),[help,setHelp]=useState(false),[arrangeOpen,setArrangeOpen]=useState(false),[listFocus,setListFocus]=useState(0),[toolbarFocus,setToolbarFocus]=useState<Tool>('stroke');
   const [stroke,setStroke]=useState('#111111'),[fill,setFill]=useState('none'),[strokeWidth,setStrokeWidth]=useState(3),[pressure,setPressure]=useState(true),[aspect,setAspect]=useState(false);
   const [announcement,setAnnouncement]=useState(''),[textEdit,setTextEdit]=useState<TextEdit|null>(null),[keyboardPath,setKeyboardPath]=useState<SceneShape|null>(null),[crosshair,setCrosshair]=useState<Point|null>(null);
   const [,refresh]=useState(0);
@@ -69,6 +78,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   };
   const cancelLatest=useRef(cancel);cancelLatest.current=cancel;
   useEffect(()=>{const interrupt=()=>{cancelLatest.current();};window.addEventListener('blur',interrupt);return()=>window.removeEventListener('blur',interrupt);},[]);
+  useEffect(()=>{if(arrangeOpen)region.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();},[arrangeOpen]);
   const activate=()=>{setActive(true);editor.setFocusedId(id);};
   useLayoutEffect(()=>{
     if(!viewport.current)return;
@@ -86,7 +96,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   useEffect(()=>()=>{if(announceTimer.current)clearTimeout(announceTimer.current);},[]);
   useEffect(()=>{if(textEdit)textInput.current?.focus();},[!!textEdit]);
   useEffect(()=>{
-    if(editor.pendingCaret.current?.blockId===id){editor.pendingCaret.current=null;region.current?.focus();}
+    if(editor.pendingCaret.current?.blockId===id){editor.pendingCaret.current=null;region.current?.focus();region.current?.scrollIntoView({block:'nearest'});}
   },[editor.version,id]);
   useEffect(()=>{
     const missing=[...selected].filter(id=>!scene.shapes.some(s=>s.id===id));
@@ -103,11 +113,11 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   useEffect(()=>{if(readOnly){cancel();setTool('pan');setToolbarFocus('pan');announce('View only');}},[readOnly]);
   const pointerPosition=(e:{clientX:number;clientY:number}):Point=>{const r=viewport.current!.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
   const center=()=>world({x:width/2,y:height/2},camera);
-  const create=(inputs:readonly Record<string,unknown>[],action:string)=>{
+  const create=(inputs:readonly Record<string,unknown>[],action:string,selectCreated=true)=>{
     if(latest.current.readOnly)return;
     const h=history();if(!h)return;
     const ords=keysBetween(scene.shapes.length?String(scene.shapes[scene.shapes.length-1].scalars.ord):null,null,inputs.length);
-    const ids=insertShapes(h,id,inputs.map((input,i)=>({...input,ord:ords[i]})),action);choose(ids);refresh(n=>n+1);return ids;
+    const ids=insertShapes(h,id,inputs.map((input,i)=>({...input,ord:ords[i]})),action);if(selectCreated)choose(ids);refresh(n=>n+1);return ids;
   };
   const createPreview=(kind:Tool,a:Point,b:Point,constrain=false):SceneShape=>{
     if(kind==='arrow'){
@@ -117,9 +127,9 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     if(constrain){const size=Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));b={x:a.x+Math.sign(b.x-a.x||1)*size,y:a.y+Math.sign(b.y-a.y||1)*size};}
     return makePreview(kind,{...pointBounds([a,b]),stroke,fill,strokeWidth});
   };
-  const finishShape=(s:SceneShape)=>{create([{...s.scalars,points:s.points,pointArity:s.pointArity}],s.scalars.kind==='stroke'?'Stroke':`Create ${String(s.scalars.kind)}`);if(s.scalars.kind!=='stroke')setTool('select');};
+  const finishShape=(s:SceneShape)=>{create([{...s.scalars,points:s.points,pointArity:s.pointArity}],names[String(s.scalars.kind)],s.scalars.kind!=='stroke');if(s.scalars.kind!=='stroke')setTool('select');};
   const startText=(p:Point,s?:SceneShape)=>{if(readOnly)return;setTextEdit({id:s?.id,x:s?number(s,'x'):p.x,y:s?number(s,'y'):p.y,w:s?number(s,'w'):200,h:s?number(s,'h'):100,text:s?String(s.scalars.text):''});};
-  const finishText=()=>{if(!textEdit||readOnly)return;if(textEdit.id)commit('Edit text',[{shapeId:textEdit.id,values:{text:textEdit.text}}]);else create([{kind:'text',...textEdit,stroke,fill,strokeWidth}],'Create text');setTextEdit(null);setTool('select');viewport.current?.focus();};
+  const finishText=()=>{if(!textEdit||readOnly)return;if(textEdit.id)commit('Edit text',[{shapeId:textEdit.id,values:{text:textEdit.text}}]);else create([{kind:'text',...textEdit,stroke,fill,strokeWidth}],'Text');setTextEdit(null);setTool('select');viewport.current?.focus();};
   const remove=(ids:Iterable<string>)=>{if(readOnly)return;const h=history();if(h){eraseShapes(h,id,[...ids]);choose([]);announce('Objects erased');refresh(n=>n+1);}};
   const duplicate=()=>{create(chosen.map(s=>({...s.scalars,x:number(s,'x')+10,y:number(s,'y')+10,pointArity:s.pointArity,points:s.points})),'Duplicate');};
   const arrange=(direction:'forward'|'backward'|'front'|'back')=>{
@@ -240,7 +250,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     const command=e.metaKey||e.ctrlKey,key=e.key.toLowerCase();
     const handled=()=>{e.preventDefault();e.stopPropagation();};
     if(key==='escape'){
-      handled();if(cancel())return;if(help){setHelp(false);return;}if(selected.size){choose([]);return;}
+      handled();if(cancel())return;if(arrangeOpen){setArrangeOpen(false);return;}if(objects){setObjects(false);return;}if(help){setHelp(false);return;}if(selected.size){choose([]);return;}
       setActive(false);const row=region.current?.closest<HTMLElement>('[data-block-row]');if(row){row.tabIndex=-1;row.focus();}else region.current?.blur();return;
     }
     if(e.target===region.current&&key==='enter'){handled();activate();if(objects&&scene.shapes.length)region.current?.querySelector<HTMLElement>(`[data-object-index="${Math.min(listFocus,scene.shapes.length-1)}"]`)?.focus();else viewport.current?.focus();return;}
@@ -251,7 +261,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     if(command&&key==='d'){handled();if(!readOnly)duplicate();return;}
     if(command&&(e.code==='BracketLeft'||e.code==='BracketRight')){handled();if(!readOnly)arrange(e.code==='BracketRight'?(e.shiftKey?'front':'forward'):(e.shiftKey?'back':'backward'));return;}
     if(command)return;
-    if(key==='?'){handled();setHelp(v=>!v);return;}
+    if(key==='?'){handled();setObjects(false);setArrangeOpen(false);setHelp(v=>!v);return;}
     if(key==='+'||key==='='||key==='-'||key==='0'||key==='1'){handled();if(key==='0')fit();else zoom(key==='1'?1:camera.zoom*(key==='-'?1/1.2:1.2));return;}
     const nextTool=tools.find(t=>t[2].toLowerCase()===key);
     if(nextTool){if(!readOnly||nextTool[0]==='pan'){handled();cancel();setTool(nextTool[0]);setToolbarFocus(nextTool[0]);}return;}
@@ -271,8 +281,8 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       handled();const p=center();
       if(keyboardPath){finishShape(keyboardPath);setKeyboardPath(null);setCrosshair(null);}
       else if(tool==='stroke'){setCrosshair(p);setKeyboardPath(makePreview('stroke',{x:p.x,y:p.y,w:1,h:1,basisW:1,basisH:1,stroke,strokeWidth},[0,0]));}
-      else if(['rect','ellipse','arrow'].includes(tool))finishShape(createPreview(tool,p,{x:p.x+120,y:p.y+(tool==='arrow'?0:80)}));
-      else if(tool==='text')startText(p);
+      else if(['rect','ellipse','arrow'].includes(tool))finishShape(createPreview(tool,{x:p.x-60,y:p.y-(tool==='arrow'?0:40)},{x:p.x+60,y:p.y+(tool==='arrow'?0:40)}));
+      else if(tool==='text')startText({x:p.x-100,y:p.y-50});
       else if(tool==='select'&&chosen.length===1&&chosen[0].scalars.kind==='text')startText(p,chosen[0]);
       else if(tool==='erase'){setObjects(true);setTimeout(()=>region.current?.querySelector<HTMLElement>('[role="listbox"] [tabindex="0"]')?.focus(),0);}
     }
@@ -292,19 +302,26 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   const canUndo=editor.undo.availability?.undo,canRedo=editor.undo.availability?.redo;
   const properties=chosen.length&&tool==='select'?chosen[0].scalars:{stroke,fill,strokeWidth};
   return <div ref={region} className="ob-canvas" role="region" aria-label={`Canvas, ${scene.shapes.length} objects, ${readOnly?'view only':'editable'}`} tabIndex={0}
-    onKeyDown={onKey} onKeyUp={e=>{if(e.key===' '&&spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;e.preventDefault();e.stopPropagation();}}}
+    onFocus={activate} onKeyDown={onKey} onKeyUp={e=>{if(e.key===' '&&spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;e.preventDefault();e.stopPropagation();}}}
     onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}
-    onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget)){setActive(false);focusedObject.current=null;if(spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;}cancel();}}}>
+    onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget)){setActive(false);setObjects(false);setHelp(false);setArrangeOpen(false);focusedObject.current=null;if(spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;}cancel();}}}>
     <div className="ob-canvas-header">
       <div role="toolbar" aria-label="Canvas tools" className="ob-canvas-tools" onKeyDown={e=>{
         if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();
         const index=visibleTools.findIndex(t=>t[0]===toolbarFocus),next=e.key==='Home'?0:e.key==='End'?visibleTools.length-1:(index+(e.key==='ArrowLeft'?-1:1)+visibleTools.length)%visibleTools.length;
         setToolbarFocus(visibleTools[next][0]);e.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
       }}>
-        {visibleTools.map(([value,name,shortcut])=><button key={value} type="button" aria-label={`${name} (${shortcut})`} title={`${name} (${shortcut})`} aria-pressed={tool===value} tabIndex={active&&toolbarFocus===value?0:-1} onClick={()=>{activate();cancel();setTool(value);setToolbarFocus(value);viewport.current?.focus();}}>{shortcut}</button>)}
+        {visibleTools.map(([value,name,shortcut])=><button key={value} type="button" aria-label={`${name} (${shortcut})`} title={`${name} (${shortcut})`} aria-pressed={tool===value} tabIndex={active&&toolbarFocus===value?0:-1} onClick={()=>{activate();cancel();setTool(value);setToolbarFocus(value);viewport.current?.focus();}}>{(() => {const Icon=toolIcons[value];return <Icon size={18} aria-hidden="true"/>;})()}</button>)}
       </div>
-      <span className="ob-canvas-title">Canvas</span><span className="ob-canvas-status">{readOnly?'View only':saveStatus==='idle'?'':saveStatus==='saving'?'Saving…':saveStatus==='saved'?'Saved':'Save failed'}</span>
-      <button type="button" tabIndex={tab} aria-label="Help (?)" aria-expanded={help} onClick={()=>setHelp(v=>!v)}>?</button>
+      <span className="ob-canvas-title">Canvas</span><span className="ob-canvas-status">{readOnly?'View only':''}</span>
+      {!readOnly&&<><button type="button" tabIndex={tab} aria-label={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} title={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} disabled={!canUndo} onClick={()=>undo()}><Undo2 size={16} aria-hidden="true"/></button><button type="button" tabIndex={tab} aria-label={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} title={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} disabled={!canRedo} onClick={()=>undo(true)}><Redo2 size={16} aria-hidden="true"/></button></>}
+      <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-label="Help (?)" aria-expanded={help} onClick={()=>{setObjects(false);setArrangeOpen(false);setHelp(v=>!v);}}><HelpCircle size={16} aria-hidden="true"/></button>      {help&&<div className="ob-canvas-help" role="dialog" aria-label="Canvas help" onPointerDown={e=>e.stopPropagation()}>
+        <strong>Canvas shortcuts</strong><p>Pen draws. Fingers move the view.</p>
+        <p>{readOnly?'H Pan.':'V Select · P Pen · R Rectangle · O Ellipse · A Arrow · T Text · E Erase · H Pan.'} +/− Zoom · 0 Fit · 1 Actual size · ? Help.</p>
+        {!readOnly&&<><p>Pen: Enter starts a path, arrows move 1 unit (Shift 10), Space places a point, Enter finishes. Shapes: Enter inserts at the center. Text: Cmd/Ctrl+Enter finishes.</p><p>Selection: arrows move 1 unit (Shift 10). Cmd/Ctrl+A selects all; D duplicates; [ / ] reorders (Shift sends to back/front); Z undoes; Shift+Z redoes; Ctrl+Y redoes. Delete erases.</p></>}
+        <p>Pan: arrows move 40 pixels (Shift 160). Space temporarily selects Pan. Escape cancels, then clears selection, then leaves the canvas. Tab leaves naturally.</p>
+        <button type="button" tabIndex={tab} onClick={()=>{setHelp(false);viewport.current?.focus();}}>Close help</button>
+      </div>}</div>
     </div>
     <div ref={viewport} className="ob-canvas-viewport" tabIndex={tab} aria-label="Drawing viewport" style={{height,background:String(get(props,'background')??'#ffffff'),cursor:tool==='pan'?'grab':tool==='select'?'default':'crosshair'}}
       onPointerDown={e=>startGesture(e)} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={e=>{if(gesture.current?.pointer===e.pointerId||e.pointerType==='pen')cancel();else {touches.current.delete(e.pointerId);ignoredTouches.current.delete(e.pointerId);touchPair.current=null;}}}
@@ -324,7 +341,35 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       {crosshair&&<span className="ob-canvas-crosshair" style={{left:screen(crosshair,camera).x,top:screen(crosshair,camera).y}} aria-hidden="true">+</span>}
       {textEdit&&<textarea ref={textInput} aria-label="Canvas text" className="ob-canvas-text" style={{...boxStyle(textEdit),fontSize:(chosen[0]?.scalars.kind==='text'?number(chosen[0],'fontSize'):16)*camera.zoom}} value={textEdit.text}
         onPointerDown={e=>e.stopPropagation()} onChange={e=>setTextEdit({...textEdit,text:e.target.value})} onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing)return;if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.stopPropagation();e.preventDefault();finishText();}if(e.key==='Escape'){e.stopPropagation();e.preventDefault();cancel();viewport.current?.focus();}}}/>}
-      {objects&&<div className="ob-canvas-objects" onPointerDown={e=>e.stopPropagation()}>
+
+    </div>
+    {active&&!readOnly&&(tool!=='select'||chosen.length>0)&&tool!=='pan'&&tool!=='erase'&&<div className="ob-canvas-properties" aria-label="Canvas properties">
+
+      {!readOnly&&<>
+        {(['stroke','rect','ellipse','arrow','text'].includes(tool)||tool==='select'&&chosen.length>0)&&<>
+          <ColorControl name="Stroke" tab={tab} value={String(properties.stroke)} onChange={value=>style('stroke',value)}/>
+          <label>Stroke width<select tabIndex={tab} aria-label="Stroke width" value={Number(properties.strokeWidth)} onChange={e=>style('strokeWidth',Number(e.target.value))}>{[1,2,3,5,8].map(n=><option key={n}>{n}</option>)}</select></label>
+          {(tool==='rect'||tool==='ellipse'||tool==='select')&&<ColorControl name="Fill" tab={tab} fill value={String(properties.fill)} onChange={value=>style('fill',value)}/>}
+        </>}
+        {tool==='stroke'&&<label><input type="checkbox" tabIndex={tab} checked={pressure} onChange={e=>setPressure(e.target.checked)}/>Pressure width</label>}
+        {selectionBounds&&tool==='select'&&<>
+          {(['x','y','w','h'] as const).map((key,i)=><label key={key}>{['X','Y','Width','Height'][i]}<CoordinateField tabIndex={tab} aria-label={['X','Y','Width','Height'][i]} type="number" step="any" value={selectionBounds[key]} onChange={value=>setGeometry(key,value)}/></label>)}
+          <label><input type="checkbox" tabIndex={tab} checked={aspect} onChange={e=>setAspect(e.target.checked)}/>Keep aspect ratio</label>
+          {chosen.length===1&&chosen[0].scalars.kind==='arrow'&&(['start','end'] as const).flatMap((endpoint,i)=>(['x','y'] as const).map(axis=><label key={`${endpoint}${axis}`}>{endpoint==='start'?'Start':'End'} {axis.toUpperCase()}<CoordinateField tabIndex={tab} aria-label={`${endpoint==='start'?'Start':'End'} ${axis.toUpperCase()}`} type="number" step="any" value={endpoints(chosen[0])[i][axis]} onChange={value=>{const pair=endpoints(chosen[0]);pair[i]={...pair[i],[axis]:value};commit('Resize arrow',[{shapeId:chosen[0].id,values:arrowValues(...pair)}]);}}/></label>))}
+          {chosen.length===1&&<label>Name<input tabIndex={tab} aria-label="Object name" value={String(chosen[0].scalars.name)} onChange={e=>commit('Rename',[{shapeId:chosen[0].id,values:{name:e.target.value}}])}/></label>}
+          {chosen.length===1&&chosen[0].scalars.kind==='text'&&<><label>Text size<input type="number" min="1" tabIndex={tab} value={number(chosen[0],'fontSize')} onChange={e=>{if(Number.isFinite(Number(e.target.value))&&Number(e.target.value)>0)commit('Style',[{shapeId:chosen[0].id,values:{fontSize:Number(e.target.value)}}]);}}/></label><button type="button" tabIndex={tab} onClick={()=>startText(center(),chosen[0])}>Edit text</button></>}
+          <button type="button" tabIndex={tab} onClick={duplicate}>Duplicate</button>
+          <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-haspopup="menu" aria-expanded={arrangeOpen} onClick={()=>{setObjects(false);setHelp(false);setArrangeOpen(v=>!v);}}>Arrange</button>
+            {arrangeOpen&&<div className="ob-canvas-arrange" role="menu" aria-label="Arrange" onKeyDown={e=>{if(!['ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();const items=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('button')],index=items.indexOf(document.activeElement as HTMLButtonElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowUp'?-1:1)+items.length)%items.length]?.focus();}}>
+              {(['back','backward','forward','front'] as const).map(direction=><button key={direction} role="menuitem" type="button" tabIndex={tab} onClick={()=>{arrange(direction);setArrangeOpen(false);viewport.current?.focus();}}>{({back:'Send to back',backward:'Send backward',forward:'Bring forward',front:'Bring to front'})[direction]}</button>)}
+            </div>}
+          </div>
+          <button type="button" tabIndex={tab} onClick={()=>remove(selected)}>Delete selected</button>
+        </>}
+      </>}
+    </div>}
+    {active&&<div className="ob-canvas-footer">
+      <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-expanded={objects} onClick={()=>{setHelp(false);setArrangeOpen(false);setObjects(v=>!v);}}>Objects</button>      {objects&&<div className="ob-canvas-objects" onPointerDown={e=>e.stopPropagation()}>
         <div role="listbox" aria-label="Objects" aria-multiselectable="true">
           {scene.shapes.length?scene.shapes.map((s,i)=><div key={s.id} role="option" data-object-index={i} aria-selected={selected.has(s.id)} tabIndex={active&&i===listFocus?0:-1} onFocus={()=>{setListFocus(i);focusedObject.current=s.id;}} onClick={e=>{const ids=new Set(e.shiftKey?selected:[]);if(e.shiftKey&&ids.has(s.id))ids.delete(s.id);else ids.add(s.id);choose(ids);}}
             onKeyDown={e=>{
@@ -336,46 +381,17 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
         <button type="button" tabIndex={tab} disabled={!selected.size} onClick={reveal}>Reveal selection</button>
         {!readOnly&&tool==='erase'&&<button type="button" tabIndex={tab} disabled={!selected.size} onClick={()=>remove(selected)}>Erase selected</button>}
       </div>}
-      {help&&<div className="ob-canvas-help" role="dialog" aria-label="Canvas help" onPointerDown={e=>e.stopPropagation()}>
-        <strong>Canvas shortcuts</strong><p>Pen draws. Fingers move the view.</p>
-        <p>{readOnly?'H Pan.':'V Select · P Pen · R Rectangle · O Ellipse · A Arrow · T Text · E Erase · H Pan.'} +/− Zoom · 0 Fit · 1 Actual size · ? Help.</p>
-        {!readOnly&&<><p>Pen: Enter starts a path, arrows move 1 unit (Shift 10), Space places a point, Enter finishes. Shapes: Enter inserts at the center. Text: Cmd/Ctrl+Enter finishes.</p><p>Selection: arrows move 1 unit (Shift 10). Cmd/Ctrl+A selects all; D duplicates; [ / ] reorders (Shift sends to back/front); Z undoes; Shift+Z redoes; Ctrl+Y redoes. Delete erases.</p></>}
-        <p>Pan: arrows move 40 pixels (Shift 160). Space temporarily selects Pan. Escape cancels, then clears selection, then leaves the canvas. Tab leaves naturally.</p>
-        <button type="button" tabIndex={tab} onClick={()=>{setHelp(false);viewport.current?.focus();}}>Close help</button>
-      </div>}
-    </div>
-    <div className="ob-canvas-properties" aria-label="Canvas properties">
-      <button type="button" tabIndex={tab} aria-expanded={objects} onClick={()=>setObjects(v=>!v)}>Objects</button>
-      {!readOnly&&<>
-        {['stroke','rect','ellipse','arrow','text','select'].includes(tool)&&<>
-          <label>Stroke color<input tabIndex={tab} aria-label="Stroke color value" type="text" value={String(properties.stroke)} onChange={e=>style('stroke',e.target.value)}/></label>
-          <label>Stroke width<select tabIndex={tab} aria-label="Stroke width" value={Number(properties.strokeWidth)} onChange={e=>style('strokeWidth',Number(e.target.value))}>{[1,2,3,5,8].map(n=><option key={n}>{n}</option>)}</select></label>
-          {(tool==='rect'||tool==='ellipse'||tool==='select')&&<label>Fill<input tabIndex={tab} aria-label="Fill color or none" value={String(properties.fill)} onChange={e=>style('fill',e.target.value)}/></label>}
-        </>}
-        {tool==='stroke'&&<label><input type="checkbox" tabIndex={tab} checked={pressure} onChange={e=>setPressure(e.target.checked)}/>Pressure width</label>}
-        {selectionBounds&&tool==='select'&&<>
-          {(['x','y','w','h'] as const).map((key,i)=><label key={key}>{['X','Y','Width','Height'][i]}<input tabIndex={tab} aria-label={['X','Y','Width','Height'][i]} type="number" step="any" value={selectionBounds[key]} onChange={e=>{if(e.target.value!=='')setGeometry(key,Number(e.target.value));}}/></label>)}
-          <label><input type="checkbox" tabIndex={tab} checked={aspect} onChange={e=>setAspect(e.target.checked)}/>Keep aspect ratio</label>
-          {chosen.length===1&&chosen[0].scalars.kind==='arrow'&&(['start','end'] as const).flatMap((endpoint,i)=>(['x','y'] as const).map(axis=><label key={`${endpoint}${axis}`}>{endpoint==='start'?'Start':'End'} {axis.toUpperCase()}<input tabIndex={tab} aria-label={`${endpoint==='start'?'Start':'End'} ${axis.toUpperCase()}`} type="number" step="any" value={endpoints(chosen[0])[i][axis]} onChange={e=>{if(e.target.value===''||!Number.isFinite(Number(e.target.value)))return;const pair=endpoints(chosen[0]);pair[i]={...pair[i],[axis]:Number(e.target.value)};commit('Resize arrow',[{shapeId:chosen[0].id,values:arrowValues(...pair)}]);}}/></label>))}
-          {chosen.length===1&&<label>Name<input tabIndex={tab} aria-label="Object name" value={String(chosen[0].scalars.name)} onChange={e=>commit('Rename',[{shapeId:chosen[0].id,values:{name:e.target.value}}])}/></label>}
-          {chosen.length===1&&chosen[0].scalars.kind==='text'&&<><label>Text size<input type="number" min="1" tabIndex={tab} value={number(chosen[0],'fontSize')} onChange={e=>{if(Number.isFinite(Number(e.target.value))&&Number(e.target.value)>0)commit('Style',[{shapeId:chosen[0].id,values:{fontSize:Number(e.target.value)}}]);}}/></label><button type="button" tabIndex={tab} onClick={()=>startText(center(),chosen[0])}>Edit text</button></>}
-          <button type="button" tabIndex={tab} onClick={duplicate}>Duplicate</button>
-          {(['back','backward','forward','front'] as const).map(direction=><button key={direction} type="button" tabIndex={tab} onClick={()=>arrange(direction)}>{({back:'Send to back',backward:'Send backward',forward:'Bring forward',front:'Bring to front'})[direction]}</button>)}
-          <button type="button" tabIndex={tab} onClick={()=>remove(selected)}>Delete selected</button>
-        </>}
-      </>}
-    </div>
-    <div className="ob-canvas-footer">
-      {!readOnly&&<><button type="button" tabIndex={tab} disabled={!canUndo} onClick={()=>undo()}>{canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'}</button><button type="button" tabIndex={tab} disabled={!canRedo} onClick={()=>undo(true)}>{canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'}</button></>}
+      </div>
+
       <button type="button" tabIndex={tab} aria-label="Zoom out" onClick={()=>zoom(camera.zoom/1.2)}>−</button>
       <label>Zoom<input type="number" aria-label="Zoom percentage" tabIndex={tab} min="10" max="400" value={Math.round(camera.zoom*100)} onChange={e=>{if(e.target.value!=='')zoom(Number(e.target.value)/100);}}/></label>
       <button type="button" tabIndex={tab} aria-label="Zoom in" onClick={()=>zoom(camera.zoom*1.2)}>+</button><button type="button" tabIndex={tab} onClick={fit}>Fit</button><button type="button" tabIndex={tab} onClick={()=>zoom(1)}>Actual size</button>
       {!readOnly&&<label>Canvas height<input type="number" tabIndex={tab} min="240" max="960" value={height} onChange={e=>{if(e.target.value!==''&&Number.isFinite(Number(e.target.value)))commit('Resize canvas',[{values:{height:Number(e.target.value)}}]);}}/></label>}
-    </div>
-    <div className="ob-canvas-height-slot">{!readOnly&&<div className="ob-canvas-height" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin={240} aria-valuemax={960} aria-valuenow={height} tabIndex={tab}
+    </div>}
+    {active&&<div className="ob-canvas-height-slot">{!readOnly&&<div className="ob-canvas-height" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin={240} aria-valuemax={960} aria-valuenow={height} tabIndex={tab}
       onPointerDown={e=>startGesture(e,'height')} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={()=>cancel()} onLostPointerCapture={e=>{if(gesture.current?.pointer===e.pointerId)cancel();}}
       onKeyDown={e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();commit('Resize canvas',[{values:{height:height+(e.key==='ArrowUp'?-16:16)}}]);}}}/>}
-    </div>
+    </div>}
     <span className="ob-canvas-live" role="status" aria-live="polite" aria-atomic="true">{announcement}</span>
     {!!scene.diagnostics.length&&<span className="ob-canvas-diagnostic" role="status">Canvas requires recovery</span>}
   </div>;

@@ -1,5 +1,6 @@
 // App registration seam: editing-only registrations belong here.
 // The standalone viewer imports reactiveCore directly.
+import {PenTool} from 'lucide-react';
 import {registerReactiveBlocks as registerCore} from './reactiveCore';
 import {registerHistoryExtension} from './historyExtension';
 import {registerPropsProjection, registerPropsConstructor} from './model';
@@ -14,6 +15,6 @@ export function registerReactiveBlocks(): void {
   registerHistoryExtension((doc, canWrite) => new CanvasHistory(doc, canWrite));
   registerPropsProjection('canvas', projectCanvas);
   registerPropsConstructor('canvas', constructCanvasProps);
-  registerCustomBlock({type:'canvas',render:CanvasBlock,slash:{label:'Canvas',hint:'Draw and diagram together',keywords:'whiteboard drawing sketch',group:'interactive',make:()=>({type:'canvas',props:{...canvasDefaults,shapes:{}}})}});
+  registerCustomBlock({type:'canvas',render:CanvasBlock,slash:{icon:PenTool,label:'Canvas',hint:'Draw and diagram together',keywords:'whiteboard drawing sketch',group:'interactive',make:()=>({type:'canvas',props:{...canvasDefaults,shapes:{}}})}});
   registerCore();
 }

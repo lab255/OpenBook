@@ -1,40 +1,53 @@
-.ob-canvas { position:relative; color:#171717; background:#fff; border-radius:8px; outline:1px solid #737373; font-size:14px; line-height:1.4; }
-.ob-canvas :focus-visible { outline:2px solid #1d4ed8; outline-offset:2px; }
-.ob-canvas:focus-visible { outline:2px solid #1d4ed8; outline-offset:3px; }
-.ob-canvas button { cursor:pointer; border:0; border-radius:4px; background:#f3f4f6; color:#171717; font:inherit; white-space:nowrap; min-height:28px; padding:0 8px; }
-.ob-canvas button:disabled { cursor:default; color:#525252; background:#f5f5f5; }
+.ob-canvas { position:relative; color:hsl(var(--foreground)); background:hsl(var(--background)); border-radius:8px; outline:1px solid hsl(var(--muted-foreground)); font-size:14px; line-height:1.4; }
+.ob-canvas :focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:-2px; }
+.ob-canvas:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
+.ob-canvas button { cursor:pointer; border:0; border-radius:4px; background:hsl(var(--muted)); color:hsl(var(--foreground)); font:inherit; white-space:nowrap; min-height:28px; padding:0 8px; }
+.ob-canvas button:disabled { cursor:default; color:hsl(var(--muted-foreground)); background:hsl(var(--muted)); }
 .ob-canvas-header { display:flex; align-items:center; gap:8px; height:36px; padding:0 8px; }
 .ob-canvas-tools { display:flex; flex-shrink:1; min-width:36px; overflow-x:auto; }
-.ob-canvas-tools button { width:36px; min-width:36px; height:36px; padding:0; font-weight:600; background:transparent; }
-.ob-canvas-tools button[aria-pressed=true] { background:#dbeafe; color:#1e3a8a; }
+.ob-canvas-tools button { width:36px; min-width:36px; height:36px; padding:0; font-weight:600; background:transparent; display:flex; align-items:center; justify-content:center; position:relative; }
+.ob-canvas-tools button[aria-pressed=true]::after { content:""; position:absolute; bottom:2px; width:12px; height:2px; background:currentColor; }
+.ob-canvas-tools button[aria-pressed=true] { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
 .ob-canvas-title { font-weight:600; }
-.ob-canvas-status { font-size:12px; font-weight:500; flex:1; min-width:62px; }
+.ob-canvas-status { font-size:12px; font-weight:500; flex:1; min-width:0; }
 .ob-canvas-viewport { position:relative; overflow:hidden; touch-action:none; }
 .ob-canvas-viewport canvas { display:block; pointer-events:none; }
 .ob-canvas-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; pointer-events:none; }
 .ob-canvas-empty strong { font-size:16px; font-weight:500; }
 .ob-canvas-empty span { font-size:12px; }
-.ob-canvas-outline { position:absolute; outline:1px solid #1d4ed8; pointer-events:none; }
-.ob-canvas-erase { outline-color:#b91c1c; outline-width:2px; }
+.ob-canvas-outline { position:absolute; outline:1px solid hsl(var(--ring)); pointer-events:none; }
+.ob-canvas-erase { outline-color:hsl(var(--destructive)); outline-width:2px; }
 .ob-canvas-handle { position:absolute; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:crosshair; touch-action:none; }
-.ob-canvas-handle i { display:block; width:6px; height:6px; background:#fff; outline:1px solid #1d4ed8; }
-.ob-canvas-crosshair { position:absolute; transform:translate(-50%,-50%); color:#1d4ed8; pointer-events:none; font-size:20px; }
-.ob-canvas-text { position:absolute; resize:none; margin:0; padding:0; border:0; outline:2px solid #1d4ed8; color:#111; background:#fff; font-family:sans-serif; line-height:1.4; }
-.ob-canvas-objects,.ob-canvas-help { position:absolute; top:8px; left:8px; max-height:calc(100% - 16px); overflow:auto; padding:12px; background:#fff; color:#171717; box-shadow:0 2px 12px #0003; border-radius:6px; }
+.ob-canvas-handle i { display:block; width:6px; height:6px; background:hsl(var(--background)); outline:1px solid hsl(var(--ring)); }
+.ob-canvas-crosshair { position:absolute; transform:translate(-50%,-50%); color:hsl(var(--ring)); pointer-events:none; font-size:20px; }
+.ob-canvas-text { position:absolute; resize:none; margin:0; padding:0; border:0; outline:2px solid hsl(var(--ring)); color:hsl(var(--foreground)); background:hsl(var(--background)); font-family:sans-serif; line-height:1.4; }
+.ob-canvas-objects,.ob-canvas-help { position:absolute; top:calc(100% + 4px); right:0; max-height:360px; overflow:auto; padding:8px; z-index:var(--z-index-local-overlay); background:hsl(var(--background)); color:hsl(var(--foreground)); box-shadow:var(--shadow-menu); border-radius:6px; }
 .ob-canvas-objects { width:200px; }
 .ob-canvas-objects [role=option] { padding:6px 8px; min-height:28px; cursor:pointer; }
-.ob-canvas-objects [aria-selected=true] { background:#dbeafe; font-weight:600; }
-.ob-canvas-help { width:min(420px,calc(100% - 16px)); font-size:14px; }
+.ob-canvas-objects [aria-selected=true] { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); font-weight:600; }
+.ob-canvas-help { width:min(420px,calc(100vw - 48px)); font-size:14px; }
 .ob-canvas-help strong { font-size:18px; font-weight:600; }
 .ob-canvas-help p { margin:8px 0; }
-.ob-canvas-properties,.ob-canvas-footer { display:flex; align-items:center; gap:8px; overflow-x:auto; padding:8px; height:52px; box-sizing:border-box; }
+.ob-canvas-properties,.ob-canvas-footer { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px; box-sizing:border-box; }
 .ob-canvas label { display:flex; align-items:center; gap:4px; font-size:12px; white-space:nowrap; }
-.ob-canvas input,.ob-canvas select { min-height:28px; width:76px; border:1px solid #737373; border-radius:4px; background:#fff; color:#171717; font:inherit; padding:2px 4px; box-sizing:border-box; }
+.ob-canvas input,.ob-canvas select { min-height:28px; width:76px; border:1px solid hsl(var(--muted-foreground)); border-radius:4px; background:hsl(var(--background)); color:hsl(var(--foreground)); font:inherit; padding:2px 4px; box-sizing:border-box; }
 .ob-canvas input[type=checkbox] { width:16px; min-height:16px; }
 .ob-canvas input[type=number] { font-variant-numeric:tabular-nums; }
 .ob-canvas-height { height:28px; cursor:ns-resize; touch-action:none; display:flex; align-items:center; justify-content:center; }
-.ob-canvas-height::after { content:''; width:36px; height:3px; border-radius:2px; background:#737373; }
+.ob-canvas-height::after { content:''; width:36px; height:3px; border-radius:2px; background:hsl(var(--muted-foreground)); }
 .ob-canvas-live { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-.ob-canvas-diagnostic { position:absolute; top:8px; right:8px; font-size:12px; background:#fff; color:#991b1b; }
+.ob-canvas-diagnostic { position:absolute; top:8px; right:8px; font-size:12px; background:hsl(var(--background)); color:hsl(var(--destructive)); }
 .ob-canvas-height-slot { height:28px; }
 .ob-canvas-status { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.ob-canvas-header > button,.ob-canvas-popup-anchor > button { min-width:28px; display:flex; align-items:center; justify-content:center; }
+.ob-canvas-popup-anchor { position:relative; }
+.ob-canvas-footer .ob-canvas-objects { left:0; right:auto; }
+.ob-canvas-arrange { position:absolute; top:calc(100% + 4px); right:0; display:flex; flex-direction:column; padding:8px; gap:4px; background:hsl(var(--popover)); color:hsl(var(--popover-foreground)); box-shadow:var(--shadow-menu); z-index:var(--z-index-local-overlay); border-radius:6px; }
+.ob-canvas-color { display:flex; align-items:center; gap:4px; font-size:12px; }
+.ob-canvas-color button { position:relative; width:28px; padding:0; background:hsl(var(--background)); color:hsl(var(--foreground)); }
+.ob-canvas-color button i { position:absolute; inset:6px; border:1px solid hsl(var(--muted-foreground)); border-radius:2px; }
+.ob-canvas-color button[aria-pressed=true] { outline:2px solid hsl(var(--ring)); outline-offset:-2px; }
+.ob-canvas-color input { width:72px; }
+.ob-canvas-tools button[aria-pressed=true]:focus-visible { outline-color:hsl(var(--primary-foreground)); }
+.ob-canvas-empty { color:hsl(var(--foreground)); background:hsl(var(--background)); }

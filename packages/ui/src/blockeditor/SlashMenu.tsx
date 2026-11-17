@@ -305,7 +305,7 @@ export const SlashMenu: React.FC<{
         keywords: def.slash!.keywords,
         group,
         apply: insertAfterOrReplace(() => def.slash!.make()),
-        icon: TYPE_ICONS[def.type] ?? GROUP_ICON[group],
+        icon: def.slash!.icon ?? TYPE_ICONS[def.type] ?? GROUP_ICON[group],
       };
     });
     const ai: SlashItem[] = aiSlashItems().map((item) => ({

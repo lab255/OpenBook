@@ -59,5 +59,6 @@ describe('SlashMenu grouping', () => {
     const {container} = renderMenu('parent-page');
     const item = container.querySelector('.obe-slash-item');
     expect(item?.querySelector('svg.obe-slash-icon')).toBeTruthy();
+    expect(screen.getByText('Canvas').closest('.obe-slash-item')?.querySelector('svg.lucide-pen-tool')).toBeTruthy();
   });
 });

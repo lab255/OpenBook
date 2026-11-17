@@ -46,6 +46,7 @@ export interface CustomBlockDef {
   render: React.FC<CustomBlockProps>;
   /** Optional slash-menu entry that inserts this block. */
   slash?: {
+    icon?: React.ComponentType<{className?:string}>;
     label: string;
     hint: string;
     keywords: string;
