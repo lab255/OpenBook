@@ -20,7 +20,10 @@ let unregister:()=>void;
 beforeEach(()=>{
   unregister=registerHistoryExtension((doc,canWrite)=>new CanvasHistory(doc,canWrite));registerPropsConstructor('canvas',constructCanvasProps);
   vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
-  HTMLElement.prototype.setPointerCapture=vi.fn();HTMLElement.prototype.releasePointerCapture=vi.fn();
+  const captures=new WeakMap<HTMLElement,Set<number>>();
+  HTMLElement.prototype.setPointerCapture=vi.fn(function(this:HTMLElement,id:number){const ids=captures.get(this)??new Set<number>();ids.add(id);captures.set(this,ids);});
+  HTMLElement.prototype.hasPointerCapture=vi.fn(function(this:HTMLElement,id:number){return captures.get(this)?.has(id)??false;});
+  HTMLElement.prototype.releasePointerCapture=vi.fn(function(this:HTMLElement,id:number){captures.get(this)?.delete(id);});
 });
 afterEach(()=>{cleanup();unregister();vi.restoreAllMocks();});
 function setup(readOnly=false) {
@@ -174,6 +177,8 @@ test.each(['start','mid','end'])('interruption at %s preserves remote geometry a
 
 
 test.each(['capture loss','pointercancel','Escape','focus interruption','permission loss','tool shortcut','tool button','window blur','component unmount','remote deletion','pointerup'] as const)('%s tears down pen state: resting touch stays inert, fresh touch pans 40px',route=>{
+  const eventWindow:Window=window;
+  const add=vi.spyOn(eventWindow,'addEventListener'),remove=vi.spyOn(eventWindow,'removeEventListener');
   let a=setup();
   const removed=route==='remote deletion'?a.seed():null;if(removed)a.select();
   pointer(a.viewport,'down',removed?130:50,removed?100:50,{pointerType:'pen',pressure:.4});
@@ -187,7 +192,14 @@ test.each(['capture loss','pointercancel','Escape','focus interruption','permiss
   else if(route==='tool shortcut')a.key('r');
   else if(route==='tool button')fireEvent.click(screen.getByRole('button',{name:'Rectangle (R)'}));
   else if(route==='window blur')fireEvent(window,new Event('blur'));
-  else if(route==='component unmount'){cleanup();a=setup();}
+  else if(route==='component unmount'){
+    const oldDoc=a.doc,oldViewport=a.viewport,bytes=Y.encodeStateAsUpdate(oldDoc),blurListeners=add.mock.calls.filter(([event])=>event==='blur').map(([,listener])=>listener);
+    expect(blurListeners.length).toBeGreaterThan(0);expect(oldViewport.hasPointerCapture(1)).toBe(true);a.view.unmount();
+    for(const listener of blurListeners)expect(remove).toHaveBeenCalledWith('blur',listener);
+    expect(HTMLElement.prototype.releasePointerCapture).toHaveBeenCalledWith(1);expect(oldViewport.hasPointerCapture(1)).toBe(false);
+    const paints=context.drawImage.mock.calls.length;fireEvent(window,new Event('blur'));expect(context.drawImage.mock.calls.length).toBe(paints);expect(Y.encodeStateAsUpdate(oldDoc)).toEqual(bytes);
+    cleanup();a=setup();
+  }
   else if(route==='remote deletion'){
     const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;(props.get('shapes') as Y.Map<unknown>).delete(removed!);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer)));
   } else pointer(a.viewport,'up',50,50,{pointerType:'pen',pressure:0});
@@ -317,8 +329,8 @@ test.each(['r','o','a','t'])('design: keyboard %s centers the whole shape in wor
 });
 test('design: inactive controls hide; active properties follow the tool and selection',()=>{
   const a=setup();act(()=>screen.getByRole('button',{name:'After canvas'}).focus());expect(screen.queryByLabelText('Stroke color value')).toBeNull();expect(screen.queryByLabelText('Zoom percentage')).toBeNull();expect(screen.queryByRole('separator')).toBeNull();
-  act(()=>screen.getByRole('region').focus());a.tool('v');expect(screen.queryByLabelText('Stroke color value')).toBeNull();a.seed();a.select();expect(screen.getByLabelText('Width')).toBeTruthy();
-  a.tool('h');expect(screen.queryByLabelText('Width')).toBeNull();expect(screen.queryByLabelText('Stroke color value')).toBeNull();expect(screen.getByLabelText('Zoom percentage')).toBeTruthy();
+  act(()=>screen.getByRole('region').focus());a.tool('v');expect(screen.queryByRole('textbox',{name:'Stroke color value'})).toBeNull();a.seed();a.select();expect(screen.getByLabelText('Width')).toBeTruthy();
+  a.tool('h');expect(screen.queryByRole('spinbutton',{name:'Width'})).toBeNull();expect(screen.queryByRole('textbox',{name:'Stroke color value'})).toBeNull();expect(a.view.container.querySelector('.ob-canvas-properties')?.getAttribute('aria-hidden')).toBe('true');expect(screen.getByLabelText('Zoom percentage')).toBeTruthy();
 });
 test('design: named color swatches and editable value both change the selection',()=>{
   const a=setup();a.seed();a.select();fireEvent.click(screen.getByRole('button',{name:'Stroke: Red'}));expect(a.shapes()[0].scalars.stroke).toBe('#b91c1c');a.field('Stroke color value','#123456');expect(a.shapes()[0].scalars.stroke).toBe('#123456');fireEvent.click(screen.getByRole('button',{name:'Fill: Blue'}));expect(a.shapes()[0].scalars.fill).toBe('#1d4ed8');equivalentScene(a);
@@ -336,4 +348,40 @@ test('design: pending slash insertion focuses and scrolls its named region into 
   const a=setup(),scroll=vi.spyOn(HTMLElement.prototype,'scrollIntoView').mockImplementation(()=>{});
   act(()=>{controller.pendingCaret.current={blockId:'canvas',offset:0};});a.seed();
   expect(document.activeElement).toBe(screen.getByRole('region'));expect(controller.pendingCaret.current).toBeNull();expect(scroll).toHaveBeenCalledWith({block:'nearest'});expect(screen.getByRole('toolbar',{name:'Canvas tools'})).toBeTruthy();
+});
+
+
+test.each(['Escape','remote deletion'])('delta: Arrange %s returns focus to its persistent trigger',route=>{
+  const a=setup();const id=a.seed();a.select();const trigger=screen.getByRole('button',{name:'Arrange'});fireEvent.click(trigger);expect(document.activeElement?.getAttribute('role')).toBe('menuitem');
+  if(route==='Escape')fireEvent.keyDown(document.activeElement!,{key:'Escape'});
+  else {const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;(props.get('shapes') as Y.Map<unknown>).delete(id);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));equivalentScene(a);}
+  expect(screen.queryByRole('menu')).toBeNull();expect(document.activeElement).toBe(trigger);expect(trigger.isConnected).toBe(true);
+});
+test.each(['new','existing'])('delta: window blur commits %s text instead of cancelling it',kind=>{
+  const a=setup();if(kind==='existing'){a.seed('text');a.select();fireEvent.click(screen.getByRole('button',{name:'Edit text'}));}else {a.tool('t');a.key('Enter');}
+  a.field('Canvas text','Words survive window blur');fireEvent(window,new Event('blur'));expect(screen.queryByLabelText('Canvas text')).toBeNull();expect(a.shapes()).toHaveLength(1);expect(a.shapes()[0].scalars.text).toBe('Words survive window blur');equivalentScene(a);
+});
+test.each(['delete','quarantine'])('delta: remote %s hides editing controls while retaining their geometry nodes',change=>{
+  const a=setup();const id=a.seed();a.select();const strip=a.view.container.querySelector('.ob-canvas-properties'),width=screen.getByLabelText('Width'),toolbar=screen.getByRole('toolbar',{name:'Canvas tools'}),toolNodes=[...toolbar.querySelectorAll('button')];
+  const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;
+  if(change==='delete')(props.get('shapes') as Y.Map<unknown>).delete(id);else props.set('canvasVersion',2);
+  act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));
+  expect(a.view.container.querySelector('.ob-canvas-properties')).toBe(strip);expect(width.isConnected).toBe(true);expect(strip?.getAttribute('aria-hidden')).toBe('true');expect(screen.queryByRole('spinbutton',{name:'Width'})).toBeNull();expect([...toolbar.querySelectorAll('button')]).toEqual(toolNodes);equivalentScene(a);
+});
+
+
+test('M2: quarantine while Width owns focus restores the region and makes the retained field inert',()=>{
+  const a=setup();a.seed();a.select();const field=screen.getByLabelText('Width');act(()=>field.focus());
+  const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));(findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>).set('canvasVersion',2);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));
+  expect(document.activeElement).toBe(screen.getByRole('region'));expect(field.closest('[inert]')).not.toBeNull();expect(screen.queryByRole('spinbutton',{name:'Width'})).toBeNull();expect(a.view.container.querySelector('.ob-canvas-live')?.textContent).toBe('View only');
+  const before=Y.encodeStateAsUpdate(a.doc);fireEvent.change(field,{target:{value:'500'}});expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);
+  act(()=>screen.getByRole('button',{name:'After canvas'}).focus());expect(a.view.container.querySelector('.ob-canvas-properties')).toBeNull();expect(a.view.container.querySelector('.ob-canvas-footer')).toBeNull();equivalentScene(a);
+});
+
+
+test('text blur commits words and resets pen contact without promoting a resting touch',()=>{
+  const a=setup();a.tool('t');pointer(a.viewport,'down',100,100,{pointerType:'pen',pressure:.4});a.field('Canvas text','Pen-entered text');pointer(a.viewport,'down',100,100,{pointerType:'touch',pointerId:2});
+  const before=context.translate.mock.calls[context.translate.mock.calls.length-1]!;fireEvent(window,new Event('blur'));expect(a.shapes()[0].scalars.text).toBe('Pen-entered text');expect(a.viewport.hasPointerCapture(1)).toBe(false);
+  pointer(a.viewport,'move',140,100,{pointerType:'touch',pointerId:2});expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual(before);pointer(a.viewport,'up',140,100,{pointerType:'touch',pointerId:2});
+  pointer(a.viewport,'down',100,100,{pointerType:'touch',pointerId:3});pointer(a.viewport,'move',140,100,{pointerType:'touch',pointerId:3});pointer(a.viewport,'up',140,100,{pointerType:'touch',pointerId:3});expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual([before[0]+40,before[1]]);equivalentScene(a);
 });

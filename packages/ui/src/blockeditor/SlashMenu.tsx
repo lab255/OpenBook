@@ -154,7 +154,7 @@ const firstTextDescendant = (block: BlockMap): string | null => {
 };
 
 const insertAfterOrReplace =
-  (make: () => NewBlock) =>
+  (make: () => NewBlock, focusOnInsert = false) =>
     (editor: BlockEditorController, blockId: string): void => {
       const found = findBlock(editor.doc, blockId);
       const empty = found && blockType(found.block) === 'paragraph' && (blockText(found.block)?.length ?? 0) === 0;
@@ -176,6 +176,8 @@ const insertAfterOrReplace =
         const next = editor.insertAfter(id, {type: 'paragraph'});
         if (next) editor.requestCaret({blockId: next, offset: 0});
       }
+      // Opted renderers own focus; retain the following paragraph for writing.
+      if (focusOnInsert && id) editor.requestCaret({blockId: id, offset: 0});
     };
 
 const columns = (n: number): NewBlock => ({
@@ -304,7 +306,7 @@ export const SlashMenu: React.FC<{
         hint: tr(`slash.custom.${def.type}.hint`, def.slash!.hint),
         keywords: def.slash!.keywords,
         group,
-        apply: insertAfterOrReplace(() => def.slash!.make()),
+        apply: insertAfterOrReplace(() => def.slash!.make(), def.focusOnInsert),
         icon: def.slash!.icon ?? TYPE_ICONS[def.type] ?? GROUP_ICON[group],
       };
     });

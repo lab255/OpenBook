@@ -7,7 +7,7 @@ Canvas now registers through the app wrapper and supports immediate Canvas2d pen
 ## Final validation
 
 - SDK build and full `pnpm --filter @book.dev/ui build` pass (production viewer + app + TypeScript).
-- 264 UI focused tests pass, including actual BlockEditor input-boundary regressions, catalogue drift, slash insertion, two-replica/reload advisories, canvas history and relay.
+- 272 UI focused tests pass, including actual BlockEditor input-boundary regressions, catalogue drift, slash insertion, two-replica/reload advisories, canvas history and relay.
 - 588 full SDK tests pass, including all 57 catalogue/validation tests, without weakening the full canvas validation checks.
 - 8 ledger/fence tests pass, with deliberate forbidden-module/endpoint controls.
 - Full CI command `pnpm run lint` passes across the workspace, including UI `eslint . && pnpm run lint:css && pnpm run test:stylelint`. Changed TS/TSX ESLint also passes. The final automatic fixes were indentation and `let` → `const` only.
@@ -191,6 +191,8 @@ Review base: `b589c05e`. The lint fix is `d3bb2276`; it adds browser globals onl
 
 Native Chromium Canvas2d at DPR 1, same local machine, synthetic mouse pointer input, 500 settled 50-point strokes plus a long uncommitted stroke. Warm-up delivers 1,000 moves; N=12 measured continuation samples per input condition. Trackpad-class delivers three moves per sample group and times the last event separately; it is not physical trackpad certification. Actual retained longest-stroke counts independently verify the ≥1,000-point bound. Every measured sample changes pixels on the first rAF; completed state appears only at pointerup and reload matches.
 
+Chromium canvas2d, DPR 1, two input classes; this card ships one renderer — WebKit/hardware legs are BUILD-2's.
+
 | Input condition | Active points before timed samples | Median / worst ms | Final retained points | Before/after pointerup shapes | Fresh reload |
 |---|---:|---:|---:|---:|---|
 | Desktop synthetic | 1,001–1,012 | **1.40 / 1.60** | 1,013 | 500 / 501 | equal |
@@ -250,7 +252,7 @@ The push was interrupted in its pre-push hook when the design review arrived, so
 | D5 panels | Help and Objects use position-relative trigger anchors | Regression above; measured Help top = trigger bottom +4px |
 | D6 Help target | At least 28px | 32×28px measured in both themes |
 | H1 duplicate status | Removed Saved/Saving/save-failed duplication from canvas header; page shell retains save status. Reserved canvas status slot stays empty unless View only; no invented reconnect signal | Save transitions still produce CLS 0; no second save-status subscription |
-| Slash arrival | Pending insertion focuses its named region and scrolls it into view | `design: pending slash insertion focuses and scrolls its named region into view` |
+| Slash arrival | Canvas opts into region focus; other blocks retain paragraph focus | Native `checkSlashFocus.mjs` real BlockEditor slash/Enter + non-opted Slider mirror; component pendingCaret test is supplementary |
 
 Properties remain below the sheet so activating them cannot move the drawing viewport under an existing pointer contact; Undo/Redo are above the sheet. The 36px palette remains visible on inactive blocks; only contextual properties/view controls/grip hide. Content ink colors, named swatch values and persisted paper background remain document values, distinct from themed chrome.
 
@@ -282,3 +284,81 @@ Reproduce with the isolated localhost harness, then `node packages/ui/scripts/ca
 ### Design-round gates
 
 Full root `pnpm run lint`, full production UI build, **264 UI focused tests**, **8 ledger/fence tests**, **216 exact raster cases against the unoptimized reference**, graph exclusion and all six document-byte comparisons pass. The full SDK suite remains **588/588** from the code round, with no SDK changes in this round. Viewer remains **852 B**, raw **1,933,227 B**, SHA-256 **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**, design delta **0 B**. Margin remains 4,096−852 = **3,244 B**; with prior F1 estimate2,588, projected3,440 leaves **656 B**. Paint path is unchanged by the design correction; the accepted dense and sustained-input timings/counters remain scoped to their recorded runs.
+
+
+## Historical delta re-review stop — resolved by the convergence round
+
+Physical bracket shortcuts intentionally match `e.code` (BracketLeft/BracketRight), including on non-US layouts. Help keeps “[ / ]”; Arrange menu and its buttons are the layout-independent route. This is the approved physical-position policy, not a character-based shortcut claim.
+
+`constructCanvasProps` now restores raw shape data without default-filling partial shape JSON. Partial input yields quarantined data and a non-editable canvas rather than silently filled defaults. This preserves malformed input for recovery and avoids throwing inside a block-move transaction. Valid fixture data therefore explicitly includes `...shapeDefaults`; validation was not weakened.
+
+M1 focus, M2 chrome reservation, L3 transparent hint overlay, L4 text blur commit and L6 old-instance cleanup are implemented locally, but this round is NOT complete or pushed. New net-delivery test passes selected-shape deletion: CLS0, control0.06859564237415477, live/fresh equality, Arrange focus restored. With Width focused before a remote quarantine, M2 still fails: focus becomes body, active strips disappear, canvas height584→396 and the following paragraph moves y672→484. CLS0.00542389181066867 (hadRecentInput=false), control0.051603606311044325. Attribution names that following P element, but the canvas shrinking causes the shift; it is canvas-attributable, not a scoping exclusion. Strict assertion retained. Restoring focus in layout effects did not close this focused-field leg. Artifacts: `remote-chrome.json` and `remote-chrome-focused-field-before.json`.
+
+270 focused tests passed before the latest focus-restoration attempt. Root lint passed. Full UI build reached TypeScript and failed at CanvasBlock.test.tsx:195: the window.addEventListener spy mock.calls overload is inferred as DedicatedWorkerGlobalScopeEventMap, so comparing its event key to blur triggers TS2367. This test typing correction remains outstanding; no full-build success claimed for this round. No new committed coordinate measurement, no push; remote remains68d6e990. Harness stopped. Dark non-default-background capture remains manager-owned.
+
+
+
+## Historical M2 closure / slash policy stop — subsequently ruled and resolved
+
+M2 now passes on a restarted measurement server with the served module verified against the intended source changes. Remote deletion via production net queue: CLS0, control0.06859564237415477, focus restored to Arrange. Remote quarantine while Width owns focus: CLS0, control0.06962885048835461, focus moves to the canvas region, polite View only, hidden field inert and cannot take focus. Both retain584px canvas height/116px property strip; live/fresh replicas agree. The unit mirror proves local focus departure reclaims the reserved controls and synthetic input cannot mutate the read-only document. There are271 focused tests passing; the Window-typed listener spy fixes TS2367 without as-any or suppression.
+
+Measurement provenance correction: the already-running Vite measurement server failed to invalidate its transformed CanvasBlock module after writes. This is demonstrated directly: the on-disk module had inert={!visible}, whereas the served transform lacked inert. Restarting the localhost server and fetching the transformed module shows inert: !visible before running the final probe. Source/mtime/SHA and stale/fresh served SHA are preserved in remote-chrome-source.json. Previous focused-field failures remain recorded; they are not final-current-code results. Future probes in this round must restart the server after source edits and verify the served module.
+
+NEW EXPLICIT POLICY STOP: SlashMenu.tsx:165–177 documents a deliberate shared behavior: text-less blocks (divider, image, kit widgets) receive a fresh following paragraph and the caret moves there so writing continues. All custom slash entries use insertAfterOrReplace; registry.tsx has no insertion-focus opt-in. Canvas's pendingCaret unit test only proves a request targeted at the canvas is consumed; the real slash flow overwrites that request with the following paragraph. The manager's integrated capture is authoritative: §1 slash-entry focus/ring is PARTIAL. No shared insertion-policy change was made.
+
+Proposed bounded option for a manager ruling: add an optional registration metadata flag slash.focusAfterInsert='block'; only canvas opts in. Preserve the following paragraph and the default text-flow focus for every other type, but make the final caret/focus request target the inserted canvas ID. Verify via actual BlockEditor slash typing/Enter and per-rAF activeElement/focus-ring trace. Alternative destination: editor insertion-focus policy follow-up (manager assigns card ID).
+
+Historical pending item, now resolved by the approved opt-in: §1 canvas slash-entry region focus/ring was awaiting the editor insertion-focus policy ruling. This is distinct from Expand/grid/presence BUILD-5 deferrals. No claim of real-shell insertion focus is made from the component-level test.
+
+Independent checks completed before the slash-policy stop: full UI build, full root lint and271 focused tests pass; viewer raw1,933,227 B/hash unchanged (852 coordinate). Harness stopped. No commit/push; remote remains68d6e990.
+
+
+## Convergence round — delta review of 68d6e990
+
+This closes the prior delta-review and slash-focus policy stops. Historical stop notes describe intermediate attempts, not the final behavior below.
+
+| Finding | Final change | Proof |
+|---|---|---|
+| M1 Arrange focus | A persistent Arrange trigger receives focus on Escape and when the selected shape disappears; unavailable actions cannot run | `delta: Arrange %s returns focus to its persistent trigger` (Escape / remote deletion); native net-deletion trace ends on Arrange |
+| M2 active chrome lifecycle | Unavailable editing controls keep their last geometry and become visibility-hidden/inert. Header slots, height control and footer geometry are retained. Local deactivation may reclaim them | `delta: remote %s hides editing controls while retaining their geometry nodes`; `M2: quarantine while Width owns focus restores the region and makes the retained field inert`; native measurements below |
+| M2 focused-field forgiveness | Before paint, focus moves from a quarantined Width field to the canvas region, with polite “View only.” Retained hidden fields cannot take focus or write | Same unit/native cases; mirror proves local focus departure removes the reserved strips |
+| L3 paper background | Empty hints have no background; the stored canvas background remains beneath them before and during first contact | Native dark-mode `#f5e4c3` remains rgb(245,228,195) before/during contact; overlay transparent, planted red overlay control detected |
+| L4 text blur | Window blur commits new/edited text through the finish-text path; pen contact teardown remains shared | `delta: window blur commits %s text instead of cancelling it`; `text blur commits words and resets pen contact without promoting a resting touch` (resting touch inert, fresh touch pans40px) |
+| L5 keyboard layout | Physical BracketLeft/BracketRight shortcuts are intentional; Help retains “[ / ]”. Arrange menu/buttons are the layout-independent route | Approved disposition; no character-based matching reintroduced |
+| L6 unmount | The old instance removes its window blur listener and releases tracked pointer captures during teardown | Strengthened existing component-unmount exit: typed Window listener spies, old node capture released, blur after unmount causes no paint or document update, then remount leg |
+| §1 slash arrival | Generic `registerCustomBlock({focusOnInsert:true})` opt-in, set only by canvas. SlashMenu retains the following paragraph but sends the final caret request to the opted block | Native real-BlockEditor slash/Enter integration and non-opted Slider mirror, per-rAF trace below |
+
+### Native slash-focus integration and §1 fidelity
+
+The old component-level pendingCaret test did not exercise SlashMenu's deliberate text-flow policy. The approved seam is **generic registration metadata `focusOnInsert?: boolean`**, false by default. Canvas alone opts in. Other custom blocks still focus a text descendant or the fresh following paragraph; the paragraph itself remains present even for canvas. No editor-wide policy changed.
+
+`checkSlashFocus.mjs` mounts the production **BlockEditor + SlashMenu + registered renderers**, types `/canvas` into the actual contenteditable and presses Enter using native browser keyboard input. It makes **no component focus call after insertion**. Every one of **55 per-rAF samples over 903.10ms** shows the canvas region as `document.activeElement`, Pen pressed, `:focus-visible`, a **2px solid outline**, and the complete ring bounds inside the viewport. The mirror types `/slider` through the same custom-block insertion path: **55 samples over 914ms** all keep focus in the following paragraph, never the canvas. This is native DOM/computed-style evidence of the focused ring, not a screenshot claim.
+
+**§1 fidelity: automated integrated focus/ring behavior now PASS.** Manager-owned state-3 focus-ring capture retake remains pending in the final mini-refresh; the prior honest capture is not relabeled. This is no longer an insertion-policy deferral. `slash-focus.json` retains every frame and the inserted/following block IDs. Reproduce: `node packages/ui/scripts/canvas-measure/checkSlashFocus.mjs` with the separate localhost harness running.
+
+The API matrix was regenerated by `pnpm --filter @book.dev/mcp exec tsx scripts/coverage.test.mts`: **48 catalogue types + 9 plugin blocks pass, no exemptions, no generated diff**. The new option belongs to the React registration API, not the document/MCP block catalogue. Nothing generated was hand-edited.
+
+### Remote-event CLS, focus and inertness together
+
+| Native net-delivery case | CLS | Unsized-canvas control | Focus after | Inertness / convergence |
+|---|---:|---:|---|---|
+| Peer deletes selected shape while Arrange is open (10-byte packet) | **0** | **0.06859564237415477** | Arrange trigger | Hidden properties inert, attempted hidden-field focus fails; live/fresh equality |
+| Peer quarantines canvas while Width owns focus (27-byte packet) | **0** | **0.06962885048835461** | Canvas region, “View only” | Hidden properties inert, attempted hidden-field focus fails; live/fresh equality |
+
+Both cases preserve total canvas height584px, property strip116px, viewport geometry, footer position and the following paragraph. They run after700ms without local input, through production `remoteFrameQueue(doc,'net')`, with actual peer updates and strict unfiltered CLS0. Focus restoration occurs before paint. The local-deactivation mirror still reclaims geometry; read-only semantics and write guards are unchanged. `remote-chrome.json` preserves layout attribution, focus events, packet sizes, controls and reload equality.
+
+The earlier focused-field run was additionally confounded by a stale measurement-server transform: on-disk `inert={!visible}` was absent from the served module. `remote-chrome-source.json` demonstrates stale/fresh served hashes. Final probes restart the measurement-only server and verify four freshly served modules (CanvasBlock, SlashMenu, registration and harness) before running; `convergence-serve-provenance.json` records source paths, mtimes and SHA-256 values. No production Vite config or fs allow-list changed.
+
+The separate withheld-update reconnect tests remain CLS0 (single and multiple transaction sequences), control0.06307107438016528, with transaction-complete frame order and live/fresh convergence. The original outline/handle and swatch CLS failures remain historical artifacts, not accepted tolerances.
+
+### Explicit scope and constructor contract
+
+**Chromium canvas2d, DPR 1, two input classes; this card ships one renderer — WebKit/hardware legs are BUILD-2's.** This is the scope of the previously accepted sustained-input medians1.40/2.20ms and worst1.60/2.40ms; no new sustained-input measurement is claimed here.
+
+`constructCanvasProps` restores shape data without default-filling partial shape JSON. Partial input now yields quarantined data and a non-editable canvas instead of silently filled defaults. That preserves recovery data and avoids exceptions inside open block-move transactions. Valid test fixtures explicitly include `...shapeDefaults`; this is the reason for that fixture change, not relaxed validation. The full SDK validation-case set remains unchanged.
+
+### Convergence validation
+
+Full UI production build, full root lint, **272 focused tests**, **8 ledger/fence tests**, **216 exact raster cases against the unoptimized reference**, fresh-server slash/mirror and remote-chrome browser probes, and six document-byte comparisons pass. Raster coverage remains72 cases at each DPR1/1.5/2. Graph checks exclude the editor/remote queue from the viewer and the measurement harness from both production graphs. Viewer remains **852 B**, raw **1,933,227 B**, SHA-256 **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**; this round adds **0 shared-side bytes**. Margin:4096−852=**3244 B**; prior F1 estimate2588 projects3440 total, leaving**656 B**.
+
+Artifacts: `convergence-*.log`, `convergence-validation.json`, `convergence-serve-provenance.json`, `slash-focus.json`, `remote-chrome.json`, refreshed design/raster/graph evidence. The separate harness remains localhost-only; no worker screenshots/video/public exposure. Manager capture refresh, physical IME, screen-reader experience and hardware remain explicitly scoped manual remainders. Full-suite push-hook results are recorded after delivery.

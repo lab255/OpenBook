@@ -1,7 +1,7 @@
 {
   "label": "Chromium synthetic/local, Canvas2d; rAF raster-availability estimate, not physical presentation",
   "inputBoundary": "Both input classes use synthetic mouse PointerEvents. Trackpad-class denotes the browser pointer path, not a physical trackpad measurement.",
-  "time": "2026-11-17T03:59:58.865Z",
+  "time": "2026-11-17T04:45:40.728Z",
   "immediacy": [],
   "cacheFidelity": {
     "rows": [
@@ -73,9 +73,9 @@
           }
         ],
         "original": {
-          "id": "26028192-fc55-4c01-bfd4-e60332cf551c",
+          "id": "9dab0eed-823f-4e7a-a27a-bcd041896df2",
           "scalars": {
-            "id": "26028192-fc55-4c01-bfd4-e60332cf551c",
+            "id": "9dab0eed-823f-4e7a-a27a-bcd041896df2",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -107,9 +107,9 @@
           "points": []
         },
         "localDuringOutage": {
-          "id": "26028192-fc55-4c01-bfd4-e60332cf551c",
+          "id": "9dab0eed-823f-4e7a-a27a-bcd041896df2",
           "scalars": {
-            "id": "26028192-fc55-4c01-bfd4-e60332cf551c",
+            "id": "9dab0eed-823f-4e7a-a27a-bcd041896df2",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -159,7 +159,7 @@
           "f": 0
         },
         "selection": [
-          "26028192-fc55-4c01-bfd4-e60332cf551c"
+          "9dab0eed-823f-4e7a-a27a-bcd041896df2"
         ],
         "focus": "Drawing viewport",
         "x": 340,
@@ -185,7 +185,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 340,
@@ -200,7 +200,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -215,7 +215,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -230,7 +230,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -245,7 +245,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -260,7 +260,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -275,7 +275,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -290,7 +290,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -305,7 +305,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -320,7 +320,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -335,7 +335,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -350,7 +350,7 @@
             "f": 0
           },
           "selection": [
-            "26028192-fc55-4c01-bfd4-e60332cf551c"
+            "9dab0eed-823f-4e7a-a27a-bcd041896df2"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -366,7 +366,7 @@
           "f": 0
         },
         "selection": [
-          "26028192-fc55-4c01-bfd4-e60332cf551c"
+          "9dab0eed-823f-4e7a-a27a-bcd041896df2"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -397,9 +397,9 @@
           }
         ],
         "original": {
-          "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+          "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
           "scalars": {
-            "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+            "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -431,9 +431,9 @@
           "points": []
         },
         "localDuringOutage": {
-          "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+          "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
           "scalars": {
-            "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+            "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
             "kind": "rect",
             "shapeVersion": 1,
             "name": "",
@@ -483,7 +483,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 340,
@@ -509,7 +509,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -524,7 +524,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -539,7 +539,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -554,7 +554,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -569,7 +569,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -584,7 +584,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -599,7 +599,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -614,7 +614,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -629,7 +629,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -644,7 +644,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -659,7 +659,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -674,7 +674,7 @@
             "f": 0
           },
           "selection": [
-            "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+            "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
           ],
           "focus": "Drawing viewport",
           "x": 348,
@@ -690,7 +690,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -722,9 +722,9 @@
         }
       ],
       "original": {
-        "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+        "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
         "scalars": {
-          "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+          "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
           "kind": "rect",
           "shapeVersion": 1,
           "name": "",
@@ -756,9 +756,9 @@
         "points": []
       },
       "localDuringOutage": {
-        "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+        "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
         "scalars": {
-          "id": "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7",
+          "id": "aa3666dd-927d-4492-a9ee-7e6b02fdeedf",
           "kind": "rect",
           "shapeVersion": 1,
           "name": "",
@@ -808,7 +808,7 @@
         "f": 0
       },
       "selection": [
-        "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+        "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
       ],
       "focus": "Drawing viewport",
       "x": 340,
@@ -834,7 +834,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -849,7 +849,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -864,7 +864,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -879,7 +879,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -894,7 +894,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -909,7 +909,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -924,7 +924,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -939,7 +939,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -954,7 +954,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -969,7 +969,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -984,7 +984,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -999,7 +999,7 @@
           "f": 0
         },
         "selection": [
-          "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+          "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
         ],
         "focus": "Drawing viewport",
         "x": 348,
@@ -1015,7 +1015,7 @@
         "f": 0
       },
       "selection": [
-        "c8bb92ee-cc6d-47c2-90fd-9a5b33c1efd7"
+        "aa3666dd-927d-4492-a9ee-7e6b02fdeedf"
       ],
       "focus": "Drawing viewport",
       "x": 348,
@@ -1177,5 +1177,5 @@
     ]
   },
   "browserErrors": [],
-  "completed": "2026-11-17T04:00:05.865Z"
+  "completed": "2026-11-17T04:45:45.276Z"
 }

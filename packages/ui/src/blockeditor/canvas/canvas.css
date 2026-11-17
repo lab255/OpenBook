@@ -50,4 +50,6 @@
 .ob-canvas-color button[aria-pressed=true] { outline:2px solid hsl(var(--ring)); outline-offset:-2px; }
 .ob-canvas-color input { width:72px; }
 .ob-canvas-tools button[aria-pressed=true]:focus-visible { outline-color:hsl(var(--primary-foreground)); }
-.ob-canvas-empty { color:hsl(var(--foreground)); background:hsl(var(--background)); }
+.ob-canvas-empty { color:hsl(var(--foreground)); }
+
+.ob-canvas-history { display:flex; gap:8px; }

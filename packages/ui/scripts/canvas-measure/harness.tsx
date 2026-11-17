@@ -2,8 +2,9 @@ import {keyBetween} from '@book.dev/sdk';
 import {createRoot} from 'react-dom/client';
 import {useState} from 'react';
 import * as Y from 'yjs';
-import {createDoc, findBlock, registerPropsConstructor, rootBlocks} from '../../src/blockeditor/model';
-import {registerHistoryExtension} from '../../src/blockeditor/historyExtension';
+import {createDoc, findBlock, rootBlocks} from '../../src/blockeditor/model';
+import {registerReactiveBlocks} from '../../src/blockeditor/reactiveBlocks';
+import {BlockEditor} from '../../src/blockeditor/BlockEditor';
 import {CanvasHistory} from '../../src/blockeditor/canvas/history';
 import {CanvasBlock} from '../../src/blockeditor/canvas/CanvasBlock';
 import {canvasDefaults, constructCanvasProps, createShape, readCanvas} from '../../src/blockeditor/canvas/schema';
@@ -11,23 +12,34 @@ import {useBlockEditor} from '../../src/blockeditor/useBlockEditor';
 import {registerBlockEditorDoc} from '../../src/lib/aiBridge';
 import {setPageSaveStatus} from '../../src/lib/pageSaveStatus';
 import '../../src/index.css';
-import {registerRemoteFrameBatching} from '../../src/blockeditor/remoteFrame';
+import {remoteFrameQueue} from '../../src/blockeditor/remoteFrame';
 import {bufferedProviders} from './bufferedTransport';
 import {CommittedSceneCache} from '../../src/blockeditor/canvas/paintCache';
 import {paint} from '../../src/blockeditor/canvas/geometry';
-registerRemoteFrameBatching();registerPropsConstructor('canvas',constructCanvasProps);registerHistoryExtension((doc,canWrite)=>new CanvasHistory(doc,canWrite));
+registerReactiveBlocks();
 let doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);
 let peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));
 let remount:()=>void;
+let editorMode=false;
+let netQueue:ReturnType<typeof remoteFrameQueue>|null=null;
 let transport:ReturnType<typeof bufferedProviders>|null=null;
 function App(){const [version,setVersion]=useState(0);remount=()=>setVersion(n=>n+1);return <Surface key={version}/>;}
-function Surface(){const editor=useBlockEditor(doc);return <main style={{width:800,margin:'40px auto'}}><h1>Canvas local measurement harness</h1><p>All generated input is synthetic/local. No physical latency or hardware certification.</p><CanvasBlock block={rootBlocks(doc).get(0)} editor={editor} pageReadOnly={false}/><p id="below">Text after the canvas detects unexpected layout movement.</p></main>;}
+function CanvasSurface(){const editor=useBlockEditor(doc);return <CanvasBlock block={rootBlocks(doc).get(0)} editor={editor} pageReadOnly={false}/>;}
+function Surface(){return <main style={{width:800,margin:'40px auto'}}><h1>Canvas local measurement harness</h1><p>All generated input is synthetic/local. No physical latency or hardware certification.</p><>{editorMode?<BlockEditor doc={doc}/>:<CanvasSurface/>}</><p id="below">Text after the canvas detects unexpected layout movement.</p></main>;}
 registerBlockEditorDoc('canvas-evidence',doc);
 const api={
-  reset(count=0){transport?.close();transport=null;doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);const props=findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>,shapes=props.get('shapes') as Y.Map<unknown>;
+  resetEditor(){netQueue?.close();netQueue=null;transport?.close();transport=null;editorMode=true;doc=createDoc([{id:'entry',type:'paragraph'}]);remount();},
+  editorBlocks(){return rootBlocks(doc).toArray().map(block=>({id:String(block.get('id')),type:String(block.get('type'))}));},
+  reset(count=0){editorMode=false;netQueue?.close();netQueue=null;transport?.close();transport=null;doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);const props=findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>,shapes=props.get('shapes') as Y.Map<unknown>;
     for(let i=0;i<count;i++)shapes.set(`s${i}`,createShape({id:`s${i}`,kind:'stroke',x:i%25*24,y:Math.floor(i/25)*12,w:1,h:1,points:Array.from({length:50},(_,j)=>[j/2,Math.sin(j/4)*5]).flat()}));
     peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));registerBlockEditorDoc('canvas-evidence',doc);remount();},
   remote(){const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;const shapes=props.get('shapes') as Y.Map<Y.Map<unknown>>;let shape=shapes.get('remote');if(!shape){shapes.set('remote',createShape({id:'remote',kind:'rect',x:20,y:20,w:30,h:30}));shape=shapes.get('remote')!;}shape.set('x',Number(shape.get('x'))+1);Y.applyUpdate(doc,Y.encodeStateAsUpdate(peer));},
+  remoteChromeChange(change:'delete'|'quarantine'){
+    Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));const vector=Y.encodeStateVector(doc),props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;
+    peer.transact(()=>{if(change==='delete'){const shapes=props.get('shapes') as Y.Map<unknown>;shapes.delete([...shapes.keys()][0]);}else props.set('canvasVersion',2);},'local');
+    const packet=Y.encodeStateAsUpdate(peer,vector);netQueue??=remoteFrameQueue(doc,'net');netQueue.receive(packet);return {origin:'net',bytes:packet.byteLength};
+  },
+  background(color:string){(findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>).set('background',color);},
   startProviders(){transport?.close();peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));transport=bufferedProviders(doc,peer);},
   outage(){transport!.outage();},
   outageEdit(singleTransaction=false){
