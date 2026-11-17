@@ -2188,6 +2188,14 @@ export function tableSplitCell(doc: Y.Doc, cellId: string): void {
 
 // ── Serialization ────────────────────────────────────────────────────────────
 
+type PropsProjection = (props: Y.Map<unknown>) => Record<string, unknown>;
+const propsProjections = new Map<string, PropsProjection>();
+/** App-installed codecs; shared/viewer code has no editing feature imports. */
+export function registerPropsProjection(type: string, project: PropsProjection): () => void {
+  propsProjections.set(type,project);
+  return () => { if (propsProjections.get(type) === project) propsProjections.delete(type); };
+}
+
 export function blockToJSON(b: BlockMap): BlockJSON {
   const json: BlockJSON = {id: blockId(b), type: blockType(b)};
   const text = blockText(b);
@@ -2198,7 +2206,7 @@ export function blockToJSON(b: BlockMap): BlockJSON {
     }));
   }
   const props = b.get('props') as Y.Map<unknown> | undefined;
-  if (props && props.size > 0) json.props = Object.fromEntries(props.entries());
+  if (props && props.size > 0) json.props = propsProjections.get(json.type)?.(props) ?? Object.fromEntries(props.entries());
   const children = blockChildren(b);
   if (children) json.children = blockType(b) === 'table' ? tableChildrenToJSON(b) : children.map(blockToJSON);
   return json;

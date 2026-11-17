@@ -22,6 +22,7 @@ import {
   type BlockType,
   type NewBlock,
 } from './model';
+import {historyExtension, type EditorHistory} from './historyExtension';
 import {ReactiveEvalCache} from './kit/evalCache';
 
 /**
@@ -49,7 +50,9 @@ export interface BlockEditorController {
    *  even inside the capture window — the "[[" wikilink accept uses it so a
    *  single undo restores the literal typed text rather than reverting the
    *  typing too. */
-  undo: {undo(): void; redo(): void; stopCapturing(): void};
+  undo: {undo(): void; redo(): void; stopCapturing(): void; readonly availability?: {undo: string | null; redo: string | null}};
+  /** The same effect-owned page journal; never instantiate a second manager. */
+  history?: () => EditorHistory | null;
   readOnly: boolean;
 
   /** Set by structural ops; consumed by the focused block after render. */
@@ -107,9 +110,11 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
   // would otherwise destroy a useMemo-created instance and leave the editor
   // holding a dead manager (undoStack frozen at 0). The controller exposes a
   // stable wrapper that always talks to the live instance.
-  const undoRef = useRef<Y.UndoManager | null>(null);
+  const undoRef = useRef<EditorHistory | null>(null);
+  const canWriteRef = useRef(!readOnly);
+  canWriteRef.current = !readOnly;
   useEffect(() => {
-    const manager = new Y.UndoManager(rootBlocks(doc), {
+    const manager = historyExtension?.(doc, () => canWriteRef.current) ?? new Y.UndoManager(rootBlocks(doc), {
       trackedOrigins: new Set(['local']),
       captureTimeout: 400,
     });
@@ -124,6 +129,7 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
       undo: () => undoRef.current?.undo(),
       redo: () => undoRef.current?.redo(),
       stopCapturing: () => undoRef.current?.stopCapturing(),
+      get availability() { return undoRef.current?.availability ?? {undo: null, redo: null}; },
     }),
     [],
   );
@@ -165,6 +171,7 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
       version,
       evalCache,
       undo,
+      history: () => undoRef.current,
       readOnly,
       pendingCaret,
       requestCaret,

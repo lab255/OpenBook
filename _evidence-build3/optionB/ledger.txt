@@ -1,0 +1,26 @@
+EVIDENCE ATTRIBUTION CORRECTION: This earlier run used the held-size viewer artifact
+(seed=1,933,102 B, coordinate 727 B). It is NOT the final option-B ledger run.
+Final B evidence: focused.txt, seeded=1933140, motionFeatureLedger.test.ts 7/7 PASS
+(viewer 1,933,140 B, coordinate 765 B). Original earlier output retained below.
+
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui
+
+FEATURE LEDGER removed renderer row RED; emitted module/export inventory GREEN
+CALIBRATION seeded=1933102; ordinary=1933335 marginal=233 own=489; eager/layout=1980716 marginal=47614 own=343; ordinary ledger GREEN, eager/layout unledgered RED
+BLOCK OWN BYTES 2048 GREEN; imported helper raises total to 2049 RED
+TREE-SHAKEN GAP unchanged: unused eager import emitted no additional bytes (1933102); no feature-ledger failure, intentionally recorded
+CHROME SEAM useMotionValue: removed row RED; measured production graph GREEN
+CHROME SEAM useReducedMotion: removed row RED; measured production graph GREEN
+CHROME SEAM animate: removed row RED; measured production graph GREEN
+LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline 1846513 -> all adjacent rows -> bounded measured 1933102 GREEN
+ENDPOINT 1931869 and 1936471 GREEN; 1936472 and 1931868 RED; changed Motion bytes RED; unledgered animate within window RED
+ ✓ scripts/motionFeatureLedger.test.ts (7 tests) 2189ms
+   ✓ calibrates actual ordinary and eager/layout additions independently of own bytes  1442ms
+   ✓ records the tree-shaken eager-import gap after the policy change  719ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  08:48:04
+   Duration  2.40s (transform 30ms, setup 0ms, import 40ms, tests 2.19s, environment 100ms)
+

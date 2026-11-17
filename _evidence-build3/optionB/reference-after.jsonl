@@ -1,0 +1,10 @@
+{"shapes":1,"coordinates":"integer","pointsPerShape":50,"batchSize":64,"rawBytes":942,"base64Bytes":1256,"projectionBytes":923,"combinedBytes":2179}
+{"shapes":1,"coordinates":"integer","pointsPerShape":100,"batchSize":64,"rawBytes":1353,"base64Bytes":1804,"projectionBytes":1437,"combinedBytes":3241}
+{"shapes":1,"coordinates":"integer","pointsPerShape":1000,"batchSize":64,"rawBytes":9103,"base64Bytes":12140,"projectionBytes":12233,"combinedBytes":24373}
+{"shapes":100,"coordinates":"integer","pointsPerShape":50,"batchSize":64,"rawBytes":84317,"base64Bytes":112424,"projectionBytes":85946,"combinedBytes":198370}
+{"shapes":500,"coordinates":"integer","pointsPerShape":50,"batchSize":64,"rawBytes":432717,"base64Bytes":576956,"projectionBytes":430346,"combinedBytes":1007302}
+{"shapes":500,"coordinates":"integer","pointsPerShape":1000,"batchSize":64,"rawBytes":4515711,"base64Bytes":6020948,"projectionBytes":6085346,"combinedBytes":12106294}
+{"shapes":1,"coordinates":"integer","pointsPerShape":200,"batchSize":64,"rawBytes":2208,"base64Bytes":2944,"projectionBytes":2577,"combinedBytes":5521}
+{"shapes":1,"coordinates":"integer","pointsPerShape":2000,"batchSize":64,"rawBytes":17703,"base64Bytes":23604,"projectionBytes":25661,"combinedBytes":49265}
+{"shapes":500,"coordinates":"integer","pointsPerShape":200,"batchSize":64,"rawBytes":1067603,"base64Bytes":1423472,"projectionBytes":1257346,"combinedBytes":2680818}
+{"shapes":500,"coordinates":"integer","pointsPerShape":100,"batchSize":64,"rawBytes":639435,"base64Bytes":852580,"projectionBytes":687346,"combinedBytes":1539926}
