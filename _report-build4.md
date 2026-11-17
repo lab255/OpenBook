@@ -135,3 +135,7 @@ pnpm --filter @book.dev/ui exec tsx scripts/canvasSchemaBytes.ts
 ```
 
 The server binds **127.0.0.1:5184 only**. No exposure command. Harness sources are excluded from both product graphs. Numeric runners use the repository's single-process Chromium recipe; no visual captures. Full measurement modes and original raw failed runs are retained for review.
+
+## Committed provenance
+
+Implementation commit `b75eaeb56900b9a2e904945b46823e082524fc2d` rebuilt successfully: **852 B**, raw **1,933,227 B**, identical SHA-256 `67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198`. `committed-viewer.json` and `committed-build.log` preserve this post-commit check. The follow-up commit adds this provenance and ignored-by-default validation logs only; no product or measurement source changes.
