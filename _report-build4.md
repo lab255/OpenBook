@@ -248,7 +248,7 @@ The push was interrupted in its pre-push hook when the design review arrived, so
 | I2 undo vocabulary | Creation journal labels are Stroke / Rectangle / Ellipse / Arrow / Text | Header regression asserts Undo rectangle / Redo rectangle; pen regressions assert Undo stroke |
 | I3 keyboard placement | Whole shape centered in world coordinates at the viewport center, including after pan/zoom | `design: keyboard %s centers the whole shape in world coordinates`, R/O/A/T; parity inventory uses equivalent pointer placement |
 | I4 coordinates | Display rounded to two decimals outside focus; exact persisted numeric value on focus | `design: coordinate display rounds only while unfocused, without rewriting exact geometry` |
-| D4 toolbar focus | Inset 2px focus outline, including contrasting outline on a pressed tool | Native browser Tab focus-visible geometry contained in scrollable toolbar, both themes |
+| D4 toolbar focus | Inset 2px accent ring on a contrasting 2px gap for the pressed tool | Native browser Tab focus-visible geometry contained in scrollable toolbar, both themes |
 | D5 panels | Help and Objects use position-relative trigger anchors | Regression above; measured Help top = trigger bottom +4px |
 | D6 Help target | At least 28px | 32×28px measured in both themes |
 | H1 duplicate status | Removed Saved/Saving/save-failed duplication from canvas header; page shell retains save status. Reserved canvas status slot stays empty unless View only; no invented reconnect signal | Save transitions still produce CLS 0; no second save-status subscription |
@@ -416,3 +416,11 @@ Simple rectangle selection now fits **two rows / 80px** by bounding numeric fiel
 After tightening, current remote-event measurements supersede the preceding pre-design dimensions: canvas**548px**, properties**80px**, strict CLS**0** for both deletion and quarantine, with unsized controls**0.06534184823441021** and **0.06634259954921111** respectively. Focus restoration, native disabled semantics and live/fresh convergence still pass. Full build/lint,280 focused tests,8 ledger/fence tests and216 unoptimized-reference raster comparisons are green; viewer remains852 B/raw1,933,227 B with the identical hash. The registration and app-side validation contracts are unchanged.
 
 The stale state-3 “retake pending” claim is removed: manager already supplied its44935994 retake. Capture7 is labeled as the prior white-edge treatment, not proof of this new double ring. The g3 caption no longer claims centering from its older GIF. Captures4/6/9 and g1–g3 are explicitly historical pending the manager's corrected-head mini-refresh; no old asset is relabeled as new.
+
+### Final micro-round after a3dab9e5
+
+Removed the properties key/remount. Local changes clear retention and request an ordinary render (including reselecting Pan); remote readonly retention still depends on chrome seen during this activation. Regression `Duplicate preserves the connected focused properties button` proves the original button retains focus; `tool switching with focus inside properties preserves the strip and shared controls` proves DOM identity. Strict local-release and remote-retention tests remain green.
+
+Existing text now has three explicit outcomes: **finish nonempty commits; finish empty deletes as one undoable action; Escape reverts**. `empty existing text: %s deletes undoably or reverts explicitly` verifies deletion, one Undo restoring original text, Redo, Escape, and fresh-replica equality. New empty text still silently cancels without history/sync.
+
+284 focused tests, full build/lint and8 ledger tests pass. Native deletion/quarantine CLS remains0, controls0.06534184823441021/0.06634259954921111. Viewer852 B/raw1,933,227 B/hash unchanged. No captured visual changes; the manager's current captures remain valid.

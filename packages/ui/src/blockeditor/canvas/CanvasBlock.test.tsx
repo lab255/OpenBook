@@ -415,3 +415,26 @@ test('quarantine closes Arrange and local navigation reclaims reserved editing c
   a.tool('h');expect(screen.queryByLabelText('Width')).toBeNull();expect(screen.queryByLabelText('Canvas height')).toBeNull();expect(within(screen.getByRole('toolbar')).getAllByRole('button',{hidden:true})).toHaveLength(1);
   props.set('canvasVersion',1);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));expect(screen.queryByRole('menu')).toBeNull();equivalentScene(a);
 });
+
+
+test('Duplicate preserves the connected focused properties button',()=>{
+  const a=setup();a.seed();a.select();const button=screen.getByRole('button',{name:'Duplicate'});act(()=>button.focus());fireEvent.click(button);
+  expect(a.shapes()).toHaveLength(2);expect(screen.getByRole('button',{name:'Duplicate'})).toBe(button);expect(button.isConnected).toBe(true);expect(document.activeElement).toBe(button);equivalentScene(a);
+});
+test('tool switching with focus inside properties preserves the strip and shared controls',()=>{
+  const a=setup();const field=screen.getByLabelText('Stroke color value'),strip=a.view.container.querySelector('.ob-canvas-properties');act(()=>field.focus());
+  // The toolbar action changes tools while the field still owns focus (click
+  // handlers need not receive DOM focus, e.g. native macOS button activation).
+  fireEvent.click(screen.getByRole('button',{name:'Rectangle (R)'}));
+  expect(a.view.container.querySelector('.ob-canvas-properties')).toBe(strip);expect(screen.getByLabelText('Stroke color value')).toBe(field);expect(field.isConnected).toBe(true);expect(document.activeElement).toBe(a.viewport);
+});
+test.each(['finish','Escape'])('empty existing text: %s deletes undoably or reverts explicitly',route=>{
+  const a=setup();a.tool('t');a.key('Enter');a.field('Canvas text','Original words');fireEvent.keyDown(screen.getByLabelText('Canvas text'),{key:'Enter',ctrlKey:true});
+  const original=a.shapes()[0];fireEvent.click(screen.getByRole('button',{name:'Edit text'}));a.field('Canvas text','');
+  fireEvent.keyDown(screen.getByLabelText('Canvas text'),route==='finish'?{key:'Enter',ctrlKey:true}:{key:'Escape'});
+  if(route==='finish'){
+    expect(a.shapes()).toHaveLength(0);equivalentScene(a);a.key('z',{ctrlKey:true});expect(a.shapes()).toEqual([original]);equivalentScene(a);
+    a.key('z',{ctrlKey:true,shiftKey:true});expect(a.shapes()).toHaveLength(0);
+  }else expect(a.shapes()).toEqual([original]);
+  equivalentScene(a);
+});

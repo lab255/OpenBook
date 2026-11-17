@@ -30,7 +30,7 @@ function ColorControl({name,value,onChange,tab,fill=false}:{name:string;value:st
   </div>;
 }
 // Rule 14a: reserve only previously visible chrome hidden remotely during this
-// activation. Local selection/tool changes reset the key; inactive chrome unmounts.
+// activation. Local changes release retention without remounting live controls.
 function ReservedProperties({visible,reserve,children}:{visible:boolean;reserve:boolean;children:ReactNode}) {
   const retained=useRef<ReactNode>(null);
   if(visible)retained.current=children;else if(!reserve)retained.current=null;
@@ -40,9 +40,8 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   const id=String(block.get('id')),props=block.get('props');
   const scene=useMemo(()=>readCanvas(props),[props,editor.version]),readOnly=pageReadOnly||!scene.editable;
   const [tool,updateTool]=useState<Tool>('stroke'),[active,setActive]=useState(false),[selected,setSelected]=useState<Set<string>>(new Set());
-  const [localChromeEpoch,setLocalChromeEpoch]=useState(0);
   const remoteChrome=useRef(false),editingChromeSeen=useRef(false);
-  const localChromeChange=()=>{setLocalChromeEpoch(value=>value+1);remoteChrome.current=false;if(readOnly)editingChromeSeen.current=false;};
+  const localChromeChange=()=>{refresh(value=>value+1);remoteChrome.current=false;if(readOnly)editingChromeSeen.current=false;};
   const setTool=(next:Tool)=>{localChromeChange();updateTool(next);};
   useEffect(()=>{const observe=(transaction:{local:boolean})=>{remoteChrome.current=!transaction.local;};editor.doc.on('afterTransaction',observe);return()=>editor.doc.off('afterTransaction',observe);},[editor.doc]);
   if(!active)editingChromeSeen.current=false;
@@ -150,7 +149,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   };
   const finishShape=(s:SceneShape)=>{create([{...s.scalars,points:s.points,pointArity:s.pointArity}],names[String(s.scalars.kind)],s.scalars.kind!=='stroke');if(s.scalars.kind!=='stroke')setTool('select');};
   const startText=(p:Point,s?:SceneShape)=>{if(readOnly)return;setTextEdit({id:s?.id,x:s?number(s,'x'):p.x,y:s?number(s,'y'):p.y,w:s?number(s,'w'):200,h:s?number(s,'h'):100,text:s?String(s.scalars.text):''});};
-  const finishText=(restoreFocus=true)=>{if(!textEdit||readOnly)return;resetContact();if(textEdit.text.length){if(textEdit.id)commit('Edit text',[{shapeId:textEdit.id,values:{text:textEdit.text}}]);else create([{kind:'text',...textEdit,stroke,fill,strokeWidth}],'Text');}setTextEdit(null);setTool('select');if(restoreFocus)viewport.current?.focus();};
+  const finishText=(restoreFocus=true)=>{if(!textEdit||readOnly)return;resetContact();if(textEdit.id){if(textEdit.text.length)commit('Edit text',[{shapeId:textEdit.id,values:{text:textEdit.text}}]);else remove([textEdit.id]);}else if(textEdit.text.length)create([{kind:'text',...textEdit,stroke,fill,strokeWidth}],'Text');setTextEdit(null);setTool('select');if(restoreFocus)viewport.current?.focus();};
   interruptLatest.current=()=>{if(textEdit)finishText(false);else cancel();};
   const remove=(ids:Iterable<string>)=>{if(readOnly)return;const h=history();if(h){eraseShapes(h,id,[...ids]);choose([]);announce('Objects erased');refresh(n=>n+1);}};
   const duplicate=()=>{create(chosen.map(s=>({...s.scalars,x:number(s,'x')+10,y:number(s,'y')+10,pointArity:s.pointArity,points:s.points})),'Duplicate');};
@@ -366,7 +365,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
         onPointerDown={e=>e.stopPropagation()} onChange={e=>setTextEdit({...textEdit,text:e.target.value})} onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing)return;if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.stopPropagation();e.preventDefault();finishText();}if(e.key==='Escape'){e.stopPropagation();e.preventDefault();cancel();viewport.current?.focus();}}}/>}
 
     </div>
-    {active&&<ReservedProperties key={localChromeEpoch} reserve={remoteChrome.current||readOnly} visible={!readOnly&&(tool!=='select'||chosen.length>0)&&tool!=='pan'&&tool!=='erase'}>
+    {active&&<ReservedProperties reserve={remoteChrome.current||readOnly&&editingChromeSeen.current} visible={!readOnly&&(tool!=='select'||chosen.length>0)&&tool!=='pan'&&tool!=='erase'}>
 
       {!readOnly&&<>
         {(['stroke','rect','ellipse','arrow','text'].includes(tool)||tool==='select'&&chosen.length>0)&&<>
