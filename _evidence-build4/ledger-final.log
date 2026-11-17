@@ -1,0 +1,19 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_yr3pisy978-1/OpenBook/packages/ui
+
+BOUNDARY app/provider leak RED; viewer/app-entry leak RED; separate graphs GREEN
+FEATURE LEDGER removed renderer row RED; emitted module/export inventory GREEN
+CALIBRATION seeded=1933227; ordinary=1933460 marginal=233 own=489; eager/layout=1980841 marginal=47614 own=343; ordinary ledger GREEN, eager/layout unledgered RED
+BLOCK OWN BYTES 2048 GREEN; imported helper raises total to 2049 RED
+TREE-SHAKEN GAP unchanged: unused eager import emitted no additional bytes (1933227); no feature-ledger failure, intentionally recorded
+CHROME SEAM useMotionValue: removed row RED; measured production graph GREEN
+CHROME SEAM useReducedMotion: removed row RED; measured production graph GREEN
+CHROME SEAM animate: removed row RED; measured production graph GREEN
+LEDGER CHAIN broken fluidHover endpoint 1925112 RED; baseline 1846513 -> all adjacent rows -> bounded measured 1933227 GREEN
+ENDPOINT 1931869 and 1936471 GREEN; 1936472 and 1931868 RED; changed Motion bytes RED; unledgered animate within window RED
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  11:08:16
+   Duration  2.32s (transform 47ms, setup 0ms, import 62ms, tests 2.11s, environment 209ms)
+

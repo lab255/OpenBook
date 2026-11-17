@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import {remoteFrameQueue} from './remoteFrame';
 
 /**
  * Collaboration transport. The editor only ever talks Y updates, so any
@@ -33,6 +34,7 @@ export interface BroadcastConnection {
 const COLORS = ['#e4a33c', '#5b8def', '#4fae6e', '#c96bd6', '#e0635c', '#3aa6a6'];
 
 export function connectBroadcast(doc: Y.Doc, channelName: string, userName = 'Guest'): BroadcastConnection {
+  const incoming = remoteFrameQueue(doc,'bc-remote');
   const bc = new BroadcastChannel(`obe:${channelName}`);
   const peers = new Map<number, PresencePeer>();
   const peerSubs = new Set<(peers: PresencePeer[]) => void>();
@@ -73,7 +75,7 @@ export function connectBroadcast(doc: Y.Doc, channelName: string, userName = 'Gu
     }
     if (msg.type === 'state' || msg.type === 'update') {
       const bytes = msg.payload instanceof Uint8Array ? msg.payload : new Uint8Array(msg.payload as ArrayBuffer);
-      Y.applyUpdate(doc, bytes, 'bc-remote');
+      incoming.receive(bytes);
       return;
     }
     if (msg.type === 'presence') {
@@ -94,6 +96,7 @@ export function connectBroadcast(doc: Y.Doc, channelName: string, userName = 'Gu
 
   return {
     disconnect() {
+      incoming.close();
       clearInterval(heartbeat);
       doc.off('update', onUpdate);
       bc.close();

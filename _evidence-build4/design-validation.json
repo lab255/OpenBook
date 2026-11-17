@@ -1,0 +1,11 @@
+{
+  "base": "b589c05ed3567ffdd90819bacc5a6a7a8d5223d5",
+  "mode": "full production build and graph verification",
+  "rawBytes": 1933227,
+  "coordinate": 852,
+  "sha256": "67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198",
+  "mtime": "2026-11-17T04:00:46.377168+00:00",
+  "focusedTests": 264,
+  "ledgerTests": 8,
+  "rasterCases": 216
+}

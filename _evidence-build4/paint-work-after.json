@@ -1,0 +1,884 @@
+{
+  "label": "Instrumented Canvas2d call counts bracket each delivered pointer event, no latency claim",
+  "time": "2026-11-17T03:14:50.795Z",
+  "results": [
+    {
+      "input": "desktop mouse synthetic/local",
+      "initialScene": "500 strokes x 50 points; same harness reset and coordinates as before profile",
+      "samples": [
+        {
+          "run": 1,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 1,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 1,
+          "event": "pointerup",
+          "stroke": 24501,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 2,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 2,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 2,
+          "event": "pointerup",
+          "stroke": 24502,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 3,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 3,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 3,
+          "event": "pointerup",
+          "stroke": 24503,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 4,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 4,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 4,
+          "event": "pointerup",
+          "stroke": 24504,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 5,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 5,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 5,
+          "event": "pointerup",
+          "stroke": 24505,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 6,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 6,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 6,
+          "event": "pointerup",
+          "stroke": 24506,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 7,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 7,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 7,
+          "event": "pointerup",
+          "stroke": 24507,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 8,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 8,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 8,
+          "event": "pointerup",
+          "stroke": 24508,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 9,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 9,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 9,
+          "event": "pointerup",
+          "stroke": 24509,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 10,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 10,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 10,
+          "event": "pointerup",
+          "stroke": 24510,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 11,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 11,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 11,
+          "event": "pointerup",
+          "stroke": 24511,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 12,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 12,
+          "event": "pointermove 1/1",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 12,
+          "event": "pointerup",
+          "stroke": 24512,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        }
+      ],
+      "reloadEquivalent": true
+    },
+    {
+      "input": "trackpad-class mouse pointer synthetic/local",
+      "initialScene": "500 strokes x 50 points; same harness reset and coordinates as before profile",
+      "samples": [
+        {
+          "run": 1,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 1,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 1,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 1,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 1,
+          "event": "pointerup",
+          "stroke": 24503,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 2,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 2,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 2,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 2,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 2,
+          "event": "pointerup",
+          "stroke": 24506,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 3,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 3,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 3,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 3,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 3,
+          "event": "pointerup",
+          "stroke": 24509,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 4,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 4,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 4,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 4,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 4,
+          "event": "pointerup",
+          "stroke": 24512,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 5,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 5,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 5,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 5,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 5,
+          "event": "pointerup",
+          "stroke": 24515,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 6,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 6,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 6,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 6,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 6,
+          "event": "pointerup",
+          "stroke": 24518,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 7,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 7,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 7,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 7,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 7,
+          "event": "pointerup",
+          "stroke": 24521,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 8,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 8,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 8,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 8,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 8,
+          "event": "pointerup",
+          "stroke": 24524,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 9,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 9,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 9,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 9,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 9,
+          "event": "pointerup",
+          "stroke": 24527,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 10,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 10,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 10,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 10,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 10,
+          "event": "pointerup",
+          "stroke": 24530,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 11,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 11,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 11,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 11,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 11,
+          "event": "pointerup",
+          "stroke": 24533,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        },
+        {
+          "run": 12,
+          "event": "pointerdown",
+          "stroke": 0,
+          "fill": 1,
+          "arc": 1,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 12,
+          "event": "pointermove 1/3",
+          "stroke": 1,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 12,
+          "event": "pointermove 2/3",
+          "stroke": 2,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 12,
+          "event": "pointermove 3/3",
+          "stroke": 3,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 1,
+          "drawImage": 1
+        },
+        {
+          "run": 12,
+          "event": "pointerup",
+          "stroke": 24536,
+          "fill": 0,
+          "arc": 0,
+          "clearRect": 3,
+          "drawImage": 2
+        }
+      ],
+      "reloadEquivalent": true
+    }
+  ]
+}

@@ -316,3 +316,18 @@ describe('creation prop validation', () => {
     expect(invalidBlockTreeProps([{type: 'meeting'}, {type: 'plugin/widget', props: {anything: true}}, {type: 'meeting', props: {title: null, future: {x: 1}}}])).toBeNull();
   });
 });
+
+
+describe('canvas catalogue and props',()=>{
+  it('accepts a void canvas and validates version, viewport bounds and projected shape-map type',()=>{
+    expect(blockTypeInfo('canvas')).toMatchObject({category:'kit',nature:'void'});
+    expect(findUnknownBlockType([{type:'canvas'}])).toBeNull();
+    expect(blockTreeError([{type:'canvas',props:{canvasVersion:1,height:360,background:'#ffffff',shapes:{}}}])).toBeNull();
+    expect(invalidBlockProps('canvas',{canvasVersion:1,height:240,shapes:{}})).toBeNull();
+    expect(invalidBlockProps('canvas',{height:960})).toBeNull();
+    for(const height of [239,961,Infinity,'360'])expect(invalidBlockProps('canvas',{height})).not.toBeNull();
+    expect(invalidBlockProps('canvas',{canvasVersion:2})).not.toBeNull();
+    expect(invalidBlockProps('canvas',{shapes:[]})).not.toBeNull();
+    expect(invalidBlockProps('canvas',{background:3})).not.toBeNull();
+  });
+});

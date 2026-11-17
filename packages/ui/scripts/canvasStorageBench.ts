@@ -3,7 +3,7 @@
 import * as Y from 'yjs';
 import {rootBlocks} from '../src/blockeditor/model';
 import * as schema from '../src/blockeditor/canvas/schema';
-import {createCanvasProps, createShape, readPressure} from '../src/blockeditor/canvas/schema';
+import {createCanvasProps, createShape, readPressure, pointData} from '../src/blockeditor/canvas/schema';
 import {CanvasHistory} from '../src/blockeditor/canvas/history';
 import {appendPoints} from '../src/blockeditor/canvas/commands';
 const reference = process.argv.includes('--scratch-reference');
@@ -21,7 +21,7 @@ for (const {strokes,count,batchSize} of workloads) {
     for(let i=0;i<count;i+=batchSize) {
       const n=Math.min(batchSize,count-i);
       // Fractional coordinates, integer quantized pressure, deterministic inputs.
-      appendPoints(history,'canvas',`shape-${s}`,Array.from({length:n*2},(_,k)=>reference ? (i+Math.floor(k/2))*(k%2 ? 2 : 1) : (i*2+k)/10),Array.from({length:n},(_,k)=>reference ? (k*5)%256/255 : ((i+k)%256)/255));
+      appendPoints(history,'canvas',`shape-${s}`,pointData(Array.from({length:n*2},(_,k)=>reference ? (i+Math.floor(k/2))*(k%2 ? 2 : 1) : (i*2+k)/10),Array.from({length:n},(_,k)=>reference ? (k*5)%256/255 : ((i+k)%256)/255)));
     }
   }
   const update=Y.encodeStateAsUpdate(doc);

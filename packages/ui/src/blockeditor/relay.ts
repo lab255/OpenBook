@@ -1,4 +1,5 @@
 import {isLocalEditOrigin} from './localHistoryOrigin';
+import {remoteFrameQueue} from './remoteFrame';
 import * as Y from 'yjs';
 import type {DataClient} from '@book.dev/sdk';
 
@@ -81,11 +82,12 @@ const fromBase64 = (b64: string): Uint8Array => {
 
 export function connectPageRelay(doc: Y.Doc, pageId: string, client: DataClient): RelayConnection {
   let disposed = false;
+  const incoming = remoteFrameQueue(doc,'net');
 
   // ── Receive: live frames + late-joiner catch-up (apply as 'net') ─────────────
   const applyRemote = (update: Uint8Array): void => {
     try {
-      Y.applyUpdate(doc, update, 'net');
+      incoming.receive(update);
     } catch {
       // A malformed remote update is dropped rather than corrupting local state.
     }
@@ -172,6 +174,7 @@ export function connectPageRelay(doc: Y.Doc, pageId: string, client: DataClient)
 
   return {
     disconnect() {
+      incoming.close();
       disposed = true;
       doc.off('update', onUpdate);
       if (timer) {

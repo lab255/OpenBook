@@ -1,0 +1,30 @@
+{
+  "dpr": 1,
+  "pass": true,
+  "cases": 72,
+  "failures": [],
+  "negativeControl": {
+    "description": "Deliberately clear the reference surface",
+    "changedPixels": 16007
+  }
+}
+{
+  "dpr": 1.5,
+  "pass": true,
+  "cases": 72,
+  "failures": [],
+  "negativeControl": {
+    "description": "Deliberately clear the reference surface",
+    "changedPixels": 35652
+  }
+}
+{
+  "dpr": 2,
+  "pass": true,
+  "cases": 72,
+  "failures": [],
+  "negativeControl": {
+    "description": "Deliberately clear the reference surface",
+    "changedPixels": 62990
+  }
+}

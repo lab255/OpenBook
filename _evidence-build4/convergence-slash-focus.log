@@ -1,0 +1,63 @@
+{
+  "cases": [
+    {
+      "type": "canvas",
+      "frames": 55,
+      "first": {
+        "ms": 19.700000017881393,
+        "insertedId": "b_256a7fec",
+        "activeTag": "DIV",
+        "activeLabel": "Canvas, 0 objects, editable",
+        "activeRow": "b_256a7fec",
+        "isCanvasRegion": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2px",
+        "outlineColor": "rgb(28, 121, 196)",
+        "outlineOffset": "3px",
+        "ringInViewport": true,
+        "penPressed": "true"
+      },
+      "last": {
+        "ms": 903.1000000238419,
+        "insertedId": "b_256a7fec",
+        "activeTag": "DIV",
+        "activeLabel": "Canvas, 0 objects, editable",
+        "activeRow": "b_256a7fec",
+        "isCanvasRegion": true,
+        "focusVisible": true,
+        "outlineStyle": "solid",
+        "outlineWidth": "2px",
+        "outlineColor": "rgb(28, 121, 196)",
+        "outlineOffset": "3px",
+        "ringInViewport": true,
+        "penPressed": "true"
+      }
+    },
+    {
+      "type": "slider",
+      "frames": 55,
+      "first": {
+        "ms": 13.900000005960464,
+        "insertedId": "b_4ea3ea25",
+        "activeTag": "DIV",
+        "activeLabel": "Text",
+        "activeRow": "b_53bbb195",
+        "isCanvasRegion": false,
+        "focusVisible": false,
+        "ringInViewport": false
+      },
+      "last": {
+        "ms": 914,
+        "insertedId": "b_4ea3ea25",
+        "activeTag": "DIV",
+        "activeLabel": "Text",
+        "activeRow": "b_53bbb195",
+        "isCanvasRegion": false,
+        "focusVisible": false,
+        "ringInViewport": false
+      }
+    }
+  ],
+  "browserErrors": []
+}

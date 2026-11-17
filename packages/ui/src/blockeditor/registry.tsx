@@ -44,8 +44,13 @@ export interface CustomBlockDef {
   /** The block `type` this renders (must not collide with core types). */
   type: string;
   render: React.FC<CustomBlockProps>;
+  /** Opt in to receiving the final slash-insert caret request at this block.
+   * The renderer consumes pendingCaret to focus its own region. Other blocks
+   * retain the existing text-descendant/following-paragraph focus policy. */
+  focusOnInsert?: boolean;
   /** Optional slash-menu entry that inserts this block. */
   slash?: {
+    icon?: React.ComponentType<{className?:string}>;
     label: string;
     hint: string;
     keywords: string;

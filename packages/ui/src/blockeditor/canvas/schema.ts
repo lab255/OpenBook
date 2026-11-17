@@ -44,6 +44,7 @@ export function createShape(input: Record<string, unknown> = {}): Y.Map<unknown>
   }
   const points = new Y.Array<number>();
   const values = input.points ?? [];
+  if (input.points !== undefined && input.pressureMode === 'variable' && input.pointArity !== 3) throw new TypeError('Variable points require explicit pointArity: 3');
   validatePointValues(values, input.pressureMode ?? 'constant', input.pointArity);
   if ((values as number[]).length && (input.kind ?? 'rect') !== 'stroke') throw new TypeError('Only strokes have points');
   points.push(values as number[]);
@@ -58,7 +59,8 @@ export function createCanvasProps(): Y.Map<unknown> {
 }
 export const get = (object: unknown, key: string): unknown => object instanceof Y.Map ? object.get(key) : object && typeof object === 'object' ? (object as Record<string, unknown>)[key] : undefined;
 const entries = (object: unknown): [string, unknown][] => object instanceof Y.Map ? [...object.entries()] : object && typeof object === 'object' && !Array.isArray(object) ? Object.entries(object) : [];
-export interface SceneShape {readonly id: string; readonly scalars: Readonly<Record<string, Scalar>>; readonly points: readonly number[]}
+export interface PointData {readonly pointArity: 2 | 3; readonly points: readonly number[]}
+export interface SceneShape extends PointData {readonly id: string; readonly scalars: Readonly<Record<string, Scalar>>}
 export interface Scene {readonly shapes: readonly SceneShape[]; readonly diagnostics: readonly string[]; readonly editable: boolean}
 /** Mutation validation touches only the addressed canvas/shape, never builds a scene. */
 export function isEditableCanvas(props: unknown): props is Y.Map<unknown> {
@@ -103,7 +105,7 @@ export function readCanvas(props: unknown): Scene {
       const points: unknown = raw instanceof Y.Array ? raw.toArray() : raw;
       validatePointValues(points, scalars.pressureMode, source instanceof Y.Map ? get(source, 'pointArity') : get(source, 'pointArity') ?? 2);
       if (!(source instanceof Y.Map) || !(raw instanceof Y.Array)) editable = false;
-      shapes.push(Object.freeze({id, scalars: Object.freeze(scalars), points: Object.freeze((points as number[]).slice())}));
+      shapes.push(Object.freeze({id, scalars: Object.freeze(scalars), pointArity: scalars.pressureMode === 'variable' ? 3 : 2, points: Object.freeze((points as number[]).slice())}));
     } catch (error) { editable = false; diagnostics.push(`Quarantined shape ${id}: ${error instanceof Error ? error.message : 'invalid shape'}`); }
   }
   shapes.sort((a,b) => String(a.scalars.ord) < String(b.scalars.ord) ? -1 : String(a.scalars.ord) > String(b.scalars.ord) ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -111,7 +113,7 @@ export function readCanvas(props: unknown): Scene {
 }
 
 /** Shared binary/JSON validation: never interpret malformed triplets as pairs. */
-function validatePointValues(values: unknown, mode: unknown, projectedArity?: unknown): asserts values is number[] {
+export function validatePointValues(values: unknown, mode: unknown, projectedArity?: unknown): asserts values is number[] {
   if (mode !== 'constant' && mode !== 'variable') throw new TypeError('Invalid pressureMode');
   const arity = mode === 'variable' ? 3 : 2;
   if (projectedArity !== undefined && projectedArity !== arity) throw new TypeError('pointArity disagrees with pressureMode');
@@ -139,7 +141,42 @@ export function projectCanvas(props: Y.Map<unknown>): Record<string, unknown> {
   const projection = props.toJSON();
   const shapes = props.get('shapes');
   if (shapes instanceof Y.Map) for (const [id, shape] of shapes) {
-    if (shape instanceof Y.Map) projection.shapes[id].pointArity = shape.get('pressureMode') === 'variable' ? 3 : 2;
+    if (shape instanceof Y.Map) projection.shapes[id].pointArity = shape.get('pointArity') ?? (shape.get('pressureMode') === 'variable' ? 3 : 2);
   }
   return projection;
+}
+
+/** App construction seam: projected clones regain fresh nested CRDT types.
+ * Preserve scalar tokens and unknown fields, but never persist JSON's arity tag. */
+export function constructCanvasProps(input: Record<string, unknown>): Y.Map<unknown> {
+  const props = new Y.Map<unknown>(Object.entries(input).filter(([key]) => key !== 'shapes'));
+  const shapes = new Y.Map<unknown>();
+  if (!(input.shapes instanceof Y.Map) && (!input.shapes || typeof input.shapes !== 'object' || Array.isArray(input.shapes))) {
+    props.set('shapes', input.shapes); return props; // Preserve malformed containers too.
+  }
+  for (const [id, value] of entries(input.shapes)) {
+    // Cloning can run after a move has deleted the original inside a Yjs
+    // transaction. Copy raw data, never invoke mutation validation here: the
+    // defensive reader must retain and diagnose malformed shapes for recovery.
+    const data = value instanceof Y.Map ? value.toJSON() : value;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) { shapes.set(id, data); continue; }
+    const source = data as Record<string, unknown>;
+    const shape = new Y.Map<unknown>();
+    for (const [key, field] of Object.entries(source)) {
+      if (key === 'pointArity' && field === (source.pressureMode === 'variable' ? 3 : 2)) continue;
+      if (key === 'points' && Array.isArray(field)) {
+        const points = new Y.Array<unknown>(); points.push(field); shape.set(key, points);
+      } else shape.set(key, field);
+    }
+    shapes.set(id, shape);
+  }
+  props.set('shapes', shapes);
+  return props;
+}
+
+/** Input conversion only; create and append both consume tagged stored values. */
+export function pointData(xy: readonly number[], pressures?: readonly number[]): PointData {
+  if (xy.length % 2 || !xy.every(Number.isFinite)) throw new TypeError('Invalid point coordinates');
+  if (pressures && (pressures.length * 2 !== xy.length || !pressures.every(Number.isFinite))) throw new TypeError('Invalid pressure samples');
+  return pressures ? {pointArity: 3, points: pressures.flatMap((p, i) => [xy[i*2], xy[i*2+1], Math.round(255 * Math.min(1, Math.max(0, p)))])} : {pointArity: 2, points: [...xy]};
 }

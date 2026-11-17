@@ -1,0 +1,29 @@
+{
+  "path": "packages/ui/src/export/vendor/openbook-viewer.js",
+  "mtime": "2026-11-17T03:03:27.297899+00:00",
+  "bytes": 1933551,
+  "sha256": "3508adf6b086d711f5dafea648c960ea4e88eff61b722ebd0bd4121a2c1041ac",
+  "buildMode": "production, pnpm --filter @book.dev/ui build; SDK dist rebuilt first",
+  "coordinate": 1176,
+  "previousCoordinate": 780,
+  "growthOver765": 411,
+  "seamStopLimit": 300,
+  "sharedCatalogueModules": [
+    {
+      "id": "workspace/sdk/dist/blockCatalogue.js",
+      "bytes": 10711,
+      "exports": [
+        "BLOCK_TYPE_CATALOGUE",
+        "CONTAINER_BLOCK_TYPES",
+        "KIT_VALUE_BLOCK_TYPES",
+        "TEXT_BLOCK_TYPES"
+      ]
+    },
+    {
+      "id": "workspace/sdk/dist/blockPropSchemas.js",
+      "bytes": 9580,
+      "exports": []
+    }
+  ],
+  "canvasModules": []
+}
