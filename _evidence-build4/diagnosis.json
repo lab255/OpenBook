@@ -1,0 +1,923 @@
+{
+  "inputCounts": [
+    {
+      "type": "down",
+      "stroke": 24500,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73506,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49003,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24503,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73515,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49009,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24506,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73524,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49015,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24509,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73533,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49021,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24512,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73542,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49027,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24515,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73551,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49033,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24518,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73560,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49039,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24521,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73569,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49045,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24524,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73578,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49051,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24527,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73587,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49057,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24530,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73596,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49063,
+      "clearRect": 2,
+      "drawImage": 0
+    },
+    {
+      "type": "down",
+      "stroke": 24533,
+      "clearRect": 1,
+      "drawImage": 0
+    },
+    {
+      "type": "move (3 real delivered steps)",
+      "stroke": 73605,
+      "clearRect": 3,
+      "drawImage": 0
+    },
+    {
+      "type": "up",
+      "stroke": 49069,
+      "clearRect": 2,
+      "drawImage": 0
+    }
+  ],
+  "label": "Diagnostic instrumented run; counts and CPU samples, not acceptance latency",
+  "events": [
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0.10000002384185791,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0.09999999403953552,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerdown",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointermove",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    },
+    {
+      "type": "pointerup",
+      "ms": 0,
+      "stroke": 0,
+      "clearRect": 0,
+      "drawImage": 0
+    }
+  ],
+  "hotSelfSamplesMicroseconds": [
+    [
+      "(idle) :0",
+      994476
+    ],
+    [
+      "(program) :0",
+      870101
+    ],
+    [
+      "paintShape http://127.0.0.1:5184/src/blockeditor/canvas/geometry.ts:121",
+      101108
+    ],
+    [
+      "bounds http://127.0.0.1:5184/src/blockeditor/canvas/geometry.ts:16",
+      78448
+    ],
+    [
+      "points http://127.0.0.1:5184/src/blockeditor/canvas/geometry.ts:2",
+      62154
+    ],
+    [
+      "exports.jsxDEV http://127.0.0.1:5184/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=398c7f95:191",
+      45130
+    ],
+    [
+      "stroke :0",
+      41404
+    ],
+    [
+      "paint http://127.0.0.1:5184/src/blockeditor/canvas/geometry.ts:181",
+      38066
+    ],
+    [
+      "number http://127.0.0.1:5184/src/blockeditor/canvas/geometry.ts:1",
+      37101
+    ],
+    [
+      "readCanvas http://127.0.0.1:5184/src/blockeditor/canvas/schema.ts:147",
+      35503
+    ],
+    [
+      "CanvasRenderingContext2D.<computed> :3",
+      23807
+    ],
+    [
+      "(garbage collector) :0",
+      18232
+    ],
+    [
+      "CanvasBlock http://127.0.0.1:5184/src/blockeditor/canvas/CanvasBlock.tsx:73",
+      11350
+    ],
+    [
+      "width http://127.0.0.1:5184/src/blockeditor/canvas/geometry.ts:134",
+      8322
+    ],
+    [
+      "get http://127.0.0.1:5184/src/blockeditor/canvas/schema.ts:118",
+      8319
+    ],
+    [
+      "typeListToArray http://127.0.0.1:5184/node_modules/.vite/deps/yjs.js?v=398c7f95:7236",
+      7747
+    ],
+    [
+      "scalarValue http://127.0.0.1:5184/src/blockeditor/canvas/schema.ts:72",
+      4540
+    ],
+    [
+      "save :0",
+      4530
+    ],
+    [
+      "moveTo :0",
+      4511
+    ],
+    [
+      "lineTo :0",
+      3721
+    ],
+    [
+      " http://127.0.0.1:5184/src/blockeditor/canvas/schema.ts:163",
+      3031
+    ],
+    [
+      "ReactElement http://127.0.0.1:5184/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=398c7f95:104",
+      3027
+    ],
+    [
+      "run :0",
+      3024
+    ],
+    [
+      "setProp http://127.0.0.1:5184/node_modules/.vite/deps/react-dom_client.js?v=398c7f95:9707",
+      2642
+    ],
+    [
+      "defineKeyPropWarningGetter http://127.0.0.1:5184/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=398c7f95:88",
+      2271
+    ],
+    [
+      " http://127.0.0.1:5184/src/blockeditor/canvas/schema.ts:183",
+      2262
+    ],
+    [
+      "restore :0",
+      2260
+    ],
+    [
+      "beginPath :0",
+      2255
+    ],
+    [
+      "serialize :168",
+      1553
+    ],
+    [
+      "clearRect :0",
+      1519
+    ],
+    [
+      " :0",
+      1510
+    ],
+    [
+      "setValueForStyles http://127.0.0.1:5184/node_modules/.vite/deps/react-dom_client.js?v=398c7f95:1988",
+      1504
+    ],
+    [
+      "getTaskName http://127.0.0.1:5184/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=398c7f95:64",
+      1503
+    ],
+    [
+      " http://127.0.0.1:5184/node_modules/.vite/deps/react-dom_client.js?v=398c7f95:9419",
+      1500
+    ],
+    [
+      "commitUpdate http://127.0.0.1:5184/node_modules/.vite/deps/react-dom_client.js?v=398c7f95:10737",
+      1500
+    ]
+  ],
+  "opacity": {
+    "before": {
+      "inline": "",
+      "computed": "rgb(23, 23, 23)",
+      "opacity": "1",
+      "transition": "all",
+      "children": [
+        {
+          "type": 3,
+          "text": "V"
+        }
+      ],
+      "parsed": [
+        23,
+        23,
+        23
+      ]
+    },
+    "immediate": {
+      "inline": "rgba(0, 0, 0, 0.4)",
+      "computed": "rgb(23, 23, 23)",
+      "opacity": "1",
+      "transition": "0.123s",
+      "children": [
+        {
+          "type": 3,
+          "text": "V"
+        }
+      ],
+      "parsed": [
+        23,
+        23,
+        23
+      ]
+    },
+    "settled": {
+      "inline": "rgba(0, 0, 0, 0.4)",
+      "computed": "rgba(0, 0, 0, 0.4)",
+      "opacity": "1",
+      "transition": "0.123s",
+      "children": [
+        {
+          "type": 3,
+          "text": "V"
+        }
+      ],
+      "parsed": [
+        0,
+        0,
+        0,
+        0.4
+      ]
+    }
+  }
+}

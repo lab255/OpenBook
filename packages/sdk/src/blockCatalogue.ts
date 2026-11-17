@@ -1,3 +1,7 @@
+// Only the standalone placeholder viewer defines this true. SDK/server/app
+// retain complete canvas validation; BUILD-6 pays for viewer fidelity separately.
+declare const __OB_SAFE_EXPORT_VIEWER__: boolean;
+
 /**
  * The block-type catalogue — the ONE types-only description of every block the
  * editor can render, shared by every layer that must reason about block types
@@ -89,6 +93,9 @@ const CATALOGUE_LITERAL = [
   {type: 'accordion', category: 'core', nature: 'container', props: {name: 'string', gated: 'boolean'}, hint: '{name?,gated?} → accordionsection children'},
   {type: 'accordionsection', category: 'core', nature: 'container', parent: 'accordion', props: {label: 'string', collapsed: 'boolean'}, hint: '{label,collapsed?}'},
   // ── Kit inputs (publish a named value into the reactive scope) ─────────────
+  typeof __OB_SAFE_EXPORT_VIEWER__ !== 'undefined' && __OB_SAFE_EXPORT_VIEWER__
+    ? {type: 'canvas', category: 'kit', nature: 'void', props: {} as Readonly<Record<string, BlockPropType>>, hint: ''}
+    : {type: 'canvas', category: 'kit', nature: 'void', props: {canvasVersion: 'number', height: 'number', background: 'string', shapes: 'object'}, hint: 'Inline drawing canvas. {canvasVersion:1,height?:240–960,background?,shapes:{}}; shapes use projected shape maps, not children.'},
   {type: 'slider', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', value: 'number', min: 'number', max: 'number', step: 'number'}, hint: '{name,label?,value,min,max,step?}'},
   {type: 'number', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', value: 'number', min: 'number', max: 'number', step: 'number'}, hint: '{name,label?,value,min?,max?,step?}'},
   {type: 'textfield', category: 'kit', nature: 'void', kitValue: true, props: {name: 'string', label: 'string', value: 'string', placeholder: 'string'}, hint: '{name,label?,value?,placeholder?}'},

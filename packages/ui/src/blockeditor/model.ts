@@ -132,8 +132,7 @@ export function makeBlock(input: NewBlock): BlockMap {
     block.set('text', text);
   }
   if (input.props && Object.keys(input.props).length > 0) {
-    const props = new Y.Map<unknown>();
-    for (const [k, v] of Object.entries(input.props)) props.set(k, v);
+    const props = propsConstructors.get(input.type)?.(input.props) ?? new Y.Map(Object.entries(input.props));
     block.set('props', props);
   }
   if (CONTAINER_BLOCKS.has(input.type as BlockType)) {
@@ -2190,6 +2189,10 @@ export function tableSplitCell(doc: Y.Doc, cellId: string): void {
 
 type PropsProjection = (props: Y.Map<unknown>) => Record<string, unknown>;
 const propsProjections = new Map<string, PropsProjection>();
+const propsConstructors = new Map<string, (props: Record<string, unknown>) => Y.Map<unknown>>();
+export function registerPropsConstructor(type: string, construct: (props: Record<string, unknown>) => Y.Map<unknown>): void {
+  propsConstructors.set(type, construct);
+}
 /** App-installed codecs; shared/viewer code has no editing feature imports. */
 export function registerPropsProjection(type: string, project: PropsProjection): () => void {
   propsProjections.set(type,project);

@@ -6,8 +6,11 @@ import {mkdtempSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {findBlock, removeBlock, rootBlocks, encodeSnapshot, registerPropsProjection} from '../model';
 import {CanvasHistory, SEMANTIC_CANVAS} from './history';
-import {createCanvasProps, createShape, readCanvas, readPressure, projectCanvas} from './schema';
-import {appendPoints, eraseShape} from './commands';
+import {createCanvasProps, createShape, readCanvas, readPressure, projectCanvas, pointData} from './schema';
+import {appendPoints as appendStoredPoints, eraseShape} from './commands';
+
+// Existing race fixtures use human-scale samples; adapt once to the unified tagged API.
+const appendPoints = (history: CanvasHistory, blockId: string, shapeId: string, xy: number[], pressures?: number[]) => appendStoredPoints(history, blockId, shapeId, pointData(xy, pressures));
 
 const observerErrors: unknown[] = [];
 const checked = <Args extends unknown[]>(check: (...args: Args) => void) => (...args: Args): void => {

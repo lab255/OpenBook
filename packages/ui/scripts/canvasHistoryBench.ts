@@ -18,7 +18,7 @@ for (const selectedCount of process.argv.includes('--single-only') ? [1] : [1, 5
     const pressure = process.argv.includes('--pressure');
     const points = pressure ? Array.from({length:pairs},(_,i)=>[i*2/10,(i*2+1)/10,i%256]).flat() : Array.from({length: pairs * 2}, (_, i) => i / 10);
     doc.transact(() => {
-      for (let i = 0; i < 500; i++) shapes.set(String(i), createShape({id:String(i),kind:'stroke',pressureMode:pressure ? 'variable' : 'constant',points}));
+      for (let i = 0; i < 500; i++) shapes.set(String(i), createShape({id:String(i),kind:'stroke',pressureMode:pressure ? 'variable' : 'constant',pointArity:pressure ? 3 : 2,points}));
     });
     const history = new CanvasHistory(doc);
     const changes = [...shapes.keys()].slice(0,selectedCount).map(shapeId => ({blockId:'canvas',shapeId,values:{x:20,y:30}}));

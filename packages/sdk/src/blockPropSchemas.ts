@@ -1,3 +1,7 @@
+// Only the standalone placeholder viewer defines this true. SDK/server/app
+// retain complete canvas validation; BUILD-6 pays for viewer fidelity separately.
+declare const __OB_SAFE_EXPORT_VIEWER__: boolean;
+
 import {z} from 'zod';
 
 export type BlockPropsJsonSchema = {
@@ -76,6 +80,7 @@ const fields = {
   htmlArtifact: {assetId: id, title: text, height: number('Sandbox height in CSS pixels.', 120, 1200)},
   columns: {}, column: {span: number('Grid columns.', 1, 12)}, table: {}, row: {header: boolean()}, cell: {},
   group: {name: text, locked: boolean()}, tabs: {}, tab: {label: text}, accordion: {name: text, gated: boolean()}, accordionsection: {label: text, collapsed: boolean()},
+  canvas: typeof __OB_SAFE_EXPORT_VIEWER__ !== 'undefined' && __OB_SAFE_EXPORT_VIEWER__ ? {} as Record<string, Field> : {canvasVersion: number('Canvas schema version.', 1, 1), height: number('Viewport height in CSS pixels.', 240, 960), background: text, shapes: freeObject},
   slider: {...frame, value: number(), min: number(), max: number(), step: number(undefined, 0)},
   number: {...frame, value: number(), min: number(), max: number(), step: number(undefined, 0)},
   textfield: inputText, longtext: inputText, richtext: {...frame, placeholder: text, runs}, toggle: {...frame, value: boolean()},

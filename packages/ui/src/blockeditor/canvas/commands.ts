@@ -2,7 +2,7 @@ import * as Y from 'yjs';
 import {keyBetween, keysBetween, ORDER_KEY_REBALANCE_LENGTH} from '@book.dev/sdk';
 import {findBlock} from '../model';
 import {CanvasHistory} from './history';
-import {createShape, isEditableCanvas, isEditableShape, readCanvas} from './schema';
+import {createShape, isEditableCanvas, isEditableShape, readCanvas, validatePointValues, type PointData} from './schema';
 
 function writableShapes(history: CanvasHistory, blockId: string): Y.Map<Y.Map<unknown>> {
   if (!history.writable) throw new Error('Read-only canvas');
@@ -25,17 +25,15 @@ export function eraseShape(history: CanvasHistory, blockId: string, shapeId: str
   if (!snapshot) throw new Error('Shape requires recovery');
   history.structural('Erase shape', () => shapes.delete(shapeId), [snapshot]);
 }
-export function appendPoints(history: CanvasHistory, blockId: string, shapeId: string, values: readonly number[], pressures?: readonly number[]): void {
+export function appendPoints(history: CanvasHistory, blockId: string, shapeId: string, data: PointData): void {
   const shape = writableShapes(history, blockId).get(shapeId);
   if (!shape) return;
   if (!isEditableShape(shape, shapeId)) throw new Error('Shape requires recovery');
-  if (shape.get('kind') !== 'stroke' || values.length === 0 || values.length % 2 || values.length > 128 || !values.every(Number.isFinite)) throw new TypeError('Invalid point batch');
-  const variable = shape.get('pressureMode') === 'variable';
-  if (variable && (!pressures || pressures.length * 2 !== values.length || !pressures.every(Number.isFinite))) throw new TypeError('Invalid pressure batch');
-  if (!variable && pressures) throw new TypeError('Constant stroke has no pressure metadata');
+  if (!data || ![2,3].includes(data.pointArity)) throw new TypeError('Tagged points required');
+  validatePointValues(data.points, shape.get('pressureMode'), data.pointArity);
+  if (shape.get('kind') !== 'stroke' || data.points.length === 0 || data.points.length / data.pointArity > 64) throw new TypeError('Invalid point batch');
   const points = shape.get('points') as Y.Array<number>;
-  const stored = variable ? pressures!.flatMap((p,i) => [values[i*2], values[i*2+1], Math.round(255 * Math.min(1, Math.max(0, p)))]) : [...values];
-  history.structural('Append points', () => points.push(stored));
+  history.structural('Append points', () => points.push([...data.points]));
 }
 /** Place between adjacent entries in deterministic (ord,id) order. */
 export function placementKey(history: CanvasHistory, blockId: string, beforeId: string | null, afterId: string | null): string {
@@ -52,4 +50,19 @@ export function placementKey(history: CanvasHistory, blockId: string, beforeId: 
     history.commitCanvasCommand('Rebalance shapes', scene.shapes.map((s,i) => ({blockId, shapeId: s.id, values: {ord: keys[i]}})));
   }
   return keyBetween(ord(beforeId), ord(afterId));
+}
+
+/** One structural journal entry for a whole creation/duplicate/erase gesture. */
+export function insertShapes(history:CanvasHistory,blockId:string,inputs:readonly Record<string,unknown>[],label:string):string[] {
+  const shapes=writableShapes(history,blockId);
+  const prepared=inputs.map(input=>{const id=crypto.randomUUID();return {id,shape:createShape({...input,id})};});
+  history.structural(label,()=>{for(const {id,shape} of prepared)shapes.set(id,shape);});
+  return prepared.map(p=>p.id);
+}
+export function eraseShapes(history:CanvasHistory,blockId:string,ids:readonly string[]):void {
+  const shapes=writableShapes(history,blockId);
+  const snapshots=ids.filter(id=>shapes.has(id)).map(id=>history.captureErase(blockId,id));
+  if(snapshots.some(s=>!s))throw new Error('Shape requires recovery');
+  if(!snapshots.length)return;
+  history.structural('Erase',()=>{for(const id of ids)shapes.delete(id);},snapshots.filter((s):s is NonNullable<typeof s>=>s!==null));
 }
