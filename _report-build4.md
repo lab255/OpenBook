@@ -82,6 +82,21 @@ Profile confirmed **24,500 Canvas2d stroke calls per dense-scene pointerdown**, 
 
 The initial dirty-region cache failed by 45 alpha-channel units at a settled antialias edge. Controlled fresh-canvas clipping reproduced all 148 differing pixels; offscreen-to-visible composite added no error. Partial clipping was removed. Physical-pixel 1:1 copy avoids fractional resampling. **216 native raster cases pass** across DPR 1/1.5/2, zoom 100/125/200/400%, fractional dimensions/camera, overlapping/translucent five-kind scenes, pressure strokes, edits, pointerup and camera changes: settled frames exactly identical in every RGBA byte; in-gesture differences permitted only within an independently painted active-stroke mask. Negative reference-clear controls change 16,007/35,652/62,990 pixels. `raster-equivalence.json`, `raster-diagnosis.json`, `diagnosis.json`, `dense-before.cpuprofile` preserve evidence. Manager accepted the standard and latency result.
 
+### Mechanism-matched paint-work counter (PM² addition)
+
+The same Canvas2d counter now confirms **24,500 stroke calls per pointerdown → 0 stroke calls + 1 dot fill + 1 drawImage composite** on the initial 500×50-point scene. The before profile used the three-step pointer path; the after counting probe checks both desktop one-step and trackpad-class three-step paths, N=12 gestures each, with identical initial scene and coordinates. Every after pointerdown has the same zero-stroke/one-fill/one-composite result. A new contact is an arc-filled dot, which is why the stroke-call count is zero rather than one. This pairs with the accepted dense trackpad-class median **88.65 → 16.35 ms**; desktop dense median is **38.60 → 16.35 ms**.
+
+| Input event, first 500-stroke gesture | Before stroke calls | After stroke calls | After composites |
+|---|---:|---:|---:|
+| Pointerdown, both after input conditions | 24,500 (original three-step probe) | 0, plus 1 dot fill | 1 |
+| Desktop single pointermove | not separately retained | 1 | 1 |
+| Trackpad-class three moves | 73,506 aggregate | 1 + 2 + 3 = 6 | 1 + 1 + 1 = 3 |
+| Trackpad-class pointerup | 49,003 | 24,503 | 2 |
+
+Committed-scene rebuilding still occurs once at pointerup; the fix removes the full-scene repaint from each contact/move sample, not all settled-scene work. Desktop pointerup costs 24,501 strokes after the one-segment gesture. The probe brackets actual delivered events; it does not use the original capture-listener microtask event rows, which ran before React's handler. No new latency measurement was made.
+
+Raw counts: `_evidence-build4/paint-work-after.json`; original counts: `diagnosis.json` → `inputCounts`. Reproduce with the isolated harness running, then `node packages/ui/scripts/canvas-measure/countPaint.mjs`. The after probe separates the same three interpolated moves into individual delivered events to attribute each count; no timing inference is made from that instrumentation. No screenshots or public exposure.
+
 ## Polish and reconnect
 
 | Measurement | Result | Deliberate violation control |
@@ -139,3 +154,5 @@ The server binds **127.0.0.1:5184 only**. No exposure command. Harness sources a
 ## Committed provenance
 
 Implementation commit `b75eaeb56900b9a2e904945b46823e082524fc2d` rebuilt successfully: **852 B**, raw **1,933,227 B**, identical SHA-256 `67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198`. `committed-viewer.json` and `committed-build.log` preserve this post-commit check. The follow-up commit adds this provenance and ignored-by-default validation logs only; no product or measurement source changes.
+
+Evidence-only commit `91d22c51e24387bb5c76076777de60934a9d4bec` also rebuilt at **852 B** with the identical raw viewer hash. The subsequent paint-counter evidence change adds only a measurement script, raw counts and this report; product source is unchanged.
