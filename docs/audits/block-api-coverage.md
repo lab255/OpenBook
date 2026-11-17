@@ -25,6 +25,7 @@
 | tab | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | accordion | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | accordionsection | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
+| canvas | ✅ | ✅ | ➖ | ✅ | ➖ | ➖ |
 | slider | ✅ | ✅ | ➖ | ✅ | ✅ | ➖ |
 | number | ✅ | ✅ | ➖ | ✅ | ✅ | ➖ |
 | textfield | ✅ | ✅ | ➖ | ✅ | ✅ | ➖ |
