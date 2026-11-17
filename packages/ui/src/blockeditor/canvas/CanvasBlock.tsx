@@ -4,7 +4,7 @@ import {getPageIdForDoc} from '@/lib/aiBridge';
 import {pageSaveStatus, pageSaveStatusVersion, subscribePageSaveStatus} from '@/lib/pageSaveStatus';
 import type {CustomBlockProps} from '../registry';
 import {CanvasHistory, type HistoryResult} from './history';
-import {eraseShapes, insertShapes} from './commands';
+import {eraseShapes, insertShapes, placementKey} from './commands';
 import {get, readCanvas, shapeDefaults, type SceneShape, type Scalar} from './schema';
 import {CommittedSceneCache} from './paintCache';
 import {arrowValues, bounds, contains, endpoints, hit, number, paint, pointBounds, resized, screen, union, world, type Bounds, type Camera, type Point} from './geometry';
@@ -67,6 +67,8 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     if(g||keyboardPath||textEdit){gesture.current=null;setKeyboardPath(null);setCrosshair(null);setTextEdit(null);setHeightPreview(null);announce(g?.kind==='create'||keyboardPath?'Stroke interrupted':'Move cancelled');draw([]);refresh(n=>n+1);return true;}
     return false;
   };
+  const cancelLatest=useRef(cancel);cancelLatest.current=cancel;
+  useEffect(()=>{const interrupt=()=>{cancelLatest.current();};window.addEventListener('blur',interrupt);return()=>window.removeEventListener('blur',interrupt);},[]);
   const activate=()=>{setActive(true);editor.setFocusedId(id);};
   useLayoutEffect(()=>{
     if(!viewport.current)return;
@@ -125,9 +127,21 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     if(direction==='front'||direction==='back'){const selectedShapes=ordered.filter(s=>selected.has(s.id)),others=ordered.filter(s=>!selected.has(s.id));ordered.splice(0,ordered.length,...(direction==='front'?[...others,...selectedShapes]:[...selectedShapes,...others]));}
     else if(direction==='forward'){for(let i=ordered.length-2;i>=0;i--)if(selected.has(ordered[i].id)&&!selected.has(ordered[i+1].id))[ordered[i],ordered[i+1]]=[ordered[i+1],ordered[i]];}
     else for(let i=1;i<ordered.length;i++)if(selected.has(ordered[i].id)&&!selected.has(ordered[i-1].id))[ordered[i],ordered[i-1]]=[ordered[i-1],ordered[i]];
-    const ords=keysBetween(null,null,ordered.length);commit('Arrange',ordered.map((s,i)=>({shapeId:s.id,values:{ord:ords[i]}})));announce('Object order changed');
+    if(ordered.every((s,i)=>s.id===scene.shapes[i].id))return;
+    const h=history();if(!h)return;
+    const changes:{shapeId:string;values:{ord:string}}[]=[];
+    for(let i=0;i<ordered.length;){
+      if(!selected.has(ordered[i].id)){i++;continue;}
+      let end=i;while(end<ordered.length&&selected.has(ordered[end].id))end++;
+      const left=i?ordered[i-1].id:null,right=end<ordered.length?ordered[end].id:null;
+      const first=placementKey(h,id,left,right,[...selected]);
+      const ords=[first,...keysBetween(first,right?String(ordered[end].scalars.ord):null,end-i-1)];
+      for(let at=i;at<end;at++)changes.push({shapeId:ordered[at].id,values:{ord:ords[at-i]}});
+      i=end;
+    }
+    commit('Arrange',changes);announce('Object order changed');
   };
-  const zoom=(value:number,anchor:Point={x:width/2,y:height/2})=>{const z=Math.max(.1,Math.min(4,value)),p=world(anchor,camera);setCamera({zoom:z,x:anchor.x-p.x*z,y:anchor.y-p.y*z});};
+  const zoom=(value:number,anchor:Point={x:width/2,y:height/2})=>{if(!Number.isFinite(value))return;const z=Math.max(.1,Math.min(4,value)),p=world(anchor,camera);setCamera({zoom:z,x:anchor.x-p.x*z,y:anchor.y-p.y*z});};
   const fit=()=>{if(!scene.shapes.length){setCamera({x:0,y:0,zoom:1});return;}const b=union(scene.shapes),z=Math.min(4,Math.max(.1,Math.min((width-40)/Math.max(1,b.w),(height-40)/Math.max(1,b.h))));setCamera({zoom:z,x:(width-b.w*z)/2-b.x*z,y:(height-b.h*z)/2-b.y*z});};
   const reveal=()=>{if(!selectionBounds)return;setCamera({...camera,x:width/2-(selectionBounds.x+selectionBounds.w/2)*camera.zoom,y:height/2-(selectionBounds.y+selectionBounds.h/2)*camera.zoom});announce('Selection revealed');};
   const undo=(redo=false)=>{
@@ -145,10 +159,10 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       if(penDown.current){ignoredTouches.current.add(e.pointerId);return;}
       ignoredTouches.current.delete(e.pointerId); // A fresh down is required after pen teardown.
       const p=pointerPosition(e);touches.current.set(e.pointerId,p);
-      if(touches.current.size===2){gesture.current=null;const [a,b]=[...touches.current.values()];touchPair.current={distance:Math.hypot(a.x-b.x,a.y-b.y),mid:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},camera};e.currentTarget.setPointerCapture(e.pointerId);return;}
+      if(touches.current.size===2){gesture.current=null;const [a,b]=[...touches.current.values()];touchPair.current={distance:Math.hypot(a.x-b.x,a.y-b.y),mid:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},camera};viewport.current?.setPointerCapture(e.pointerId);return;}
     }
     if(gesture.current)return;
-    activate();viewport.current?.focus();e.preventDefault();e.stopPropagation();e.currentTarget.setPointerCapture(e.pointerId);
+    activate();viewport.current?.focus();e.preventDefault();e.stopPropagation();viewport.current?.setPointerCapture(e.pointerId);
     if(e.pointerType==='pen')penDown.current=true;
     const p=world(pointerPosition(e),camera),target=[...scene.shapes].reverse().find(s=>hit(s,p,camera.zoom));
     const effective=readOnly?'pan':tool;
@@ -190,10 +204,13 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       }else g.preview=[createPreview(s.scalars.kind as Tool,g.start,p,e.shiftKey)];
     }else if(g.kind==='move')g.preview=g.shapes.map(s=>({...s,scalars:{...s.scalars,x:number(s,'x')+p.x-g.start.x,y:number(s,'y')+p.y-g.start.y}}));
     else if(g.kind==='resize'){
-      const b=g.from!,h=g.handle!,dx=p.x-g.start.x,dy=p.y-g.start.y;let next={...b};
+      const b=g.from!,h=g.handle!,dx=p.x-g.start.x,dy=p.y-g.start.y;const next={...b};
       if(h.includes('w')){next.x=Math.min(b.x+dx,b.x+b.w);next.w=Math.max(0,b.w-dx);}if(h.includes('e'))next.w=Math.max(0,b.w+dx);
       if(h.includes('n')){next.y=Math.min(b.y+dy,b.y+b.h);next.h=Math.max(0,b.h-dy);}if(h.includes('s'))next.h=Math.max(0,b.h+dy);
-      if((aspect||e.shiftKey)&&b.w&&b.h){next={...next,h:next.w*b.h/b.w};}
+      if((aspect||e.shiftKey)&&b.w&&b.h){
+        if(h==='n'||h==='s'){next.w=next.h*b.w/b.h;next.x=b.x+(b.w-next.w)/2;}
+        else {next.h=next.w*b.h/b.w;if(h==='e'||h==='w')next.y=b.y+(b.h-next.h)/2;else if(h.includes('n'))next.y=b.y+b.h-next.h;}
+      }
       g.preview=g.shapes.map(s=>({...s,scalars:{...s.scalars,...resized(s,b,next)}}));
     }else if(g.kind==='endpoint'){
       const s=g.shapes[0],[a,b]=endpoints(s);g.preview=[{...s,scalars:{...s.scalars,...arrowValues(g.handle==='start'?p:a,g.handle==='end'?p:b)}}];
@@ -215,9 +232,10 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     draw([]);refresh(n=>n+1);
   };
   const onKey=(e:ReactKeyboardEvent)=>{
-    // Canvas-owned focus includes native chrome fields. Preserve their native
-    // default behavior, but never dispatch these keys to page block selection.
-    e.stopPropagation();
+    // Native fields own editing/navigation keys, while app-global shortcuts
+    // (for example Cmd/Ctrl+K) still reach their document-level listeners.
+    const blockKey=['Delete','Backspace','Escape','Enter','ArrowUp','ArrowDown'].includes(e.key)||((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='d');
+    if(blockKey)e.stopPropagation();
     if(composing.current||e.nativeEvent.isComposing||editableTarget(e.target))return;
     const command=e.metaKey||e.ctrlKey,key=e.key.toLowerCase();
     const handled=()=>{e.preventDefault();e.stopPropagation();};
@@ -231,7 +249,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     if(command&&key==='z'){handled();undo(e.shiftKey);return;}
     if(e.ctrlKey&&key==='y'){handled();undo(true);return;}
     if(command&&key==='d'){handled();if(!readOnly)duplicate();return;}
-    if(command&&(key==='['||key===']')){handled();if(!readOnly)arrange(key===']'?(e.shiftKey?'front':'forward'):(e.shiftKey?'back':'backward'));return;}
+    if(command&&(e.code==='BracketLeft'||e.code==='BracketRight')){handled();if(!readOnly)arrange(e.code==='BracketRight'?(e.shiftKey?'front':'forward'):(e.shiftKey?'back':'backward'));return;}
     if(command)return;
     if(key==='?'){handled();setHelp(v=>!v);return;}
     if(key==='+'||key==='='||key==='-'||key==='0'||key==='1'){handled();if(key==='0')fit();else zoom(key==='1'?1:camera.zoom*(key==='-'?1/1.2:1.2));return;}
@@ -274,7 +292,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   const canUndo=editor.undo.availability?.undo,canRedo=editor.undo.availability?.redo;
   const properties=chosen.length&&tool==='select'?chosen[0].scalars:{stroke,fill,strokeWidth};
   return <div ref={region} className="ob-canvas" role="region" aria-label={`Canvas, ${scene.shapes.length} objects, ${readOnly?'view only':'editable'}`} tabIndex={0}
-    onKeyDown={onKey} onKeyUp={e=>{e.stopPropagation();if(e.key===' '&&spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;e.preventDefault();e.stopPropagation();}}}
+    onKeyDown={onKey} onKeyUp={e=>{if(e.key===' '&&spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;e.preventDefault();e.stopPropagation();}}}
     onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}
     onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget)){setActive(false);focusedObject.current=null;if(spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;}cancel();}}}>
     <div className="ob-canvas-header">
@@ -305,7 +323,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       {g?.kind==='erase'&&scene.shapes.filter(s=>g.ids.has(s.id)).map(s=><div key={s.id} className="ob-canvas-outline ob-canvas-erase" style={boxStyle(bounds(s))} aria-hidden="true"/>)}
       {crosshair&&<span className="ob-canvas-crosshair" style={{left:screen(crosshair,camera).x,top:screen(crosshair,camera).y}} aria-hidden="true">+</span>}
       {textEdit&&<textarea ref={textInput} aria-label="Canvas text" className="ob-canvas-text" style={{...boxStyle(textEdit),fontSize:(chosen[0]?.scalars.kind==='text'?number(chosen[0],'fontSize'):16)*camera.zoom}} value={textEdit.text}
-        onPointerDown={e=>e.stopPropagation()} onChange={e=>setTextEdit({...textEdit,text:e.target.value})} onKeyDown={e=>{e.stopPropagation();if(composing.current||e.nativeEvent.isComposing)return;if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();finishText();}if(e.key==='Escape'){e.preventDefault();cancel();viewport.current?.focus();}}}/>}
+        onPointerDown={e=>e.stopPropagation()} onChange={e=>setTextEdit({...textEdit,text:e.target.value})} onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing)return;if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.stopPropagation();e.preventDefault();finishText();}if(e.key==='Escape'){e.stopPropagation();e.preventDefault();cancel();viewport.current?.focus();}}}/>}
       {objects&&<div className="ob-canvas-objects" onPointerDown={e=>e.stopPropagation()}>
         <div role="listbox" aria-label="Objects" aria-multiselectable="true">
           {scene.shapes.length?scene.shapes.map((s,i)=><div key={s.id} role="option" data-object-index={i} aria-selected={selected.has(s.id)} tabIndex={active&&i===listFocus?0:-1} onFocus={()=>{setListFocus(i);focusedObject.current=s.id;}} onClick={e=>{const ids=new Set(e.shiftKey?selected:[]);if(e.shiftKey&&ids.has(s.id))ids.delete(s.id);else ids.add(s.id);choose(ids);}}
@@ -338,9 +356,9 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
         {selectionBounds&&tool==='select'&&<>
           {(['x','y','w','h'] as const).map((key,i)=><label key={key}>{['X','Y','Width','Height'][i]}<input tabIndex={tab} aria-label={['X','Y','Width','Height'][i]} type="number" step="any" value={selectionBounds[key]} onChange={e=>{if(e.target.value!=='')setGeometry(key,Number(e.target.value));}}/></label>)}
           <label><input type="checkbox" tabIndex={tab} checked={aspect} onChange={e=>setAspect(e.target.checked)}/>Keep aspect ratio</label>
-          {chosen.length===1&&chosen[0].scalars.kind==='arrow'&&(['start','end'] as const).flatMap((endpoint,i)=>(['x','y'] as const).map(axis=><label key={`${endpoint}${axis}`}>{endpoint==='start'?'Start':'End'} {axis.toUpperCase()}<input tabIndex={tab} aria-label={`${endpoint==='start'?'Start':'End'} ${axis.toUpperCase()}`} type="number" step="any" value={endpoints(chosen[0])[i][axis]} onChange={e=>{if(e.target.value==='')return;const pair=endpoints(chosen[0]);pair[i]={...pair[i],[axis]:Number(e.target.value)};commit('Resize arrow',[{shapeId:chosen[0].id,values:arrowValues(...pair)}]);}}/></label>))}
+          {chosen.length===1&&chosen[0].scalars.kind==='arrow'&&(['start','end'] as const).flatMap((endpoint,i)=>(['x','y'] as const).map(axis=><label key={`${endpoint}${axis}`}>{endpoint==='start'?'Start':'End'} {axis.toUpperCase()}<input tabIndex={tab} aria-label={`${endpoint==='start'?'Start':'End'} ${axis.toUpperCase()}`} type="number" step="any" value={endpoints(chosen[0])[i][axis]} onChange={e=>{if(e.target.value===''||!Number.isFinite(Number(e.target.value)))return;const pair=endpoints(chosen[0]);pair[i]={...pair[i],[axis]:Number(e.target.value)};commit('Resize arrow',[{shapeId:chosen[0].id,values:arrowValues(...pair)}]);}}/></label>))}
           {chosen.length===1&&<label>Name<input tabIndex={tab} aria-label="Object name" value={String(chosen[0].scalars.name)} onChange={e=>commit('Rename',[{shapeId:chosen[0].id,values:{name:e.target.value}}])}/></label>}
-          {chosen.length===1&&chosen[0].scalars.kind==='text'&&<><label>Text size<input type="number" min="1" tabIndex={tab} value={number(chosen[0],'fontSize')} onChange={e=>{if(Number(e.target.value)>0)commit('Style',[{shapeId:chosen[0].id,values:{fontSize:Number(e.target.value)}}]);}}/></label><button type="button" tabIndex={tab} onClick={()=>startText(center(),chosen[0])}>Edit text</button></>}
+          {chosen.length===1&&chosen[0].scalars.kind==='text'&&<><label>Text size<input type="number" min="1" tabIndex={tab} value={number(chosen[0],'fontSize')} onChange={e=>{if(Number.isFinite(Number(e.target.value))&&Number(e.target.value)>0)commit('Style',[{shapeId:chosen[0].id,values:{fontSize:Number(e.target.value)}}]);}}/></label><button type="button" tabIndex={tab} onClick={()=>startText(center(),chosen[0])}>Edit text</button></>}
           <button type="button" tabIndex={tab} onClick={duplicate}>Duplicate</button>
           {(['back','backward','forward','front'] as const).map(direction=><button key={direction} type="button" tabIndex={tab} onClick={()=>arrange(direction)}>{({back:'Send to back',backward:'Send backward',forward:'Bring forward',front:'Bring to front'})[direction]}</button>)}
           <button type="button" tabIndex={tab} onClick={()=>remove(selected)}>Delete selected</button>
@@ -352,7 +370,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       <button type="button" tabIndex={tab} aria-label="Zoom out" onClick={()=>zoom(camera.zoom/1.2)}>−</button>
       <label>Zoom<input type="number" aria-label="Zoom percentage" tabIndex={tab} min="10" max="400" value={Math.round(camera.zoom*100)} onChange={e=>{if(e.target.value!=='')zoom(Number(e.target.value)/100);}}/></label>
       <button type="button" tabIndex={tab} aria-label="Zoom in" onClick={()=>zoom(camera.zoom*1.2)}>+</button><button type="button" tabIndex={tab} onClick={fit}>Fit</button><button type="button" tabIndex={tab} onClick={()=>zoom(1)}>Actual size</button>
-      {!readOnly&&<label>Canvas height<input type="number" tabIndex={tab} min="240" max="960" value={height} onChange={e=>{if(e.target.value!=='')commit('Resize canvas',[{values:{height:Number(e.target.value)}}]);}}/></label>}
+      {!readOnly&&<label>Canvas height<input type="number" tabIndex={tab} min="240" max="960" value={height} onChange={e=>{if(e.target.value!==''&&Number.isFinite(Number(e.target.value)))commit('Resize canvas',[{values:{height:Number(e.target.value)}}]);}}/></label>}
     </div>
     <div className="ob-canvas-height-slot">{!readOnly&&<div className="ob-canvas-height" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin={240} aria-valuemax={960} aria-valuenow={height} tabIndex={tab}
       onPointerDown={e=>startGesture(e,'height')} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={()=>cancel()} onLostPointerCapture={e=>{if(gesture.current?.pointer===e.pointerId)cancel();}}

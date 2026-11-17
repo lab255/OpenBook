@@ -141,7 +141,7 @@ export function projectCanvas(props: Y.Map<unknown>): Record<string, unknown> {
   const projection = props.toJSON();
   const shapes = props.get('shapes');
   if (shapes instanceof Y.Map) for (const [id, shape] of shapes) {
-    if (shape instanceof Y.Map) projection.shapes[id].pointArity = shape.get('pressureMode') === 'variable' ? 3 : 2;
+    if (shape instanceof Y.Map) projection.shapes[id].pointArity = shape.get('pointArity') ?? (shape.get('pressureMode') === 'variable' ? 3 : 2);
   }
   return projection;
 }
@@ -151,10 +151,23 @@ export function projectCanvas(props: Y.Map<unknown>): Record<string, unknown> {
 export function constructCanvasProps(input: Record<string, unknown>): Y.Map<unknown> {
   const props = new Y.Map<unknown>(Object.entries(input).filter(([key]) => key !== 'shapes'));
   const shapes = new Y.Map<unknown>();
+  if (!(input.shapes instanceof Y.Map) && (!input.shapes || typeof input.shapes !== 'object' || Array.isArray(input.shapes))) {
+    props.set('shapes', input.shapes); return props; // Preserve malformed containers too.
+  }
   for (const [id, value] of entries(input.shapes)) {
-    const data = value instanceof Y.Map ? {...value.toJSON(), pointArity: value.get('pressureMode') === 'variable' ? 3 : 2} : value as Record<string, unknown>;
-    const shape = createShape({...data, id});
-    for (const [key, token] of Object.entries(data)) if (key.startsWith('op:')) shape.set(key, token);
+    // Cloning can run after a move has deleted the original inside a Yjs
+    // transaction. Copy raw data, never invoke mutation validation here: the
+    // defensive reader must retain and diagnose malformed shapes for recovery.
+    const data = value instanceof Y.Map ? value.toJSON() : value;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) { shapes.set(id, data); continue; }
+    const source = data as Record<string, unknown>;
+    const shape = new Y.Map<unknown>();
+    for (const [key, field] of Object.entries(source)) {
+      if (key === 'pointArity' && field === (source.pressureMode === 'variable' ? 3 : 2)) continue;
+      if (key === 'points' && Array.isArray(field)) {
+        const points = new Y.Array<unknown>(); points.push(field); shape.set(key, points);
+      } else shape.set(key, field);
+    }
     shapes.set(id, shape);
   }
   props.set('shapes', shapes);

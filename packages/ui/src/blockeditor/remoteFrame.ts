@@ -26,13 +26,15 @@ export function remoteFrameQueue(doc:Y.Doc,origin:'bc-remote'|'net') {
       }
     },origin);
   };
+  const visibility=()=>flush();
+  if(typeof document!=='undefined')document.addEventListener('visibilitychange',visibility);
   return {
     receive(update:Uint8Array):void {
-      if(!enabled||typeof requestAnimationFrame!=='function'){Y.applyUpdate(doc,update,origin);return;}
+      if(!enabled||typeof requestAnimationFrame!=='function'||typeof document!=='undefined'&&document.hidden){flush();Y.applyUpdate(doc,update,origin);return;}
       pending.push(update);
       if(frame===null)frame=requestAnimationFrame(flush);
     },
     // Preserve already received bytes when the provider is disconnected.
-    close:flush,
+    close():void {if(typeof document!=='undefined')document.removeEventListener('visibilitychange',visibility);flush();},
   };
 }

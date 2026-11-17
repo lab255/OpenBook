@@ -36,10 +36,11 @@ export function appendPoints(history: CanvasHistory, blockId: string, shapeId: s
   history.structural('Append points', () => points.push([...data.points]));
 }
 /** Place between adjacent entries in deterministic (ord,id) order. */
-export function placementKey(history: CanvasHistory, blockId: string, beforeId: string | null, afterId: string | null): string {
+export function placementKey(history: CanvasHistory, blockId: string, beforeId: string | null, afterId: string | null, movingIds: readonly string[] = []): string {
   const shapes = writableShapes(history, blockId);
   const props = findBlock(history.doc, blockId)!.block.get('props');
-  const scene = readCanvas(props);
+  const current = readCanvas(props);
+  const scene = {...current, shapes: current.shapes.filter(s=>!movingIds.includes(s.id))};
   const left = beforeId === null ? -1 : scene.shapes.findIndex(s => s.id === beforeId);
   const right = afterId === null ? scene.shapes.length : scene.shapes.findIndex(s => s.id === afterId);
   if ((beforeId !== null && left < 0) || right < 0 || right !== left + 1) throw new RangeError('Placement bounds must be adjacent');

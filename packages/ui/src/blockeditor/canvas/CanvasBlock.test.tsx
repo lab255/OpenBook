@@ -1,3 +1,4 @@
+import {registerRemoteFrameBatching,remoteFrameQueue} from '../remoteFrame';
 import {BlockEditor} from '../BlockEditor';
 import {registerCustomBlock} from '../registry';
 import {keyBetween} from '@book.dev/sdk';
@@ -10,7 +11,7 @@ import {useBlockEditor, type BlockEditorController} from '../useBlockEditor';
 import {CanvasBlock} from './CanvasBlock';
 import {CanvasHistory} from './history';
 import {insertShapes} from './commands';
-import {canvasDefaults, constructCanvasProps, readCanvas} from './schema';
+import {canvasDefaults, constructCanvasProps, shapeDefaults, readCanvas} from './schema';
 import {bounds, endpoints} from './geometry';
 
 const context={drawImage:vi.fn(),setTransform:vi.fn(),clearRect:vi.fn(),translate:vi.fn(),scale:vi.fn(),save:vi.fn(),restore:vi.fn(),setLineDash:vi.fn(),beginPath:vi.fn(),arc:vi.fn(),ellipse:vi.fn(),rect:vi.fn(),clip:vi.fn(),fill:vi.fn(),stroke:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),fillText:vi.fn(),measureText:(s:string)=>({width:s.length*8})};
@@ -28,7 +29,7 @@ function setup(readOnly=false) {
   const view=render(<App viewOnly={readOnly}/>);
   const viewport=screen.getByLabelText('Drawing viewport');
   act(()=>screen.getByRole('region').focus());fireEvent.keyDown(screen.getByRole('region'),{key:'Enter'});
-  const key=(key:string,more:Record<string,unknown>={})=>fireEvent.keyDown(viewport,{key,...more});
+  const key=(key:string,more:Record<string,unknown>={})=>fireEvent.keyDown(viewport,{key,code:key==='['||key==='{'?'BracketLeft':key===']'||key==='}'?'BracketRight':undefined,...more});
   const tool=(shortcut:string)=>key(shortcut);
   const shapes=()=>readCanvas(findBlock(doc,'canvas')!.block.get('props')).shapes;
   const seed=(kind='rect',x=100)=>{let ids:string[]=[];act(()=>{ids=insertShapes(controller.history!() as CanvasHistory,'canvas',[{kind,ord:keyBetween(shapes()[shapes().length-1]?.scalars.ord as string??null,null),x,y:80,w:120,h:80,...(kind==='arrow'?{h:1,startX:0,startY:0,endX:1,endY:0}:{})}],'Seed');});return ids[0];};
@@ -141,7 +142,7 @@ test('parity detail: marquee and list range both select two; grouped resize and 
   a.key('z',{ctrlKey:true});a.key('z',{ctrlKey:true});expect(a.shapes().map(s=>bounds(s).w)).toEqual([120,120]);equivalentScene(a);
 });
 
-test.each([['back','[',true,'Send to back'],['backward','[',false,'Send backward'],['forward',']',false,'Bring forward'],['front',']',true,'Bring to front']])('parity detail: %s order control and shortcut',(_direction,key,shift,label)=>{
+test.each([['back','{',true,'Send to back'],['backward','[',false,'Send backward'],['forward',']',false,'Bring forward'],['front','}',true,'Bring to front']])('parity detail: %s order control and shortcut',(_direction,key,shift,label)=>{
   const run=(keyboard:boolean)=>{const a=setup();a.seed();a.seed('ellipse',300);a.select();if(keyboard)a.key(String(key),{ctrlKey:true,shiftKey:shift});else fireEvent.click(screen.getByRole('button',{name:String(label)}));const result=a.shapes().map(s=>s.scalars.kind);cleanup();return result;};expect(run(true)).toEqual(run(false));
 });
 
@@ -172,18 +173,27 @@ test.each(['start','mid','end'])('interruption at %s preserves remote geometry a
 });
 
 
-test.each(['capture loss','pointercancel','Escape','focus interruption','permission loss'] as const)('%s tears down pen state: resting touch stays inert, fresh touch pans 40px',route=>{
-  const a=setup();
-  pointer(a.viewport,'down',50,50,{pointerType:'pen',pressure:.4});
+test.each(['capture loss','pointercancel','Escape','focus interruption','permission loss','tool shortcut','tool button','window blur','component unmount','remote deletion','pointerup'] as const)('%s tears down pen state: resting touch stays inert, fresh touch pans 40px',route=>{
+  let a=setup();
+  const removed=route==='remote deletion'?a.seed():null;if(removed)a.select();
+  pointer(a.viewport,'down',removed?130:50,removed?100:50,{pointerType:'pen',pressure:.4});
   pointer(a.viewport,'down',100,100,{pointerType:'touch',pointerId:2});
   const before=context.translate.mock.calls[context.translate.mock.calls.length-1]!;
   if(route==='capture loss')fireEvent.lostPointerCapture(a.viewport,{pointerId:1,pointerType:'pen'});
   else if(route==='pointercancel')fireEvent.pointerCancel(a.viewport,{pointerId:1,pointerType:'pen'});
   else if(route==='Escape')a.key('Escape');
   else if(route==='focus interruption')act(()=>screen.getByRole('button',{name:'After canvas'}).focus());
-  else a.rerender(true);
-  expect(a.shapes()).toHaveLength(0);
-  expect(screen.getByRole('status').textContent).toBe(route==='permission loss'?'View only':'Stroke interrupted');
+  else if(route==='permission loss')a.rerender(true);
+  else if(route==='tool shortcut')a.key('r');
+  else if(route==='tool button')fireEvent.click(screen.getByRole('button',{name:'Rectangle (R)'}));
+  else if(route==='window blur')fireEvent(window,new Event('blur'));
+  else if(route==='component unmount'){cleanup();a=setup();}
+  else if(route==='remote deletion'){
+    const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;(props.get('shapes') as Y.Map<unknown>).delete(removed!);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer)));
+  } else pointer(a.viewport,'up',50,50,{pointerType:'pen',pressure:0});
+  expect(a.shapes()).toHaveLength(route==='pointerup'?1:0);
+  if(route!=='pointerup')expect(a.viewport.querySelector('.ob-canvas-empty')).not.toBeNull();
+  if(!['component unmount','pointerup'].includes(route))expect(screen.getByRole('status').textContent).toBe(route==='permission loss'?'View only':route==='remote deletion'?'Selected object removed':'Stroke interrupted');
   pointer(a.viewport,'move',140,100,{pointerType:'touch',pointerId:2});
   expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual(before);
   pointer(a.viewport,'up',140,100,{pointerType:'touch',pointerId:2});
@@ -200,7 +210,7 @@ test.each(nativeControls.flatMap(label=>['Delete','Backspace'].map(key=>({label,
   const unregisterBlock=registerCustomBlock({type:'canvas',render:props=>{controller=props.editor;return <CanvasBlock {...props}/>;}});
   try {
     const kind=label.startsWith('Start')||label.startsWith('End')?'arrow':label==='Text size'||label==='Canvas text'?'text':'rect';
-    const doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{s:{id:'s',kind,x:100,y:80,w:120,h:80,text:'Native text'}}}}]);
+    const doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{s:{...shapeDefaults,id:'s',kind,x:100,y:80,w:120,h:80,text:'Native text',points:[],pointArity:2}}}}]);
     render(<BlockEditor doc={doc}/>);
     const region=screen.getByRole('region',{name:/Canvas, 1 objects/});act(()=>region.focus());fireEvent.keyDown(region,{key:'Enter'});
     const viewport=screen.getByLabelText('Drawing viewport');fireEvent.keyDown(viewport,{key:'v'});fireEvent.keyDown(viewport,{key:'a',ctrlKey:true});
@@ -222,4 +232,70 @@ test.each(['Delete','Backspace'])('full-page integration: page-level %s still re
     fireEvent.keyDown(screen.getByRole('button',{name:'Page focus'}),{key});
     expect(findBlock(doc,'canvas')).toBeNull();
   } finally {cleanup();unregisterBlock();}
+});
+
+
+test.each(['viewport','native input','text editor'])('app command palette shortcut bubbles from canvas %s while Delete remains owned',where=>{
+  const a=setup();let target:HTMLElement=a.viewport;
+  if(where==='native input')target=screen.getByLabelText('Canvas height');
+  if(where==='text editor'){a.tool('t');a.key('Enter');target=screen.getByLabelText('Canvas text');}
+  act(()=>target.focus());const palette=vi.fn((e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key==='k')e.preventDefault();});document.addEventListener('keydown',palette);
+  try {fireEvent.keyDown(target,{key:'k',metaKey:true});expect(palette).toHaveBeenCalledTimes(1);fireEvent.keyDown(target,{key:'Delete'});expect(palette).toHaveBeenCalledTimes(1);}finally{document.removeEventListener('keydown',palette);}
+});
+
+test.each([['n',120,120],['s',120,80]] as const)('aspect-locked %s handle changes both dimensions and keeps opposite edge fixed', (handle,endY,expectedY)=>{
+  const a=setup();a.seed();a.select();fireEvent.click(screen.getByLabelText('Keep aspect ratio'));
+  const handles=a.viewport.querySelectorAll('.ob-canvas-handle'),el=handles[handle==='n'?1:5];
+  pointer(el,'down',160,handle==='n'?80:160);pointer(a.viewport,'move',160,endY);pointer(a.viewport,'up',160,endY);
+  const b=bounds(a.shapes()[0]);expect(b.h).toBe(40);expect(b.w).toBe(60);expect(b.y).toBe(expectedY);expect(b.x).toBe(130);
+});
+
+test('resize captures on stable viewport through handle removal below size threshold and releases outside',()=>{
+  const a=setup();a.seed();a.select();const edge=a.viewport.querySelectorAll('.ob-canvas-handle')[3];
+  const capture=vi.mocked(HTMLElement.prototype.setPointerCapture);capture.mockClear();pointer(edge,'down',220,120);
+  expect(capture.mock.contexts[0]).toBe(a.viewport);pointer(a.viewport,'move',110,120);
+  expect(edge.isConnected).toBe(false);pointer(a.viewport,'up',-50,120);expect(bounds(a.shapes()[0]).w).toBe(10);
+  // The completed capture leaves no stranded gesture: the next creation works.
+  a.tool('r');pointer(a.viewport,'down',300,200);pointer(a.viewport,'up',300,200);expect(a.shapes()).toHaveLength(2);
+});
+
+test.each(['forward','backward','front','back'] as const)('arrange %s writes only the selected ord in one journal action',direction=>{
+  const a=setup();const ids=[a.seed('rect',100),a.seed('ellipse',300),a.seed('rect',500)];
+  const selected=direction==='forward'||direction==='front'?ids[0]:ids[2];a.tool('v');
+  const x=direction==='forward'||direction==='front'?130:530;pointer(a.viewport,'down',x,100);pointer(a.viewport,'up',x,100);
+  const h=controller.history!() as CanvasHistory,commit=vi.spyOn(h,'commitCanvasCommand');
+  fireEvent.click(screen.getByRole('button',{name:({forward:'Bring forward',backward:'Send backward',front:'Bring to front',back:'Send to back'})[direction]}));
+  expect(commit).toHaveBeenCalledTimes(1);expect(commit.mock.calls[0][1]).toEqual([{blockId:'canvas',shapeId:selected,values:{ord:expect.any(String)}}]);
+  let undo:ReturnType<CanvasHistory['undo']>|undefined;act(()=>{undo=h.undo();});expect(undo?.appliedKeys).toEqual([`canvas/${selected}/ord`]);equivalentScene(a);
+});
+
+test.each(['Canvas height','Zoom percentage','X','Y','Width','Height','Start X','Start Y','End X','End Y','Text size'])('non-finite 1e999 in %s is ignored without throwing or writing',label=>{
+  const a=setup();a.seed(label==='Text size'?'text':'arrow');a.tool('v');a.key('a',{ctrlKey:true});const before=a.shapes();const props=findBlock(a.doc,'canvas')!.block.get('props') as Y.Map<unknown>,height=props.get('height');
+  const input=screen.getByLabelText(label) as HTMLInputElement;const h=controller.history!() as CanvasHistory,commit=vi.spyOn(h,'commitCanvasCommand');
+  // Use text type to keep the explicit overflow string observable to React;
+  // browser number-input sanitization must not be the safety mechanism.
+  input.type='text';expect(()=>fireEvent.change(input,{target:{value:'1e999'}})).not.toThrow();
+  expect(commit).not.toHaveBeenCalled();expect(a.shapes()).toEqual(before);expect(props.get('height')).toBe(height);
+});
+
+
+test.each(['bc-remote','net'] as const)('%s continuous remote burst paints each frame without waiting for quiet',origin=>{
+  const a=setup(),id=a.seed(),peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));
+  const shape=((findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>).get('shapes') as Y.Map<Y.Map<unknown>>).get(id)!;
+  const frames=new Map<number,FrameRequestCallback>();let counter=0;
+  vi.stubGlobal('requestAnimationFrame',(callback:FrameRequestCallback)=>{frames.set(++counter,callback);return counter;});vi.stubGlobal('cancelAnimationFrame',(frame:number)=>frames.delete(frame));
+  const disable=registerRemoteFrameBatching(),queue=remoteFrameQueue(a.doc,origin);peer.on('update',update=>queue.receive(update));
+  try {
+    for(let frame=0;frame<30;frame++){
+      shape.set('x',101+frame*5);const firstScheduled=[...frames.keys()][0];
+      for(let sample=1;sample<5;sample++)shape.set('x',101+frame*5+sample);
+      expect(frames.size).toBe(1);expect([...frames.keys()][0]).toBe(firstScheduled); // New input never moves the frame deadline.
+      const before=context.drawImage.mock.calls.length;
+      act(()=>{for(const callback of [...frames.values()])callback(frame*16);});
+      expect(context.drawImage.mock.calls.length).toBeGreaterThan(before);
+      expect(context.rect.mock.calls[context.rect.mock.calls.length-1][0]).toBe(105+frame*5);
+      expect(a.shapes()[0].scalars.x).toBe(105+frame*5);
+    }
+    equivalentScene(a);expect(readCanvas(findBlock(peer,'canvas')!.block.get('props')).shapes).toEqual(a.shapes());
+  } finally {queue.close();disable();vi.unstubAllGlobals();}
 });
