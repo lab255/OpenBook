@@ -84,7 +84,8 @@
           "active": "BUTTON"
         }
       ],
-      "hiddenFieldTookFocus": false
+      "hiddenFieldTookFocus": false,
+      "hiddenFieldDisabled": true
     },
     {
       "change": "quarantine",
@@ -147,29 +148,30 @@
         {
           "type": "blur",
           "target": "Width",
-          "related": "Canvas, 1 objects, view only",
+          "related": null,
           "active": "body"
         },
         {
           "type": "focusout",
           "target": "Width",
-          "related": "Canvas, 1 objects, view only",
+          "related": null,
           "active": "body"
         },
         {
           "type": "focus",
           "target": "Canvas, 1 objects, view only",
-          "related": "Width",
+          "related": null,
           "active": "Canvas, 1 objects, view only"
         },
         {
           "type": "focusin",
           "target": "Canvas, 1 objects, view only",
-          "related": "Width",
+          "related": null,
           "active": "Canvas, 1 objects, view only"
         }
       ],
-      "hiddenFieldTookFocus": false
+      "hiddenFieldTookFocus": false,
+      "hiddenFieldDisabled": true
     }
   ],
   "paper": {

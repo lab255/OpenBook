@@ -362,3 +362,31 @@ The separate withheld-update reconnect tests remain CLS0 (single and multiple tr
 Full UI production build, full root lint, **272 focused tests**, **8 ledger/fence tests**, **216 exact raster cases against the unoptimized reference**, fresh-server slash/mirror and remote-chrome browser probes, and six document-byte comparisons pass. Raster coverage remains72 cases at each DPR1/1.5/2. Graph checks exclude the editor/remote queue from the viewer and the measurement harness from both production graphs. Viewer remains **852 B**, raw **1,933,227 B**, SHA-256 **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**; this round adds **0 shared-side bytes**. Margin:4096−852=**3244 B**; prior F1 estimate2588 projects3440 total, leaving**656 B**.
 
 Artifacts: `convergence-*.log`, `convergence-validation.json`, `convergence-serve-provenance.json`, `slash-focus.json`, `remote-chrome.json`, refreshed design/raster/graph evidence. The separate harness remains localhost-only; no worker screenshots/video/public exposure. Manager capture refresh, physical IME, screen-reader experience and hardware remain explicitly scoped manual remainders. Full-suite push-hook results are recorded after delivery.
+
+## Final reservation correction — review of 44935994
+
+This section supersedes the overly broad retention description in the preceding convergence round. **Reserved geometry exists only for chrome visible during the current activation that becomes hidden by a remote change while active.** Static readonly (page permission or already-quarantined data) renders a lean Pan-only toolbar, without history/height/Arrange ghost slots. Local deselection, tool changes and deactivation reclaim immediately. Canvas-local transaction observation distinguishes remote scene changes; local selection/tool changes reset the retained properties context. No shared transport policy changed.
+
+The strict original `queryByLabelText(...).toBeNull()` assertions in **“design: inactive controls hide; active properties follow the tool and selection”** are restored. The prior switch to role queries allowed hidden leftover controls and therefore asserted the regression rather than the contract. Remote retention assertions remain strict and separate.
+
+| Correction | Committed regression |
+|---|---|
+| Static readonly is lean | `static readonly %s has only Pan and no editing ghost slots` — page permission and loads-quarantined |
+| Local transitions reclaim | Restored design test; `local deselection and a local tool change after remote deletion reclaim properties` |
+| Remote changes retain, focus survives, controls are inert | Existing net-deletion/quarantine tests; focused-Width test also checks disabled fieldset; native Chromium checks the field itself matches `:disabled` and cannot take focus |
+| Arrange closes on quarantine and stays closed on recovery | `quarantine closes Arrange and local navigation reclaims reserved editing chrome` |
+| Empty text never publishes | `empty/nonempty text on %s blur commits only words` — window and click-away; empty: zero shapes, unchanged encoded document, zero update events, no undo entry; nonempty: one shape plus fresh-replica equality |
+| Insertion focus is now CI-gated | `slash insertion focuses the opted region or non-opted paragraph: %s` — production BlockEditor contenteditable/native beforeinput → SlashMenu → registered renderer, Canvas and Slider mirror |
+
+**Blur policy:** any blur out of the canvas (click-away) and window blur commit only non-empty text; empty text silently cancels. Escape remains explicit cancellation. This approved click-away disposition exceeds the original window-blur-only L4 wording. Arrange's relocation into the footer is an explicitly accepted layout change. Hidden retained properties use a native disabled fieldset as well as inert, so disabling does not depend on React 19 inert support; hidden toolbar/history/height/Arrange controls are disabled too.
+
+| Refreshed native measurement | Result | Deliberate control / scope |
+|---|---|---|
+| Remote deletion, selected shape, Arrange open | CLS **0**; focus restored to Arrange; live/fresh equal | Unsized-canvas CLS **0.06859564237415477** |
+| Remote quarantine, Width focused | CLS **0**; canvas region focused; polite View only; field disabled and cannot take focus; live/fresh equal | Unsized-canvas CLS **0.06962885048835461** |
+| Real slash Canvas insertion | **55/55 frames**, through **910.80ms**, region focused, Pen pressed, 2px solid focus-visible ring inside viewport | Slider mirror **55/55 frames**, through **905.20ms**, following paragraph focused |
+| Raster | **216 exact comparisons**, 72 each at DPR1/1.5/2 | Same-machine native-resolution **unoptimized full-repaint** reference, never optimized self-comparison; settled identity and gesture-scoped differences; cleared-reference controls fire |
+
+Native browser evidence is numeric/DOM evidence, not a worker screenshot claim. Manager capture refresh remains separate. Both remote CLS rows preserve canvas584px/property116px and footer/following-paragraph positions. `remote-chrome.json` now includes `hiddenFieldDisabled:true` for both. Fresh-server transformed source provenance is in `reservation-serve-provenance.json`. Reconnect/design controls and six document-byte comparisons were rerun successfully; no document bytes moved. The full SDK validation set remains unchanged.
+
+**Validation:** full UI production build, exact root `pnpm run lint` (including full-package UI lint), **280 focused tests**, **8 ledger/fence tests**, raster and graph fences pass. API matrix generator passes48 catalogue types +9 plugin blocks, no exemptions and no generated diff. Viewer coordinate remains **852 B**; raw **1,933,227 B**, SHA256 **67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198**. This correction adds **0 shared-side bytes**. Margin remains4096−852=**3244 B**; prior F1 estimate2588 projects3440 total, **656 B** remaining. `reservation-*.log` records these checks; full pre-push suites run again before delivery.

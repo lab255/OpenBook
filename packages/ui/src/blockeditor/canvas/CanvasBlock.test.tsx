@@ -26,8 +26,8 @@ beforeEach(()=>{
   HTMLElement.prototype.releasePointerCapture=vi.fn(function(this:HTMLElement,id:number){captures.get(this)?.delete(id);});
 });
 afterEach(()=>{cleanup();unregister();vi.restoreAllMocks();});
-function setup(readOnly=false) {
-  const doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);
+function setup(readOnly=false,quarantined=false) {
+  const doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,canvasVersion:quarantined?2:1,shapes:{}}}]);
   function App({viewOnly=false}:{viewOnly?:boolean}){controller=useBlockEditor(doc);return <><button>Before canvas</button><div data-block-row="canvas"><CanvasBlock block={rootBlocks(doc).get(0)} editor={controller} pageReadOnly={viewOnly}/></div><button>After canvas</button></>;}
   const view=render(<App viewOnly={readOnly}/>);
   const viewport=screen.getByLabelText('Drawing viewport');
@@ -329,8 +329,8 @@ test.each(['r','o','a','t'])('design: keyboard %s centers the whole shape in wor
 });
 test('design: inactive controls hide; active properties follow the tool and selection',()=>{
   const a=setup();act(()=>screen.getByRole('button',{name:'After canvas'}).focus());expect(screen.queryByLabelText('Stroke color value')).toBeNull();expect(screen.queryByLabelText('Zoom percentage')).toBeNull();expect(screen.queryByRole('separator')).toBeNull();
-  act(()=>screen.getByRole('region').focus());a.tool('v');expect(screen.queryByRole('textbox',{name:'Stroke color value'})).toBeNull();a.seed();a.select();expect(screen.getByLabelText('Width')).toBeTruthy();
-  a.tool('h');expect(screen.queryByRole('spinbutton',{name:'Width'})).toBeNull();expect(screen.queryByRole('textbox',{name:'Stroke color value'})).toBeNull();expect(a.view.container.querySelector('.ob-canvas-properties')?.getAttribute('aria-hidden')).toBe('true');expect(screen.getByLabelText('Zoom percentage')).toBeTruthy();
+  act(()=>screen.getByRole('region').focus());a.tool('v');expect(screen.queryByLabelText('Stroke color value')).toBeNull();a.seed();a.select();expect(screen.getByLabelText('Width')).toBeTruthy();
+  a.tool('h');expect(screen.queryByLabelText('Width')).toBeNull();expect(screen.queryByLabelText('Stroke color value')).toBeNull();expect(a.view.container.querySelector('.ob-canvas-properties')).toBeNull();expect(screen.getByLabelText('Zoom percentage')).toBeTruthy();
 });
 test('design: named color swatches and editable value both change the selection',()=>{
   const a=setup();a.seed();a.select();fireEvent.click(screen.getByRole('button',{name:'Stroke: Red'}));expect(a.shapes()[0].scalars.stroke).toBe('#b91c1c');a.field('Stroke color value','#123456');expect(a.shapes()[0].scalars.stroke).toBe('#123456');fireEvent.click(screen.getByRole('button',{name:'Fill: Blue'}));expect(a.shapes()[0].scalars.fill).toBe('#1d4ed8');equivalentScene(a);
@@ -373,7 +373,7 @@ test.each(['delete','quarantine'])('delta: remote %s hides editing controls whil
 test('M2: quarantine while Width owns focus restores the region and makes the retained field inert',()=>{
   const a=setup();a.seed();a.select();const field=screen.getByLabelText('Width');act(()=>field.focus());
   const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));(findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>).set('canvasVersion',2);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));
-  expect(document.activeElement).toBe(screen.getByRole('region'));expect(field.closest('[inert]')).not.toBeNull();expect(screen.queryByRole('spinbutton',{name:'Width'})).toBeNull();expect(a.view.container.querySelector('.ob-canvas-live')?.textContent).toBe('View only');
+  expect(document.activeElement).toBe(screen.getByRole('region'));expect(field.closest('[inert]')).not.toBeNull();expect(field.closest('fieldset')?.disabled).toBe(true);expect(screen.queryByRole('spinbutton',{name:'Width'})).toBeNull();expect(a.view.container.querySelector('.ob-canvas-live')?.textContent).toBe('View only');
   const before=Y.encodeStateAsUpdate(a.doc);fireEvent.change(field,{target:{value:'500'}});expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);
   act(()=>screen.getByRole('button',{name:'After canvas'}).focus());expect(a.view.container.querySelector('.ob-canvas-properties')).toBeNull();expect(a.view.container.querySelector('.ob-canvas-footer')).toBeNull();equivalentScene(a);
 });
@@ -384,4 +384,34 @@ test('text blur commits words and resets pen contact without promoting a resting
   const before=context.translate.mock.calls[context.translate.mock.calls.length-1]!;fireEvent(window,new Event('blur'));expect(a.shapes()[0].scalars.text).toBe('Pen-entered text');expect(a.viewport.hasPointerCapture(1)).toBe(false);
   pointer(a.viewport,'move',140,100,{pointerType:'touch',pointerId:2});expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual(before);pointer(a.viewport,'up',140,100,{pointerType:'touch',pointerId:2});
   pointer(a.viewport,'down',100,100,{pointerType:'touch',pointerId:3});pointer(a.viewport,'move',140,100,{pointerType:'touch',pointerId:3});pointer(a.viewport,'up',140,100,{pointerType:'touch',pointerId:3});expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual([before[0]+40,before[1]]);equivalentScene(a);
+});
+
+test.each(['window','click-away'])('empty/nonempty text on %s blur commits only words',route=>{
+  const a=setup();
+  for(const text of ['', 'Typed words']){
+    a.tool('t');a.key('Enter');a.field('Canvas text',text);
+    const before=Y.encodeStateAsUpdate(a.doc),updates=vi.fn();a.doc.on('update',updates);
+    if(route==='window')fireEvent(window,new Event('blur'));else act(()=>screen.getByRole('button',{name:'After canvas'}).focus());
+    expect(screen.queryByLabelText('Canvas text')).toBeNull();expect(a.shapes()).toHaveLength(text?1:0);
+    if(!text){expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);expect(updates).not.toHaveBeenCalled();expect(controller.history?.()?.availability?.undo).toBeNull();}
+    a.doc.off('update',updates);act(()=>screen.getByRole('region').focus());
+  }
+  equivalentScene(a);
+});
+test.each(['permission','quarantine'])('static readonly %s has only Pan and no editing ghost slots',kind=>{
+  const a=setup(kind==='permission',kind==='quarantine');expect(within(screen.getByRole('toolbar')).getAllByRole('button',{hidden:true})).toHaveLength(1);
+  expect(screen.getByRole('button',{name:'Pan (H)'})).toBeTruthy();expect(screen.queryByLabelText('Canvas height')).toBeNull();expect(a.view.container.querySelector('.ob-canvas-history')).toBeNull();expect(a.view.container.querySelector('.ob-canvas-height-slot')).toBeNull();
+});
+
+test('local deselection and a local tool change after remote deletion reclaim properties',()=>{
+  const a=setup();a.seed();a.select();a.key('Escape');expect(screen.queryByLabelText('Width')).toBeNull();expect(a.view.container.querySelector('.ob-canvas-properties')).toBeNull();
+  a.select();const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;(props.get('shapes') as Y.Map<unknown>).clear();act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));
+  expect(screen.getByLabelText('Width').closest('[aria-hidden="true"]')).toBeTruthy();a.tool('h');expect(screen.queryByLabelText('Width')).toBeNull();equivalentScene(a);
+});
+test('quarantine closes Arrange and local navigation reclaims reserved editing chrome',()=>{
+  const a=setup();a.seed();a.select();fireEvent.click(screen.getByRole('button',{name:'Arrange'}));
+  const peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(a.doc));const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;props.set('canvasVersion',2);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));
+  expect(screen.queryByRole('menu',{hidden:true})).toBeNull();expect(document.activeElement).toBe(screen.getByRole('region'));
+  a.tool('h');expect(screen.queryByLabelText('Width')).toBeNull();expect(screen.queryByLabelText('Canvas height')).toBeNull();expect(within(screen.getByRole('toolbar')).getAllByRole('button',{hidden:true})).toHaveLength(1);
+  props.set('canvasVersion',1);act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(peer),'net'));expect(screen.queryByRole('menu')).toBeNull();equivalentScene(a);
 });

@@ -29,17 +29,25 @@ function ColorControl({name,value,onChange,tab,fill=false}:{name:string;value:st
     <input tabIndex={tab} aria-label={fill?'Fill color or none':'Stroke color value'} value={value} onChange={e=>onChange(e.target.value)}/>
   </div>;
 }
-// Keep the last visible controls in flow when a remote change makes them
-// unavailable. Visibility removes hit-testing and focus without moving chrome.
-function ReservedProperties({visible,children}:{visible:boolean;children:ReactNode}) {
+// Rule 14a: reserve only previously visible chrome hidden remotely during this
+// activation. Local selection/tool changes reset the key; inactive chrome unmounts.
+function ReservedProperties({visible,reserve,children}:{visible:boolean;reserve:boolean;children:ReactNode}) {
   const retained=useRef<ReactNode>(null);
-  if(visible)retained.current=children;
-  return retained.current?<div className="ob-canvas-properties" aria-label="Canvas properties" inert={!visible} aria-hidden={!visible} style={{visibility:visible?'visible':'hidden'}}>{retained.current}</div>:null;
+  if(visible)retained.current=children;else if(!reserve)retained.current=null;
+  return retained.current?<div className="ob-canvas-properties" aria-label="Canvas properties" inert={!visible} aria-hidden={!visible} style={{visibility:visible?'visible':'hidden'}}><fieldset disabled={!visible} style={{display:'contents'}}>{retained.current}</fieldset></div>:null;
 }
 export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   const id=String(block.get('id')),props=block.get('props');
   const scene=useMemo(()=>readCanvas(props),[props,editor.version]),readOnly=pageReadOnly||!scene.editable;
-  const [tool,setTool]=useState<Tool>('stroke'),[active,setActive]=useState(false),[selected,setSelected]=useState<Set<string>>(new Set());
+  const [tool,updateTool]=useState<Tool>('stroke'),[active,setActive]=useState(false),[selected,setSelected]=useState<Set<string>>(new Set());
+  const [localChromeEpoch,setLocalChromeEpoch]=useState(0);
+  const remoteChrome=useRef(false),editingChromeSeen=useRef(false);
+  const localChromeChange=()=>{setLocalChromeEpoch(value=>value+1);remoteChrome.current=false;if(readOnly)editingChromeSeen.current=false;};
+  const setTool=(next:Tool)=>{localChromeChange();updateTool(next);};
+  useEffect(()=>{const observe=(transaction:{local:boolean})=>{remoteChrome.current=!transaction.local;};editor.doc.on('afterTransaction',observe);return()=>editor.doc.off('afterTransaction',observe);},[editor.doc]);
+  if(!active)editingChromeSeen.current=false;
+  else if(!readOnly)editingChromeSeen.current=true;
+  const keepEditingChrome=!readOnly||editingChromeSeen.current;
   const [camera,setCamera]=useState<Camera>({x:0,y:0,zoom:1}),[width,setWidth]=useState(640),[heightPreview,setHeightPreview]=useState<number|null>(null);
   const height=heightPreview??Number(get(props,'height')??360);
   const [objects,setObjects]=useState(false),[help,setHelp]=useState(false),[arrangeOpen,setArrangeOpen]=useState(false),[listFocus,setListFocus]=useState(0),[toolbarFocus,setToolbarFocus]=useState<Tool>('stroke');
@@ -67,7 +75,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       paint(canvas.current,current.scene.shapes.map(s=>overrides.get(s.id)??s),current.camera,current.width,current.height);
     }else paintCache.current!.draw(canvas.current,current.scene.shapes,[...preview,...(current.keyboardPath?[current.keyboardPath]:[])],current.camera,current.width,current.height);
   };
-  const choose=(ids:Iterable<string>)=>{const next=new Set(ids);setSelected(next);announce(`${next.size} object${next.size===1?'':'s'} selected`);};
+  const choose=(ids:Iterable<string>)=>{localChromeChange();const next=new Set(ids);setSelected(next);announce(`${next.size} object${next.size===1?'':'s'} selected`);};
   const commit=(action:string,changes:{shapeId?:string;values:Record<string,unknown>}[])=>{
     if(latest.current.readOnly)return;
     const h=history();if(!h)return;
@@ -123,7 +131,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     }
     lastScene.current=scene.shapes;
   },[editor.version]);
-  useLayoutEffect(()=>{if(readOnly){if(active)region.current?.focus();cancel();setTool('pan');setToolbarFocus('pan');announce('View only');}},[readOnly]);
+  useLayoutEffect(()=>{if(readOnly){setArrangeOpen(false);if(active)region.current?.focus();cancel();updateTool('pan');setToolbarFocus('pan');announce('View only');}},[readOnly]);
   const pointerPosition=(e:{clientX:number;clientY:number}):Point=>{const r=viewport.current!.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
   const center=()=>world({x:width/2,y:height/2},camera);
   const create=(inputs:readonly Record<string,unknown>[],action:string,selectCreated=true)=>{
@@ -142,7 +150,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   };
   const finishShape=(s:SceneShape)=>{create([{...s.scalars,points:s.points,pointArity:s.pointArity}],names[String(s.scalars.kind)],s.scalars.kind!=='stroke');if(s.scalars.kind!=='stroke')setTool('select');};
   const startText=(p:Point,s?:SceneShape)=>{if(readOnly)return;setTextEdit({id:s?.id,x:s?number(s,'x'):p.x,y:s?number(s,'y'):p.y,w:s?number(s,'w'):200,h:s?number(s,'h'):100,text:s?String(s.scalars.text):''});};
-  const finishText=(restoreFocus=true)=>{if(!textEdit||readOnly)return;resetContact();if(textEdit.id)commit('Edit text',[{shapeId:textEdit.id,values:{text:textEdit.text}}]);else create([{kind:'text',...textEdit,stroke,fill,strokeWidth}],'Text');setTextEdit(null);setTool('select');if(restoreFocus)viewport.current?.focus();};
+  const finishText=(restoreFocus=true)=>{if(!textEdit||readOnly)return;resetContact();if(textEdit.text.length){if(textEdit.id)commit('Edit text',[{shapeId:textEdit.id,values:{text:textEdit.text}}]);else create([{kind:'text',...textEdit,stroke,fill,strokeWidth}],'Text');}setTextEdit(null);setTool('select');if(restoreFocus)viewport.current?.focus();};
   interruptLatest.current=()=>{if(textEdit)finishText(false);else cancel();};
   const remove=(ids:Iterable<string>)=>{if(readOnly)return;const h=history();if(h){eraseShapes(h,id,[...ids]);choose([]);announce('Objects erased');refresh(n=>n+1);}};
   const duplicate=()=>{create(chosen.map(s=>({...s.scalars,x:number(s,'x')+10,y:number(s,'y')+10,pointArity:s.pointArity,points:s.points})),'Duplicate');};
@@ -326,10 +334,10 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
         const index=visibleTools.findIndex(t=>t[0]===toolbarFocus),next=e.key==='Home'?0:e.key==='End'?visibleTools.length-1:(index+(e.key==='ArrowLeft'?-1:1)+visibleTools.length)%visibleTools.length;
         setToolbarFocus(visibleTools[next][0]);e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([aria-hidden=true])')[next]?.focus();
       }}>
-        {tools.map(([value,name,shortcut])=><button key={value} type="button" aria-label={`${name} (${shortcut})`} title={`${name} (${shortcut})`} aria-hidden={readOnly&&value!=='pan'} style={{visibility:readOnly&&value!=='pan'?'hidden':'visible'}} aria-pressed={tool===value} tabIndex={active&&toolbarFocus===value?0:-1} onClick={()=>{activate();cancel();setTool(value);setToolbarFocus(value);viewport.current?.focus();}}>{(() => {const Icon=toolIcons[value];return <Icon size={18} aria-hidden="true"/>;})()}</button>)}
+        {(keepEditingChrome?tools:visibleTools).map(([value,name,shortcut])=><button key={value} type="button" aria-label={`${name} (${shortcut})`} title={`${name} (${shortcut})`} disabled={readOnly&&value!=='pan'} aria-hidden={readOnly&&value!=='pan'} style={{visibility:readOnly&&value!=='pan'?'hidden':'visible'}} aria-pressed={tool===value} tabIndex={active&&toolbarFocus===value?0:-1} onClick={()=>{activate();cancel();setTool(value);setToolbarFocus(value);viewport.current?.focus();}}>{(() => {const Icon=toolIcons[value];return <Icon size={18} aria-hidden="true"/>;})()}</button>)}
       </div>
       <span className="ob-canvas-title">Canvas</span><span className="ob-canvas-status">{readOnly?'View only':''}</span>
-      <div className="ob-canvas-history" aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}}><button type="button" tabIndex={tab} aria-label={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} title={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} disabled={!canUndo} onClick={()=>undo()}><Undo2 size={16} aria-hidden="true"/></button><button type="button" tabIndex={tab} aria-label={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} title={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} disabled={!canRedo} onClick={()=>undo(true)}><Redo2 size={16} aria-hidden="true"/></button></div>
+      {keepEditingChrome&&<div className="ob-canvas-history" aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}}><button type="button" tabIndex={tab} aria-label={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} title={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} disabled={readOnly||!canUndo} onClick={()=>undo()}><Undo2 size={16} aria-hidden="true"/></button><button type="button" tabIndex={tab} aria-label={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} title={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} disabled={readOnly||!canRedo} onClick={()=>undo(true)}><Redo2 size={16} aria-hidden="true"/></button></div>}
       <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-label="Help (?)" aria-expanded={help} onClick={()=>{setObjects(false);setArrangeOpen(false);setHelp(v=>!v);}}><HelpCircle size={16} aria-hidden="true"/></button>      {help&&<div className="ob-canvas-help" role="dialog" aria-label="Canvas help" onPointerDown={e=>e.stopPropagation()}>
         <strong>Canvas shortcuts</strong><p>Pen draws. Fingers move the view.</p>
         <p>{readOnly?'H Pan.':'V Select · P Pen · R Rectangle · O Ellipse · A Arrow · T Text · E Erase · H Pan.'} +/− Zoom · 0 Fit · 1 Actual size · ? Help.</p>
@@ -358,7 +366,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
         onPointerDown={e=>e.stopPropagation()} onChange={e=>setTextEdit({...textEdit,text:e.target.value})} onKeyDown={e=>{if(composing.current||e.nativeEvent.isComposing)return;if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.stopPropagation();e.preventDefault();finishText();}if(e.key==='Escape'){e.stopPropagation();e.preventDefault();cancel();viewport.current?.focus();}}}/>}
 
     </div>
-    {active&&<ReservedProperties visible={!readOnly&&(tool!=='select'||chosen.length>0)&&tool!=='pan'&&tool!=='erase'}>
+    {active&&<ReservedProperties key={localChromeEpoch} reserve={remoteChrome.current||readOnly} visible={!readOnly&&(tool!=='select'||chosen.length>0)&&tool!=='pan'&&tool!=='erase'}>
 
       {!readOnly&&<>
         {(['stroke','rect','ellipse','arrow','text'].includes(tool)||tool==='select'&&chosen.length>0)&&<>
@@ -379,13 +387,13 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       </>}
     </ReservedProperties>}
     {active&&<div className="ob-canvas-footer">
-      <div style={{visibility:readOnly?'hidden':'visible'}} aria-hidden={readOnly}>
-        <div className="ob-canvas-popup-anchor"><button ref={arrangeTrigger} type="button" tabIndex={tab} aria-disabled={readOnly||!chosen.length} aria-haspopup="menu" aria-expanded={arrangeOpen} onClick={()=>{if(readOnly||!chosen.length)return;setObjects(false);setHelp(false);setArrangeOpen(v=>!v);}}>Arrange</button>
+      {keepEditingChrome&&<div style={{visibility:readOnly?'hidden':'visible'}} aria-hidden={readOnly}>
+        <div className="ob-canvas-popup-anchor"><button ref={arrangeTrigger} disabled={readOnly} type="button" tabIndex={tab} aria-disabled={readOnly||!chosen.length} aria-haspopup="menu" aria-expanded={arrangeOpen} onClick={()=>{if(readOnly||!chosen.length)return;setObjects(false);setHelp(false);setArrangeOpen(v=>!v);}}>Arrange</button>
           {arrangeOpen&&<div className="ob-canvas-arrange" role="menu" aria-label="Arrange" onKeyDown={e=>{if(!['ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();const items=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('button')],index=items.indexOf(document.activeElement as HTMLButtonElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowUp'?-1:1)+items.length)%items.length]?.focus();}}>
             {(['back','backward','forward','front'] as const).map(direction=><button key={direction} role="menuitem" type="button" tabIndex={tab} onClick={()=>{arrange(direction);setArrangeOpen(false);viewport.current?.focus();}}>{({back:'Send to back',backward:'Send backward',forward:'Bring forward',front:'Bring to front'})[direction]}</button>)}
           </div>}
         </div>
-      </div>
+      </div>}
       <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-expanded={objects} onClick={()=>{setHelp(false);setArrangeOpen(false);setObjects(v=>!v);}}>Objects</button>      {objects&&<div className="ob-canvas-objects" onPointerDown={e=>e.stopPropagation()}>
         <div role="listbox" aria-label="Objects" aria-multiselectable="true">
           {scene.shapes.length?scene.shapes.map((s,i)=><div key={s.id} role="option" data-object-index={i} aria-selected={selected.has(s.id)} tabIndex={active&&i===listFocus?0:-1} onFocus={()=>{setListFocus(i);focusedObject.current=s.id;}} onClick={e=>{const ids=new Set(e.shiftKey?selected:[]);if(e.shiftKey&&ids.has(s.id))ids.delete(s.id);else ids.add(s.id);choose(ids);}}
@@ -403,9 +411,9 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       <button type="button" tabIndex={tab} aria-label="Zoom out" onClick={()=>zoom(camera.zoom/1.2)}>−</button>
       <label>Zoom<input type="number" aria-label="Zoom percentage" tabIndex={tab} min="10" max="400" value={Math.round(camera.zoom*100)} onChange={e=>{if(e.target.value!=='')zoom(Number(e.target.value)/100);}}/></label>
       <button type="button" tabIndex={tab} aria-label="Zoom in" onClick={()=>zoom(camera.zoom*1.2)}>+</button><button type="button" tabIndex={tab} onClick={fit}>Fit</button><button type="button" tabIndex={tab} onClick={()=>zoom(1)}>Actual size</button>
-      <label aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}}>Canvas height<input type="number" tabIndex={tab} min="240" max="960" value={height} onChange={e=>{if(e.target.value!==''&&Number.isFinite(Number(e.target.value)))commit('Resize canvas',[{values:{height:Number(e.target.value)}}]);}}/></label>
+      {keepEditingChrome&&<label aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}}>Canvas height<input disabled={readOnly} type="number" tabIndex={tab} min="240" max="960" value={height} onChange={e=>{if(e.target.value!==''&&Number.isFinite(Number(e.target.value)))commit('Resize canvas',[{values:{height:Number(e.target.value)}}]);}}/></label>}
     </div>}
-    {active&&<div className="ob-canvas-height-slot"><div aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}} className="ob-canvas-height" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin={240} aria-valuemax={960} aria-valuenow={height} tabIndex={tab}
+    {active&&keepEditingChrome&&<div className="ob-canvas-height-slot"><div aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}} className="ob-canvas-height" role="separator" aria-label="Resize canvas height" aria-orientation="horizontal" aria-valuemin={240} aria-valuemax={960} aria-valuenow={height} tabIndex={tab}
       onPointerDown={e=>startGesture(e,'height')} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={()=>cancel()} onLostPointerCapture={e=>{if(gesture.current?.pointer===e.pointerId)cancel();}}
       onKeyDown={e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();commit('Resize canvas',[{values:{height:height+(e.key==='ArrowUp'?-16:16)}}]);}}}/>
     </div>}
