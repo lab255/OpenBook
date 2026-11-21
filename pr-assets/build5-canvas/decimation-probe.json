@@ -1,15 +1,16 @@
 {
-  "commit": "3e9ab726",
+  "commit": "8648e124",
+  "recipe": "Production next build + next start (127.0.0.1:3195), per-worker isolated data server, SINGLE_PROCESS=1 Chromium, fresh browser per case, 1280x800 DPR1, expanded posture, pen tool, same camera before/after. before = mid-gesture (pointer held, raw samples); after = committed (pointerup, decimated + curve-rendered).",
+  "diffMethod": "Exact RGB inequality per pixel. wholeFramePct over 1280x800 (includes Undo enabling after commit); drawingAreaPct over the expanded drawing surface only.",
   "pairs": {
-    "100": {
-      "zoomShown": "100",
-      "regionLabel": "Canvas, 1 objects, editable",
-      "inputPoints": 176
-    },
-    "400": {
-      "zoomShown": "400",
-      "regionLabel": "Canvas, 1 objects, editable",
-      "inputPoints": 176
-    }
+    "100-wave": {"inputPoints": 176, "regionLabel": "Canvas, 1 objects, editable", "wholeFramePct": 0.33, "drawingAreaPct": 0.416},
+    "400-wave": {"inputPoints": 176, "regionLabel": "Canvas, 1 objects, editable", "wholeFramePct": 0.607, "drawingAreaPct": 0.773},
+    "400-zigzag": {"inputPoints": 281, "regionLabel": "Canvas, 1 objects, editable", "wholeFramePct": 0.854, "drawingAreaPct": 1.091, "teeth": "10 sharp vertices, heights 160 -> 16 screen px (40 -> 4 world units)"},
+    "100-zigzag": {"inputPoints": 281, "regionLabel": "Canvas, 1 objects, editable", "wholeFramePct": 0.438, "drawingAreaPct": 0.555}
+  },
+  "round2Control": {
+    "commit": "3e9ab726",
+    "note": "Identical paths replayed against a production build of the round-2 head. Mid-gesture frames are byte-identical across rounds (0 px), so the camera/input is controlled.",
+    "committedFrameRound2VsRound3DrawingAreaPct": {"100-wave": 0.111, "400-wave": 0.045, "400-zigzag": 0.0, "100-zigzag": 0.069}
   }
 }
