@@ -31,6 +31,27 @@ export function useExpansion(region: RefObject<HTMLDivElement|null>) {
       transitioning.current=false;
     }
   },[expanded,host]);
+  useLayoutEffect(()=>{
+    if(!expanded)return;
+    const dialogs='[role="dialog"],[role="alertdialog"]';
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    // Radix resumes the underlying scope after close-autofocus, but a keyboard
+    // dialog has no trigger to restore. Its portal removal is outside our scope's
+    // own observer. Reclaim BODY only after that teardown; never steal from a
+    // live modal or an explicitly focused element, and never run inline.
+    const observer=new MutationObserver(records=>{
+      if(!records.some(record=>!region.current?.contains(record.target)&&[...record.removedNodes].some(node=>node instanceof Element&&(node.matches(dialogs)||node.querySelector(dialogs)))))return;
+      clearTimeout(timer);
+      timer=setTimeout(()=>{
+        const surface=region.current;
+        if(!surface?.isConnected||document.activeElement!==document.body)return;
+        const otherDialog=[...document.querySelectorAll(dialogs)].some(el=>!surface.contains(el)&&el.getAttribute('data-state')!=='closed'&&el.getClientRects().length>0);
+        if(!otherDialog)surface.focus({preventScroll:true});
+      },0);
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
+    return()=>{observer.disconnect();clearTimeout(timer);};
+  },[expanded,region]);
   useLayoutEffect(()=>()=>host.remove(),[host]);
   return {host,slot,expanded,reservedHeight,transitioning,toggle};
 }

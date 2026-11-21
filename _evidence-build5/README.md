@@ -2,7 +2,7 @@ Canvas blocks now expand into the viewport without remounting the canvas, show b
 
 Audited at: `147cdf1c94c62b95f38147e5082fffdf8713b5f9`.
 
-Round 3 addresses the code gate and the design follow-ups. Code re-review and manager perceptual no-jump acceptance remain pending. No worker screenshots, video, or public exposure.
+Round 3 addresses the code gate and the design follow-ups. The manager has cleared the nine round3 items and perceptual pairs; the final modal-close focus correction is described below. No worker screenshots, video, or public exposure.
 
 ## Deferral replay
 
@@ -97,7 +97,7 @@ The +26 B was a seam leak: `ViewerApp.PageView` renders `PresentBlocks`, whose l
 
 - `round3-layers.json`: actual production Next app, light/dark at1280×800 and1024×640. Sidebar is covered; Back/title/all8 tools hittable. Arrange and app command palette/dialog/toast/lightbox paint above the intended surfaces and remain interactive. Inline placement/focus mirrors and the too-tall scroll proof pass. Canvas-free pages before mounting and after unmounting contain no canvas interceptor; the planted overlay makes the hit-test control fail as intended.
 - `browser.json`: asserted736px column, properties two rows/80px; five enter/exit cycles at each100/200/400% preserve local view, selection, scroll and focus, with drift control and reload. Expansion is input-adjacent and not claimed as CLS evidence. Isolated unscrolled remote join/move/leave/delete/quarantine CLS legs have firing controls outside recent input. The earlier dead scrolled control was **scroll anchoring**, shown by scroll124→274 offsetting a150px insertion, not merely hypothesized input exclusion.
-- `round3-ink-raster.json`:12 numerical raster pairs at100%/400%; no screenshots saved. **Round3 is less smoothed at sharp turns than round2 because original-sample fidelity is now enforced.** This is the contract being honored. Manager must judge the perceptual pairs; numeric differences are not relabeled “imperceptible.” `round2-raster-equivalence.json` was rerun:216 cache/full-paint cases over DPR1/1.5/2, all with firing controls.
+- `round3-ink-raster.json`:12 numerical raster pairs at100%/400%; no screenshots saved. **Round3 is less smoothed at sharp turns than round2 because original-sample fidelity is now enforced.** This is the contract being honored. The manager has now judged the perceptual pairs: smooth no-jump and faithful-sharp zigzags. Numeric differences alone were not relabeled “imperceptible.” `round2-raster-equivalence.json` was rerun:216 cache/full-paint cases over DPR1/1.5/2, all with firing controls.
 - Return uses Minimize. Hover-only, pointer-transparent peers have no Tab stops; hover reveal does not block the next draw. Remote outlines offset3px outside bounds; **offset plus label** is the non-color cue. Grid is paper-relative in both themes. Snap guides are32px stationary segments. X/Y fields show preview bounds and remain controlled through a complete gesture, with a planted React-warning control.
 
 Escape's gesture→selection→posture ladder is accepted as spec-correct. F/Back preserve selection; recapture includes F→F selection survival. White paper in dark mode is a document value; the expanded white slab is an owner taste note. Pen-default bare-click draws per UX§8 step9; stray-dot feel remains a human-acceptance item.
@@ -123,3 +123,11 @@ Hardware/Pencil, physical latency, screen-reader experience, physical IME and hu
 Environmental pre-clears: shared-worktree Husky `.git/config` warning with full hooks retained; ordinary workspace builds; Next dev Watchpack EMFILE in this sandbox uses production build/start (escalate production/outside-sandbox EMFILE). Single-process Chromium uses **one browser process per client/theme/context**: closing the sole page or opening a second context's page may kill it. Escalate unexplained death with a single live page. Source mismatch is a failing measurement, never a passing result.
 
 Evidence-layer correction: `checkGraphs.mjs` now emits `viewer.json` from the production artifact and checks coordinate/raw bytes/SHA256 against freshly read artifact bytes before write and after JSON read-back. A failed emission removes its output, so stale evidence cannot survive as a success. The planted878-coordinate control fails and leaves no file; correct852 emission and same-size changed-hash controls pass/fail respectively. The regenerated `viewer.json` agrees with the852-coordinate mechanism record and README.
+
+## Final focus-recovery micro-round
+
+The manager cleared all nine round3 gate items, including independent440-stroke fidelity fuzz and perceptual pairs (smooth no-jump; zigzag faithful-sharp and byte-identical to round2). This final correction addresses only the residual modal-close focus gap.
+
+Radix resumes an underlying FocusScope after dialog teardown, but keyboard-opened dialogs have no trigger to restore and their removed portals sit outside the canvas observer. Expanded canvas now observes external dialog removal, then reclaims BODY focus after teardown only when no other visible dialog remains open. It does not steal an explicitly focused element and is disabled inline. No shared dialog or transport code changed.
+
+The production native regression fails on the prior build at palette Escape, then passes after the correction: palette Escape and Settings Escape each restore focus inside the expanded surface and keep Tab/Shift+Tab contained, in both themes and both1280×800/1024×640 viewports. Settings is again closed with **Escape**, not the close button. Open-modal focus and inline modal-close mirrors pass. All other layer/scroll checks remain intact in `round3-layers.json`. Focused canvas suite144 passes; production UI and Next builds pass.

@@ -11,6 +11,12 @@ test('BUILD-5 real shell layer relationships',async({page,request})=>{
   await page.goto(`/?page=${id}`);await expect(page.getByRole('button',{name:'Page actions'})).toBeVisible();
   const rows:unknown[]=[];const save=()=>writeFileSync('../../_evidence-build5/round3-layers.json',JSON.stringify({scope:'Real production Next app + isolated data server; native hit testing at 1280x800 and 1024x640 light/dark, inline mirror1280x1400, too-tall1024x240. No screenshots/trace/video.',rows},null,2));
   const hit=async(selector:string)=>page.locator(selector).first().evaluate(el=>{const r=el.getBoundingClientRect(),target=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {name:el.getAttribute('aria-label')||el.textContent,hittable:el===target||el.contains(target),canvasOnTop:!!target?.closest('.ob-canvas-expanded'),z:getComputedStyle(el).zIndex,rect:r.toJSON()};});
+  const assertModalReturn=async(route:string)=>{
+    const inside=()=>page.locator('.ob-canvas-expanded').evaluate(el=>el.contains(document.activeElement));
+    await expect.poll(inside,{message:`${route}: close restores focus inside expanded canvas`}).toBe(true);
+    for(const key of ['Tab','Shift+Tab']){await page.keyboard.press(key);expect(await inside()).toBe(true);}
+    rows.push({modalReturn:route,focusInside:true,tabAndShiftTabContained:true});save();
+  };
   const checkCanvasAbsent=async(phase:string)=>{
     await page.goto(`/?page=${toastId}`);await expect(page.getByRole('button',{name:'Page actions'})).toBeVisible();
     await expect(page.locator('.ob-canvas')).toHaveCount(0);
@@ -48,12 +54,22 @@ test('BUILD-5 real shell layer relationships',async({page,request})=>{
         const first=await hit(`${selector} ${item}`);rows.push({theme,vw,vh,name,menu,first});save();expect(menu.within).toBe(true);expect(first.hittable).toBe(true);
         await page.getByRole('button',{name,exact:true}).click();
       }
-      await page.keyboard.press('ControlOrMeta+k');await expect(page.getByPlaceholder(/Search pages or run a command/)).toBeVisible();const palette=await hit('[cmdk-input]');rows.push({theme,palette});save();expect(palette.hittable).toBe(true);expect(palette.canvasOnTop).toBe(false);
-      await page.getByPlaceholder(/Search pages or run a command/).fill('Open settings');await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();const dialog=await hit('[role="dialog"]');rows.push({theme,dialog});save();expect(dialog.hittable).toBe(true);expect(dialog.canvasOnTop).toBe(false);await page.getByRole('dialog',{name:'Settings',exact:true}).getByRole('button',{name:'Close settings',exact:true}).click();await expect(page.getByRole('dialog',{name:'Settings',exact:true})).toBeHidden();await expect(page.locator('.ob-canvas-expanded')).toBeVisible();
+      await page.keyboard.press('ControlOrMeta+k');await expect(page.getByPlaceholder(/Search pages or run a command/)).toBeFocused();const palette=await hit('[cmdk-input]');rows.push({theme,palette});save();expect(palette.hittable).toBe(true);expect(palette.canvasOnTop).toBe(false);
+      await page.keyboard.press('Escape');await expect(page.getByPlaceholder(/Search pages or run a command/)).toBeHidden();
+      await assertModalReturn('palette Escape');
+      await page.keyboard.press('ControlOrMeta+k');await expect(page.getByPlaceholder(/Search pages or run a command/)).toBeFocused();
+      await page.getByPlaceholder(/Search pages or run a command/).fill('Open settings');await page.keyboard.press('Enter');await expect(page.getByRole('dialog',{name:'Settings',exact:true})).toBeVisible();await expect.poll(()=>page.getByRole('dialog',{name:'Settings',exact:true}).evaluate(el=>el.contains(document.activeElement))).toBe(true);const dialog=await hit('[role="dialog"]');rows.push({theme,dialog});save();expect(dialog.hittable).toBe(true);expect(dialog.canvasOnTop).toBe(false);await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Settings',exact:true})).toBeHidden();await expect(page.locator('.ob-canvas-expanded')).toBeVisible();
+      await assertModalReturn('Settings Escape');
       await page.locator('.ob-canvas-expanded-heading button').click();
     }
   }
   await page.setViewportSize({width:1280,height:1400});
+  // Modal-close recovery is expanded-only: inline must not reclaim BODY.
+  await page.getByLabel('Drawing viewport',{exact:true}).focus();await page.keyboard.press('ControlOrMeta+k');
+  await expect(page.getByPlaceholder(/Search pages or run a command/)).toBeFocused();await page.keyboard.press('Escape');
+  await expect(page.getByPlaceholder(/Search pages or run a command/)).toBeHidden();
+  await page.keyboard.press('Tab');expect(await page.locator('.ob-canvas').evaluate(el=>el.contains(document.activeElement))).toBe(false);
+  await page.getByRole('region',{name:/Canvas, /}).focus();await page.keyboard.press('Enter');
   // Inline mirror/control: the same Tab meter must observe focus leaving.
   await page.getByRole('separator',{name:'Resize canvas height'}).focus();await page.keyboard.press('Tab');
   expect(await page.locator('.ob-canvas').evaluate(el=>el.contains(document.activeElement))).toBe(false);
