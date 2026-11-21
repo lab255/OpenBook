@@ -1,8 +1,8 @@
 {
-  "path": "packages/ui/src/export/vendor/openbook-viewer.js",
-  "mtime": "2026-11-21T07:48:15.216449+00:00",
+  "path": "/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_2esy62wzy8-1/OpenBook/packages/ui/src/export/vendor/openbook-viewer.js",
+  "mtime": "2026-11-21T08:47:02.570Z",
   "buildMode": "production",
-  "rawBytes": 1933253,
-  "coordinate": 878,
-  "sha256": "5e19a4370e544d1fba98a711519149d282ba7a32d897919ae6e3df7abc4fcfee"
+  "rawBytes": 1933227,
+  "coordinate": 852,
+  "sha256": "67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198"
 }
