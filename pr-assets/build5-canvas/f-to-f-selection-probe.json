@@ -1,0 +1,19 @@
+{
+  "commit": "3e9ab726",
+  "steps": [
+    {
+      "step": "inline selection",
+      "outlines": 1
+    },
+    {
+      "step": "expanded selection",
+      "outlines": 1,
+      "handles": 8
+    },
+    {
+      "step": "inline after return",
+      "outlines": 1,
+      "handles": 8
+    }
+  ]
+}

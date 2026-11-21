@@ -1,0 +1,9 @@
+{
+  "commit": "3e9ab726",
+  "note": "camera panned +37,+21 so the paper-relative backgroundPosition offset is visible",
+  "backgroundPosition": "37px 21px, 37px 21px",
+  "backgroundSize": "16px 16px, 16px 16px",
+  "color": "rgb(219, 219, 219)",
+  "paperBg": "rgb(255, 255, 255)",
+  "dark": true
+}

@@ -1,0 +1,53 @@
+{
+  "commit": "3e9ab726",
+  "mechanism": "two single-process Chromium browsers, awareness over the real data server",
+  "steps": [
+    {
+      "step": "peer selected rect",
+      "outlines": 1
+    }
+  ],
+  "peerOnMain": {
+    "pillRect": {
+      "x": 975,
+      "y": 611,
+      "width": 77.515625,
+      "height": 28,
+      "top": 611,
+      "right": 1052.515625,
+      "bottom": 639,
+      "left": 975
+    },
+    "pillLabel": "Mika, select",
+    "labelVisible": "visible",
+    "labelText": "Mika",
+    "peerSelectionRect": {
+      "x": 705,
+      "y": 443,
+      "width": 120,
+      "height": 80,
+      "top": 443,
+      "right": 825,
+      "bottom": 523,
+      "left": 705
+    },
+    "peerSelectionOutlineOffset": "3px",
+    "peerSelectionOutlineColor": "rgb(58, 166, 166)",
+    "presencePointerEvents": "none",
+    "localSelectionOutlines": 0
+  },
+  "m3InkThroughPill": {
+    "pointerdownAt": {
+      "x": 995,
+      "y": 625
+    },
+    "elementUnderPillPoint": {
+      "tag": "DIV",
+      "cls": "ob-canvas-viewport",
+      "insidePill": false
+    },
+    "regionBefore": "Canvas, 2 objects, editable",
+    "regionAfter": "Canvas, 3 objects, editable",
+    "inkDrawn": true
+  }
+}

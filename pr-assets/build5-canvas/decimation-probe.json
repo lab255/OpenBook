@@ -1,0 +1,15 @@
+{
+  "commit": "3e9ab726",
+  "pairs": {
+    "100": {
+      "zoomShown": "100",
+      "regionLabel": "Canvas, 1 objects, editable",
+      "inputPoints": 176
+    },
+    "400": {
+      "zoomShown": "400",
+      "regionLabel": "Canvas, 1 objects, editable",
+      "inputPoints": 176
+    }
+  }
+}

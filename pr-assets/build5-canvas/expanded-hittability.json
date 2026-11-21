@@ -1,0 +1,349 @@
+{
+  "commit": "3e9ab726",
+  "scope": "Production next build + real data server, 1280x800, sidebar open before expanding; theme via app ThemeProvider (localStorage theme key)",
+  "themes": {
+    "light": {
+      "darkClassApplied": false,
+      "sidebarDrawerRightBeforeExpand": 256,
+      "toolCount": 8,
+      "allToolsHittable": true,
+      "tools": [
+        {
+          "name": "Select (V)",
+          "hittable": true,
+          "rect": {
+            "x": 8,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 44,
+            "bottom": 80,
+            "left": 8
+          }
+        },
+        {
+          "name": "Pen (P)",
+          "hittable": true,
+          "rect": {
+            "x": 44,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 80,
+            "bottom": 80,
+            "left": 44
+          }
+        },
+        {
+          "name": "Rectangle (R)",
+          "hittable": true,
+          "rect": {
+            "x": 80,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 116,
+            "bottom": 80,
+            "left": 80
+          }
+        },
+        {
+          "name": "Ellipse (O)",
+          "hittable": true,
+          "rect": {
+            "x": 116,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 152,
+            "bottom": 80,
+            "left": 116
+          }
+        },
+        {
+          "name": "Arrow (A)",
+          "hittable": true,
+          "rect": {
+            "x": 152,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 188,
+            "bottom": 80,
+            "left": 152
+          }
+        },
+        {
+          "name": "Text (T)",
+          "hittable": true,
+          "rect": {
+            "x": 188,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 224,
+            "bottom": 80,
+            "left": 188
+          }
+        },
+        {
+          "name": "Erase (E)",
+          "hittable": true,
+          "rect": {
+            "x": 224,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 260,
+            "bottom": 80,
+            "left": 224
+          }
+        },
+        {
+          "name": "Pan (H)",
+          "hittable": true,
+          "rect": {
+            "x": 260,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 296,
+            "bottom": 80,
+            "left": 260
+          }
+        }
+      ],
+      "back": {
+        "name": "Back",
+        "hittable": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 8,
+          "width": 72.703125,
+          "height": 28,
+          "top": 8,
+          "right": 88.703125,
+          "bottom": 36,
+          "left": 16
+        }
+      },
+      "title": {
+        "name": "BUILD-5 round2 expanded",
+        "hittable": true,
+        "z": "auto",
+        "rect": {
+          "x": 104.703125,
+          "y": 10.796875,
+          "width": 203.40625,
+          "height": 22.390625,
+          "top": 10.796875,
+          "right": 308.109375,
+          "bottom": 33.1875,
+          "left": 104.703125
+        }
+      }
+    },
+    "dark": {
+      "darkClassApplied": true,
+      "sidebarDrawerRightBeforeExpand": 256,
+      "toolCount": 8,
+      "allToolsHittable": true,
+      "tools": [
+        {
+          "name": "Select (V)",
+          "hittable": true,
+          "rect": {
+            "x": 8,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 44,
+            "bottom": 80,
+            "left": 8
+          }
+        },
+        {
+          "name": "Pen (P)",
+          "hittable": true,
+          "rect": {
+            "x": 44,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 80,
+            "bottom": 80,
+            "left": 44
+          }
+        },
+        {
+          "name": "Rectangle (R)",
+          "hittable": true,
+          "rect": {
+            "x": 80,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 116,
+            "bottom": 80,
+            "left": 80
+          }
+        },
+        {
+          "name": "Ellipse (O)",
+          "hittable": true,
+          "rect": {
+            "x": 116,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 152,
+            "bottom": 80,
+            "left": 116
+          }
+        },
+        {
+          "name": "Arrow (A)",
+          "hittable": true,
+          "rect": {
+            "x": 152,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 188,
+            "bottom": 80,
+            "left": 152
+          }
+        },
+        {
+          "name": "Text (T)",
+          "hittable": true,
+          "rect": {
+            "x": 188,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 224,
+            "bottom": 80,
+            "left": 188
+          }
+        },
+        {
+          "name": "Erase (E)",
+          "hittable": true,
+          "rect": {
+            "x": 224,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 260,
+            "bottom": 80,
+            "left": 224
+          }
+        },
+        {
+          "name": "Pan (H)",
+          "hittable": true,
+          "rect": {
+            "x": 260,
+            "y": 44,
+            "width": 36,
+            "height": 36,
+            "top": 44,
+            "right": 296,
+            "bottom": 80,
+            "left": 260
+          }
+        }
+      ],
+      "back": {
+        "name": "Back",
+        "hittable": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 8,
+          "width": 72.703125,
+          "height": 28,
+          "top": 8,
+          "right": 88.703125,
+          "bottom": 36,
+          "left": 16
+        }
+      },
+      "title": {
+        "name": "BUILD-5 round2 expanded",
+        "hittable": true,
+        "z": "auto",
+        "rect": {
+          "x": 104.703125,
+          "y": 10.796875,
+          "width": 203.40625,
+          "height": 22.390625,
+          "top": 10.796875,
+          "right": 308.109375,
+          "bottom": 33.1875,
+          "left": 104.703125
+        }
+      }
+    }
+  },
+  "returnGlyph": {
+    "ariaLabel": "Return to page (F)",
+    "box": {
+      "x": 362.53125,
+      "y": 48,
+      "width": 32,
+      "height": 28
+    }
+  },
+  "arrange": {
+    "menu": {
+      "rect": {
+        "x": 8,
+        "y": 620,
+        "width": 135.109375,
+        "height": 140,
+        "top": 620,
+        "right": 143.109375,
+        "bottom": 760,
+        "left": 8
+      },
+      "placement": "above",
+      "within": true,
+      "footerTop": 756,
+      "triggerTop": 764,
+      "clearOfTrigger": true
+    },
+    "firstItem": {
+      "name": "Send to back",
+      "hittable": true,
+      "z": "auto",
+      "rect": {
+        "x": 16,
+        "y": 628,
+        "width": 119.109375,
+        "height": 28,
+        "top": 628,
+        "right": 135.109375,
+        "bottom": 656,
+        "left": 16
+      }
+    }
+  }
+}
