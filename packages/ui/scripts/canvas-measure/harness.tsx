@@ -19,6 +19,10 @@ import {remoteFrameQueue} from '../../src/blockeditor/remoteFrame';
 import {bufferedProviders} from './bufferedTransport';
 import {CommittedSceneCache} from '../../src/blockeditor/canvas/paintCache';
 import {paint} from '../../src/blockeditor/canvas/geometry';
+declare const __CANVAS_SOURCE_STAMP__:string;
+const servedStamp=__CANVAS_SOURCE_STAMP__;
+const diskStamp=await fetch('/__canvas-source',{cache:'no-store'}).then(r=>r.json()).then(r=>r.stamp);
+if(servedStamp!==diskStamp)throw new Error(`Stale canvas measurement source: served ${servedStamp}, disk ${diskStamp}. Restart the measurement server.`);
 registerReactiveBlocks();
 let doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);
 let awareness=new Awareness(doc),peerPresence=new Awareness(new Y.Doc());
@@ -34,6 +38,8 @@ function CanvasSurface(){const editor=useBlockEditor(doc);return <CanvasBlock bl
 function Surface(){return <main style={{width:columnWidth,margin:'40px auto'}}><h1>Canvas local measurement harness</h1><p>All generated input is synthetic/local. No physical latency or hardware certification.</p><>{editorMode?<BlockEditor doc={doc}/>:<CanvasSurface/>}</><p id="below">Text after the canvas detects unexpected layout movement.</p></main>;}
 registerBlockEditorDoc('canvas-evidence',doc);
 const api={
+  sourceStamp:servedStamp,
+  paper(color:string){(findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>).set('background',color);},
   column(width:number){columnWidth=width;remount();},
   presence(change:'join'|'move'|'leave'){peerPresence.setLocalStateField('user',{name:'Morgan',id:'morgan',color:'#1d4ed8'});peerPresence.setLocalStateField('canvas',change==='leave'?null:canvasFacet('canvas',{x:change==='move'?120:80,y:100},'pen',readCanvas(findBlock(doc,'canvas')!.block.get('props')).shapes.slice(0,1).map(s=>s.id)));applyAwarenessUpdate(awareness,encodeAwarenessUpdate(peerPresence,[peerPresence.clientID]),'net');},
   resetEditor(){netQueue?.close();netQueue=null;transport?.close();transport=null;editorMode=true;doc=createDoc([{id:'entry',type:'paragraph'}]);remount();},

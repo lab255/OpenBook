@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Native numeric/DOM measurements only. Captures belong to the manager.
 import {createRequire} from 'node:module';
 import {readFileSync,writeFileSync,statSync} from 'node:fs';
@@ -8,7 +9,7 @@ const runOutput=new URL(`../../../../_evidence-build5/browser-${Date.now()}.json
 const save=()=>{const text=JSON.stringify(result,null,2);writeFileSync(output,text);writeFileSync(runOutput,text);};
 let browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 try{
- let page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
+ let page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});await openHarness(page);await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
  await page.evaluate(()=>{window.canvasEvidence.column(736);});
  const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  const select=async()=>{await page.evaluate(()=>window.canvasEvidence.reset(0));await settle();await page.getByRole('region').focus();await page.keyboard.press('Enter');await page.keyboard.press('r');await page.keyboard.press('Enter');};
@@ -23,7 +24,7 @@ try{
   const after=await measure();result.continuity.push({zoom,cycles:5,before,after,driftControl,reload:await page.evaluate(()=>window.canvasEvidence.reload())});save();if(JSON.stringify(before)!==JSON.stringify(after)||!result.continuity.at(-1).reload)throw new Error('Expansion continuity failed');
  }
  result.continuityScope='DOM continuity with nonzero scroll, not a CLS claim; expansion/scroll inputs may be excluded by CLS recent-input semantics.';
- await browser.close();browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();await page.evaluate(()=>{window.canvasEvidence.column(736);window.lastMeasurementInput=performance.now();for(const type of ['keydown','pointerdown','scroll'])window.addEventListener(type,()=>window.lastMeasurementInput=performance.now(),true);});await page.evaluate(()=>document.fonts.ready);
+ await browser.close();browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});await openHarness(page);await page.getByRole('region').waitFor();await page.evaluate(()=>{window.canvasEvidence.column(736);window.lastMeasurementInput=performance.now();for(const type of ['keydown','pointerdown','scroll'])window.addEventListener(type,()=>window.lastMeasurementInput=performance.now(),true);});await page.evaluate(()=>document.fonts.ready);
  for(const change of ['join','move','leave','delete','quarantine']){
   await select();if(change==='move'||change==='leave')await page.evaluate(()=>window.canvasEvidence.presence('join'));
   await page.waitForTimeout(700);

@@ -28,25 +28,35 @@ export function useCanvasProducer(awareness: Awareness | undefined, blockId: str
 }
 
 const glyphs={select:MousePointer2,pen:Pencil,rect:RectangleHorizontal,ellipse:Circle,arrow:MoveUpRight,text:Type,erase:Eraser,pan:Hand};
-function Peer({facet,user,shapes,camera,width,height}:{facet:CanvasFacet;user:NonNullable<AwarenessState['user']>;shapes:readonly SceneShape[];camera:Camera;width:number;height:number}) {
+function Peer({facet,user,shapes,camera,width,height,hover}:{hover:Point|null;facet:CanvasFacet;user:NonNullable<AwarenessState['user']>;shapes:readonly SceneShape[];camera:Camera;width:number;height:number}) {
   const [idle,setIdle]=useState(false);
+  const element=useRef<HTMLDivElement>(null);
+  const rect=element.current?.getBoundingClientRect();
+  const hovered=!!(hover&&rect&&hover.x>=rect.left&&hover.x<=rect.right&&hover.y>=rect.top&&hover.y<=rect.bottom);
   const activity=JSON.stringify(facet);
   useEffect(()=>{setIdle(false);const timer=setTimeout(()=>setIdle(true),3000);return()=>clearTimeout(timer);},[activity]);
   const at=facet.cursor ? screen(facet.cursor,camera) : null,Icon=glyphs[facet.tool];
   return <>
     {shapes.filter(s=>facet.selectedShapeIds.includes(s.id)).map(s=>{const b=bounds(s),p=screen(b,camera);return <div key={s.id} className="ob-canvas-peer-selection" aria-hidden="true" style={{transform:`translate(${p.x}px,${p.y}px)`,width:b.w*camera.zoom,height:b.h*camera.zoom,outlineColor:user.color}}/>;})}
-    {at&&at.x>=0&&at.y>=0&&at.x<=width&&at.y<=height&&<button type="button" className="ob-canvas-peer" data-idle={idle} aria-label={`${user.name}, ${facet.tool}${facet.selectionTruncated?', selection summarized':''}`} style={{transform:`translate(${at.x}px,${at.y}px)`,color:user.color}} onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+    {at&&at.x>=0&&at.y>=0&&at.x<=width&&at.y<=height&&<div ref={element} role="img" className="ob-canvas-peer" data-idle={idle} data-hovered={hovered} aria-label={`${user.name}, ${facet.tool}${facet.selectionTruncated?', selection summarized':''}`} style={{transform:`translate(${at.x}px,${at.y}px)`,color:user.color}}>
       <MousePointer2 size={18} strokeWidth={1} aria-hidden="true"/>
       <span className="ob-canvas-peer-label"><Icon size={12} aria-hidden="true"/>{user.name}</span>
-    </button>}
+    </div>}
   </>;
 }
 export function CanvasPresence({awareness,blockId,shapes,camera,width,height}:{awareness:Awareness|undefined;blockId:string;shapes:readonly SceneShape[];camera:Camera;width:number;height:number}) {
+  const root=useRef<HTMLDivElement>(null),[hover,setHover]=useState<Point|null>(null);
+  useEffect(()=>{
+    const viewport=root.current?.parentElement;if(!viewport)return;
+    const move=(event:PointerEvent)=>setHover({x:event.clientX,y:event.clientY}),leave=()=>setHover(null);
+    viewport.addEventListener('pointermove',move);viewport.addEventListener('pointerleave',leave);
+    return()=>{viewport.removeEventListener('pointermove',move);viewport.removeEventListener('pointerleave',leave);};
+  },[awareness]);
   if(!awareness)return null;
-  return <div className="ob-canvas-presence" aria-label="Canvas collaborators">{[...awareness.getStates()].map(([client,state]:[number,AwarenessState])=>{
+  return <div ref={root} className="ob-canvas-presence" aria-label="Canvas collaborators">{[...awareness.getStates()].map(([client,state]:[number,AwarenessState])=>{
     if(client===awareness.clientID)return null;
     const facet=readCanvasFacet(state.canvas),user=state.user;
     if(!facet||facet.blockId!==blockId||!user||typeof user.name!=='string'||typeof user.color!=='string')return null;
-    return <Peer key={client} facet={facet} user={user} shapes={shapes} camera={camera} width={width} height={height}/>;
+    return <Peer key={client} facet={facet} user={user} shapes={shapes} camera={camera} width={width} height={height} hover={hover}/>;
   })}</div>;
 }

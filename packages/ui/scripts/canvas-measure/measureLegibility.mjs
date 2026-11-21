@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Numeric native-browser evidence only; visual captures remain manager-owned.
 import {createRequire} from 'node:module';
 import {writeFileSync} from 'node:fs';
@@ -9,7 +10,7 @@ const ratio=(a,b)=>{const lum=color=>{const v=color.match(/[\d.]+/g).slice(0,3).
 try {
  const page=await browser.newPage({viewport:{width:1280,height:800},deviceScaleFactor:1});
  await page.bringToFront();
- await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
+ await openHarness(page);await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
  for(const theme of ['light','dark']){
   for(const paper of ['#ffffff','#172554']){
    await page.evaluate(({theme,paper})=>{document.documentElement.classList.toggle('dark',theme==='dark');window.canvasEvidence.reset(0);window.canvasEvidence.background(paper);},{theme,paper});

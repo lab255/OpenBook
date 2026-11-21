@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Bounded CPU/call-count diagnosis, not a latency benchmark or visual capture.
 import {createRequire} from 'node:module';
 import {writeFileSync} from 'node:fs';
@@ -8,7 +9,7 @@ const output=name=>fileURLToPath(new URL(`../../../../_evidence-build4/${name}`,
 const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 try {
  const page=await browser.newPage({viewport:{width:1100,height:900}});
- await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();
+ await openHarness(page);await page.getByRole('region').waitFor();
  await page.evaluate(()=>window.canvasEvidence.reset(500));await page.getByRole('region').focus();await page.keyboard.press('Enter');await page.keyboard.press('p');
  await page.evaluate(()=>{
   window.profileEvents=[];window.paintCounts={stroke:0,clearRect:0,drawImage:0};

@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Numeric DOM/style checks only. Captures remain manager-owned.
 import {createRequire} from 'node:module';
 import {readFileSync,writeFileSync} from 'node:fs';
@@ -12,7 +13,7 @@ const browser=await chromium.launch({headless:true,args:['--single-process','--n
 try {
  const page=await browser.newPage({viewport:{width:1100,height:1000},deviceScaleFactor:1});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);await page.evaluate(column=>window.canvasEvidence.column(column),column);
+ await openHarness(page);await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);await page.evaluate(column=>window.canvasEvidence.column(column),column);
  for(const theme of ['light','dark']){
   await page.evaluate(theme=>{document.documentElement.classList.toggle('dark',theme==='dark');window.canvasEvidence.reset(0);},theme);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.getByRole('region').focus();await page.keyboard.press('Enter');await page.getByLabel('Stroke color value').waitFor();

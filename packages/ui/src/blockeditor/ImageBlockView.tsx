@@ -346,6 +346,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
         </button>
         {noticeEl}
         <input
+          key="image-file"
           ref={fileRef}
           type="file"
           accept="image/*"
@@ -507,6 +508,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
       )}
       {!readOnly && (
         <input
+          key="image-file"
           ref={fileRef}
           type="file"
           accept="image/*"

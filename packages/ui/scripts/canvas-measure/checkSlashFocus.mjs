@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Real BlockEditor + SlashMenu + registered renderers; native keyboard input.
 // Numeric per-rAF focus/ring evidence only. No captures or public server.
 import {createRequire} from 'node:module';
@@ -11,7 +12,7 @@ const save=()=>writeFileSync(output,JSON.stringify(result,null,2)+'\n');
 const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 try {
  const page=await browser.newPage({viewport:{width:1100,height:900},deviceScaleFactor:1});const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();
+ await openHarness(page);await page.getByRole('region').waitFor();
  for(const type of ['canvas','slider']){
   await page.evaluate(()=>window.canvasEvidence.resetEditor());
   const input=page.locator('[data-block-row="entry"] [contenteditable="true"]').first();await input.waitFor();await input.focus();await page.keyboard.type('/'+type);await page.locator('.obe-slash').waitFor();

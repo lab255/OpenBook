@@ -438,3 +438,20 @@ describe('image block — paste / drop event integration (regression guard)', ()
     expect(hasImageBlock(doc)).toBe(false);
   });
 });
+
+
+it('keeps caption and file-input identities distinct when an image becomes unavailable',()=>{
+  const errors=vi.spyOn(console,'error').mockImplementation(()=>{});
+  const assertQuiet=()=>expect(errors.mock.calls).toEqual([]);
+  console.error('A component is changing a controlled input to be uncontrolled.');
+  expect(assertQuiet).toThrow();errors.mockClear();
+  const doc=createDoc([{id:'img',type:'image',props:{src:TINY_PNG,caption:'Caption'}}]);
+  const {container}=render(<BlockEditor doc={doc}/>);
+  const caption=screen.getByLabelText('Image caption');
+  const file=screen.getByLabelText('Choose an image file');
+  fireEvent.error(container.querySelector('img.obe-image-img')!);
+  expect(screen.queryByLabelText('Image caption')).toBeNull();
+  expect(screen.getByLabelText('Choose an image file')).toBe(file);
+  expect(screen.getByLabelText('Choose an image file')).not.toBe(caption);
+  assertQuiet();
+});

@@ -1,0 +1,11 @@
+{
+  "scope": "Production viewer, same checkout/config, remove only the two image file-input identity keys then rebuild",
+  "beforeBytes": 1933227,
+  "afterBytes": 1933253,
+  "delta": 26,
+  "beforeSha256": "67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198",
+  "afterSha256": "5e19a4370e544d1fba98a711519149d282ba7a32d897919ae6e3df7abc4fcfee",
+  "emittedKeyArgument": ",`image-file`",
+  "keyArgumentOccurrences": 2,
+  "removingEmittedKeysMatchesBeforeSha": true
+}

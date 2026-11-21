@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Pixel arrays only, never screenshot/video capture. Human no-visible-jump review
 // remains manager-owned: raster differences alone cannot certify perception.
 import {createRequire} from 'node:module';
@@ -5,7 +6,7 @@ import {writeFileSync,readFileSync} from 'node:fs';
 const require=createRequire(new URL('../../../web/package.json',import.meta.url)),{chromium}=require('@playwright/test');
 const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 try{
- const page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();
+ const page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});await openHarness(page);await page.getByRole('region').waitFor();
  const rows=await page.evaluate(async()=>{
   const {simplifyStroke}=await import('/src/blockeditor/canvas/decimation.ts'),{paint}=await import('/src/blockeditor/canvas/geometry.ts'),{shapeDefaults}=await import('/src/blockeditor/canvas/schema.ts');
   const rows=[];

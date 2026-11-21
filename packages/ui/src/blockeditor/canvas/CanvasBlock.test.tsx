@@ -19,7 +19,7 @@ import {insertShapes} from './commands';
 import {canvasDefaults, constructCanvasProps, shapeDefaults, readCanvas} from './schema';
 import {bounds, endpoints} from './geometry';
 
-const context={drawImage:vi.fn(),setTransform:vi.fn(),clearRect:vi.fn(),translate:vi.fn(),scale:vi.fn(),save:vi.fn(),restore:vi.fn(),setLineDash:vi.fn(),beginPath:vi.fn(),arc:vi.fn(),ellipse:vi.fn(),rect:vi.fn(),clip:vi.fn(),fill:vi.fn(),stroke:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),fillText:vi.fn(),measureText:(s:string)=>({width:s.length*8})};
+const context={drawImage:vi.fn(),setTransform:vi.fn(),clearRect:vi.fn(),translate:vi.fn(),scale:vi.fn(),save:vi.fn(),restore:vi.fn(),setLineDash:vi.fn(),beginPath:vi.fn(),arc:vi.fn(),ellipse:vi.fn(),rect:vi.fn(),clip:vi.fn(),fill:vi.fn(),stroke:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),bezierCurveTo:vi.fn(),fillText:vi.fn(),measureText:(s:string)=>({width:s.length*8})};
 let controller:BlockEditorController;
 let unregister:()=>void;
 let presenceCleanup:(()=>void)[]=[];
@@ -478,9 +478,9 @@ test('BUILD-5: hidden clears, visible reasserts only with focus; clear/rejoin mi
 test('BUILD-5: peers stay within their canvas; idle labels restore; remote selection has no handles',()=>{
   vi.useFakeTimers();const a=setup(false,false,true),id=a.seed();const peer=new Awareness(new Y.Doc());peer.setLocalStateField('user',{id:'peer',name:'Morgan',color:'#123456'});peer.setLocalStateField('canvas',canvasFacet('canvas',{x:12,y:24},'select',[id,'deleted']));
   const deliver=()=>act(()=>applyAwarenessUpdate(a.awareness!,encodeAwarenessUpdate(peer,[peer.clientID]),'net'));deliver();
-  expect(screen.getByRole('button',{name:'Morgan, select'})).toBeTruthy();expect(a.view.container.querySelectorAll('.ob-canvas-peer-selection')).toHaveLength(1);expect(a.view.container.querySelectorAll('.ob-canvas-handle')).toHaveLength(0);
-  act(()=>vi.advanceTimersByTime(3000));expect(screen.getByRole('button',{name:'Morgan, select'}).getAttribute('data-idle')).toBe('true');peer.setLocalStateField('canvas',canvasFacet('canvas',{x:14,y:24},'pen',[]));deliver();expect(screen.getByRole('button',{name:'Morgan, pen'}).getAttribute('data-idle')).toBe('false');
-  peer.setLocalStateField('canvas',canvasFacet('other',{x:14,y:24},'pen',[]));deliver();expect(screen.queryByRole('button',{name:'Morgan, pen'})).toBeNull();peer.destroy();
+  expect(screen.getByRole('img',{name:'Morgan, select'})).toBeTruthy();expect(a.view.container.querySelectorAll('.ob-canvas-peer-selection')).toHaveLength(1);expect(a.view.container.querySelectorAll('.ob-canvas-handle')).toHaveLength(0);
+  act(()=>vi.advanceTimersByTime(3000));expect(screen.getByRole('img',{name:'Morgan, select'}).getAttribute('data-idle')).toBe('true');peer.setLocalStateField('canvas',canvasFacet('canvas',{x:14,y:24},'pen',[]));deliver();expect(screen.getByRole('img',{name:'Morgan, pen'}).getAttribute('data-idle')).toBe('false');
+  peer.setLocalStateField('canvas',canvasFacet('other',{x:14,y:24},'pen',[]));deliver();expect(screen.queryByRole('img',{name:'Morgan, pen'})).toBeNull();peer.destroy();
 });
 
 
@@ -496,4 +496,26 @@ test('BUILD-5: snap applies to move and resize; freehand is never magnetic',()=>
   pointer(a.viewport,'down',130,100);pointer(a.viewport,'move',141,100);pointer(a.viewport,'up',141,100);expect(bounds(a.shapes()[0]).x).toBe(112);
   const b=bounds(a.shapes()[0]),handles=a.view.container.querySelectorAll('.ob-canvas-handle');pointer(handles[4],'down',b.x+b.w,b.y+b.h);pointer(a.viewport,'move',b.x+b.w+9,b.y+b.h+17);pointer(a.viewport,'up',b.x+b.w+9,b.y+b.h+17);expect(bounds(a.shapes()[0])).toMatchObject({w:128,h:96});
   a.tool('p');pointer(a.viewport,'down',15,15);pointer(a.viewport,'move',31,31);pointer(a.viewport,'up',31,31);expect(a.shapes()[1].scalars.x).toBe(15);expect(a.shapes()[1].points).toEqual([0,0,16,16]);equivalentScene(a);
+});
+
+test('coordinates remain controlled through creation, drag, cancel and expansion',()=>{
+  const errors=vi.spyOn(console,'error');
+  const assertQuiet=()=>expect(errors.mock.calls).toEqual([]);
+  // A planted warning proves the console-error meter rejects warnings.
+  errors.mockImplementation(()=>{});
+  console.error('A component is changing a controlled input to be uncontrolled.');
+  expect(assertQuiet).toThrow();errors.mockClear();
+  const a=setup();assertQuiet();
+  a.tool('r');assertQuiet();a.key('Enter');assertQuiet();
+  a.key('f');assertQuiet();a.key('f');assertQuiet();
+  const x=screen.getByLabelText('X') as HTMLInputElement;
+  const before=Number(x.value);
+  pointer(a.viewport,'down',320,180);assertQuiet();
+  pointer(a.viewport,'move',340,200);assertQuiet();
+  expect(Number(x.value)).toBe(before+20);
+  pointer(a.viewport,'up',340,200);assertQuiet();
+  expect(Number(x.value)).toBe(before+20);
+  pointer(a.viewport,'down',340,200);pointer(a.viewport,'move',350,210);
+  expect(Number(x.value)).toBe(before+30);a.key('Escape');assertQuiet();
+  expect(Number(x.value)).toBe(before+20);equivalentScene(a);
 });

@@ -155,7 +155,7 @@
     {
       "change": "join",
       "column": 736,
-      "inputAge": 714.7000000476837,
+      "inputAge": 714.8999999761581,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -163,7 +163,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 962.2000000476837
+        "inputAge": 964.3999999761581
       },
       "controlAfter": {
         "scroll": 0,
@@ -181,7 +181,7 @@
     {
       "change": "move",
       "column": 736,
-      "inputAge": 713.2000000476837,
+      "inputAge": 720.7000000476837,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -189,7 +189,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 972.1000000238419
+        "inputAge": 974.7000000476837
       },
       "controlAfter": {
         "scroll": 0,
@@ -207,7 +207,7 @@
     {
       "change": "leave",
       "column": 736,
-      "inputAge": 712.9000000953674,
+      "inputAge": 722,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -215,7 +215,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 969.3000000715256
+        "inputAge": 973
       },
       "controlAfter": {
         "scroll": 0,
@@ -233,7 +233,7 @@
     {
       "change": "delete",
       "column": 736,
-      "inputAge": 711.7000000476837,
+      "inputAge": 718,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -241,7 +241,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 970.3000000715256
+        "inputAge": 964.8999999761581
       },
       "controlAfter": {
         "scroll": 0,
@@ -259,7 +259,7 @@
     {
       "change": "quarantine",
       "column": 736,
-      "inputAge": 711.6000000238419,
+      "inputAge": 713.2999999523163,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -267,7 +267,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 971.2999999523163
+        "inputAge": 969.1000000238419
       },
       "controlAfter": {
         "scroll": 0,
@@ -288,12 +288,12 @@
     "before": {
       "scroll": 124,
       "below": 548,
-      "inputAge": 925.7000000476837
+      "inputAge": 930.6000000238419
     },
     "after": {
       "scroll": 274,
       "below": 548,
-      "inputAge": 127.59999990463257
+      "inputAge": 115.59999990463257
     },
     "controlHeight": 150,
     "entries": []
@@ -301,31 +301,31 @@
   "provenance": [
     {
       "path": "src/blockeditor/canvas/CanvasBlock.tsx",
-      "mtime": "2026-11-21T06:25:19.687Z",
-      "sourceBytes": 51917,
-      "sourceSha256": "5df232b9fd198046a8a48f9055aec24aa7a9cff2137a6dae95777c6bb9f933f3",
-      "servedSha256": "87fdccf0165185a7fdec440b58ad71cee164f8f217f086daffe2f138f0050715"
+      "mtime": "2026-11-21T07:35:36.249Z",
+      "sourceBytes": 52802,
+      "sourceSha256": "6e8d3c61e58dd5879e3a0e2e3698fd78c954072ecb35c6faa6cb85aa671196cf",
+      "servedSha256": "a83ddf743e2c3d65c3e55702905677b42cc284b36cbc2c3227a80e1692ad846d"
     },
     {
       "path": "src/blockeditor/canvas/CanvasPresence.tsx",
-      "mtime": "2026-11-21T06:17:42.290Z",
-      "sourceBytes": 4344,
-      "sourceSha256": "e13cfec18977d4cec0343f87a636a2607530b629f1968b3feb284a178356d2f2",
-      "servedSha256": "9bb2475b556a0a7582b6e24234e3463b860946f472ce9a0a55780c49d3a07484"
+      "mtime": "2026-11-21T07:35:09.473Z",
+      "sourceBytes": 5079,
+      "sourceSha256": "ac79170988f99483699ec02accf3c523f7e6e1d480857a194ba8e393310bfb75",
+      "servedSha256": "0251808a2614b1ac07be719ad41588cfef3603f2c69884ae14d4218b04e1db51"
     },
     {
       "path": "src/blockeditor/canvas/canvas.css",
-      "mtime": "2026-11-21T06:25:19.687Z",
-      "sourceBytes": 8780,
-      "sourceSha256": "5920a9740122ac8b42363983d94f11f5914c4f0e8502b2e6c7d0724c5458e4b2",
-      "servedSha256": "0079d3f3ee57266b5d288e5a54e996a5532b8fd86b02ce1cef46b1cac45978ce"
+      "mtime": "2026-11-21T07:35:36.250Z",
+      "sourceBytes": 8737,
+      "sourceSha256": "f9b71d9d39c6e6d8ecfa42f774b1ade151ff3e53b47e87ae75c3127ba3ecf5e9",
+      "servedSha256": "8b5566721d15ff8d865a47917f6199d6f410b03445307cb0e4e24932d4ad2def"
     },
     {
       "path": "scripts/canvas-measure/harness.tsx",
-      "mtime": "2026-11-21T06:23:47.641Z",
-      "sourceBytes": 9029,
-      "sourceSha256": "cb4d2c29b48f3e8430024be76428a64a6c5d525d98bb444e8b6110a3f33206d1",
-      "servedSha256": "47c8fbd7c4188bcae277bbe40e31829e049dba1eab5f0a59bc1dc21a7d87084f"
+      "mtime": "2026-11-21T07:43:23.370Z",
+      "sourceBytes": 9515,
+      "sourceSha256": "2cb3f5c8fb0cda8ed2a5897e3e916104aa0c13ca182ff714131ca4bbcae2c34c",
+      "servedSha256": "e5d1dcebf856a5a6221cba46748c43b7abbf33606b5589a08e5ca18e215c2a18"
     }
   ]
 }
