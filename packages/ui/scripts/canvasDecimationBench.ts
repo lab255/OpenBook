@@ -6,6 +6,7 @@ import {canvasDefaults,constructCanvasProps,projectCanvas,readCanvas} from '../s
 import {CanvasHistory} from '../src/blockeditor/canvas/history';
 import {insertShapes,eraseShapes} from '../src/blockeditor/canvas/commands';
 import {simplifyStroke} from '../src/blockeditor/canvas/decimation';
+import {chordDistance,curvePoint,strokeCurves} from '../src/blockeditor/canvas/strokeCurve';
 registerPropsConstructor('canvas',constructCanvasProps);registerPropsProjection('canvas',projectCanvas);
 const fixtures=[
   {name:'straight',n:500,point:(i:number)=>[i/4,i/8]},
@@ -20,37 +21,50 @@ const representative=['smooth-curve','handwriting-like','loop'].flatMap(name=>[0
   const points=Array.from({length:n},(_,i)=>{const t=i/(n-1);const xy=name==='smooth-curve'?[100*t,30*Math.sin(t*Math.PI)]:name==='handwriting-like'?[100*t,12*Math.sin(t*6*Math.PI)+4*Math.sin(t*2*Math.PI)]:[60*t+20*Math.sin(t*4*Math.PI),20*Math.cos(t*4*Math.PI)];return [...xy,...(arity===3?[Math.round(128+80*Math.sin(t*2*Math.PI))]:[])];}).flat();
   return {name,variant,arity:arity as 2|3,points,result:simplifyStroke(points,arity as 2|3)};
 })));
+const lattice=['line','circle','sine'].flatMap(name=>[false,true].flatMap(quantized=>[2,3].map(arity=>{
+  const points=Array.from({length:300},(_,i)=>{
+    const xy=name==='line'?[i,i*.3]:name==='circle'?[100*Math.cos(i/299*2*Math.PI),100*Math.sin(i/299*2*Math.PI)]:[i,20*Math.sin(i/15)];
+    return [...xy.map(v=>quantized?Math.round(v):v),...(arity===3?[Math.round(128+80*Math.sin(i/35))]:[])];
+  }).flat();return {name:`${quantized?'lattice':'float-control'}-${name}`,arity:arity as 2|3,points,result:simplifyStroke(points,arity as 2|3)};
+})));
+const classes=[['original-synthetic-float',samples],['representative-geometric-proxies-float',representative],['paired-float-controls',lattice.filter(s=>s.name.startsWith('float-control'))],['integer-lattice',lattice.filter(s=>s.name.startsWith('lattice'))]] as const;
 // Independent chronological segment check against original points; indices are
 // recovered by exact retained tuple identity, not simplifier internals.
 function deviation(original:number[],retained:number[],arity:2|3){
-  let originalIndex=0,maxGeometry=0,maxPressureQ=0;
+  let originalIndex=0,maxGeometry=0,maxPressureQ=0,maxRenderedToOriginal=0;
+  const curves=strokeCurves(Array.from({length:retained.length/arity},(_,i)=>({x:retained[i*arity],y:retained[i*arity+1]})));
   for(let end=arity;end<retained.length;end+=arity){
     let next=originalIndex+1;
     while(next<original.length/arity&&!retained.slice(end,end+arity).every((value,k)=>value===original[next*arity+k]))next++;
     if(next===original.length/arity)throw new Error('Retained tuple lost q or order');
     const dx=retained[end]-retained[end-arity],dy=retained[end+1]-retained[end-arity+1],length=dx*dx+dy*dy;
     for(let i=originalIndex;i<=next;i++){const x=original[i*arity]-retained[end-arity],y=original[i*arity+1]-retained[end-arity+1],t=length?Math.max(0,Math.min(1,(x*dx+y*dy)/length)):(i-originalIndex)/(next-originalIndex);maxGeometry=Math.max(maxGeometry,Math.hypot(x-t*dx,y-t*dy));if(arity===3)maxPressureQ=Math.max(maxPressureQ,Math.abs(original[i*arity+2]-retained[end-arity+2]-t*(retained[end+2]-retained[end-arity+2])));}
+    for(let t=0;t<=64;t++){
+      const point=curvePoint(curves[end/arity-1],t/64);let distance=Infinity;
+      for(let i=originalIndex;i<next;i++)distance=Math.min(distance,chordDistance(point,{x:original[i*arity],y:original[i*arity+1]},{x:original[(i+1)*arity],y:original[(i+1)*arity+1]}));
+      maxRenderedToOriginal=Math.max(maxRenderedToOriginal,distance);
+    }
     originalIndex=next;
   }
-  return {maxGeometry,maxPressureQ};
+  return {maxGeometry,maxPressureQ,maxRenderedToOriginal};
 }
-const checks=[...samples,...representative].map(s=>({name:s.name,arity:s.arity,...deviation(s.points,s.result.points,s.arity)}));
-if(checks.some(c=>c.maxGeometry>.500000001||c.maxPressureQ>1.000000001))throw new Error('Fidelity bound exceeded');
+const checks=[...samples,...representative,...lattice].map(s=>({name:s.name,arity:s.arity,...deviation(s.points,s.result.points,s.arity)}));
+if(checks.some(c=>c.maxGeometry>.500000001||c.maxRenderedToOriginal>.500000001||c.maxPressureQ>1.000000001))throw new Error('Fidelity bound exceeded');
 const control=representative.find(s=>s.arity===3)!;
 const negativeControl=deviation(control.points,[...control.points.slice(0,3),...control.points.slice(-3)],3);
 if(negativeControl.maxGeometry<=.5||negativeControl.maxPressureQ<=1)throw new Error('Deviation meter control failed');
 const bytes=(doc:Y.Doc)=>{const snapshot=encodeSnapshot(doc);const raw=Y.encodeStateAsUpdate(doc).length;return {raw,base64:Buffer.byteLength(snapshot.update),projection:Buffer.byteLength(JSON.stringify(snapshot.blocks)),complete:Buffer.byteLength(JSON.stringify(snapshot))};};
 const boards=[];
-for(const count of [100,500]) for(let trial=0;trial<5;trial++) for(const simplified of [false,true]){
+for(const [population,populationSamples] of classes) for(const count of [100,500]) for(let trial=0;trial<5;trial++) for(const simplified of [false,true]){
   const doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);doc.clientID=101+trial;const history=new CanvasHistory(doc),ids:string[]=[];let updateBytes=0;doc.on('update',(update:Uint8Array)=>updateBytes+=update.length);
-  for(let i=0;i<count;i++){const sample=samples[(i+trial*2)%samples.length];ids.push(...insertShapes(history,'canvas',[{kind:'stroke',x:i%25*120,y:Math.floor(i/25)*100,pressureMode:sample.arity===3?'variable':'constant',pointArity:sample.arity,points:simplified?sample.result.points:sample.points}],'Stroke'));}
+  for(let i=0;i<count;i++){const sample=populationSamples[(i+trial*2)%populationSamples.length];ids.push(...insertShapes(history,'canvas',[{kind:'stroke',x:i%25*120,y:Math.floor(i/25)*100,pressureMode:sample.arity===3?'variable':'constant',pointArity:sample.arity,points:simplified?sample.result.points:sample.points}],'Stroke'));}
   const before=bytes(doc);eraseShapes(history,'canvas',ids.filter((_,i)=>i%2===0));const retainedUndo=bytes(doc);const snapshot=encodeSnapshot(doc),fresh=decodeSnapshot(snapshot),afterReload=bytes(fresh);
   const scene=JSON.stringify(readCanvas(findBlock(doc,'canvas')!.block.get('props'))),reloadEqual=scene===JSON.stringify(readCanvas(findBlock(fresh,'canvas')!.block.get('props')));if(!reloadEqual)throw new Error('Reload differs');
-  boards.push({count,trial,simplified,updateBytes,before,afterHalfEraseRetainedUndo:retainedUndo,afterReload,reloadEqual});history.destroy();doc.destroy();fresh.destroy();
+  boards.push({population,count,trial,simplified,updateBytes,before,afterHalfEraseRetainedUndo:retainedUndo,afterReload,reloadEqual});history.destroy();doc.destroy();fresh.destroy();
 }
 const distribution=(values:number[])=>{const v=[...values].sort((a,b)=>a-b);return {median:v.length%2?v[(v.length-1)/2]:(v[v.length/2-1]+v[v.length/2])/2,worst:Math.max(...v)};};
-const summary=[100,500].flatMap(count=>[false,true].map(simplified=>{const rows=boards.filter(r=>r.count===count&&r.simplified===simplified);return {count,simplified,base64:distribution(rows.map(r=>r.before.base64)),complete:distribution(rows.map(r=>r.before.complete)),retainedUndoBase64:distribution(rows.map(r=>r.afterHalfEraseRetainedUndo.base64)),retainedUndoComplete:distribution(rows.map(r=>r.afterHalfEraseRetainedUndo.complete))};}));
-const classes=[['original-synthetic',samples],['representative-geometric-proxies',representative]] as const;
+const summary=classes.flatMap(([population])=>[100,500].flatMap(count=>[false,true].map(simplified=>{const rows=boards.filter(r=>r.population===population&&r.count===count&&r.simplified===simplified);return {population,count,simplified,base64:distribution(rows.map(r=>r.before.base64)),complete:distribution(rows.map(r=>r.before.complete)),retainedUndoBase64:distribution(rows.map(r=>r.afterHalfEraseRetainedUndo.base64)),retainedUndoComplete:distribution(rows.map(r=>r.afterHalfEraseRetainedUndo.complete))};})));
+
 const perClass=classes.flatMap(([population,rows])=>[...new Set(rows.map(s=>s.name))].flatMap(name=>[2,3].map(arity=>({population,name,arity,count:rows.filter(s=>s.name===name&&s.arity===arity).length,retained:distribution(rows.filter(s=>s.name===name&&s.arity===arity).map(s=>s.result.retained))}))));
-writeFileSync('../../_evidence-build5/decimation.json',JSON.stringify({generation:{original:'straight: (i/4,i/8), n500; arc: (100 cos(i*pi/600),100 sin(i*pi/600)), n600; handwriting-like: (i/4,8 sin(i/18)+12 sin(i/51)), n800; loops: (i/20+20 sin(i/25),20 cos(i/25)), n1000; corner-stress: (i/4,3*(i mod 2)), n1200. Variable q=round(128+80 sin(i/35)).',representative:'Geometric proxies, NOT recorded human handwriting. Five sample densities n=160,200,240,280,320 per class; t=i/(n-1). Smooth=(100t,30 sin(pi*t)); handwriting-like=(100t,12 sin(6pi*t)+4 sin(2pi*t)); loop=(60t+20 sin(4pi*t),20 cos(4pi*t)). Variable q=round(128+80 sin(2pi*t)). Both constant and variable modes.'},perClass,checks,negativeControl,scope:'Five synthetic geometry families, constant/variable q; five mixed boards at each 100/500 stroke size, random production shape ids; whole pointerup transactions with semantic history, then half erase and fresh reload. UTF-8 bytes, uncompressed. Observed worst is not a hard cap. No prediction or time-flushed streaming implemented.',strokes:samples.map(s=>({name:s.name,arity:s.arity,original:s.result.original,retained:s.result.retained,overrun:s.result.overrun})),retained:distribution(samples.map(s=>s.result.retained)),summary,boards},null,2));
+writeFileSync('../../_evidence-build5/round3-decimation.json',JSON.stringify({generation:{lattice:'Paired 300-sample float/lattice line (i,0.3i), circle (100cos(2pi*i/299),100sin(2pi*i/299)), sine (i,20sin(i/15)); lattice rounds x/y to integers. Both pressure modes. Rendered deviation sampled at 65 points per retained interval; production verifier additionally uses continuous hull certificates.',original:'straight: (i/4,i/8), n500; arc: (100 cos(i*pi/600),100 sin(i*pi/600)), n600; handwriting-like: (i/4,8 sin(i/18)+12 sin(i/51)), n800; loops: (i/20+20 sin(i/25),20 cos(i/25)), n1000; corner-stress: (i/4,3*(i mod 2)), n1200. Variable q=round(128+80 sin(i/35)).',representative:'Geometric proxies, NOT recorded human handwriting. Five sample densities n=160,200,240,280,320 per class; t=i/(n-1). Smooth=(100t,30 sin(pi*t)); handwriting-like=(100t,12 sin(6pi*t)+4 sin(2pi*t)); loop=(60t+20 sin(4pi*t),20 cos(4pi*t)). Variable q=round(128+80 sin(2pi*t)). Both constant and variable modes.'},perClass,checks,negativeControl,scope:'Five synthetic geometry families, constant/variable q; five mixed boards at each 100/500 stroke size, random production shape ids; whole pointerup transactions with semantic history, then half erase and fresh reload. UTF-8 bytes, uncompressed. Observed worst is not a hard cap. No prediction or time-flushed streaming implemented.',strokes:samples.map(s=>({name:s.name,arity:s.arity,original:s.result.original,retained:s.result.retained,overrun:s.result.overrun})),retained:distribution(samples.map(s=>s.result.retained)),summary,boards},null,2));
 console.log(JSON.stringify({perClass,checks,negativeControl,retained:distribution(samples.map(s=>s.result.retained)),summary},null,2));

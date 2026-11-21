@@ -37,3 +37,22 @@ test('killed peer facet expires on inherited awareness TTL; live refresh mirror'
   // to exercise its real expiry callback, rather than claiming fake wall time.
   local.meta.get(remote.clientID)!.lastUpdated-=30001;vi.advanceTimersByTime(3000);expect(local.getStates().has(remote.clientID)).toBe(false);local.destroy();remote.destroy();
 });
+
+test('reader rejects hostile count and UTF-8 byte overflow with boundary mirrors',()=>{
+  const base=canvasFacet('board',null,'pen',[])!;
+  const ids=Array.from({length:64},(_,i)=>String(i));
+  expect(readCanvasFacet({...base,selectedShapeIds:ids})).not.toBeNull();
+  expect(readCanvasFacet({...base,selectedShapeIds:[...ids,'65']})).toBeNull();
+  const unicode={...base,selectedShapeIds:Array.from({length:64},()=> '界'.repeat(128))};
+  expect(facetBytes(unicode)).toBeGreaterThan(12288);expect(readCanvasFacet(unicode)).toBeNull();
+  expect(readCanvasFacet({...base,selectedShapeIds:Array.from({length:64},()=> 'a'.repeat(128))})).not.toBeNull();
+});
+test('unchanged state emissions are deduplicated without suppressing queued position or transitions',()=>{
+  const a=setup();const send=vi.spyOn(a.awareness,'setLocalStateField');
+  a.producer.state({...a.facet,selectedShapeIds:[]});expect(send).not.toHaveBeenCalled();
+  a.producer.position({x:1,y:1});a.producer.position({x:2,y:2});send.mockClear();
+  for(let i=0;i<20;i++){a.producer.state({...a.facet,cursor:{x:2,y:2}});a.producer.state({...a.facet,cursor:{x:1,y:1}});}
+  expect(send).not.toHaveBeenCalled();vi.advanceTimersByTime(100);expect(a.awareness.getLocalState()?.canvas.cursor).toEqual({x:2,y:2});
+  a.producer.state({...a.facet,tool:'rect'});expect(a.awareness.getLocalState()?.canvas.tool).toBe('rect');
+  a.producer.clear();a.producer.state(a.facet);expect(a.awareness.getLocalState()?.canvas).toEqual(a.facet);a.close();
+});

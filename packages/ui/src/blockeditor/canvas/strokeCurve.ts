@@ -2,10 +2,25 @@ import type {Point} from './geometry';
 export interface Curve {a:Point;b:Point;c:Point;d:Point}
 const mix=(a:Point,b:Point,t:number):Point=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 const clamp=(p:Point,a:Point,b:Point):Point=>({x:Math.max(Math.min(a.x,b.x),Math.min(Math.max(a.x,b.x),p.x)),y:Math.max(Math.min(a.y,b.y),Math.min(Math.max(a.y,b.y),p.y))});
+/** Distance to the finite chord, shared by the commit-time fidelity verifier. */
+export function chordDistance(p:Point,a:Point,d:Point):number {
+  const x=d.x-a.x,y=d.y-a.y,length=x*x+y*y;
+  const t=length?Math.max(0,Math.min(1,((p.x-a.x)*x+(p.y-a.y)*y)/length)):0;
+  return Math.hypot(p.x-a.x-t*x,p.y-a.y-t*y);
+}
+const cap=(p:Point,a:Point,d:Point):Point=>{
+  const x=d.x-a.x,y=d.y-a.y,length=x*x+y*y;
+  const t=length?Math.max(0,Math.min(1,((p.x-a.x)*x+(p.y-a.y)*y)/length)):0;
+  const projected=mix(a,d,t),distance=Math.hypot(p.x-projected.x,p.y-projected.y);
+  return distance>.5?mix(projected,p,.5/distance):p;
+};
 /** Interpolating Catmull–Rom controls, clamped to each retained interval.
  * Every retained point is an exact endpoint. Sharp corners have zero tangent;
  * controls stay inside the interval's bounding box, so curves cannot overshoot
- * retained bounds. This is render geometry only; stored points/q never change.
+ * retained bounds. Local tangent components perpendicular to the chord shrink
+ * toward it when necessary: the control hull is at most .5 units from the chord.
+ * Determinism holds at the retained-points layer (including after reload).
+ * This is render geometry only; stored points/q never change.
  */
 export function strokeCurves(points:readonly Point[]):Curve[] {
   const tangent=(i:number):Point=>{
@@ -14,7 +29,7 @@ export function strokeCurves(points:readonly Point[]):Curve[] {
     if(i>0&&i<points.length-1&&(ax*bx+ay*by)<Math.SQRT1_2*Math.hypot(ax,ay)*Math.hypot(bx,by))return {x:0,y:0};
     return {x:(after.x-before.x)/6,y:(after.y-before.y)/6};
   };
-  return points.slice(1).map((d,i)=>{const a=points[i],ta=tangent(i),td=tangent(i+1);return {a,b:clamp({x:a.x+ta.x,y:a.y+ta.y},a,d),c:clamp({x:d.x-td.x,y:d.y-td.y},a,d),d};});
+  return points.slice(1).map((d,i)=>{const a=points[i],ta=tangent(i),td=tangent(i+1);return {a,b:cap(clamp({x:a.x+ta.x,y:a.y+ta.y},a,d),a,d),c:cap(clamp({x:d.x-td.x,y:d.y-td.y},a,d),a,d),d};});
 }
 export function curvePoint(c:Curve,t:number):Point {
   if(t===0)return c.a;if(t===1)return c.d;

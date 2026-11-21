@@ -17,7 +17,8 @@ import {CanvasBlock} from './CanvasBlock';
 import {CanvasHistory} from './history';
 import {insertShapes} from './commands';
 import {canvasDefaults, constructCanvasProps, shapeDefaults, readCanvas} from './schema';
-import {bounds, endpoints} from './geometry';
+import {bounds, endpoints,points} from './geometry';
+import {strokeCurves} from './strokeCurve';
 
 const context={drawImage:vi.fn(),setTransform:vi.fn(),clearRect:vi.fn(),translate:vi.fn(),scale:vi.fn(),save:vi.fn(),restore:vi.fn(),setLineDash:vi.fn(),beginPath:vi.fn(),arc:vi.fn(),ellipse:vi.fn(),rect:vi.fn(),clip:vi.fn(),fill:vi.fn(),stroke:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),bezierCurveTo:vi.fn(),fillText:vi.fn(),measureText:(s:string)=>({width:s.length*8})};
 let controller:BlockEditorController;
@@ -52,7 +53,8 @@ function pointer(el:Element,phase:'down'|'move'|'up',x:number,y:number,more:Reco
   fireEvent[phase==='down'?'pointerDown':phase==='move'?'pointerMove':'pointerUp'](el,{pointerId:1,pointerType:'mouse',button:0,buttons:phase==='up'?0:1,clientX:x,clientY:y,...more});
 }
 function equivalentScene(a:ReturnType<typeof setup>) {
-  const fresh=new Y.Doc();Y.applyUpdate(fresh,Y.encodeStateAsUpdate(a.doc));expect(readCanvas(findBlock(fresh,'canvas')!.block.get('props')).shapes).toEqual(a.shapes());
+  const fresh=new Y.Doc();Y.applyUpdate(fresh,Y.encodeStateAsUpdate(a.doc));const loaded=readCanvas(findBlock(fresh,'canvas')!.block.get('props')).shapes;expect(loaded).toEqual(a.shapes());
+  expect(loaded.filter(s=>s.scalars.kind==='stroke').map(s=>strokeCurves(points(s)))).toEqual(a.shapes().filter(s=>s.scalars.kind==='stroke').map(s=>strokeCurves(points(s))));
   return a.shapes().map(s=>({kind:s.scalars.kind,bounds:bounds(s),points:s.points,text:s.scalars.text,stroke:s.scalars.stroke,fill:s.scalars.fill}));
 }
 
@@ -518,4 +520,12 @@ test('coordinates remain controlled through creation, drag, cancel and expansion
   pointer(a.viewport,'down',340,200);pointer(a.viewport,'move',350,210);
   expect(Number(x.value)).toBe(before+30);a.key('Escape');assertQuiet();
   expect(Number(x.value)).toBe(before+20);equivalentScene(a);
+});
+
+test('F during an active ink gesture is ignored; completion and subsequent F both work',()=>{
+  const a=setup();a.tool('p');pointer(a.viewport,'down',100,100);pointer(a.viewport,'move',130,120);
+  a.key('f',{code:'KeyF'});expect(screen.queryByRole('button',{name:'Back'})).toBeNull();
+  pointer(a.viewport,'move',160,140);pointer(a.viewport,'up',160,140);
+  expect(a.shapes()).toHaveLength(1);expect(bounds(a.shapes()[0]).w).toBe(60);equivalentScene(a);
+  a.key('f',{code:'KeyF'});expect(screen.getByRole('button',{name:'Back'})).toBeTruthy();
 });

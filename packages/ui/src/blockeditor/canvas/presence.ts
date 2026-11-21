@@ -51,7 +51,12 @@ export function canvasProducer(awareness: Awareness) {
   const emit = (value: CanvasFacet | null) => {current = value; awareness.setLocalStateField('canvas',value);};
   const flush = () => {timer = undefined; if (pending && awareness.getLocalState()?.canvas?.blockId === pending.blockId) {const value = pending; pending = null; lastPosition = Date.now(); emit(value);}};
   return {
-    state(value: CanvasFacet | null) {cancel(); emit(value);},
+    state(value: CanvasFacet | null) {
+      // Focus/Tab repeats must neither emit nor erase a queued newest position.
+      const encoded=JSON.stringify(value);
+      if(encoded===JSON.stringify(current)||pending&&encoded===JSON.stringify(pending))return;
+      cancel(); emit(value);
+    },
     position(cursor: CanvasFacet['cursor']) {
       if (!current) return;
       pending = {...current,cursor};

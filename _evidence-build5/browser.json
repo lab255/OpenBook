@@ -155,7 +155,7 @@
     {
       "change": "join",
       "column": 736,
-      "inputAge": 714.8999999761581,
+      "inputAge": 715.7000000476837,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -163,7 +163,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 964.3999999761581
+        "inputAge": 973.3000000715256
       },
       "controlAfter": {
         "scroll": 0,
@@ -181,7 +181,7 @@
     {
       "change": "move",
       "column": 736,
-      "inputAge": 720.7000000476837,
+      "inputAge": 713.1999999284744,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -189,7 +189,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 974.7000000476837
+        "inputAge": 972.1000000238419
       },
       "controlAfter": {
         "scroll": 0,
@@ -207,7 +207,7 @@
     {
       "change": "leave",
       "column": 736,
-      "inputAge": 722,
+      "inputAge": 713.1000000238419,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -215,7 +215,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 973
+        "inputAge": 971.1000000238419
       },
       "controlAfter": {
         "scroll": 0,
@@ -233,7 +233,7 @@
     {
       "change": "delete",
       "column": 736,
-      "inputAge": 718,
+      "inputAge": 712.1999999284744,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -241,7 +241,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 964.8999999761581
+        "inputAge": 961.2999999523163
       },
       "controlAfter": {
         "scroll": 0,
@@ -259,7 +259,7 @@
     {
       "change": "quarantine",
       "column": 736,
-      "inputAge": 713.2999999523163,
+      "inputAge": 711.6000000238419,
       "before": 672,
       "after": 672,
       "cls": 0,
@@ -267,7 +267,7 @@
       "controlBefore": {
         "scroll": 0,
         "below": 672,
-        "inputAge": 969.1000000238419
+        "inputAge": 969.7999999523163
       },
       "controlAfter": {
         "scroll": 0,
@@ -288,12 +288,12 @@
     "before": {
       "scroll": 124,
       "below": 548,
-      "inputAge": 930.6000000238419
+      "inputAge": 920.2999999523163
     },
     "after": {
       "scroll": 274,
       "below": 548,
-      "inputAge": 115.59999990463257
+      "inputAge": 116.20000004768372
     },
     "controlHeight": 150,
     "entries": []
@@ -301,17 +301,17 @@
   "provenance": [
     {
       "path": "src/blockeditor/canvas/CanvasBlock.tsx",
-      "mtime": "2026-11-21T07:35:36.249Z",
-      "sourceBytes": 52802,
-      "sourceSha256": "6e8d3c61e58dd5879e3a0e2e3698fd78c954072ecb35c6faa6cb85aa671196cf",
-      "servedSha256": "a83ddf743e2c3d65c3e55702905677b42cc284b36cbc2c3227a80e1692ad846d"
+      "mtime": "2026-11-21T08:21:24.365Z",
+      "sourceBytes": 53155,
+      "sourceSha256": "fc7743241d6182b2191987498c776f55f522d84aa861b09ae97ca17dbdaa4573",
+      "servedSha256": "94fa9691d86c61b0652ea6713fd1e267f9a2336d3372ccacb7792527a93760f5"
     },
     {
       "path": "src/blockeditor/canvas/CanvasPresence.tsx",
       "mtime": "2026-11-21T07:35:09.473Z",
       "sourceBytes": 5079,
       "sourceSha256": "ac79170988f99483699ec02accf3c523f7e6e1d480857a194ba8e393310bfb75",
-      "servedSha256": "0251808a2614b1ac07be719ad41588cfef3603f2c69884ae14d4218b04e1db51"
+      "servedSha256": "26f0b32f028ada1f960b1614ad22b9bbc1a34f6ab5b60da8ded7f85033bf3e59"
     },
     {
       "path": "src/blockeditor/canvas/canvas.css",
@@ -322,10 +322,10 @@
     },
     {
       "path": "scripts/canvas-measure/harness.tsx",
-      "mtime": "2026-11-21T07:43:23.370Z",
-      "sourceBytes": 9515,
-      "sourceSha256": "2cb3f5c8fb0cda8ed2a5897e3e916104aa0c13ca182ff714131ca4bbcae2c34c",
-      "servedSha256": "e5d1dcebf856a5a6221cba46748c43b7abbf33606b5589a08e5ca18e215c2a18"
+      "mtime": "2026-11-21T08:22:22.024Z",
+      "sourceBytes": 9555,
+      "sourceSha256": "38cb59371d3977d5e6b4e907ee0eec2d835d1592f7d212be413963a3e24c36c1",
+      "servedSha256": "aeb5bc992e85550d5bfddda5d769e5c919bb124e1e6f37f543c9f9d1542f2038"
     }
   ]
 }

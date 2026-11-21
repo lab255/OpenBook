@@ -345,7 +345,14 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
           <span className="obe-image-placeholder-hint">Click to upload, or paste / drop an image</span>
         </button>
         {noticeEl}
-        <input
+        {__OB_SAFE_EXPORT_VIEWER__ ? (<input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="obe-sr-only"
+          aria-label="Choose an image file"
+          onChange={onFileInput}
+        />) : (<input
           key="image-file"
           ref={fileRef}
           type="file"
@@ -353,7 +360,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
           className="obe-sr-only"
           aria-label="Choose an image file"
           onChange={onFileInput}
-        />
+        />)}
         {caption && <figcaption className="obe-image-caption" style={{width: width ?? '100%'}}>{caption}</figcaption>}
       </figure>
     );
@@ -507,7 +514,14 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
         />
       )}
       {!readOnly && (
-        <input
+        __OB_SAFE_EXPORT_VIEWER__ ? (<input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="obe-sr-only"
+          aria-label="Choose an image file"
+          onChange={onFileInput}
+        />) : (<input
           key="image-file"
           ref={fileRef}
           type="file"
@@ -515,7 +529,7 @@ export const ImageBlockView: React.FC<{block: BlockMap; editor: BlockEditorContr
           className="obe-sr-only"
           aria-label="Choose an image file"
           onChange={onFileInput}
-        />
+        />)
       )}
       {noticeEl}
     </figure>

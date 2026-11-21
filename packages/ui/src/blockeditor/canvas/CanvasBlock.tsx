@@ -1,3 +1,4 @@
+import {FocusScope} from '@radix-ui/react-focus-scope';
 import {CanvasPopup} from './CanvasPopup';
 import {createPortal} from 'react-dom';
 import {useAwareness} from '../../components/presence/useAwareness';
@@ -320,7 +321,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     if(command&&key==='d'){handled();if(!readOnly)duplicate();return;}
     if(command&&(e.code==='BracketLeft'||e.code==='BracketRight')){handled();if(!readOnly)arrange(e.code==='BracketRight'?(e.shiftKey?'front':'forward'):(e.shiftKey?'back':'backward'));return;}
     if(command)return;
-    if(key==='f'){handled();expansion.toggle();return;}
+    if(key==='f'){handled();if(!gesture.current&&!keyboardPath)expansion.toggle();return;}
     if(key==='?'){handled();setObjects(false);setArrangeOpen(false);setHelp(v=>!v);return;}
     if(key==='+'||key==='='||key==='-'||key==='0'||key==='1'){handled();if(key==='0')fit();else zoom(key==='1'?1:camera.zoom*(key==='-'?1/1.2:1.2));return;}
     const nextTool=tools.find(t=>t[2].toLowerCase()===key);
@@ -361,7 +362,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
   const visibleTools=readOnly?tools.filter(t=>t[0]==='pan'):tools;
   const canUndo=editor.undo.availability?.undo,canRedo=editor.undo.availability?.redo;
   const properties=chosen.length&&tool==='select'?chosen[0].scalars:{stroke,fill,strokeWidth};
-  return <div ref={expansion.slot} style={{height:expansion.expanded?expansion.reservedHeight:undefined}}>{createPortal(<div ref={region} className={`ob-canvas${expansion.expanded?' ob-canvas-expanded':''}`} role="region" aria-label={`Canvas, ${scene.shapes.length} objects, ${readOnly?'view only':'editable'}`} tabIndex={0}
+  return <div ref={expansion.slot} style={{height:expansion.expanded?expansion.reservedHeight:undefined}}>{createPortal(<FocusScope asChild trapped={expansion.expanded} loop={expansion.expanded} onMountAutoFocus={e=>e.preventDefault()} onUnmountAutoFocus={e=>e.preventDefault()}><div ref={region} className={`ob-canvas${expansion.expanded?' ob-canvas-expanded':''}`} role="region" aria-label={`Canvas, ${scene.shapes.length} objects, ${readOnly?'view only':'editable'}`} tabIndex={0}
     onFocus={activate} onKeyDown={onKey} onKeyUp={e=>{if(e.key===' '&&spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;e.preventDefault();e.stopPropagation();}}}
     onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}
     onBlur={e=>{if(!expansion.transitioning.current&&!e.currentTarget.contains(e.relatedTarget)){presence.leave();setActive(false);setObjects(false);setHelp(false);setArrangeOpen(false);focusedObject.current=null;if(spaceTool.current){setTool(spaceTool.current);spaceTool.current=null;}if(textEdit)finishText(false);else cancel();}}}>
@@ -376,7 +377,7 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
       </div>
       <span className="ob-canvas-title">Canvas</span><button type="button" tabIndex={tab} aria-label={expansion.expanded?'Return to page (F)':'Expand canvas (F)'} title={expansion.expanded?'Return to page (F)':'Expand canvas (F)'} onClick={expansion.toggle}>{expansion.expanded?<Minimize2 size={16} aria-hidden="true"/>:<Maximize2 size={16} aria-hidden="true"/>}</button><span className="ob-canvas-status">{readOnly?'View only':''}</span>
       {keepEditingChrome&&<div className="ob-canvas-history" aria-hidden={readOnly} style={{visibility:readOnly?'hidden':'visible'}}><button type="button" tabIndex={tab} aria-label={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} title={canUndo?`Undo ${canUndo.toLowerCase()}`:'Undo'} disabled={readOnly||!canUndo} onClick={()=>undo()}><Undo2 size={16} aria-hidden="true"/></button><button type="button" tabIndex={tab} aria-label={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} title={canRedo?`Redo ${canRedo.toLowerCase()}`:'Redo'} disabled={readOnly||!canRedo} onClick={()=>undo(true)}><Redo2 size={16} aria-hidden="true"/></button></div>}
-      <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-label="Help (?)" aria-expanded={help} onClick={()=>{setObjects(false);setArrangeOpen(false);setHelp(v=>!v);}}><HelpCircle size={16} aria-hidden="true"/></button>      {help&&<CanvasPopup className="ob-canvas-help" role="dialog" aria-label="Canvas help" onPointerDown={e=>e.stopPropagation()}>
+      <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-label="Help (?)" aria-expanded={help} onClick={()=>{setObjects(false);setArrangeOpen(false);setHelp(v=>!v);}}><HelpCircle size={16} aria-hidden="true"/></button>      {help&&<CanvasPopup expanded={expansion.expanded} className="ob-canvas-help" role="dialog" aria-label="Canvas help" onPointerDown={e=>e.stopPropagation()}>
         <strong>Canvas shortcuts</strong><p>Pen draws. Fingers move the view.</p>
         <p>{readOnly?'H Pan.':'V Select · P Pen · R Rectangle · O Ellipse · A Arrow · T Text · E Erase · H Pan.'} +/− Zoom · 0 Fit · 1 Actual size · F Expand/return · ? Help.</p>
         {!readOnly&&<><p>Pen: Enter starts a path, arrows move 1 unit (Shift 10), Space places a point, Enter finishes. Shapes: Enter inserts at the center. Text: Cmd/Ctrl+Enter finishes.</p><p>Selection: arrows move 1 unit (Shift 10). Cmd/Ctrl+A selects all; D duplicates; [ / ] reorders (Shift sends to back/front); Z undoes; Shift+Z redoes; Ctrl+Y redoes. Delete erases.</p></>}
@@ -432,12 +433,12 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     {active&&<div className="ob-canvas-footer">
       {keepEditingChrome&&<div style={{visibility:readOnly?'hidden':'visible'}} aria-hidden={readOnly}>
         <div className="ob-canvas-popup-anchor"><button ref={arrangeTrigger} disabled={readOnly} type="button" tabIndex={tab} aria-disabled={readOnly||!chosen.length} aria-haspopup="menu" aria-expanded={arrangeOpen} onClick={()=>{if(readOnly||!chosen.length)return;setObjects(false);setHelp(false);setArrangeOpen(v=>!v);}}>Arrange</button>
-          {arrangeOpen&&<CanvasPopup className="ob-canvas-arrange" role="menu" aria-label="Arrange" onKeyDown={e=>{if(!['ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();const items=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('button')],index=items.indexOf(document.activeElement as HTMLButtonElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowUp'?-1:1)+items.length)%items.length]?.focus();}}>
+          {arrangeOpen&&<CanvasPopup expanded={expansion.expanded} className="ob-canvas-arrange" role="menu" aria-label="Arrange" onKeyDown={e=>{if(!['ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();e.stopPropagation();const items=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('button')],index=items.indexOf(document.activeElement as HTMLButtonElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowUp'?-1:1)+items.length)%items.length]?.focus();}}>
             {(['back','backward','forward','front'] as const).map(direction=><button key={direction} role="menuitem" type="button" tabIndex={tab} onClick={()=>{arrange(direction);setArrangeOpen(false);viewport.current?.focus();}}>{({back:'Send to back',backward:'Send backward',forward:'Bring forward',front:'Bring to front'})[direction]}</button>)}
           </CanvasPopup>}
         </div>
       </div>}
-      <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-expanded={objects} onClick={()=>{setHelp(false);setArrangeOpen(false);setObjects(v=>!v);}}>Objects</button>      {objects&&<CanvasPopup className="ob-canvas-objects" onPointerDown={e=>e.stopPropagation()}>
+      <div className="ob-canvas-popup-anchor"><button type="button" tabIndex={tab} aria-expanded={objects} onClick={()=>{setHelp(false);setArrangeOpen(false);setObjects(v=>!v);}}>Objects</button>      {objects&&<CanvasPopup expanded={expansion.expanded} className="ob-canvas-objects" onPointerDown={e=>e.stopPropagation()}>
         <div role="listbox" aria-label="Objects" aria-multiselectable="true">
           {scene.shapes.length?scene.shapes.map((s,i)=><div key={s.id} role="option" data-object-index={i} aria-selected={selected.has(s.id)} tabIndex={active&&i===listFocus?0:-1} onFocus={()=>{setListFocus(i);focusedObject.current=s.id;}} onClick={e=>{const ids=new Set(e.shiftKey?selected:[]);if(e.shiftKey&&ids.has(s.id))ids.delete(s.id);else ids.add(s.id);choose(ids);}}
             onKeyDown={e=>{
@@ -464,5 +465,5 @@ export function CanvasBlock({block,editor,pageReadOnly}:CustomBlockProps) {
     </div>}
     <span className="ob-canvas-live" role="status" aria-live="polite" aria-atomic="true">{announcement}</span>
     {!!scene.diagnostics.length&&<span className="ob-canvas-diagnostic" role="status">Canvas requires recovery</span>}
-  </div>,expansion.host)}</div>;
+  </div></FocusScope>,expansion.host)}</div>;
 }

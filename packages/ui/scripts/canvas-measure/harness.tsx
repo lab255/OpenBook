@@ -41,7 +41,7 @@ const api={
   sourceStamp:servedStamp,
   paper(color:string){(findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>).set('background',color);},
   column(width:number){columnWidth=width;remount();},
-  presence(change:'join'|'move'|'leave'){peerPresence.setLocalStateField('user',{name:'Morgan',id:'morgan',color:'#1d4ed8'});peerPresence.setLocalStateField('canvas',change==='leave'?null:canvasFacet('canvas',{x:change==='move'?120:80,y:100},'pen',readCanvas(findBlock(doc,'canvas')!.block.get('props')).shapes.slice(0,1).map(s=>s.id)));applyAwarenessUpdate(awareness,encodeAwarenessUpdate(peerPresence,[peerPresence.clientID]),'net');},
+  presence(change:'join'|'move'|'leave',position?:{x:number;y:number}){peerPresence.setLocalStateField('user',{name:'Morgan',id:'morgan',color:'#1d4ed8'});peerPresence.setLocalStateField('canvas',change==='leave'?null:canvasFacet('canvas',position??{x:change==='move'?120:80,y:100},'pen',readCanvas(findBlock(doc,'canvas')!.block.get('props')).shapes.slice(0,1).map(s=>s.id)));applyAwarenessUpdate(awareness,encodeAwarenessUpdate(peerPresence,[peerPresence.clientID]),'net');},
   resetEditor(){netQueue?.close();netQueue=null;transport?.close();transport=null;editorMode=true;doc=createDoc([{id:'entry',type:'paragraph'}]);remount();},
   editorBlocks(){return rootBlocks(doc).toArray().map(block=>({id:String(block.get('id')),type:String(block.get('type'))}));},
   reset(count=0){editorMode=false;netQueue?.close();netQueue=null;transport?.close();transport=null;doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);const props=findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>,shapes=props.get('shapes') as Y.Map<unknown>;

@@ -1,0 +1,229 @@
+{
+  "scope": "Original float board TABLE medians/worsts vs round 2 (not individual random-id trials). All 32 table entries within the previously observed 40-byte summary noise; exact geometry identity independently asserted by the 46-fixture counterfactual.",
+  "rows": [
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "base64",
+      "statistic": "median",
+      "delta": -36
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "base64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "complete",
+      "statistic": "median",
+      "delta": -36
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "complete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "retainedUndoBase64",
+      "statistic": "median",
+      "delta": -40
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "retainedUndoBase64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "retainedUndoComplete",
+      "statistic": "median",
+      "delta": -40
+    },
+    {
+      "count": 100,
+      "simplified": false,
+      "form": "retainedUndoComplete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "base64",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "base64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "complete",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "complete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "retainedUndoBase64",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "retainedUndoBase64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "retainedUndoComplete",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "form": "retainedUndoComplete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "base64",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "base64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "complete",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "complete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "retainedUndoBase64",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "retainedUndoBase64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "retainedUndoComplete",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "form": "retainedUndoComplete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "base64",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "base64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "complete",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "complete",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "retainedUndoBase64",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "retainedUndoBase64",
+      "statistic": "worst",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "retainedUndoComplete",
+      "statistic": "median",
+      "delta": 0
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "form": "retainedUndoComplete",
+      "statistic": "worst",
+      "delta": 0
+    }
+  ]
+}

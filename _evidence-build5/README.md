@@ -1,8 +1,8 @@
-# BUILD-5 evidence — Round 2
+Canvas blocks now expand into the viewport without remounting the canvas, show bounded peer pointers and selection outlines, and offer optional grid/snap. Confirmed strokes are simplified before commit while retaining geometric and pressure fidelity; irreducible strokes are preserved and reported.
 
 Audited at: `147cdf1c94c62b95f38147e5082fffdf8713b5f9`.
 
-The inline canvas now expands in place, shows bounded peer presence, offers grid/snap, and simplifies confirmed strokes before pointerup commit. Round 2 addresses the first design review; manager recaptures and perceptual no-jump acceptance remain pending. No worker screenshots, video, or public exposure.
+Round 3 addresses the code gate and the design follow-ups. Code re-review and manager perceptual no-jump acceptance remain pending. No worker screenshots, video, or public exposure.
 
 ## Deferral replay
 
@@ -16,7 +16,7 @@ The editable empty-sheet hint is now exactly “Pen P · Select V · Expand F”
 
 ## Named presence producer policy (rule 11)
 
-The ≤10Hz ceiling governs position, not state. Newer positions replace older positions within a 100ms slot; under sustained movement, the newest position lands each slot. Tool/selection transitions emit immediately at the canvas producer boundary. Clear on focus-leave immediately supersedes pending positions; immediate rejoin publishes present, not a sticky clear.
+The ≤10Hz ceiling governs position, not state. Newer positions replace older positions within a 100ms slot; under sustained movement, the newest position lands each slot. State transitions (tool/selection/focus-leave CLEAR) are latched and emitted without loss at the canvas producer boundary. Tool/selection transitions emit immediately; pure CLEAR bypasses the position ceiling. Clear on focus-leave immediately supersedes pending positions; immediate rejoin publishes present, not a sticky clear.
 
 This is **current-state semantics, not an event stream**. The existing network coalescer may collapse intermediate transitions. “Immediate” means the canvas producer calls Awareness immediately; the existing network sender delivers current state on its unchanged normal path. No shared sender or server change.
 
@@ -24,60 +24,100 @@ Hidden tab means focus leave: clear immediately on visibilitychange→hidden; on
 
 `presence-bytes.json`: synthetic UTF-8 facet measurements 236 B ordinary, 8,540 B with 64 maximum-length ASCII ids, 12,048 B with 31 retained Unicode ids (summarized), 849 B with 100 requested/64 retained ids. Unbounded Unicode control 24,635 B. Complete awareness payload is reported separately; no HTTP/SSE envelope claim.
 
-## Numeric results and scope
+## Round 3 corrections
 
-- `browser.json`: single-process Chromium DPR1, 1280×900, **asserted 736px column**, simple-shape properties **two rows / 80px**. Five expand/Back cycles each at 100/200/400% preserve camera-relative selected bounds, focus, zoom, and scroll124px; planted drift control1px; fresh replica equality. This is DOM continuity, **not a CLS claim for input-adjacent expansion**.
-- Fresh-browser, unscrolled remote-event CLS: join/move/leave/delete/quarantine **0**. Each control fires0.0569759–0.0578825 with `hadRecentInput:false`, event age>700ms and control age>960ms. Remote events leave the following paragraph in place; reload equality retained.
-- Scrolled-control diagnosis: insertion150px changed scroll124→274 while paragraph screen top remained548px; no layout-shift entries. This demonstrates scroll anchoring in that arrangement, not recent-input exclusion. Historical failed-control artifacts remain named separately.
-- `design-polish.json`: light/dark token, focus, control, clipping and text-opacity checks at736px, with planted controls. `ink-raster.json` adds stylesheet scope: literal chrome hex count0/control1, literal durations0/control1; no new animation.
-- `viewer.json`, `production-graphs.json`: **878 B coordinate**, raw1,933,253 B, SHA256 `5e19a4370e544d1fba98a711519149d282ba7a32d897919ae6e3df7abc4fcfee`. Sequence: BUILD-4 **852** → first push **852** → Round 2 **878**. The **+26 B** is exactly two emitted image file-input identity arguments; removing them reproduces the prior bundle hash (`round2-viewer-mechanism.json`). Viewer has no canvas editor modules; app has them; measurement harness appears in neither production graph. Authorized4096 minus878=3218 B; F1 estimate2588 leaves projected630 B. Awareness changes remain type-only; no shared transport change.
-- Full UI build, full workspace lint, **282 focused tests / 8 files**, and **8 ledger/boundary tests** pass at this checkpoint. Untouched full pre-push hooks run at delivery.
+- **Rendered fidelity:** online radial prefilter and bounded-window RDP remain. A deterministic local curve-to-chord cap reduces tangent displacement toward the chord; before discarding original samples, final verification checks the rendered curve against the original polyline. The fast control-hull bound has an adaptive subdivision fallback that certifies both geometric directions; failing intervals retain additional original points. Pressure is rechecked after insertion. The complete fidelity ladder is documented in `decimation.ts`. The unchanged bound is **0.5 world units**, not “0.5 storage plus 0.5 rendering.” No schema changes. Retained endpoints/corners/q extrema stay exact. Determinism holds **at the retained-points layer**, with actual Yjs reload render-input identity asserted.
+- **Lattice input:** strict corner comparison excludes single-sample 45° stairs. Within at most128 samples, endpoint selection prefers fidelity-valid chords aligned with repeated lattice samples; fractional partitions are unchanged. The 300-point `(i,round(0.3i))` probe retains **7**, versus float **4**. The earlier0.854 result belonged to the four forced anchors alone: the implementation preserved fidelity by retaining130, so this was excess retention, not shipped out-of-bound output. No published prefix is changed. Window working sets are bounded; original unsent samples still live for the pointerup verification.
+- **Focus and gestures:** expanded mode uses Radix FocusScope, the same containment primitive used by PresentMode's dialog, without remounting the canvas. Native Tab/Shift+Tab tests cover both edges, inline Tab leaves, and Escape restores inline viewport focus. F during an active pointer/keyboard path does not toggle or discard it; completion followed by F works.
+- **Presence:** hostile count/UTF-8 read-bound regressions; unchanged producer state deduplicates without cancelling the newest queued position or suppressing clear→rejoin/tool transitions. Transport unchanged.
+- **Popup placement:** layout effect has explicit posture dependencies. Shared placement remains anchored → flip → clamp → scroll when taller than viewport. Expanded footer popups end at or above the footer border box; inline placement is unchanged. The1024×240 Help test proves an initially off-screen Close control becomes hittable after scrolling.
 
-## Decimation: fidelity before point targets
+## Fidelity and document bytes (§7)
 
-`decimation.json` contains exact generation equations, per-class distributions, all board trials, raw/update/projection bytes, retained-history erase and reload legs. Original synthetic families: straight n500; semicircle n600; sinusoidal handwriting-like n800; repeated loops n1000; alternating sharp-corner stress n1200. Variable q oscillates as round(128+80 sin(i/35)). That ten-stroke population retains median132.5 / worst1200, above planning targets; geometry is preserved.
+`round3-decimation.json` records generation equations, each population separately, all80 board trials, raw/update/projection bytes, both snapshot forms, retained-history erase, and reload equality. These are synthetic geometric proxies, **not recorded handwriting or physical device samples**. “Worst” is observed, not a hard cap. There are no predicted points or time-flushed streaming claims.
 
-Representative **geometric proxies, not recorded human handwriting**, use five sample densities160/200/240/280/320 on fixed smooth-curve, handwriting-like and loop domains, with a one-cycle q modulation. Per-class N5 results:
+The random-walk regression has199 seeded float walks; integer sine and the all-original `(0,0)→(100,100)→(200,150)` counterexample also assert rendered deviation. The old uncapped curve is a firing >0.5 control. The benchmark's independent65-probes-per-retained-interval meter observes max rendered-to-original **0.4864933**, original-to-stored-polyline **0.4982729**, and pressure **1q =1/255**. Production acceptance additionally uses continuous hull certificates, not just these probes.
 
-| Class | Constant retained median / worst | Variable retained median / worst |
-|---|---:|---:|
-| Smooth curve | 10 / 11 | 51 / 81 |
-| Handwriting-like | 29 / 30 | 67 / 95 |
-| Loop | 40 / 42 | 67 / 102 |
+Corrected-enforcement provenance: these tables were remeasured with the cap and final rendered verification enabled. Existing float families retain the same counts; the byte-table medians/worsts reproduce within the previously observed40 B summary noise (`round3-float-tables.json`). Independently disabling only lattice partitioning reproduces all46 float fixture outputs **exactly**, including q (`round3-float-partition.json`). No fidelity parameter was retuned to obtain point counts.
 
-Across all40 strokes, independent original-to-retained segment verification measures max geometric deviation **0.4975654885888501 world units** and pressure error **1q =1/255**. Endpoint-only controls measure29.9985 units /80q. Original q, endpoints, deliberate corners and pressure extrema are retained. No prediction or published prefix is simplified; producer remains pointerup-only. The UI overrun test commits all1200 stress points, records the overrun, announces “Long stroke preserved · point budget exceeded”, and verifies fresh-replica equality; ordinary-stroke mirror does not increment overrun.
+| Population / class | N per mode | Constant retained median / worst | Variable retained median / worst |
+|---|---:|---:|---:|
+| original-synthetic-float / straight | 1 | 5 / 5 | 112 / 112 |
+| original-synthetic-float / arc | 1 | 21 / 21 | 136 / 136 |
+| original-synthetic-float / handwriting-like | 1 | 49 / 49 | 193 / 193 |
+| original-synthetic-float / loops | 1 | 129 / 129 | 255 / 255 |
+| original-synthetic-float / corner-stress | 1 | 1,200 / 1,200 | 1,200 / 1,200 |
+| representative-geometric-proxies-float / smooth-curve | 5 | 10 / 11 | 51 / 81 |
+| representative-geometric-proxies-float / handwriting-like | 5 | 29 / 30 | 67 / 95 |
+| representative-geometric-proxies-float / loop | 5 | 40 / 42 | 67 / 102 |
+| paired-float-controls / float-control-line | 1 | 4 / 4 | 71 / 71 |
+| paired-float-controls / float-control-circle | 1 | 41 / 41 | 88 / 88 |
+| paired-float-controls / float-control-sine | 1 | 40 / 40 | 93 / 93 |
+| integer-lattice / lattice-line | 1 | 7 / 7 | 164 / 164 |
+| integer-lattice / lattice-circle | 1 | 116 / 116 | 148 / 148 |
+| integer-lattice / lattice-sine | 1 | 75 / 75 | 118 / 118 |
 
-Five synthetic mixed boards per size, production random shape ids; UTF-8/uncompressed snapshot bytes:
+The original ten-stroke stress population remains median132.5/worst1200, above the planning targets. The lattice circle/sine also retain more than their float counterparts; the table reports that scope explicitly. Geometry wins over the derived point target. The UI overrun regression commits all1200 stress points, records and announces the overrun, and reloads identically; the ordinary-stroke mirror does not increment the diagnostic.
 
-| Board | Before base64 median / worst | After base64 median / worst | Before full snapshot median / worst | After full snapshot median / worst |
+Five boards per population/size, random production shape IDs, UTF-8 uncompressed bytes:
+
+| Population / strokes | Before base64 median / worst | After base64 median / worst | Before full snapshot median / worst | After full snapshot median / worst |
 |---|---:|---:|---:|---:|
-| 100 strokes | 1,610,332 / 1,610,332 | 538,108 / 538,148 | 3,675,895 / 3,675,895 | 1,106,951 / 1,106,991 |
-| 500 strokes | 8,052,284 / 8,052,284 | 2,692,700 / 2,692,740 | 18,380,001 / 18,380,001 | 5,536,817 / 5,536,857 |
+| original-synthetic-float / 100 | 1,610,296 / 1,610,332 | 538,108 / 538,148 | 3,675,859 / 3,675,895 | 1,106,951 / 1,106,991 |
+| original-synthetic-float / 500 | 8,052,284 / 8,052,284 | 2,692,700 / 2,692,740 | 18,380,001 / 18,380,001 | 5,536,817 / 5,536,857 |
+| representative-geometric-proxies-float / 100 | 694,000 / 694,036 | 191,268 / 192,992 | 1,667,497 / 1,667,901 | 413,497 / 417,830 |
+| representative-geometric-proxies-float / 500 | 3,473,536 / 3,473,572 | 979,504 / 981,896 | 8,343,299 / 8,343,983 | 2,103,776 / 2,109,894 |
+| paired-float-controls / 100 | 673,308 / 674,148 | 192,060 / 193,128 | 1,487,715 / 1,495,189 | 396,478 / 399,774 |
+| paired-float-controls / 500 | 3,361,132 / 3,366,072 | 973,980 / 974,936 | 7,428,985 / 7,442,601 | 1,997,022 / 1,999,681 |
+| integer-lattice / 100 | 332,944 / 333,180 | 172,200 / 172,272 | 637,649 / 637,735 | 316,444 / 316,472 |
+| integer-lattice / 500 | 1,667,900 / 1,667,936 | 867,732 / 868,360 | 3,190,455 / 3,190,777 | 1,587,448 / 1,588,735 |
 
-After half erase with semantic history retained, simplified100-stroke base64 median/worst538,388/538,432; full925,419/925,463. Simplified500-stroke base64 median/worst2,694,156/2,694,196; full4,628,984/4,629,024. These are medians of the measured synthetic trials, not a general population claim. Point targets are planning outcomes, not truncation caps. Decimation intentionally changes document bytes. Round 2 changes rendering only; stored point counts and the tables above remain unchanged. The separate image-input correction adds26 B of viewer code as measured above.
+After half erase, with semantic undo retained, for the simplified boards:
 
-`ink-raster.json`: 12 native Canvas2d comparisons, three240-sample proxies × constant/variable ×100/400%. Raster differences are nonzero (reported honestly), support bounds unchanged at100%, at most1px support-bound change at400%; deliberate5-world-unit translation controls read5/20px. This **does not certify no perceptible end-of-stroke jump**; that remains a named design-review item. No images saved.
+| Population / strokes | Base64 median / worst | Full snapshot median / worst |
+|---|---:|---:|
+| original-synthetic-float / 100 | 538,388 / 538,432 | 925,419 / 925,463 |
+| original-synthetic-float / 500 | 2,694,156 / 2,694,196 | 4,628,984 / 4,629,024 |
+| representative-geometric-proxies-float / 100 | 191,468 / 193,192 | 345,421 / 348,384 |
+| representative-geometric-proxies-float / 500 | 980,768 / 983,164 | 1,755,725 / 1,759,666 |
+| paired-float-controls / 100 | 192,268 / 193,336 | 333,838 / 336,275 |
+| paired-float-controls / 500 | 975,256 / 976,212 | 1,683,305 / 1,685,367 |
+| integer-lattice / 100 | 172,476 / 172,548 | 270,538 / 271,046 |
+| integer-lattice / 500 | 869,252 / 869,884 | 1,360,309 / 1,360,840 |
 
-## Honest partials and environmental pre-clears
+## Viewer coordinate and consumer evidence
 
-Manager-owned Round 2 recaptures/design review, visual no-jump judgment at100/400%, screen-reader experience and physical IME remain manual. iPad/Pencil/hardware belong to BUILD-2; F1 export to BUILD-6. No new offline durability, authorship or edit-authority guarantees. JS retained-history memory, physical presentation latency and human-stroke cost distributions are not measured here.
+**852 B**, raw1,933,227 B, SHA256 `67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198`: exact pre-leak bundle restored. Sequence: BUILD-4 852 → first push852 → round2 878 → round3 **852**.
 
-Known environmental pre-clears: shared-.git/config Husky install write is denied but existing main-checkout hooks remain active; ordinary builds supply MCP/server command outputs. Single-process Chromium uses **one page per fresh browser**; sole-page closure may terminate the process. **Escalate if a browser dies with pages still open.** Failed-fixture artifacts are retained without relabeling them as passing evidence.
+The +26 B was a seam leak: `ViewerApp.PageView` renders `PresentBlocks`, whose locked context makes `BlockEditor.BlockBody` pass `textEditor.readOnly=true` into `ImageBlockView`. That component returns before the placeholder picker and guards the loaded picker with `!readOnly`. **Neither keyed file input mounts in the viewer.** The existing compile-time viewer flag now keeps key identity app-side; emitted viewer bytes/hash prove exact restoration (`round3-viewer-mechanism.json`). The warning regression and its planted console control still run app-side. No adjacent product-policy change. Production graph: no canvas editor/remoteFrame in viewer, no measurement module in either product build.
 
+**Trend:** 125 B of allowance consumed across BUILD-4/5 (727→852); the temporary26 B leak is recovered. 4096−852=3244 B remains now; estimated F1 slice2588 leaves **656 B projected**, versus630 B at878. These are the coordinate, allowance, and estimate respectively—not interchangeable byte quantities.
 
-## Round 2 corrections and evidence
+## Browser evidence and design handoff
 
-- Expanded canvas uses the existing menu tier (50), following the ruled PresentMode precedent. `round2-layers.json` tests actual production Next app: sidebar coverage with Back/title/all8 tools hittable; Arrange/Objects/Help within the viewport; Cmd+K, app dialogs, toast and lightbox above and interactive. Lower layers cannot intercept those targets. Light/dark at1280×800 and1024×640; inline mirror1280×1400 stays below its trigger. Too-tall Help at1024×240 is top-clamped at8px with224px scroll viewport for486px content; scrolling makes Close hittable. One utility preserves the anchor, flips when space below is insufficient, clamps inward, then scrolls content taller than the viewport. No global layer token added.
-- Committed and preview strokes use interpolating cubic curves through every retained point. Endpoints, corners and pressure-extrema locations stay put; controls are bounded by each adjacent retained pair, with zero tangents at sharp corners. Only interpolation between retained points is rendered. Pressure follows retained q; **storage still uses the exact0.5-unit decimation contract**. Curve tests verify retained points, bounds, corners and subdivision equivalence. Twelve raster before/after pairs at100/400% are recorded in `ink-raster.json` versus `ink-raster-before-curves.json`; pixel differences decreased in all12, but this does not certify perceptual no-jump. Manager must judge the capture pairs; if unsuccessful, stop for the owner fork.
-- Return uses a minimize glyph. Peer visuals have no Tab stops or pointer interception; viewport hover reveals idle labels without blocking the next pointerdown. `round2-polish.json` includes native hit testing, planted intercepting-overlay control, hover→draw, and empty-paper mirror. Remote outlines sit3px outside geometry; **offset plus the name label** supplies the non-color cue. Grid derives from paper luminance: white paper grid rgb219 in both themes, dark paper rgb50 in both themes. Snap guides are32px segments near the snapped edge. Geometry fields show preview bounds during gestures and committed values otherwise.
-- Controlled-input warning was in image fallback: React reused a controlled caption input as a file picker. Stable file-input identity fixes it; regression fails on old code and passes after, with a planted console-warning control. Canvas fields remain controlled across full drag, cancel and F→F, with zero console errors asserted and a firing control. No warning suppression or defaultValue fallback.
-- `round2-raster-equivalence.json`:216 cache/full-paint cases across DPR1/1.5/2, with firing clear-surface controls. `round2-sustained-ink.json`:500 settled strokes plus >1000 active samples,12 raster-availability observations per mouse/trackpad-class condition. Every newest sample lands on the first sampled frame; commit retains126/127 points respectively and fresh replicas agree. Synthetic/local measurements, not human or physical latency.
-- The measurement bundle embeds a SHA256 stamp over UI source and measurement source/config. Before mounting, it compares against current disk via a no-cache endpoint; every measurement also compares against its local disk hash. `round2-source-stamp.json` proves a planted mismatch blocks mounting and a matching source proceeds. Restart after edits; never accept stale-source results.
+- `round3-layers.json`: actual production Next app, light/dark at1280×800 and1024×640. Sidebar is covered; Back/title/all8 tools hittable. Arrange and app command palette/dialog/toast/lightbox paint above the intended surfaces and remain interactive. Inline placement/focus mirrors and the too-tall scroll proof pass. Canvas-free pages before mounting and after unmounting contain no canvas interceptor; the planted overlay makes the hit-test control fail as intended.
+- `browser.json`: asserted736px column, properties two rows/80px; five enter/exit cycles at each100/200/400% preserve local view, selection, scroll and focus, with drift control and reload. Expansion is input-adjacent and not claimed as CLS evidence. Isolated unscrolled remote join/move/leave/delete/quarantine CLS legs have firing controls outside recent input. The earlier dead scrolled control was **scroll anchoring**, shown by scroll124→274 offsetting a150px insertion, not merely hypothesized input exclusion.
+- `round3-ink-raster.json`:12 numerical raster pairs at100%/400%; no screenshots saved. **Round3 is less smoothed at sharp turns than round2 because original-sample fidelity is now enforced.** This is the contract being honored. Manager must judge the perceptual pairs; numeric differences are not relabeled “imperceptible.” `round2-raster-equivalence.json` was rerun:216 cache/full-paint cases over DPR1/1.5/2, all with firing controls.
+- Return uses Minimize. Hover-only, pointer-transparent peers have no Tab stops; hover reveal does not block the next draw. Remote outlines offset3px outside bounds; **offset plus label** is the non-color cue. Grid is paper-relative in both themes. Snap guides are32px stationary segments. X/Y fields show preview bounds and remain controlled through a complete gesture, with a planted React-warning control.
 
-### Accepted with statement / capture handoff
+Escape's gesture→selection→posture ladder is accepted as spec-correct. F/Back preserve selection; recapture includes F→F selection survival. White paper in dark mode is a document value; the expanded white slab is an owner taste note. Pen-default bare-click draws per UX§8 step9; stray-dot feel remains a human-acceptance item.
 
-Escape's gesture→selection→posture ladder is spec-correct. F/Back preserve selection; manager recapture includes **F→F selection survival**. White paper in dark mode is the document value; the expanded white slab is an owner taste note, not a design defect. Pen-default bare-click drawing is UX§8 step9 behavior; stray-dot feel remains a named human-acceptance item.
+`round3-sustained-ink.json`: native Chromium Canvas2d, DPR1,500 settled strokes plus >1000 active samples. All newest sampled positions appear at the first observed rAF; commits/reloads agree. Peer-load leg uses a timer-driven synthetic awareness peer, asserts visible presence and every emission gap ≥100ms. The local comparison has12 observations per input class; peer-load has60 and10 peer emissions. These are handler-to-raster-availability measurements, **not physical presentation latency**. A self-rescheduling timer avoids setInterval catch-up bursts after busy input handling.
 
-Manager recaptures: expanded sidebar-open light/dark; dark+grid; no-jump pairs100%/400%; F→F selection survival. Hardware/screen-reader/physical latency remain honest partials. Round 2 local gates: full UI build, production web build, workspace lint, full UI3165 passed/1 skipped; final full hook-suite result is recorded in the delivery report.
+| Synthetic condition | N | Median / worst ms | Peer emissions |
+|---|---:|---:|---:|
+| desktop mouse synthetic/local | 12 | 1.75 / 2.80 | 0 |
+| trackpad-class mouse pointer synthetic/local | 12 | 1.70 / 4.10 | 0 |
+| desktop mouse synthetic/peer positions at 10Hz | 60 | 1.70 / 3.00 | 10 |
 
-Environmental additions: Next dev Watchpack EMFILE under sandbox uses production build/start on loopback; escalate if EMFILE appears in production serve or outside sandbox. Single-process Chromium remains one-page-per-browser; escalate if it dies with pages still open. Stale served measurement code must fail the source-stamp guard; restart the measurement server after edits rather than treating cached results as current evidence.
+## Test infrastructure and remaining limits
+
+The shard4 diagnosis supersedes the initial canvas-layer hypothesis. Run44882256553 had **one failed layer test**, with press-state and review-suggest passing on retry. Click logs named `nextjs-portal`; the existing artifact showed the Next “Compiling…” badge over the profile control. Exact production/single-process press-state reproduction passed; canvas-absence tests passed. **CI only** disables Next's dev indicator, with the incident named in `next.config.js`; local dev is unchanged. This removes toolchain chrome from app hit-test measurements (rules5/8/16), not product UI.
+
+The served-source stamp hashes **content**, including UI `.js/.json`, measurement source/config, and consumed SDK dist. `round3-source-stamp.json` plants a **real source edit** and proves mounting fails; restore and identical-content rewrite pass. Mtime is never hashed. Restart after edits; measurement entrypoints compare local disk, bundle and endpoint stamps.
+
+Full local library builds, production web build, workspace typecheck/lint, SDK588, UI3170 passed/1 skipped, app9 and complete MCP suites passed. Final full pre-push result and pushed SHA are recorded at delivery; no hooks bypassed.
+
+Hardware/Pencil, physical latency, screen-reader experience, physical IME and human handwriting cost remain honest partials. No new transport, offline-durability, authorship or edit-authority guarantee. F1 export belongs to BUILD-6. No worker screenshots/video/public exposure.
+
+Environmental pre-clears: shared-worktree Husky `.git/config` warning with full hooks retained; ordinary workspace builds; Next dev Watchpack EMFILE in this sandbox uses production build/start (escalate production/outside-sandbox EMFILE). Single-process Chromium uses **one browser process per client/theme/context**: closing the sole page or opening a second context's page may kill it. Escalate unexplained death with a single live page. Source mismatch is a failing measurement, never a passing result.
