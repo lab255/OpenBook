@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 /** Numeric measurements only. No screenshots, video, tracing, or public server. */
 import {createRequire} from 'node:module';
 import {writeFileSync} from 'node:fs';
@@ -12,7 +13,7 @@ const browser=await chromium.launch({headless:true,args:['--single-process','--n
 try {
   const page=await browser.newPage({viewport:{width:1100,height:900},deviceScaleFactor:1});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');
+  await openHarness(page);
   await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
   for(const inputClass of (checksOnly?[]:['desktop mouse synthetic/local','trackpad-class mouse pointer synthetic/local']))for(const condition of ['empty','500 strokes','500 strokes + concurrent remote edits']) {
     await page.evaluate(count=>window.canvasEvidence.reset(count),condition==='empty'?0:500);

@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Mechanism-matched paint work, not a latency rerun. Same 500x50-point scene
 // and pointer coordinates as profile.mjs; no screenshots or CPU trace required.
 import {createRequire} from 'node:module';
@@ -10,7 +11,7 @@ for(const input of [{name:'desktop mouse synthetic/local',steps:1},{name:'trackp
   const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
   try {
     const page=await browser.newPage({viewport:{width:1100,height:900},deviceScaleFactor:1});
-    await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();
+    await openHarness(page);await page.getByRole('region').waitFor();
     await page.evaluate(()=>window.canvasEvidence.reset(500));await page.getByRole('region').focus();await page.keyboard.press('Enter');await page.keyboard.press('p');
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
     await page.evaluate(()=>{

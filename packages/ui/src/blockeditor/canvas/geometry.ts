@@ -1,3 +1,4 @@
+import {strokeCurves, curvePoint, splitCurve} from './strokeCurve';
 import type {SceneShape} from './schema';
 export interface Point {x:number; y:number}
 export interface Bounds extends Point {w:number; h:number}
@@ -36,7 +37,8 @@ export function hit(shape:SceneShape,p:Point,zoom:number):boolean {
   const b=bounds(shape),padding=Math.max(3/zoom,number(shape,'strokeWidth')/2);
   if(!contains(b,p,padding))return false;
   if(shape.scalars.kind==='stroke'||shape.scalars.kind==='arrow') {
-    const ps=shape.scalars.kind==='stroke'?points(shape):endpoints(shape);
+    const raw=shape.scalars.kind==='stroke'?points(shape):endpoints(shape);
+    const ps=shape.scalars.kind==='stroke'&&raw.length>1?[raw[0],...strokeCurves(raw).flatMap(c=>Array.from({length:16},(_,i)=>curvePoint(c,(i+1)/16)))]:raw;
     return ps.length===1 ? Math.hypot(p.x-ps[0].x,p.y-ps[0].y)<=padding : ps.some((q,i)=>i>0&&distance(p,ps[i-1],q)<=padding);
   }
   if(shape.scalars.kind==='ellipse')return ((p.x-b.x-b.w/2)/(b.w/2+padding||1))**2+((p.y-b.y-b.h/2)/(b.h/2+padding||1))**2<=1;
@@ -65,7 +67,16 @@ export function paintShape(ctx:CanvasRenderingContext2D,s:SceneShape):void {
     const ps=points(s);ctx.fillStyle=String(v.stroke);
     const width=(i:number)=>number(s,'strokeWidth')*(s.pointArity===3?0.5+s.points[i*3+2]/255:1);
     if(ps.length===1){ctx.beginPath();ctx.arc(ps[0].x,ps[0].y,width(0)/2,0,Math.PI*2);ctx.fill();}
-    for(let i=1;i<ps.length;i++){ctx.lineWidth=(width(i-1)+width(i))/2;ctx.beginPath();ctx.moveTo(ps[i-1].x,ps[i-1].y);ctx.lineTo(ps[i].x,ps[i].y);ctx.stroke();}
+    for(const [i,curve] of strokeCurves(ps).entries()){
+      // Pressure interpolates between retained q values, including extrema.
+      const steps=s.pointArity===3?Math.max(1,Math.ceil(Math.abs(s.points[(i+1)*3+2]-s.points[i*3+2])/8)):1;
+      let rest=curve;
+      for(let step=0;step<steps;step++){
+        const [part,next]=splitCurve(rest,1/(steps-step));rest=next;
+        const t=(step+.5)/steps;ctx.lineWidth=width(i)*(1-t)+width(i+1)*t;
+        ctx.beginPath();ctx.moveTo(part.a.x,part.a.y);ctx.bezierCurveTo(part.b.x,part.b.y,part.c.x,part.c.y,part.d.x,part.d.y);ctx.stroke();
+      }
+    }
   } else if(v.kind==='text') {
     ctx.beginPath();ctx.rect(b.x,b.y,b.w,b.h);ctx.clip();
     ctx.font=`${v.fontSize}px ${v.fontFamily==='mono'?'monospace':v.fontFamily==='serif'?'serif':'sans-serif'}`;ctx.textBaseline='top';ctx.textAlign=v.textAlign as CanvasTextAlign;ctx.fillStyle=String(v.stroke);

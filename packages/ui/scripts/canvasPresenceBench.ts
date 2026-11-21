@@ -1,0 +1,10 @@
+import {writeFileSync} from 'node:fs';
+import * as Y from 'yjs';
+import {Awareness,encodeAwarenessUpdate} from 'y-protocols/awareness';
+import {canvasFacet,facetBytes} from '../src/blockeditor/canvas/presence';
+const doc=new Y.Doc(),awareness=new Awareness(doc);
+const rows=[['ordinary',Array.from({length:8},(_,i)=>`shape-${i}`)],['ascii-limit',Array.from({length:64},(_,i)=>`${i}`.padEnd(128,'x'))],['unicode-limit',Array.from({length:64},(_,i)=>`${i}`.padEnd(128,'界'))],['selection-overflow',Array.from({length:100},(_,i)=>`shape-${i}`)]] as const;
+const measurements=rows.map(([name,ids])=>{const facet=canvasFacet('01234567-89ab-cdef-0123-456789abcdef',{x:123.456,y:-987.654},'select',ids)!;awareness.setLocalStateField('canvas',facet);return {name,inputIds:ids.length,selectedIds:facet.selectedShapeIds.length,truncated:facet.selectionTruncated,facetUtf8Bytes:facetBytes(facet),wholeAwarenessUpdateBytes:encodeAwarenessUpdate(awareness,[doc.clientID]).length};});
+const negativeControl=facetBytes({v:1,blockId:'board',cursor:null,tool:'select',selectedShapeIds:rows[2][1],selectionTruncated:false});
+if(measurements.some(r=>r.facetUtf8Bytes>12288||r.selectedIds>64)||negativeControl<=12288)throw new Error('Awareness facet byte guard/control failed');
+writeFileSync('../../_evidence-build5/presence-bytes.json',JSON.stringify({scope:'UTF-8 JSON canvas facet separately from complete binary awareness update; synthetic ids, 36-character block id, finite fractional world position. No claim about identity/HTTP/SSE envelope size.',measurements,unboundedUnicodeNegativeControlBytes:negativeControl},null,2));console.log(measurements);awareness.destroy();doc.destroy();

@@ -14,6 +14,8 @@ const sameOrigin = process.env.NEXT_PUBLIC_OPENBOOK_SAMEORIGIN === '1';
 
 const nextConfig = {
   reactStrictMode: true,
+  // BUILD-5 CI: Next debug chrome intercepted app-layer/press-state hit tests.
+  ...(process.env.CI ? {devIndicators: false} : {}),
   ...(sameOrigin
     ? {
         output: 'export',

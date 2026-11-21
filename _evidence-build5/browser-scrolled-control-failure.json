@@ -1,0 +1,166 @@
+{
+  "scope": "Single-process Chromium, DPR1, 1280x900; 736px editor column. Numeric DOM/CLS; no saved screenshots, no physical-input certification.",
+  "layout": {
+    "column": 736,
+    "stripHeight": 80,
+    "rows": [
+      506,
+      542
+    ],
+    "controls": [
+      {
+        "name": "Stroke",
+        "x": 280,
+        "y": 492,
+        "width": 208.578125
+      },
+      {
+        "name": "Stroke width12358",
+        "x": 496.578125,
+        "y": 492,
+        "width": 127
+      },
+      {
+        "name": "Fill",
+        "x": 631.578125,
+        "y": 492,
+        "width": 219.90625
+      },
+      {
+        "name": "X",
+        "x": 280,
+        "y": 528,
+        "width": 64.15625
+      },
+      {
+        "name": "Y",
+        "x": 352.15625,
+        "y": 528,
+        "width": 63.875
+      },
+      {
+        "name": "W",
+        "x": 424.03125,
+        "y": 528,
+        "width": 67.625
+      },
+      {
+        "name": "H",
+        "x": 499.65625,
+        "y": 528,
+        "width": 64.90625
+      },
+      {
+        "name": "Keep aspect ratio",
+        "x": 572.5625,
+        "y": 533.59375,
+        "width": 119.109375
+      },
+      {
+        "name": "Name",
+        "x": 859.484375,
+        "y": 492,
+        "width": 100.828125
+      },
+      {
+        "name": "Duplicate",
+        "x": 699.671875,
+        "y": 528,
+        "width": 77.078125
+      },
+      {
+        "name": "Delete selected",
+        "x": 784.75,
+        "y": 528,
+        "width": 116.796875
+      }
+    ],
+    "footerBottom": 644
+  },
+  "continuity": [
+    {
+      "zoom": 100,
+      "cycles": 5,
+      "before": {
+        "x": 308,
+        "y": 140,
+        "w": 120,
+        "h": 80,
+        "scroll": 124,
+        "zoom": "100",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 308,
+        "y": 140,
+        "w": 120,
+        "h": 80,
+        "scroll": 124,
+        "zoom": "100",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    },
+    {
+      "zoom": 200,
+      "cycles": 5,
+      "before": {
+        "x": 248,
+        "y": 100,
+        "w": 240,
+        "h": 160,
+        "scroll": 124,
+        "zoom": "200",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 248,
+        "y": 100,
+        "w": 240,
+        "h": 160,
+        "scroll": 124,
+        "zoom": "200",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    },
+    {
+      "zoom": 400,
+      "cycles": 5,
+      "before": {
+        "x": 128,
+        "y": 20,
+        "w": 480,
+        "h": 320,
+        "scroll": 124,
+        "zoom": "400",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 128,
+        "y": 20,
+        "w": 480,
+        "h": 320,
+        "scroll": 124,
+        "zoom": "400",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    }
+  ],
+  "remote": [
+    {
+      "change": "join",
+      "before": 584,
+      "after": 584,
+      "cls": 0,
+      "negativeControl": 0,
+      "peerCount": 1,
+      "reload": true
+    }
+  ],
+  "failure": "Error: Remote layout contract failed"
+}

@@ -1,3 +1,4 @@
+import {openHarness} from './openHarness.mjs';
 // Numeric evidence only: net-origin remote chrome changes and stored paper color.
 import {createRequire} from 'node:module';
 import {writeFileSync} from 'node:fs';
@@ -10,7 +11,7 @@ const save=()=>writeFileSync(output,JSON.stringify(result,null,2)+'\n');
 const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 try {
  const page=await browser.newPage({viewport:{width:1100,height:1100},deviceScaleFactor:1});
- await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
+ await openHarness(page);await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
  for(const change of ['delete','quarantine']){
   await page.evaluate(()=>window.canvasEvidence.reset(0));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await page.getByRole('region').focus();await page.keyboard.press('Enter');await page.keyboard.press('r');await page.keyboard.press('Enter');

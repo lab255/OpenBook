@@ -56,6 +56,8 @@ export interface AwarenessSelection {
 
 /** The shape T5 reads out of each peer's `awareness.getStates()` entry. */
 export interface AwarenessState {
+  /** Ephemeral canvas assertions; bounds and producer policy live in app code. */
+  canvas?: import('./canvas/presence').CanvasFacet | null;
   user?: {name: string; color: string; id: string};
   selection?: AwarenessSelection | null;
   /**

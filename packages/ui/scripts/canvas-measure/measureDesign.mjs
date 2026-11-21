@@ -1,17 +1,19 @@
+import {openHarness} from './openHarness.mjs';
 // Numeric DOM/style checks only. Captures remain manager-owned.
 import {createRequire} from 'node:module';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 const require=createRequire(new URL('../../../web/package.json',import.meta.url));
 const {chromium}=require('@playwright/test');
+const column=Number(process.argv[3]??800);
 const css=readFileSync(new URL('../../src/blockeditor/canvas/canvas.css',import.meta.url),'utf8');
 const hexCount=source=>(source.match(/#[\da-f]{3,8}\b/gi)||[]).length;
-const result={method:'Native Chromium computed styles and geometry, light/dark app tokens, 800 CSS-pixel default canvas. No captures. Hex meter scans canvas chrome stylesheet; literal content ink/paper/swatches are document color values, not chrome tokens.',colorTokens:{observedHex:hexCount(css),negativeControlHex:hexCount(css+'\n.ob-canvas-title { color:#123456; }')},themes:[]};
+const result={method:`Native Chromium computed styles and geometry, light/dark app tokens, ${column} CSS-pixel canvas. No captures. Hex meter scans canvas chrome stylesheet; literal content ink/paper/swatches are document color values, not chrome tokens.`,colorTokens:{observedHex:hexCount(css),negativeControlHex:hexCount(css+'\n.ob-canvas-title { color:#123456; }')},themes:[]};
 const browser=await chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 try {
  const page=await browser.newPage({viewport:{width:1100,height:1000},deviceScaleFactor:1});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto('http://127.0.0.1:5184/scripts/canvas-measure/index.html');await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);
+ await openHarness(page);await page.getByRole('region').waitFor();await page.evaluate(()=>document.fonts.ready);await page.evaluate(column=>window.canvasEvidence.column(column),column);
  for(const theme of ['light','dark']){
   await page.evaluate(theme=>{document.documentElement.classList.toggle('dark',theme==='dark');window.canvasEvidence.reset(0);},theme);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await page.getByRole('region').focus();await page.keyboard.press('Enter');await page.getByLabel('Stroke color value').waitFor();
@@ -39,7 +41,7 @@ try {
   result.themes.push({theme,pressed,focus,selection,popover,restraint,inactive});
  }
  result.browserErrors=errors;
- writeFileSync(fileURLToPath(new URL('../../../../_evidence-build4/design-polish.json',import.meta.url)),JSON.stringify(result,null,2)+'\n');
- if(errors.length||result.colorTokens.observedHex!==0||result.colorTokens.negativeControlHex!==1||result.themes.some(r=>r.pressed.pressedBoundaryContrast<3||r.pressed.pressedIconContrast<3||r.pressed.fieldBoundaryContrast<3||r.pressed.textContrast<4.5||r.pressed.nonColorMarker!=='2px'||!r.focus.visible||!r.focus.contained||parseFloat(r.focus.offset)>=0||r.selection.overflow||r.selection.clipped.length||r.selection.negativeControl.length!==1||!r.selection.undoInHeader||r.popover.helpTarget.width<28||r.popover.helpTarget.height<28||r.popover.gap!==4||r.restraint.observed!==0||r.restraint.negativeControl!==1||Object.values(r.inactive).some(Boolean)))throw new Error('Design polish assertion failed; inspect design-polish.json');
+ writeFileSync(fileURLToPath(new URL(process.argv[2]??'../../../../_evidence-build4/design-polish.json',import.meta.url)),JSON.stringify(result,null,2)+'\n');
+ if(errors.length||result.colorTokens.observedHex!==0||result.colorTokens.negativeControlHex!==1||result.themes.some(r=>r.pressed.pressedBoundaryContrast<3||r.pressed.pressedIconContrast<3||r.pressed.fieldBoundaryContrast<3||r.pressed.textContrast<4.5||r.pressed.nonColorMarker!=='2px'||!r.focus.visible||!r.focus.contained||parseFloat(r.focus.offset)>=0||r.selection.width!==column||r.selection.overflow||r.selection.clipped.length||r.selection.negativeControl.length!==1||!r.selection.undoInHeader||r.popover.helpTarget.width<28||r.popover.helpTarget.height<28||r.popover.gap!==4||r.restraint.observed!==0||r.restraint.negativeControl!==1||Object.values(r.inactive).some(Boolean)))throw new Error('Design polish assertion failed; inspect design-polish.json');
  console.log(JSON.stringify(result,null,2));
 } finally {await browser.close();}

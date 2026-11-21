@@ -1,3 +1,6 @@
+import {Awareness,applyAwarenessUpdate,encodeAwarenessUpdate} from 'y-protocols/awareness';
+import {registerOpenAwareness} from '../../src/lib/openAwareness';
+import {canvasFacet} from '../../src/blockeditor/canvas/presence';
 import {keyBetween} from '@book.dev/sdk';
 import {createRoot} from 'react-dom/client';
 import {useState} from 'react';
@@ -16,23 +19,34 @@ import {remoteFrameQueue} from '../../src/blockeditor/remoteFrame';
 import {bufferedProviders} from './bufferedTransport';
 import {CommittedSceneCache} from '../../src/blockeditor/canvas/paintCache';
 import {paint} from '../../src/blockeditor/canvas/geometry';
+declare const __CANVAS_SOURCE_STAMP__:string;
+const servedStamp=__CANVAS_SOURCE_STAMP__;
+const diskStamp=await fetch('/__canvas-source',{cache:'no-store'}).then(r=>r.json()).then(r=>r.stamp);
+if(servedStamp!==diskStamp)throw new Error(`Stale canvas measurement source: served ${servedStamp}, disk ${diskStamp}. Restart the measurement server.`);
 registerReactiveBlocks();
 let doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);
+let awareness=new Awareness(doc),peerPresence=new Awareness(new Y.Doc());
+let unregisterAwareness=registerOpenAwareness('canvas-evidence',awareness);
 let peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));
 let remount:()=>void;
 let editorMode=false;
+let columnWidth=800;
 let netQueue:ReturnType<typeof remoteFrameQueue>|null=null;
 let transport:ReturnType<typeof bufferedProviders>|null=null;
 function App(){const [version,setVersion]=useState(0);remount=()=>setVersion(n=>n+1);return <Surface key={version}/>;}
 function CanvasSurface(){const editor=useBlockEditor(doc);return <CanvasBlock block={rootBlocks(doc).get(0)} editor={editor} pageReadOnly={false}/>;}
-function Surface(){return <main style={{width:800,margin:'40px auto'}}><h1>Canvas local measurement harness</h1><p>All generated input is synthetic/local. No physical latency or hardware certification.</p><>{editorMode?<BlockEditor doc={doc}/>:<CanvasSurface/>}</><p id="below">Text after the canvas detects unexpected layout movement.</p></main>;}
+function Surface(){return <main style={{width:columnWidth,margin:'40px auto'}}><h1>Canvas local measurement harness</h1><p>All generated input is synthetic/local. No physical latency or hardware certification.</p><>{editorMode?<BlockEditor doc={doc}/>:<CanvasSurface/>}</><p id="below">Text after the canvas detects unexpected layout movement.</p></main>;}
 registerBlockEditorDoc('canvas-evidence',doc);
 const api={
+  sourceStamp:servedStamp,
+  paper(color:string){(findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>).set('background',color);},
+  column(width:number){columnWidth=width;remount();},
+  presence(change:'join'|'move'|'leave',position?:{x:number;y:number}){peerPresence.setLocalStateField('user',{name:'Morgan',id:'morgan',color:'#1d4ed8'});peerPresence.setLocalStateField('canvas',change==='leave'?null:canvasFacet('canvas',position??{x:change==='move'?120:80,y:100},'pen',readCanvas(findBlock(doc,'canvas')!.block.get('props')).shapes.slice(0,1).map(s=>s.id)));applyAwarenessUpdate(awareness,encodeAwarenessUpdate(peerPresence,[peerPresence.clientID]),'net');},
   resetEditor(){netQueue?.close();netQueue=null;transport?.close();transport=null;editorMode=true;doc=createDoc([{id:'entry',type:'paragraph'}]);remount();},
   editorBlocks(){return rootBlocks(doc).toArray().map(block=>({id:String(block.get('id')),type:String(block.get('type'))}));},
   reset(count=0){editorMode=false;netQueue?.close();netQueue=null;transport?.close();transport=null;doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,shapes:{}}}]);const props=findBlock(doc,'canvas')!.block.get('props') as Y.Map<unknown>,shapes=props.get('shapes') as Y.Map<unknown>;
     for(let i=0;i<count;i++)shapes.set(`s${i}`,createShape({id:`s${i}`,kind:'stroke',x:i%25*24,y:Math.floor(i/25)*12,w:1,h:1,points:Array.from({length:50},(_,j)=>[j/2,Math.sin(j/4)*5]).flat()}));
-    peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));registerBlockEditorDoc('canvas-evidence',doc);remount();},
+    peer=new Y.Doc();Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));unregisterAwareness();awareness.destroy();peerPresence.destroy();awareness=new Awareness(doc);peerPresence=new Awareness(new Y.Doc());unregisterAwareness=registerOpenAwareness('canvas-evidence',awareness);registerBlockEditorDoc('canvas-evidence',doc);remount();},
   remote(){const props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;const shapes=props.get('shapes') as Y.Map<Y.Map<unknown>>;let shape=shapes.get('remote');if(!shape){shapes.set('remote',createShape({id:'remote',kind:'rect',x:20,y:20,w:30,h:30}));shape=shapes.get('remote')!;}shape.set('x',Number(shape.get('x'))+1);Y.applyUpdate(doc,Y.encodeStateAsUpdate(peer));},
   remoteChromeChange(change:'delete'|'quarantine'){
     Y.applyUpdate(peer,Y.encodeStateAsUpdate(doc));const vector=Y.encodeStateVector(doc),props=findBlock(peer,'canvas')!.block.get('props') as Y.Map<unknown>;

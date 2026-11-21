@@ -1,0 +1,331 @@
+{
+  "scope": "Single-process Chromium, DPR1, 1280x900; 736px editor column. Numeric DOM/CLS; no saved screenshots, no physical-input certification.",
+  "layout": {
+    "column": 736,
+    "stripHeight": 80,
+    "rows": [
+      506,
+      542
+    ],
+    "controls": [
+      {
+        "name": "Stroke",
+        "x": 280,
+        "y": 492,
+        "width": 208.578125
+      },
+      {
+        "name": "Stroke width12358",
+        "x": 496.578125,
+        "y": 492,
+        "width": 127
+      },
+      {
+        "name": "Fill",
+        "x": 631.578125,
+        "y": 492,
+        "width": 219.90625
+      },
+      {
+        "name": "X",
+        "x": 280,
+        "y": 528,
+        "width": 64.15625
+      },
+      {
+        "name": "Y",
+        "x": 352.15625,
+        "y": 528,
+        "width": 63.875
+      },
+      {
+        "name": "W",
+        "x": 424.03125,
+        "y": 528,
+        "width": 67.625
+      },
+      {
+        "name": "H",
+        "x": 499.65625,
+        "y": 528,
+        "width": 64.90625
+      },
+      {
+        "name": "Keep aspect ratio",
+        "x": 572.5625,
+        "y": 533.59375,
+        "width": 119.109375
+      },
+      {
+        "name": "Name",
+        "x": 859.484375,
+        "y": 492,
+        "width": 100.828125
+      },
+      {
+        "name": "Duplicate",
+        "x": 699.671875,
+        "y": 528,
+        "width": 77.078125
+      },
+      {
+        "name": "Delete selected",
+        "x": 784.75,
+        "y": 528,
+        "width": 116.796875
+      }
+    ],
+    "footerBottom": 644
+  },
+  "continuity": [
+    {
+      "zoom": 100,
+      "cycles": 5,
+      "before": {
+        "x": 308,
+        "y": 140,
+        "w": 120,
+        "h": 80,
+        "scroll": 124,
+        "zoom": "100",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 308,
+        "y": 140,
+        "w": 120,
+        "h": 80,
+        "scroll": 124,
+        "zoom": "100",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    },
+    {
+      "zoom": 200,
+      "cycles": 5,
+      "before": {
+        "x": 248,
+        "y": 100,
+        "w": 240,
+        "h": 160,
+        "scroll": 124,
+        "zoom": "200",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 248,
+        "y": 100,
+        "w": 240,
+        "h": 160,
+        "scroll": 124,
+        "zoom": "200",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    },
+    {
+      "zoom": 400,
+      "cycles": 5,
+      "before": {
+        "x": 128,
+        "y": 20,
+        "w": 480,
+        "h": 320,
+        "scroll": 124,
+        "zoom": "400",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 128,
+        "y": 20,
+        "w": 480,
+        "h": 320,
+        "scroll": 124,
+        "zoom": "400",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    }
+  ],
+  "remote": [
+    {
+      "change": "join",
+      "column": 736,
+      "inputAge": 714.8999999761581,
+      "before": 672,
+      "after": 672,
+      "cls": 0,
+      "negativeControl": 0.056975911458333334,
+      "controlBefore": {
+        "scroll": 0,
+        "below": 672,
+        "inputAge": 973.1999999284744
+      },
+      "controlAfter": {
+        "scroll": 0,
+        "below": 822
+      },
+      "controlEntries": [
+        {
+          "value": 0.056975911458333334,
+          "hadRecentInput": false
+        }
+      ],
+      "peerCount": 1,
+      "reload": true
+    },
+    {
+      "change": "move",
+      "column": 736,
+      "inputAge": 712.1999999284744,
+      "before": 672,
+      "after": 672,
+      "cls": 0,
+      "negativeControl": 0.056975911458333334,
+      "controlBefore": {
+        "scroll": 0,
+        "below": 672,
+        "inputAge": 959
+      },
+      "controlAfter": {
+        "scroll": 0,
+        "below": 822
+      },
+      "controlEntries": [
+        {
+          "value": 0.056975911458333334,
+          "hadRecentInput": false
+        }
+      ],
+      "peerCount": 1,
+      "reload": true
+    },
+    {
+      "change": "leave",
+      "column": 736,
+      "inputAge": 715.2999999523163,
+      "before": 672,
+      "after": 672,
+      "cls": 0,
+      "negativeControl": 0.056975911458333334,
+      "controlBefore": {
+        "scroll": 0,
+        "below": 672,
+        "inputAge": 975.3999999761581
+      },
+      "controlAfter": {
+        "scroll": 0,
+        "below": 822
+      },
+      "controlEntries": [
+        {
+          "value": 0.056975911458333334,
+          "hadRecentInput": false
+        }
+      ],
+      "peerCount": 0,
+      "reload": true
+    },
+    {
+      "change": "delete",
+      "column": 736,
+      "inputAge": 712.5,
+      "before": 672,
+      "after": 672,
+      "cls": 0,
+      "negativeControl": 0.05788248697916666,
+      "controlBefore": {
+        "scroll": 0,
+        "below": 672,
+        "inputAge": 965.1000000238419
+      },
+      "controlAfter": {
+        "scroll": 0,
+        "below": 822
+      },
+      "controlEntries": [
+        {
+          "value": 0.05788248697916666,
+          "hadRecentInput": false
+        }
+      ],
+      "peerCount": 0,
+      "reload": true
+    },
+    {
+      "change": "quarantine",
+      "column": 736,
+      "inputAge": 712.1000000238419,
+      "before": 672,
+      "after": 672,
+      "cls": 0,
+      "negativeControl": 0.05788248697916666,
+      "controlBefore": {
+        "scroll": 0,
+        "below": 672,
+        "inputAge": 963.3999999761581
+      },
+      "controlAfter": {
+        "scroll": 0,
+        "below": 822
+      },
+      "controlEntries": [
+        {
+          "value": 0.05788248697916666,
+          "hadRecentInput": false
+        }
+      ],
+      "peerCount": 0,
+      "reload": true
+    }
+  ],
+  "continuityScope": "DOM continuity with nonzero scroll, not a CLS claim; expansion/scroll inputs may be excluded by CLS recent-input semantics.",
+  "scrolledControlProbe": {
+    "before": {
+      "scroll": 124,
+      "below": 548,
+      "inputAge": 924
+    },
+    "after": {
+      "scroll": 274,
+      "below": 548,
+      "inputAge": 120.89999997615814
+    },
+    "controlHeight": 150,
+    "entries": []
+  },
+  "provenance": [
+    {
+      "path": "src/blockeditor/canvas/CanvasBlock.tsx",
+      "mtime": "2026-11-21T07:35:36.249Z",
+      "sourceBytes": 52802,
+      "sourceSha256": "6e8d3c61e58dd5879e3a0e2e3698fd78c954072ecb35c6faa6cb85aa671196cf",
+      "servedSha256": "a83ddf743e2c3d65c3e55702905677b42cc284b36cbc2c3227a80e1692ad846d"
+    },
+    {
+      "path": "src/blockeditor/canvas/CanvasPresence.tsx",
+      "mtime": "2026-11-21T07:35:09.473Z",
+      "sourceBytes": 5079,
+      "sourceSha256": "ac79170988f99483699ec02accf3c523f7e6e1d480857a194ba8e393310bfb75",
+      "servedSha256": "0251808a2614b1ac07be719ad41588cfef3603f2c69884ae14d4218b04e1db51"
+    },
+    {
+      "path": "src/blockeditor/canvas/canvas.css",
+      "mtime": "2026-11-21T07:35:36.250Z",
+      "sourceBytes": 8737,
+      "sourceSha256": "f9b71d9d39c6e6d8ecfa42f774b1ade151ff3e53b47e87ae75c3127ba3ecf5e9",
+      "servedSha256": "8b5566721d15ff8d865a47917f6199d6f410b03445307cb0e4e24932d4ad2def"
+    },
+    {
+      "path": "scripts/canvas-measure/harness.tsx",
+      "mtime": "2026-11-21T07:43:23.370Z",
+      "sourceBytes": 9515,
+      "sourceSha256": "2cb3f5c8fb0cda8ed2a5897e3e916104aa0c13ca182ff714131ca4bbcae2c34c",
+      "servedSha256": "e5d1dcebf856a5a6221cba46748c43b7abbf33606b5589a08e5ca18e215c2a18"
+    }
+  ]
+}

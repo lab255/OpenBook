@@ -1,0 +1,157 @@
+{
+  "scope": "Single-process Chromium, DPR1, 1280x900; 736px editor column. Numeric DOM/CLS; no saved screenshots, no physical-input certification.",
+  "layout": {
+    "column": 736,
+    "stripHeight": 80,
+    "rows": [
+      506,
+      542
+    ],
+    "controls": [
+      {
+        "name": "Stroke",
+        "x": 280,
+        "y": 492,
+        "width": 208.578125
+      },
+      {
+        "name": "Stroke width12358",
+        "x": 496.578125,
+        "y": 492,
+        "width": 127
+      },
+      {
+        "name": "Fill",
+        "x": 631.578125,
+        "y": 492,
+        "width": 219.90625
+      },
+      {
+        "name": "X",
+        "x": 280,
+        "y": 528,
+        "width": 64.15625
+      },
+      {
+        "name": "Y",
+        "x": 352.15625,
+        "y": 528,
+        "width": 63.875
+      },
+      {
+        "name": "W",
+        "x": 424.03125,
+        "y": 528,
+        "width": 67.625
+      },
+      {
+        "name": "H",
+        "x": 499.65625,
+        "y": 528,
+        "width": 64.90625
+      },
+      {
+        "name": "Keep aspect ratio",
+        "x": 572.5625,
+        "y": 533.59375,
+        "width": 119.109375
+      },
+      {
+        "name": "Name",
+        "x": 859.484375,
+        "y": 492,
+        "width": 100.828125
+      },
+      {
+        "name": "Duplicate",
+        "x": 699.671875,
+        "y": 528,
+        "width": 77.078125
+      },
+      {
+        "name": "Delete selected",
+        "x": 784.75,
+        "y": 528,
+        "width": 116.796875
+      }
+    ],
+    "footerBottom": 644
+  },
+  "continuity": [
+    {
+      "zoom": 100,
+      "cycles": 5,
+      "before": {
+        "x": 308,
+        "y": 140,
+        "w": 120,
+        "h": 80,
+        "scroll": 124,
+        "zoom": "100",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 308,
+        "y": 140,
+        "w": 120,
+        "h": 80,
+        "scroll": 124,
+        "zoom": "100",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    },
+    {
+      "zoom": 200,
+      "cycles": 5,
+      "before": {
+        "x": 248,
+        "y": 100,
+        "w": 240,
+        "h": 160,
+        "scroll": 124,
+        "zoom": "200",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 248,
+        "y": 100,
+        "w": 240,
+        "h": 160,
+        "scroll": 124,
+        "zoom": "200",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    },
+    {
+      "zoom": 400,
+      "cycles": 5,
+      "before": {
+        "x": 128,
+        "y": 20,
+        "w": 480,
+        "h": 320,
+        "scroll": 124,
+        "zoom": "400",
+        "focused": "Drawing viewport"
+      },
+      "after": {
+        "x": 128,
+        "y": 20,
+        "w": 480,
+        "h": 320,
+        "scroll": 124,
+        "zoom": "400",
+        "focused": "Drawing viewport"
+      },
+      "driftControl": 1,
+      "reload": true
+    }
+  ],
+  "remote": [],
+  "continuityScope": "DOM continuity with nonzero scroll, not a CLS claim; expansion/scroll inputs may be excluded by CLS recent-input semantics.",
+  "failure": "Error: browser.newPage: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Users/eliot/Library/Caches/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-mac-arm64/chrome-headless-shell --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate,RenderDocument,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --single-process --no-zygote --user-data-dir=/var/folders/_1/mk1dnnks74j3pz_jj4htlc440000gn/T/playwright_chromiumdev_profile-SBoSy5 --remote-debugging-pipe --no-startup-window\n<launched> pid=29600\n[pid=29600][err] [1121/142759.977616:ERROR:base/power_monitor/thermal_state_observer_mac.mm:140] ThermalStateObserverMac unable to register to power notifications. Result: 9\n[pid=29600][err] [1121/142759.978794:ERROR:net/dns/dns_config_service_posix.cc:138] DNS config watch failed to start.\n[pid=29600][err] 2026-11-21 14:27:59.984 chrome-headless-shell[29600:8745048] Failure on line 688 in function id scheduleApplicationNotification(LSNotificationCode, NSWorkspaceNotificationCenter *): noErr == _LSModifyNotification(notificationID, 1, &code, 0, NULL, NULL, NULL)\n[pid=29600][err] 2026-11-21 14:28:00.035 chrome-headless-shell[29600:8745050] Connection Invalid error for service com.apple.hiservices-xpcservice.\n[pid=29600][err] 2026-11-21 14:28:00.035 chrome-headless-shell[29600:8745048] Error received in message reply handler: Connection invalid\n[pid=29600][err] [1121/142800.049507:ERROR:ui/display/mac/cv_display_link_mac.mm:184] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=29600][err] [1121/142800.338308:INFO:CONSOLE:851] \"[vite] connecting...\", source: http://127.0.0.1:5184/@vite/client (851)\n[pid=29600][err] [1121/142800.362421:INFO:CONSOLE:955] \"[vite] connected.\", source: http://127.0.0.1:5184/@vite/client (955)\n[pid=29600][err] [1121/142800.560815:INFO:CONSOLE:14338] \"%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold\", source: http://127.0.0.1:5184/node_modules/.vite/deps/react-dom_client.js?v=ba46e029 (14338)"
+}
