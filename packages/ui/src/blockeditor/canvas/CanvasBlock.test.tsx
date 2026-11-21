@@ -1,3 +1,8 @@
+import {decimationDiagnostics} from './decimation';
+import {Awareness,applyAwarenessUpdate,encodeAwarenessUpdate} from 'y-protocols/awareness';
+import {registerOpenAwareness} from '../../lib/openAwareness';
+import {registerBlockEditorDoc} from '../../lib/aiBridge';
+import {canvasFacet} from './presence';
 import {registerRemoteFrameBatching,remoteFrameQueue} from '../remoteFrame';
 import {BlockEditor} from '../BlockEditor';
 import {registerCustomBlock} from '../registry';
@@ -17,6 +22,7 @@ import {bounds, endpoints} from './geometry';
 const context={drawImage:vi.fn(),setTransform:vi.fn(),clearRect:vi.fn(),translate:vi.fn(),scale:vi.fn(),save:vi.fn(),restore:vi.fn(),setLineDash:vi.fn(),beginPath:vi.fn(),arc:vi.fn(),ellipse:vi.fn(),rect:vi.fn(),clip:vi.fn(),fill:vi.fn(),stroke:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),fillText:vi.fn(),measureText:(s:string)=>({width:s.length*8})};
 let controller:BlockEditorController;
 let unregister:()=>void;
+let presenceCleanup:(()=>void)[]=[];
 beforeEach(()=>{
   unregister=registerHistoryExtension((doc,canWrite)=>new CanvasHistory(doc,canWrite));registerPropsConstructor('canvas',constructCanvasProps);
   vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
@@ -25,9 +31,11 @@ beforeEach(()=>{
   HTMLElement.prototype.hasPointerCapture=vi.fn(function(this:HTMLElement,id:number){return captures.get(this)?.has(id)??false;});
   HTMLElement.prototype.releasePointerCapture=vi.fn(function(this:HTMLElement,id:number){captures.get(this)?.delete(id);});
 });
-afterEach(()=>{cleanup();unregister();vi.restoreAllMocks();});
-function setup(readOnly=false,quarantined=false) {
+afterEach(()=>{cleanup();unregister();for(const close of presenceCleanup)close();presenceCleanup=[];vi.restoreAllMocks();vi.useRealTimers();});
+function setup(readOnly=false,quarantined=false,withPresence=false) {
   const doc=createDoc([{id:'canvas',type:'canvas',props:{...canvasDefaults,canvasVersion:quarantined?2:1,shapes:{}}}]);
+  const awareness=withPresence?new Awareness(doc):undefined;
+  if(awareness){presenceCleanup.push(registerBlockEditorDoc('test-canvas',doc),registerOpenAwareness('test-canvas',awareness),()=>awareness.destroy());}
   function App({viewOnly=false}:{viewOnly?:boolean}){controller=useBlockEditor(doc);return <><button>Before canvas</button><div data-block-row="canvas"><CanvasBlock block={rootBlocks(doc).get(0)} editor={controller} pageReadOnly={viewOnly}/></div><button>After canvas</button></>;}
   const view=render(<App viewOnly={readOnly}/>);
   const viewport=screen.getByLabelText('Drawing viewport');
@@ -38,7 +46,7 @@ function setup(readOnly=false,quarantined=false) {
   const seed=(kind='rect',x=100)=>{let ids:string[]=[];act(()=>{ids=insertShapes(controller.history!() as CanvasHistory,'canvas',[{kind,ord:keyBetween(shapes()[shapes().length-1]?.scalars.ord as string??null,null),x,y:80,w:120,h:80,...(kind==='arrow'?{h:1,startX:0,startY:0,endX:1,endY:0}:{})}],'Seed');});return ids[0];};
   const select=()=>{tool('v');pointer(viewport,'down',130,100);pointer(viewport,'up',130,100);};
   const field=(name:string,value:string)=>{const el=screen.getByLabelText(name);act(()=>el.focus());fireEvent.change(el,{target:{value}});};
-  return {doc,view,viewport,key,tool,shapes,seed,select,field,rerender:(readOnly:boolean)=>view.rerender(<App viewOnly={readOnly}/>)};
+  return {doc,awareness,view,viewport,key,tool,shapes,seed,select,field,rerender:(readOnly:boolean)=>view.rerender(<App viewOnly={readOnly}/>)};
 }
 function pointer(el:Element,phase:'down'|'move'|'up',x:number,y:number,more:Record<string,unknown>={}) {
   fireEvent[phase==='down'?'pointerDown':phase==='move'?'pointerMove':'pointerUp'](el,{pointerId:1,pointerType:'mouse',button:0,buttons:phase==='up'?0:1,clientX:x,clientY:y,...more});
@@ -131,10 +139,10 @@ test('remote deletion moves focused Objects entry to nearest survivor, with fres
   act(()=>Y.applyUpdate(a.doc,Y.encodeStateAsUpdate(remote)));expect(document.activeElement).toBe(within(screen.getByRole('listbox')).getByRole('option'));expect(a.shapes()[0].id).toBe(second);equivalentScene(a);
 });
 
-test('focus boundary, roving tools, Escape ladder and no deferred affordances',()=>{
+test('focus boundary, roving tools, Escape ladder and replayed Expand affordance',()=>{
   const a=setup();const toolbar=screen.getByRole('toolbar');const pen=screen.getByRole('button',{name:'Pen (P)'});act(()=>pen.focus());fireEvent.keyDown(pen,{key:'ArrowRight'});expect(document.activeElement).toBe(screen.getByRole('button',{name:'Rectangle (R)'}));
   expect(toolbar.querySelectorAll('[tabindex="0"]')).toHaveLength(1);a.seed();a.select();a.key('Escape');expect(screen.getByRole('status').textContent).toBe('0 objects selected');a.key('Escape');expect(document.activeElement?.getAttribute('data-block-row')).toBe('canvas');
-  expect(screen.queryByRole('button',{name:/Expand/})).toBeNull();expect(screen.queryByLabelText('Show grid')).toBeNull();
+  expect(screen.getByRole('button',{name:/Expand/})).toBeTruthy();expect(screen.queryByLabelText('Grid')).toBeNull();
   expect(screen.getByRole('button',{name:'After canvas'}).tabIndex).toBe(0);
 });
 
@@ -158,7 +166,7 @@ test('parity detail: aspect ratio, constrained rectangle, numeric zoom, fit, act
   const a=setup();a.tool('r');pointer(a.viewport,'down',100,100);pointer(a.viewport,'move',160,140,{shiftKey:true});pointer(a.viewport,'up',160,140);expect(bounds(a.shapes()[0])).toMatchObject({w:60,h:60});
   fireEvent.click(screen.getByLabelText('Keep aspect ratio'));a.field('Width','120');expect(bounds(a.shapes()[0])).toMatchObject({w:120,h:120});a.field('Zoom percentage','200');expect((screen.getByLabelText('Zoom percentage') as HTMLInputElement).value).toBe('200');
   act(()=>a.viewport.focus());a.key('1');expect((screen.getByLabelText('Zoom percentage') as HTMLInputElement).value).toBe('100');a.key('0');expect(Number((screen.getByLabelText('Zoom percentage') as HTMLInputElement).value)).toBeGreaterThan(100);
-  fireEvent.click(screen.getByRole('button',{name:'Objects'}));fireEvent.click(screen.getByRole('button',{name:'Reveal selection'}));expect(screen.getByRole('status').textContent).toBe('Selection revealed');a.key('?');expect(screen.getByRole('dialog',{name:'Canvas help'})).toBeTruthy();expect(screen.queryByText(/Expand F/)).toBeNull();a.key('Escape');expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Objects'}));fireEvent.click(screen.getByRole('button',{name:'Reveal selection'}));expect(screen.getByRole('status').textContent).toBe('Selection revealed');a.key('?');expect(screen.getByRole('dialog',{name:'Canvas help'})).toBeTruthy();expect(screen.getByText(/F Expand\/return/)).toBeTruthy();a.key('Escape');expect(screen.queryByRole('dialog')).toBeNull();
 });
 
 test('real delivered pressure samples enable only subsequent strokes; coalesced points publish only on release',()=>{
@@ -166,7 +174,7 @@ test('real delivered pressure samples enable only subsequent strokes; coalesced 
   pointer(a.viewport,'down',50,50,{pointerType:'pen',pressure:.2});
   const event=new PointerEvent('pointermove',{bubbles:true,pointerId:1,pointerType:'pen',clientX:70,clientY:70,buttons:1,pressure:.8});
   Object.defineProperty(event,'getCoalescedEvents',{value:()=>[new PointerEvent('pointermove',{pointerId:1,pointerType:'pen',clientX:60,clientY:60,buttons:1,pressure:.5}),event]});fireEvent(a.viewport,event);
-  expect(a.shapes()).toHaveLength(1);pointer(a.viewport,'up',70,70,{pointerType:'pen',pressure:0});expect(a.shapes()[1].pointArity).toBe(3);expect(a.shapes()[1].points).toEqual([0,0,51,10,10,128,20,20,204]);equivalentScene(a);
+  expect(a.shapes()).toHaveLength(1);pointer(a.viewport,'up',70,70,{pointerType:'pen',pressure:0});expect(a.shapes()[1].pointArity).toBe(3);expect(a.shapes()[1].points).toEqual([0,0,51,20,20,204]);equivalentScene(a);
 });
 
 test.each(['start','mid','end'])('interruption at %s preserves remote geometry and clears local manipulation preview',phase=>{
@@ -437,4 +445,55 @@ test.each(['finish','Escape'])('empty existing text: %s deletes undoably or reve
     a.key('z',{ctrlKey:true,shiftKey:true});expect(a.shapes()).toHaveLength(0);
   }else expect(a.shapes()).toEqual([original]);
   equivalentScene(a);
+});
+
+
+test.each([false,true])('BUILD-5: Expand replay preserves mounted canvas, document, selection, local camera and focus (viewer %s)',viewOnly=>{
+  const a=setup(viewOnly);if(!viewOnly){expect(screen.getByText('Pen P · Select V · Expand F')).toBeTruthy();a.seed();a.select();}
+  const surface=screen.getByRole('region'),canvas=a.view.container.querySelector('canvas'),before=Y.encodeStateAsUpdate(a.doc);
+  a.key('h');a.key('ArrowRight',{code:'ArrowRight'});const camera=context.translate.mock.calls[context.translate.mock.calls.length-1];
+  act(()=>a.viewport.focus());a.key('f',{code:'KeyF'});
+  expect(screen.getByRole('button',{name:'Back'})).toBeTruthy();expect(screen.getByRole('region')).toBe(surface);expect(surface.querySelector('canvas')).toBe(canvas);expect(surface.classList.contains('ob-canvas-expanded')).toBe(true);
+  expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual(camera);expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);
+  fireEvent.click(screen.getByRole('button',{name:'Back'}));expect(document.activeElement).toBe(a.viewport);expect(a.view.container.contains(surface)).toBe(true);expect(context.translate.mock.calls[context.translate.mock.calls.length-1]).toEqual(camera);expect(Y.encodeStateAsUpdate(a.doc)).toEqual(before);equivalentScene(a);
+});
+test('BUILD-5: F does not leak from fields; Escape follows selection then returns from expanded',()=>{
+  const a=setup();a.seed();a.select();a.field('Object name','name');fireEvent.keyDown(screen.getByLabelText('Object name'),{key:'f',code:'KeyF'});expect(screen.queryByRole('button',{name:'Back'})).toBeNull();
+  act(()=>a.viewport.focus());a.key('f',{code:'KeyF'});a.key('Escape',{code:'Escape'});expect(screen.getByRole('button',{name:'Back'})).toBeTruthy();a.key('Escape',{code:'Escape'});expect(screen.queryByRole('button',{name:'Back'})).toBeNull();
+});
+test('BUILD-5: grid/snap replay has working pointer creation, Alt mirror and exact numeric/keyboard edits',()=>{
+  const a=setup();expect((screen.getByLabelText('Grid') as HTMLInputElement).checked).toBe(false);expect((screen.getByLabelText('Snap') as HTMLInputElement).checked).toBe(false);
+  fireEvent.click(screen.getByLabelText('Grid'));expect(a.view.container.querySelector('.ob-canvas-grid')).not.toBeNull();fireEvent.click(screen.getByLabelText('Snap'));
+  a.tool('r');pointer(a.viewport,'down',15,15);pointer(a.viewport,'move',63,47);expect(a.view.container.querySelectorAll('.ob-canvas-guide').length).toBe(2);pointer(a.viewport,'up',63,47);expect(bounds(a.shapes()[0])).toEqual({x:16,y:16,w:48,h:32});
+  a.key('ArrowRight',{code:'ArrowRight'});expect(bounds(a.shapes()[0]).x).toBe(17);a.field('X','19');expect(bounds(a.shapes()[0]).x).toBe(19);
+  act(()=>a.viewport.focus());a.tool('r');pointer(a.viewport,'down',111,111,{altKey:true});pointer(a.viewport,'move',159,143,{altKey:true});pointer(a.viewport,'up',159,143,{altKey:true});expect(bounds(a.shapes()[1])).toEqual({x:111,y:111,w:48,h:32});equivalentScene(a);
+});
+test('BUILD-5: hidden clears, visible reasserts only with focus; clear/rejoin mirror; viewers point',()=>{
+  vi.useFakeTimers();const a=setup(true,false,true);const aw=a.awareness!;
+  expect(aw.getLocalState()?.canvas.tool).toBe('pan');pointer(a.viewport,'move',10,20);pointer(a.viewport,'move',30,40);
+  vi.spyOn(document,'hidden','get').mockReturnValue(true);fireEvent(document,new Event('visibilitychange'));expect(aw.getLocalState()?.canvas).toBeNull();act(()=>vi.advanceTimersByTime(100));expect(aw.getLocalState()?.canvas).toBeNull();
+  vi.spyOn(document,'hidden','get').mockReturnValue(false);fireEvent(document,new Event('visibilitychange'));expect(aw.getLocalState()?.canvas.blockId).toBe('canvas');
+  act(()=>screen.getByRole('button',{name:'After canvas'}).focus());expect(aw.getLocalState()?.canvas).toBeNull();fireEvent(document,new Event('visibilitychange'));expect(aw.getLocalState()?.canvas).toBeNull();act(()=>a.viewport.focus());expect(aw.getLocalState()?.canvas.blockId).toBe('canvas');expect(a.shapes()).toHaveLength(0);
+});
+test('BUILD-5: peers stay within their canvas; idle labels restore; remote selection has no handles',()=>{
+  vi.useFakeTimers();const a=setup(false,false,true),id=a.seed();const peer=new Awareness(new Y.Doc());peer.setLocalStateField('user',{id:'peer',name:'Morgan',color:'#123456'});peer.setLocalStateField('canvas',canvasFacet('canvas',{x:12,y:24},'select',[id,'deleted']));
+  const deliver=()=>act(()=>applyAwarenessUpdate(a.awareness!,encodeAwarenessUpdate(peer,[peer.clientID]),'net'));deliver();
+  expect(screen.getByRole('button',{name:'Morgan, select'})).toBeTruthy();expect(a.view.container.querySelectorAll('.ob-canvas-peer-selection')).toHaveLength(1);expect(a.view.container.querySelectorAll('.ob-canvas-handle')).toHaveLength(0);
+  act(()=>vi.advanceTimersByTime(3000));expect(screen.getByRole('button',{name:'Morgan, select'}).getAttribute('data-idle')).toBe('true');peer.setLocalStateField('canvas',canvasFacet('canvas',{x:14,y:24},'pen',[]));deliver();expect(screen.getByRole('button',{name:'Morgan, pen'}).getAttribute('data-idle')).toBe('false');
+  peer.setLocalStateField('canvas',canvasFacet('other',{x:14,y:24},'pen',[]));deliver();expect(screen.queryByRole('button',{name:'Morgan, pen'})).toBeNull();peer.destroy();
+});
+
+
+test('BUILD-5: irreducible over-budget real-sample path keeps geometry, records and announces; ordinary stroke mirror',()=>{
+  // Synthetic PointerEvents exercise the real commit path, not device latency.
+  const a=setup(),overruns=decimationDiagnostics.overruns;
+  pointer(a.viewport,'down',0,0);const samples=Array.from({length:1199},(_,j)=>{const i=j+1;return new PointerEvent('pointermove',{bubbles:true,pointerId:1,pointerType:'mouse',buttons:1,clientX:i/4,clientY:i%2?3:0});});const event=samples[samples.length-1];Object.defineProperty(event,'getCoalescedEvents',{value:()=>samples});fireEvent(a.viewport,event);pointer(a.viewport,'up',1199/4,3);
+  expect(a.shapes()[0].points).toHaveLength(2400);expect(decimationDiagnostics.overruns).toBe(overruns+1);expect(screen.getByRole('status').textContent).toBe('Long stroke preserved · point budget exceeded');equivalentScene(a);
+  pointer(a.viewport,'down',20,20);pointer(a.viewport,'move',30,30);pointer(a.viewport,'up',30,30);expect(decimationDiagnostics.overruns).toBe(overruns+1);expect(a.shapes()).toHaveLength(2);equivalentScene(a);
+});
+test('BUILD-5: snap applies to move and resize; freehand is never magnetic',()=>{
+  const a=setup();a.seed();a.select();fireEvent.click(screen.getByLabelText('Snap'));
+  pointer(a.viewport,'down',130,100);pointer(a.viewport,'move',141,100);pointer(a.viewport,'up',141,100);expect(bounds(a.shapes()[0]).x).toBe(112);
+  const b=bounds(a.shapes()[0]),handles=a.view.container.querySelectorAll('.ob-canvas-handle');pointer(handles[4],'down',b.x+b.w,b.y+b.h);pointer(a.viewport,'move',b.x+b.w+9,b.y+b.h+17);pointer(a.viewport,'up',b.x+b.w+9,b.y+b.h+17);expect(bounds(a.shapes()[0])).toMatchObject({w:128,h:96});
+  a.tool('p');pointer(a.viewport,'down',15,15);pointer(a.viewport,'move',31,31);pointer(a.viewport,'up',31,31);expect(a.shapes()[1].scalars.x).toBe(15);expect(a.shapes()[1].points).toEqual([0,0,16,16]);equivalentScene(a);
 });

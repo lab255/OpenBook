@@ -1,3 +1,4 @@
+import {canvasFacet} from '../canvas/presence';
 import {describe, it, expect} from 'vitest';
 import * as Y from 'yjs';
 import {Awareness, applyAwarenessUpdate, encodeAwarenessUpdate} from 'y-protocols/awareness';
@@ -211,8 +212,10 @@ describe('Collab T7 — reconnect re-announce + reconcile', () => {
     const {docA, docB} = twoLoaded('');
     const a = connectPageAwareness(docA, 'p1', fake.client, {name: 'Ada', id: 'ada'}, {channelName: 'tab-a'});
     const b = connectPageAwareness(docB, 'p1', fake.client, {name: 'Boris', id: 'boris'}, {channelName: 'tab-b'});
+    a.awareness.setLocalStateField('canvas',canvasFacet('board',{x:12,y:24},'pen',[]));
     await wait(80);
     expect(b.awareness.getStates().has(docA.clientID)).toBe(true);
+    expect(b.awareness.getStates().get(docA.clientID)?.canvas.blockId).toBe('board');
 
     // B's stream drops; A leaves for good and the server GC's it — but B, being offline,
     // never sees A's departure frame.
@@ -235,8 +238,10 @@ describe('Collab T7 — reconnect re-announce + reconcile', () => {
     const {docA, docB} = twoLoaded('');
     const a = connectPageAwareness(docA, 'p1', fake.client, {name: 'Ada', id: 'ada'}, {channelName: 'tab-a'});
     const b = connectPageAwareness(docB, 'p1', fake.client, {name: 'Boris', id: 'boris'}, {channelName: 'tab-b'});
+    a.awareness.setLocalStateField('canvas',canvasFacet('board',{x:12,y:24},'pen',[]));
     await wait(80);
     expect(b.awareness.getStates().has(docA.clientID)).toBe(true);
+    expect(b.awareness.getStates().get(docA.clientID)?.canvas.blockId).toBe('board');
 
     // A is still present in the snapshot; a reconnect must not prune it.
     fake.reconnect();

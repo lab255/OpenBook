@@ -24,6 +24,6 @@ if(canvasCatalogueCost>100||viewerSource.includes('Canvas schema version.')||vie
 const ledger=JSON.parse(readFileSync('scripts/motionFeatures.json','utf8'));
 const coordinate=bytes-ledger.features.at(-1).afterRawBytes;
 const result={buildMode:'production, unchanged Vite configs plus read-only graph inspection plugin',path,bytes,coordinate,canvasCatalogueCost,mtime:statSync(path).mtime.toISOString(),results};
-writeFileSync('../../_evidence-build4/production-graphs.json',JSON.stringify(result,null,2)+'\n');
-if(coordinate-765>300)throw new Error('Shared seam exceeded 300 B growth');
+writeFileSync(resolve(process.argv[2]??'../../_evidence-build4','production-graphs.json'),JSON.stringify(result,null,2)+'\n');
+if(coordinate-Number(process.argv[3]??765)>300)throw new Error('Shared seam exceeded 300 B growth');
 console.log(JSON.stringify({bytes,coordinate,lanes:results.map(({lane,moduleCount,measurement,canvas,remote})=>({lane,moduleCount,measurement,canvas,remote}))}));
