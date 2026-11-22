@@ -2756,13 +2756,13 @@
     {
       "name": "canvasF1Viewer",
       "status": "UNLANDED; owner authorized exactly 9413 B on 2026-11-22; squash-merge provenance follows merge",
-      "rawCostBytes": 8561,
-      "measuredAt": "UNLANDED: BUILD-6 working tree based on 99cd2dc77d8955fbc8929e03a91800a5c3c6e4f7",
+      "rawCostBytes": 8491,
+      "measuredAt": "UNLANDED: BUILD-6 design correction on base 05eac93657e076c7ee745e332f8851fd16c7618b",
       "beforeRawBytes": 1933227,
-      "afterRawBytes": 1941788,
-      "artifactSha256": "b8b9ec51b52eeed2ce0886c3b636743d1f460b0eef4d51d16b460ea8ed4a14c8",
+      "afterRawBytes": 1941718,
+      "artifactSha256": "a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3",
       "mechanism": "Live inert canvas renderer, shared curve ladder, committed-input quarantine, JSON pointArity producer projection, kept-static hydration handoff. Raster serializer and layout mirror remain export-side.",
-      "evidence": "BUILD-6 final-priced-options.json, landing-accounting.json, landing-interop.json and layout-fixed-{preceding,following,surrounding}.json; production artifact unchanged",
+      "evidence": "BUILD-6 design-final-accounting.json, design-fix-raw-costs.json, final-artifact acceptance; COMMENT-TOKEN SCANNER EMISSION control documented in ledger",
       "exportedObservable": "No motion: drawing present immediately as static fallback; live pan/zoom/inspection after hydration, no edits, network, persistence or document undo.",
       "modules": [
         "src/blockeditor/canvas/geometry.ts",
@@ -2781,9 +2781,9 @@
     }
   ],
   "endpointAttribution": {
-    "artifactSha256": "b8b9ec51b52eeed2ce0886c3b636743d1f460b0eef4d51d16b460ea8ed4a14c8",
-    "graphSha256": "4b251ff8e5ce12d36e0e9738d6ece0b82dffa10fc58e36b8fe2d35f0191fe2fe",
-    "measuredAt": "BUILD-6 final unpushed production measurement on base 99cd2dc7",
+    "artifactSha256": "a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3",
+    "graphSha256": "ec238b2d2c08975e3ca64a63fb183e2ed9e885403aaf93a97eb9b7688b11bb73",
+    "measuredAt": "BUILD-6 design corrections on base 05eac936; final production measurement",
     "scope": "Partition regenerated from THIS final graph. Raw IIFE deltas reconcile exactly; unique normalized-ID ownership aggregates repeated rendered instances for diagnostics only."
   }
 }

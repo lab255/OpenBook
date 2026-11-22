@@ -28,11 +28,14 @@ label their pre-final-minification rendered sizes. The inherited ownership
 inventory is from the reproduced BUILD-6 baseline at 99cd2dc7, raw 1,933,227 B;
 it is not a claim that the historical residue equals the inventory's byte sum.
 
-BUILD-6 complete measurement (UNLANDED provenance; owner authorized 2026-11-22): the canvas row
-measures 1,933,227 → 1,941,788 raw IIFE B, a cost of 8,561 B. The six consumer
-rows reconcile exactly: 567 + 160 + 38 + 15 + 72 + 8,561 = 9,413 B coordinate.
-The owner authorized EXACTLY 9,413 B on 2026-11-22 via PM² relay, with no
-inferred margin: 1,932,375 + 9,413 = 1,941,788 B equals the complete artifact.
+BUILD-6 owner calibration (2026-11-22): the complete held artifact measured
+1,941,788 raw IIFE B / coordinate 9,413; the owner authorized EXACTLY 9,413 B,
+with no inferred margin. The authorization remains 1,932,375 + 9,413 = 1,941,788.
+After the design corrections the final artifact measures 1,941,718 raw IIFE B:
+1,932,375 + 9,343 = 1,941,718. The canvas row measures 1,933,227 → 1,941,718,
+a cost of 8,491 B; six raw consumer rows reconcile exactly:
+567 + 160 + 38 + 15 + 72 + 8,491 = 9,343 B coordinate. The measured recovery
+is 70 B; it does not change the owner decision boundary.
 Any growth past 9,413 is a NEW OWNER RULING; stop unpushed at this owner
 decision boundary. Superseded 4,096 is CALIBRATED-TWO-CONTRACTS-AGO, not a miss:
 it correctly calibrated the pre-option-B design at 59c49f80. Three ruled
@@ -42,7 +45,7 @@ subtraction controls below are the authorization justification, not additive pri
 Landing provenance remains UNLANDED through merge. A tiny post-merge follow-up
 records main’s actual squash-merge SHA, never the branch SHA. `measuredAt` is
 required provenance metadata, not Git-existence or ancestry validation. The artifact SHA256 is
-`b8b9ec51b52eeed2ce0886c3b636743d1f460b0eef4d51d16b460ea8ed4a14c8`;
+`a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3`;
 `endpointAttribution` binds the regenerated final module partition to that
 artifact and its graph SHA256. Repeated normalized graph IDs have one owner;
 their rendered instances are aggregated for diagnostics, never dropped.
@@ -50,7 +53,7 @@ their rendered instances are aggregated for diagnostics, never dropped.
 Canvas is non-Motion: it consumes the endpoint window, not a new Motion-chain
 row. It is not a direct Motion adopter charged by the separate 2,048 B guard;
 that guard remains unchanged for its adopters. Exact Motion bytes stay 211,511.
-Aggregate growth is 95,275 B, leaving 166,869 B of the 262,144 B allowance.
+Aggregate growth is 95,205 B, leaving 166,939 B of the 262,144 B allowance.
 Exported observable: drawing present immediately as static fallback, with no
 motion; hydration enables local pan/zoom/inspection, never document editing,
 network, persistence or undo. The raster serializer, Markdown package and
@@ -60,7 +63,7 @@ Independent whole-IIFE subtraction controls price the current contracts:
 curve/pressure subdivision 1,192 B; committed-input quarantine 1,886 B;
 pointArity producer projection 309 B; kept-static handoff/reuse 144 B;
 local camera interactions 659 B. These are non-additive marginal costs against
-the same final candidate. The controls deliberately violate the contract and
+the owner-calibration candidate (9,413 coordinate, before design corrections). The controls deliberately violate the contract and
 are not shipping variants. `scripts/canvas-export-measure/measureCosts.mjs`
 rebuilds and byte-verifies the restored full candidate afterward.
 
@@ -267,3 +270,26 @@ The emitted viewer graph assertion rejects the app wrapper and canvas editing
 modules. No editing canvas implementation is included in BUILD-1.
 
 `sharedModules` retains the pre-fence `reactiveBlocks.tsx` entry as a known-stale record; re-pointing it to `reactiveCore.tsx` changes block-own-code accounting and belongs to a future ruled change.
+
+### BUILD-6 design corrections: ordered raw attribution
+
+| Fix | Placement | Ordered raw IIFE delta |
+| --- | --- | ---: |
+| A PDF static capture and drawing-region meter | Export-side | 0 B |
+| B document ink, box and paint-context identity | Export-side | 0 B |
+| D1 surface and fixed viewport styles | Export-side CSS; viewer inline styles removed | −147 B |
+| D4 figure rhythm and identical non-collapsing title boxes | Export-side CSS; viewer inline margin removed | −17 B |
+| D2 pointer/keyboard focus distinction | Viewer-side native focus; export-side ring CSS | −10 B |
+| D3 viewport-centred camera | Viewer-side | +104 B |
+| D5 caption and print suppression | Export-side | 0 B |
+
+Order: 9,413 → 9,266 → 9,249 → 9,239 → 9,343. Shared fixed-style relocation
+is counted once at D1. These are raw ordered integration deltas, not rendered
+module diagnostics. Export-only controls reproduce the owner-calibration SHA
+exactly; the final ownership partition is regenerated at the artifact SHA above.
+
+COMMENT-TOKEN SCANNER EMISSION: a PDF-test prose word collided with a Tailwind
+utility and emitted 82 B of unused CSS. Rewording the comment restored the exact
+calibration artifact in the control. No contract depended on that utility.
+Source-scan configuration is unchanged; excluding test/fixture trees needs a
+separate inventory because those trees also render real fixture markup.

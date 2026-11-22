@@ -11,8 +11,13 @@ declare const __CANVAS_EXPORT_BUILD__:Record<string,string>;
 registerPropsProjection('canvas',projectCanvas);
 export function exportFixture(mixed:boolean|string=false):{html:string;snapshot:PageSnapshot;stamp:Record<string,string>;surfaces:Record<string,unknown>} {
   const before=!!mixed&&mixed!=='following',after=!!mixed&&mixed!=='preceding';
-  const doc=createDoc([...(before?[{id:'before',type:'paragraph',text:[{t:'Before the drawing: mixed document context.'}]}]:[]),{id:'drawing',type:'canvas'},...(after?[{id:'after',type:'paragraph',text:[{t:'After the drawing: content must remain in place.'}]}]:[])]);
-  const drawingIndex=before?1:0;
+  const prefix = [
+    ...(mixed==='rich'?[{id:'heading',type:'heading',props:{level:1},text:[{t:'Drawing in context'}]}]:[]),
+    ...(before?[{id:'before',type:'paragraph',text:[{t:'Before the drawing: mixed document context.'}]}]:[]),
+    ...(mixed==='rich'?[{id:'second',type:'paragraph',text:[{t:'A second paragraph checks document ink and rhythm.'}]}]:[]),
+  ];
+  const doc=createDoc([...prefix,{id:'drawing',type:'canvas'},...(after?[{id:'after',type:'paragraph',text:[{t:'After the drawing: content must remain in place.'}]}]:[])]);
+  const drawingIndex=prefix.length;
   const props=constructCanvasProps({...canvasDefaults,shapes:{}});rootBlocks(doc).get(drawingIndex).set('props',props);
   const shapes=props.get('shapes') as Y.Map<Y.Map<unknown>>;
   for(const [i,kind] of ['rect','ellipse','arrow','text','stroke'].entries())shapes.set(String(i),createShape({id:String(i),kind,x:15+i*95,y:40,w:80,h:70,basisW:80,basisH:70,fill:'#e2e8f0',text:'Export text',pressureMode:kind==='stroke'?'variable':'constant',pointArity:kind==='stroke'?3:2,points:kind==='stroke'?[0,0,0,10,20,255,30,5,80,60,40,200]:[]}));

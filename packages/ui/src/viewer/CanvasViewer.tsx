@@ -31,7 +31,7 @@ export const CanvasViewer: React.FC<CustomBlockProps> = ({block}) => {
     };
     element.onpointerdown = event => {
       if(event.button!==0)return;
-      element.focus();element.setPointerCapture(event.pointerId);
+      element.setPointerCapture(event.pointerId);
       drag={x:event.clientX-camera.x,y:event.clientY-camera.y};
     };
     element.onpointermove = event => {
@@ -42,7 +42,12 @@ export const CanvasViewer: React.FC<CustomBlockProps> = ({block}) => {
       const axis=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(event.key);
       if(axis>=0)camera[axis<2?'x':'y']+=(axis%2?-1:1)*40;
       else if(event.key==='0')camera={x:0,y:0,zoom:1};
-      else if(['+','=','-'].includes(event.key))camera.zoom=Math.max(.1,Math.min(8,camera.zoom*(event.key==='-'?.8:1.25)));
+      else if(['+','=','-'].includes(event.key)) {
+        const zoom=Math.max(.1,Math.min(8,camera.zoom*(event.key==='-'?.8:1.25))),ratio=zoom/camera.zoom;
+        for(const [axis,center] of [['x',element.getBoundingClientRect().width/2],['y',height/2]] as const)
+          camera[axis]=center+(camera[axis]-center)*ratio;
+        camera.zoom=zoom;
+      }
       else return;
       event.preventDefault();draw();
     };
@@ -53,11 +58,11 @@ export const CanvasViewer: React.FC<CustomBlockProps> = ({block}) => {
       element.onpointerdown=element.onpointermove=element.onpointerup=element.onpointercancel=element.onlostpointercapture=element.onkeydown=null;
     };
   }, [scene, height, kept]);
-  return <figure data-canvas-export="" style={{margin:0}}>
-    <div style={{position:'relative',height,maxWidth:672,overflow:'hidden'}}>
+  return <figure data-canvas-export="" >
+    <div style={{height}}>
       {kept && <StaticKeepBlock node={kept} />}
       <canvas ref={canvas} tabIndex={0} aria-label="Drawing. Drag to pan; plus and minus to zoom; zero to reset."
-        style={{position:'absolute',inset:0,visibility:'hidden',display:'block',width:'100%',height,backgroundColor:String(get(props,'background') ?? '#ffffff'),touchAction:'none'}}
+        style={{height,backgroundColor:String(get(props,'background') ?? '#ffffff')}}
       />
     </div>
     {scene.diagnostics.length>0 && <figcaption role="status">{scene.diagnostics.join('; ')}</figcaption>}
