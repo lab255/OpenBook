@@ -17,6 +17,7 @@
 import {jsPDF} from 'jspdf';
 import 'svg2pdf.js';
 import {elementToSVG} from 'dom-to-svg';
+import {prepareCanvasPdf} from './canvasPdf';
 import {KIT_EXPORT_PRIMARY} from '../blockeditor/colors';
 
 const PAGE_W = 612; // US Letter, points
@@ -48,6 +49,7 @@ const PDF_FONT =
   // text node — deEmoji can't reach it), which renders as mojibake. Drop it; the
   // tinted background already signals the variant.
   '.callout::before{content:none !important}' +
+  '[data-canvas-export] > details{display:none !important}' +
   '</style>';
 
 // jsPDF's standard fonts are WinAnsi (Latin-1) — emoji render as mojibake and
@@ -157,12 +159,11 @@ export async function awaitImages(root: Element): Promise<void> {
 // widget states are all baked at export time — same pixels, no React). The
 // legacy reactive runtime (#ob-data path) ignores the flag and still runs,
 // exactly as before, for legacy-snapshot exports and slide decks.
-const NO_HYDRATE = '<script>window.__OB_NO_HYDRATE=true</script>';
 
 /**
  * Lay the HTML out in a hidden iframe (real layout — plus the legacy reactive
  * runtime where present, so its computed values and charts render), and hand
- * back its `<main>` element. Viewer hydration is disabled (see NO_HYDRATE).
+ * back its `<main>` element. Viewer hydration is disabled through the frame flag before parsing.
  */
 async function layout(html: string): Promise<{frame: HTMLIFrameElement; el: Element}> {
   const frame = document.createElement('iframe');
@@ -172,8 +173,12 @@ async function layout(html: string): Promise<{frame: HTMLIFrameElement; el: Elem
   });
   document.body.appendChild(frame);
   const idoc = frame.contentDocument!;
-  const head = `${NO_HYDRATE}${PDF_FONT}`;
+  const head = PDF_FONT;
   idoc.open();
+  // Export CSP authorizes only its original script hashes. Injecting a new
+  // inline flag script is blocked; set the same-origin frame flag directly
+  // before parsing the authorized viewer boot. Keep CSP unchanged.
+  (frame.contentWindow as Window & {__OB_NO_HYDRATE?: boolean}).__OB_NO_HYDRATE = true;
   idoc.write(html.includes('</head>') ? html.replace('</head>', `${head}</head>`) : head + html);
   idoc.close();
   await new Promise<void>((res) => {
@@ -187,6 +192,7 @@ async function layout(html: string): Promise<{frame: HTMLIFrameElement; el: Elem
   }
   await new Promise((r) => setTimeout(r, 300)); // let the reactive runtime recompute + draw charts
   const el = idoc.querySelector('main') ?? idoc.body;
+  prepareCanvasPdf(el,html);
   await awaitImages(el); // images must be decoded or dom-to-svg snapshots blank boxes
   deEmoji(el);
   staticizeSliders(el);
@@ -225,9 +231,10 @@ export async function toPdf(html: string, mode: PdfMode): Promise<Blob> {
     const contW = PAGE_W - 2 * MARGIN;
     const scale = contW / w;
 
+    // Flate compression also selects lossless compression for PNG RGB/alpha streams.
     if (mode === 'continuous') {
       const pageH = Math.min(JSPDF_MAX, h * scale + 2 * MARGIN);
-      const pdf = new jsPDF({unit: 'pt', format: [PAGE_W, pageH]}) as SvgPdf;
+      const pdf = new jsPDF({unit: 'pt', format: [PAGE_W, pageH], compress: true}) as SvgPdf;
       svg.setAttribute('viewBox', `${minX} ${minY} ${w} ${h}`);
       await pdf.svg(svg, {x: MARGIN, y: MARGIN, width: contW, height: h * scale});
       return pdf.output('blob');
@@ -236,7 +243,7 @@ export async function toPdf(html: string, mode: PdfMode): Promise<Blob> {
     const contH = PAGE_H - 2 * MARGIN;
     const sliceH = contH / scale; // SVG units shown per page
     const pages = Math.max(1, Math.min(2000, Math.ceil(h / sliceH)));
-    const pdf = new jsPDF({unit: 'pt', format: [PAGE_W, PAGE_H]}) as SvgPdf;
+    const pdf = new jsPDF({unit: 'pt', format: [PAGE_W, PAGE_H], compress: true}) as SvgPdf;
     for (let p = 0; p < pages; p++) {
       if (p > 0) pdf.addPage([PAGE_W, PAGE_H], 'portrait');
       // Slice the y-range; keep min-x and width so content stays aligned.

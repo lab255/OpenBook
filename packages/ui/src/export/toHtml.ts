@@ -1,4 +1,5 @@
 import {normalizeColumnSpans} from '../blockeditor/model';
+import {canvasStaticHtml,CANVAS_EXPORT_CSS} from './canvasStatic';
 /**
  * Render a page — or a whole reachable mini-site — to a **self-contained,
  * interactive** HTML document, structured in three layers:
@@ -363,6 +364,10 @@ function renderBlocks(blocks: ExportBlock[], ctx: RenderCtx): string {
     const d = block.data ?? {};
     const id = block.id ?? '';
     switch (block.type) {
+    case 'canvas': {
+      html.push(canvasStaticHtml(id,d.props));
+      break;
+    }
     case 'header': {
       if (d.container === 'group' || d.container === 'tab' || d.container === 'accordion') {
         const label = inlineToHtml(parseInline(str(d.text)), ctx);
@@ -938,13 +943,13 @@ function document_(
   const csp = pageCsp(scriptHashes);
 
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${bodyHtml.includes('<figure data-canvas-export=')?` data-ob-canvas-export=""${hydrate?' data-ob-canvas-hydrate=""':''}`:''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <title>${escapeHtml(headTitle)}</title>
-<style>${entranceCss()}${stylesFor(ctx.scheme)}${hydrate ? SCHEME_LIGHT : schemeDual(ctx.scheme)}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
+<style>${entranceCss()}${stylesFor(ctx.scheme)}${bodyHtml.includes('<figure data-canvas-export=')?CANVAS_EXPORT_CSS:''}${hydrate ? SCHEME_LIGHT : schemeDual(ctx.scheme)}</style>${extra?.styles ? `\n<style>${extra.styles}</style>` : ''}
 </head>
 <body${!hydrate && rootId ? ` data-root="${escapeHtml(rootId)}"` : ''}>
 ${legacyHeader}${bodyHtml}
@@ -1318,6 +1323,7 @@ const stylesFor = (scheme: DataColorScheme): string => `
 * { box-sizing: border-box; }
 body { margin: 0; background: #fff; color: #1a1a1a; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 main { max-width: 720px; margin: 0 auto; padding: 48px 24px 120px; }
+
 section.page[hidden] { display: none; }
 .ob-nav { position: sticky; top: 0; z-index: 10; padding: 8px 24px; backdrop-filter: blur(8px); background: rgba(127,127,127,.06); border-bottom: 1px solid rgba(127,127,127,.18); }
 .ob-nav button { font: inherit; font-size: .9rem; cursor: pointer; border: 1px solid rgba(127,127,127,.3); background: transparent; color: inherit; border-radius: 6px; padding: 4px 12px; }

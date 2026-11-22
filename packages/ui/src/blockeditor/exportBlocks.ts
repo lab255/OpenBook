@@ -1,3 +1,4 @@
+import {canvasStaticHtml} from '../export/canvasStatic';
 import {isSafeHref, type DatabaseFormReference, type FormField, type FormSchema} from '@book.dev/sdk';
 import {t} from '@/i18n';
 import type {BlockJSON, BlockType, CellRangeExportCell, InlineAttrs, TextRun} from './model';
@@ -311,6 +312,11 @@ export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOption
   while (i < blocks.length) {
     const b = blocks[i];
     switch (b.type) {
+    case 'canvas': {
+      parts.push(canvasStaticHtml(b.id,b.props));
+      i += 1;
+      break;
+    }
     case 'heading': {
       const level = Math.min(6, Math.max(1, Number(b.props?.level ?? 2)));
       parts.push(`<h${level}>${textHtml(b.text)}</h${level}>`);
@@ -517,6 +523,9 @@ export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOp
   for (const b of blocks) {
     if (b.type !== 'list' || (b.props?.kind as string) !== 'number') n = 0;
     switch (b.type) {
+    case 'canvas':
+      out.push('Drawing (image included in clipboard HTML).');
+      break;
     case 'heading':
       out.push(`${'#'.repeat(Math.min(6, Math.max(1, Number(b.props?.level ?? 2))))} ${textMd(b.text)}`);
       break;

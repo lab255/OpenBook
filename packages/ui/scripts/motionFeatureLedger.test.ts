@@ -3,10 +3,42 @@ import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import ledger from './motionFeatures.json';
 import baseline from './viewerMotionBaseline.json';
-import {assertFeatureLedger, assertBlockOwnBytes, assertViewerCeiling, assertLedgerEndpoint, motionModule} from './motionGraph.mjs';
+import {assertFeatureLedger, assertBlockOwnBytes, assertViewerCeiling, assertLedgerEndpoint, assertEndpointConsumers, assertEndpointOwnership, motionModule} from './motionGraph.mjs';
 
 const readGraph = (path: string) => JSON.parse(readFileSync(path, 'utf8'));
 const productionGraph = readGraph('src/export/vendor/motion-graph.json');
+it('itemizes the measured non-Motion coordinate with zero tolerance without moving the anchor', () => {
+  const bytes = readFileSync('src/export/vendor/openbook-viewer.js').byteLength;
+  expect(ledger.features.at(-1)!.afterRawBytes).toBe(1932375);
+  assertEndpointConsumers(bytes, ledger, productionGraph);
+  expect(() => assertEndpointConsumers(bytes + 1, ledger)).toThrow('measured coordinate');
+  expect(() => assertEndpointConsumers(bytes - 1, ledger)).toThrow('measured coordinate');
+  const missing = {...ledger, endpointConsumers: ledger.endpointConsumers.slice(1)};
+  expect(() => assertEndpointConsumers(bytes, missing)).toThrow('measured coordinate');
+  // Signed recovery rows are legal; offsetting itemization must preserve the sum.
+  assertEndpointConsumers(bytes, {...ledger, endpointConsumers: [...ledger.endpointConsumers,
+    {name: 'control-growth', rawCostBytes: 1, measuredAt: 'fixture', mechanism: 'control'},
+    {name: 'control-recovery', rawCostBytes: -1, measuredAt: 'fixture', mechanism: 'control'},
+  ]});
+});
+it('diagnoses module ownership in rendered units and counts shared modules once', () => {
+  const first = {name:'first',modules:['shared'],usesModules:[]};
+  const second = {name:'second',modules:['consumer'],usesModules:['shared']};
+  const rows = {endpointConsumers:[first,second]};
+  const graph = {modules:[{id:'shared',bytes:73},{id:'consumer',bytes:41}]};
+  assertEndpointOwnership(graph,rows);
+  assertEndpointOwnership({modules:[...graph.modules,{id:'shared',bytes:29}]},rows);
+  expect(() => assertEndpointOwnership({modules:[{id:'unclaimed',bytes:3},{id:'unclaimed',bytes:7}]},rows))
+    .toThrow('Unclaimed module unclaimed: 10 rendered B (pre-final-minification)');
+  expect(() => assertEndpointOwnership({...graph,modules:[...graph.modules,{id:'new-viewer-module',bytes:83}]},rows))
+    .toThrow('Unclaimed module new-viewer-module: 83 rendered B (pre-final-minification)');
+  expect(() => assertEndpointOwnership(graph,{endpointConsumers:[first,{...second,modules:['consumer','shared']}]}))
+    .toThrow('Module shared claimed twice: first and second');
+  expect(() => assertEndpointOwnership(graph,{endpointConsumers:[first,{...second,usesModules:['unknown']}]}))
+    .toThrow('references unowned shared module unknown');
+  // Tree-shaken modules have no rendered contribution; no invented byte charge.
+  assertEndpointOwnership({modules:[...graph.modules,{id:'discarded',bytes:0}]},rows);
+});
 it('requires a ledger row for every emitted Motion module and export', () => {
   assertFeatureLedger(productionGraph, ledger);
   expect(() => assertFeatureLedger(productionGraph, {...ledger, features: ledger.features.filter(feature => feature.name !== 'renderer')})).toThrow('Unledgered motion feature');
@@ -82,8 +114,12 @@ it('checks the complete emitted Motion closure transitively reachable from the v
   expect(reached.has('src/components/ui/fluid-hover.tsx')).toBe(true);
   // Editing registrations belong to the app wrapper, never the viewer graph.
   expect(reached.has('src/blockeditor/reactiveCore.tsx')).toBe(true);
+  const readOnlyCanvas = new Set(['src/blockeditor/canvas/schema.ts','src/blockeditor/canvas/geometry.ts','src/blockeditor/canvas/strokeCurve.ts']);
   expect(productionGraph.modules.some((module: {id: string}) =>
-    module.id === 'src/blockeditor/reactiveBlocks.tsx' || module.id.startsWith('src/blockeditor/canvas/'))).toBe(false);
+    module.id === 'src/blockeditor/reactiveBlocks.tsx' || (module.id.startsWith('src/blockeditor/canvas/') && !readOnlyCanvas.has(module.id)))).toBe(false);
+  const schema = productionGraph.modules.find((module: {id:string}) => module.id === 'src/blockeditor/canvas/schema.ts');
+  for(const authoring of ['createShape','createCanvasProps','constructCanvasProps','isEditableCanvas','isEditableShape','pointData'])expect(schema.exports).not.toContain(authoring);
+  expect(productionGraph.modules.some((module:{id:string;bytes:number}) => module.id === 'src/export/canvasStatic.ts' && module.bytes > 0)).toBe(false);
   for (const module of productionGraph.modules.filter((module: {id: string; bytes: number}) => module.bytes > 0 && /^(motion|framer-motion|motion-dom|motion-utils)\//.test(module.id))) {
     expect(reached.has(module.id), module.id).toBe(true);
     // Every emitted module is independently covered; deleting its authorization
@@ -120,11 +156,11 @@ it('keeps historical rows continuous and bounds non-motion drift at the measured
 it('accepts only the authorized non-motion window, never unledgered Motion or extra Motion bytes', () => {
   const historical = ledger.features.at(-1)!.afterRawBytes;
   expect(ledger.endpoint.nonMotionShrinkageBytes).toBe(506);
-  expect(ledger.endpoint.nonMotionGrowthBytes).toBe(4096);
-  for (const bytes of [historical, historical - 506, historical + 4096]) {
+  expect(ledger.endpoint.nonMotionGrowthBytes).toBe(10086);
+  for (const bytes of [historical, historical - 506, historical + 10086]) {
     expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).not.toThrow();
   }
-  for (const bytes of [historical + 4097, historical - 507]) {
+  for (const bytes of [historical + 10087, historical - 507]) {
     expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).toThrow('outside non-motion window');
   }
   const changed = {modules: productionGraph.modules.map((module: {id: string; bytes: number}) =>
@@ -134,5 +170,5 @@ it('accepts only the authorized non-motion window, never unledgered Motion or ex
   // allowed window must still reject an unledgered Motion feature.
   const missing = {...ledger, features: ledger.features.map(feature => feature.name === 'animate' ? {...feature, modules: []} : feature)};
   expect(() => assertLedgerEndpoint(productionGraph, historical - 506, missing)).toThrow('Unledgered motion feature');
-  process.stdout.write(`ENDPOINT ${historical - 506} and ${historical + 4096} GREEN; ${historical + 4097} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
+  process.stdout.write(`ENDPOINT ${historical - 506} and ${historical + 10086} GREEN; ${historical + 10087} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
 });

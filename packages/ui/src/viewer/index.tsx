@@ -1,3 +1,4 @@
+import {registerCanvasViewer} from './CanvasViewer';
 /**
  * OpenBook Viewer — the single-file, self-contained renderer HTML exports
  * embed (owner decision 2026-07-04). Built by `vite.viewer.config.js` into an
@@ -56,6 +57,7 @@ registerReactiveBlocks();
 registerArtifactKit();
 registerDatabaseFormBlock();
 registerFormBlock();
+registerCanvasViewer();
 
 // The viewer is provider-less (no ThemeProvider), so nothing else writes the
 // data-colour CSS vars. Emit them once at load — for the scheme the export baked
