@@ -1,71 +1,80 @@
 # Export-viewer motion accounting
 
-### Non-Motion endpoint consumers (BUILD-6)
+### BUILD-6 owner ruling — exactly 10,086 B (2026-11-22)
 
-`endpointConsumers` records non-Motion consumption separately from the historical
-feature chain. Its signed raw byte costs must sum exactly to the measured
-whole-IIFE coordinate; tolerance is zero. Carried-forward unattributed residue
-has its own labeled row. Each row records its measurement commit, mechanism and
-evidence; working-tree checkpoints are explicitly distinguished from final commits.
-The chain anchor is pinned by construction because non-Motion consumers never
-enter the chain: 1,932,375 B remains the anchor and 1,941,788 B the owner-ruled absolute upper
-endpoint. Neither adding a consumer nor recovering bytes grants new budget.
+The owner authorizes EXACTLY **10,086 B**, no inferred margin. The complete
+artifact measures **1,942,461 raw IIFE B = 1,932,375 pinned anchor +10,086**,
+SHA256 `3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc`.
+**Growth past 10,086 is a NEW OWNER RULING.** The boundary fixtures accept
++10,086 and reject +10,087; the independent lower boundary remains −506/−507.
 
-Historical consumption before the F1 slice: 567 B carried-forward residue,
-160 B history seam, 38 B projection seam, 15 B constructor seam and 72 B lean
-viewer catalogue = 852 B. The fresh BUILD-6 baseline reproduces 1,933,227 B,
-SHA256 67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198.
-The independent Motion module, block-own-code and aggregate guards still apply.
+Superseded **9,413** is **superseded-by-re-gate-findings**: it was correct for a
+candidate that had not yet been through the design re-gate. The record is a
+sequence of better-informed decisions. The full chain on this ruling is:
+**9,343 → +111 M1 mirror regression repair → +5 crop repair → +627 fit-and-centre
+=10,086 B**. M1 restores a shipping consumer, not new scope. The crop-only
+9,459 variant works at origin; the owner chose the complete fitted variant.
+
+Taste rulings, 2026-11-22: caption link uses the **28px ladder** and **muted ink**.
+Both are export-side CSS and reproduce the same viewer bytes/SHA. Writer-wide
+lossless PDF compression is accepted as disclosed; paged/continuous document
+exports use it, slides are unchanged.
+
+Earlier owner calibration: 9,413 coordinate / 1,941,788 raw B / 8,561 slice B,
+artifact b8b9ec51, on base 99cd2dc7. The pushed design correction measured 9,343
+coordinate / 1,941,718 raw B / 8,491 slice B, artifact a60114ce. These historical
+measurements do not describe the current artifact. Superseded 4,096 remains
+**CALIBRATED-TWO-CONTRACTS-AGO**, not a miss: correct for pre-option-B at 59c49f80;
+curve-fidelity ladder, quarantine-never-silent-default and producer projection
+were added afterward. Historical quantities remain separate: 2,981 B raw slice,
+3,159 B coordinate, 4,096 B former authorization, 656 B projected remainder.
+
+### Non-Motion endpoint consumers
+
+`endpointConsumers` itemizes non-Motion consumption separately from the Motion
+feature chain. The anchor is pinned by construction: non-Motion consumers never
+enter that chain. Raw IIFE landing deltas sum exactly to the coordinate, with
+zero tolerance. Current row: 1,933,227 →1,942,461, cost **9,234 B**.
+Reconciliation: **567 +160 +38 +15 +72 +9,234 =10,086 B**. Earlier consumers
+are residue, history seam, projection seam, constructor seam and lean catalogue.
+The reproduced BUILD-6 baseline is 1,933,227 B / coordinate 852, SHA256
+`67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198`.
 
 Consumer deltas are raw IIFE bytes measured at landing and sum to the coordinate;
 module ownership is a partition for attribution; rendered bytes are diagnostic
-only. These two spaces are never added together. `modules` assigns each emitted
-non-Motion module once, including inherited infrastructure in the carried-forward
-row. Later consumers reference existing owners through `usesModules`, so sharing
-does not duplicate ownership. Completeness covers all emitted non-Motion modules
-(stronger than checking only newly emitted modules), and diagnostics explicitly
-label their pre-final-minification rendered sizes. The inherited ownership
-inventory is from the reproduced BUILD-6 baseline at 99cd2dc7, raw 1,933,227 B;
-it is not a claim that the historical residue equals the inventory's byte sum.
+only. Never add these spaces. `modules` gives every emitted non-Motion module
+one owner; `usesModules` references sharing without duplicate ownership. Missing
+and duplicate owners fail diagnostically; repeated normalized graph IDs aggregate
+rendered instances. The inherited inventory is from baseline 99cd2dc7, not a
+claim that its rendered sum equals historical raw residue. `endpointAttribution`
+binds the partition regenerated from the final graph to the artifact/graph SHAs.
 
-BUILD-6 owner calibration (2026-11-22): the complete held artifact measured
-1,941,788 raw IIFE B / coordinate 9,413; the owner authorized EXACTLY 9,413 B,
-with no inferred margin. The authorization remains 1,932,375 + 9,413 = 1,941,788.
-After the design corrections the final artifact measures 1,941,718 raw IIFE B:
-1,932,375 + 9,343 = 1,941,718. The canvas row measures 1,933,227 → 1,941,718,
-a cost of 8,491 B; six raw consumer rows reconcile exactly:
-567 + 160 + 38 + 15 + 72 + 8,491 = 9,343 B coordinate. The measured recovery
-is 70 B; it does not change the owner decision boundary.
-Any growth past 9,413 is a NEW OWNER RULING; stop unpushed at this owner
-decision boundary. Superseded 4,096 is CALIBRATED-TWO-CONTRACTS-AGO, not a miss:
-it correctly calibrated the pre-option-B design at 59c49f80. Three ruled
-contracts were added after it: curve-fidelity ladder, quarantine-never-silent-default,
-and producer projection. The new number prices those contracts. The independent
-subtraction controls below are the authorization justification, not additive prices.
-Landing provenance remains UNLANDED through merge. A tiny post-merge follow-up
-records main’s actual squash-merge SHA, never the branch SHA. `measuredAt` is
-required provenance metadata, not Git-existence or ancestry validation. The artifact SHA256 is
-`a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3`;
-`endpointAttribution` binds the regenerated final module partition to that
-artifact and its graph SHA256. Repeated normalized graph IDs have one owner;
-their rendered instances are aggregated for diagnostics, never dropped.
+Provenance stays **UNLANDED through merge**. The tiny post-merge follow-up records
+the actual main squash SHA, never the branch SHA. `measuredAt` is provenance
+metadata, not Git-existence or ancestry validation.
 
-Canvas is non-Motion: it consumes the endpoint window, not a new Motion-chain
-row. It is not a direct Motion adopter charged by the separate 2,048 B guard;
-that guard remains unchanged for its adopters. Exact Motion bytes stay 211,511.
-Aggregate growth is 95,205 B, leaving 166,939 B of the 262,144 B allowance.
-Exported observable: drawing present immediately as static fallback, with no
-motion; hydration enables local pan/zoom/inspection, never document editing,
-network, persistence or undo. The raster serializer, Markdown package and
-canvas-specific export layout CSS remain outside the emitted viewer code.
+Motion stays **211,511 rendered B**. Canvas is non-Motion and uses the endpoint
+window; it is not a direct Motion adopter under the separate 2,048 B guard.
+Aggregate growth is **95,948 raw B**, leaving **166,196 B (63.4%)** of the
+262,144 allowance. Endpoint widening does not trade another feature's allocation.
+Exported observable: drawing present immediately, no motion; hydration permits
+local pan/zoom/inspection, never editing, networking, persistence or document undo.
+Raster serialization, PDF density/compression, Markdown packaging and document
+CSS stay export-side. The viewer owns its layout/touch obligations in mirrors.
 
-Independent whole-IIFE subtraction controls price the current contracts:
-curve/pressure subdivision 1,192 B; committed-input quarantine 1,886 B;
-pointArity producer projection 309 B; kept-static handoff/reuse 144 B;
-local camera interactions 659 B. These are non-additive marginal costs against
-the owner-calibration candidate (9,413 coordinate, before design corrections). The controls deliberately violate the contract and
-are not shipping variants. `scripts/canvas-export-measure/measureCosts.mjs`
-rebuilds and byte-verifies the restored full candidate afterward.
+The floor pass measured shared app bounds at 10,519 B; the read-only bounds
+mirror reuses existing viewer point helpers and exact app-source drift tests,
+saving 433 B to reach 10,086. Independent marginal subtraction controls at this
+artifact price fit/adoption at 627 B and mirror self-sufficiency at 85 B. These
+are not additive; the ordered M1 repair above costs 111 B at its integration point.
+Export-only M2/M3/L1–L4/F2/F3 changes reproduce the pushed 9,343 artifact exactly.
+
+Historical independent controls at the prior 9,413 owner-calibration artifact:
+curve/pressure 1,192 B; quarantine 1,886 B; projection 309 B; camera 659 B;
+kept-static handoff 144 B. Those non-additive costs describe that earlier artifact,
+not a new measurement of the current one. Controls deliberately break contracts
+and are never shipping alternatives. `measureCosts.mjs` restores and verifies
+the complete artifact after controls.
 
 The app uses eager Motion independently. The viewer provider uses non-strict LazyMotion/domAnimation and seeds the lazy renderer. `motionBoundary.mjs` checks the resolved app/viewer graphs; `motionGraph.mjs` checks the viewer's emitted modules after tree shaking. The exporter intentionally carries viewer JS as an inert raw asset in the app graph.
 
@@ -293,3 +302,25 @@ utility and emitted 82 B of unused CSS. Rewording the comment restored the exact
 calibration artifact in the control. No contract depended on that utility.
 Source-scan configuration is unchanged; excluding test/fixture trees needs a
 separate inventory because those trees also render real fixture markup.
+
+### Named layout-engine property: intrinsic text LayoutUnit quantization
+
+Chromium LayoutUnit stores lengths in 1/64px units. In this fixture, one parsed
+text node measures 155.044921875px before quantization and 155.046875px as a
+Range. React's three text nodes have advances 98.0390625, 7.41796875 and
+49.587890625px; rounding each up to the LayoutUnit grid gives 98.046875,
+7.421875 and 49.59375px, total 155.0625px. Marker (7.5625px), gap (8px),
+left edge and height are identical; only the intrinsic right edge differs by
+1/64px. Splitting the static node reproduces it; normalizing React's nodes
+reverses it. This predates the 28px/muted-ink taste change.
+
+Ten no-JS/no-JS pairs and ten hydrated/hydrated pairs have exact rects/pixels.
+Twenty cross-state pairs have the same width difference but **zero caption-strip
+pixel differences**, exact figure rects and exact outside-figure pixels. Thus
+internal width is diagnostic geometry, not the paint guarantee. The permanent
+paint check now UNMASKS the full caption strip and requires exact caption pixels,
+exact figure geometry and exact outside-figure pixels, with separate caption/title
+ink controls. No tolerance, offset or viewer change. The quantum is a named
+engine representation, not a universal browser constant; re-check after upgrades.
+Chromium source: https://chromium.googlesource.com/chromium/src/+/96b04b8744c3300c980cd87bc41cc3444d463fb0/third_party/blink/renderer/platform/geometry/layout_unit.h
+Evidence: BUILD-6 summary-quantization/{rects,comparison,node-controls}.json.

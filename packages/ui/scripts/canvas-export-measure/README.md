@@ -1,31 +1,72 @@
 # BUILD-6 canvas export acceptance
 
-Audited at: `05eac93657e076c7ee745e332f8851fd16c7618b`. Original slice baseline: `99cd2dc77d8955fbc8929e03a91800a5c3c6e4f7`.
+Audited at: `05eac93657e076c7ee745e332f8851fd16c7618b`.
+Original slice baseline: `99cd2dc77d8955fbc8929e03a91800a5c3c6e4f7`.
 
-Owner ruling 2026-11-22 via PM² authorizes exactly **9,413 B** in the non-Motion endpoint coordinate, with no inferred margin. **Any growth past 9,413 is a NEW OWNER RULING.** The superseded 4,096 is **CALIBRATED-TWO-CONTRACTS-AGO**, not a miss: it correctly calibrated the pre-option-B design at 59c49f80; curve fidelity, quarantine-never-silent-default and producer projection were subsequently ruled in. The new measurement prices those contracts.
+Owner ruling 2026-11-22 authorizes exactly **10,086 B**, no inferred margin.
+**Growth past 10,086 is a NEW OWNER RULING.** Superseded 9,413 is
+**superseded-by-re-gate-findings**: correct for the candidate before the design
+re-gate; the record is a sequence of better-informed decisions. Ruling chain:
+**9,343 → +111 M1 mirror regression repair → +5 crop repair → +627 fit-and-centre
+=10,086 B**. The owner chose the complete fitted variant, not the working
+crop-only 9,459 variant that opens at origin.
 
 | Quantity | Bytes | Scope |
 | --- | ---: | --- |
 | Historical slice | 2,981 | Raw IIFE delta at 59c49f80 |
-| Historical coordinate | 3,159 | Endpoint consumption at that artifact |
-| Superseded authorization | 4,096 | Correct calibration of the earlier design |
-| Historical projected remainder | 656 | Planning, using the 2,588 estimate; not current measured headroom |
-| Owner authorization | 9,413 | Owner-calibration artifact; unchanged decision boundary |
-| Current measured coordinate | 9,343 | After design corrections; 70 B recovered |
+| Historical coordinate | 3,159 | Coordinate at that historical artifact |
+| Superseded authorization | 4,096 | CALIBRATED-TWO-CONTRACTS-AGO, not a miss |
+| Historical projected remainder | 656 | Planning, never current headroom |
+| Superseded calibration | 9,413 | superseded-by-re-gate-findings |
+| Measured and authorized coordinate | 10,086 | Current complete artifact; exact owner boundary |
 
-The final artifact is 1,941,718 B = pinned historical anchor 1,932,375 + 9,343.
-SHA256: `a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3`.
-The reproduced base is 1,933,227 B; the slice delta is 8,491 B. Coordinate sequence:
-567 → 727 → 765 → 780 → 852 → 9,413 (owner calibration) → 9,343 (design corrections).
-The authorization stays 9,413. Motion stays exactly 211,511 rendered B. Aggregate
-growth is 95,205 raw B, leaving 166,939 of the 262,144 allowance. Canvas is
-non-Motion; the separate 2,048 B Motion-adopter guard is unchanged. See
-`../motionFeatures.md` for the ordered per-fix raw attribution and scanner incident.
+Final artifact **1,942,461 B = 1,932,375 +10,086**, SHA256
+`3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc`.
+Raw slice cost **9,234 B** against baseline 1,933,227. Consumer sum:
+567 +160 +38 +15 +72 +9,234 =10,086. Motion stays 211,511 rendered B;
+aggregate growth 95,948 raw B leaves 166,196 B (63.4%) of the 262,144 allowance.
+The historical 4,096 correctly calibrated pre-option-B; curve fidelity,
+quarantine and producer projection were ruled in afterward. See the ledger for
+historical contract prices, final partition and separate raw/rendered units.
 
+UNLANDED provenance stays through merge; a tiny follow-up records main's actual
+squash SHA. Commit identity is metadata, not Git-existence validation. The module
+partition is regenerated at the measured artifact; shared modules count once.
 
-The consumer row stays **UNLANDED through merge**. A tiny post-merge follow-up records the squash-merge SHA on main, never the branch SHA. Commit identity is provenance metadata, not Git-existence/ancestry validation. Raw deltas reconcile exactly; normalized module ownership is a disjoint partition regenerated from the final graph and bound to the artifact and graph hashes. Shared modules have one owner; repeated instances aggregate rendered diagnostic magnitudes. Rendered bytes never enter raw arithmetic.
+Taste rulings 2026-11-22: **28px caption-link ladder and muted caption ink**.
+Export-side CSS, confirmed zero viewer delta. The writer-wide compression scope
+below is explicitly accepted by the owner.
 
-Independent clean-build subtraction controls against the owner-calibration artifact (before design corrections) justify the authorization: curve/pressure ladder 1,192 raw B; quarantine 1,886; producer projection 309; camera 659; kept-static handoff 144. These are **non-additive marginal prices**, not shipping variants. Removing any of them violates a ruled contract. Authoring constructors and editing eligibility are absent; committed-input scalar, arity, q, bounds and ordering validation remain load-bearing. Serializer/Markdown packaging stay export-side.
+The export serializes a camera fitted at the canonical 624px inner width; the
+viewer adopts it. Mirrors without a kept raster compute the identical fit.
+Static image and live canvas share the 624:height aspect ratio and scale together
+at narrow widths; resize does not refit. Native pointer deltas map back into
+canonical coordinates. Empty input retains the app's origin/zoom-1 camera.
+Exact camera drift is checked before Canvas2D's f32 matrix readback; the browser
+check separately asserts exact Math.fround readback, never an epsilon.
+
+PDF capture disables hydration before parsing by setting the frame flag, not an
+inline script forbidden by export CSP (SBX-3 history). This restores static PDF
+projection for **all hydrated-export block types**, not only canvas. The
+non-canvas base/head control retains text and image, restores the static database
+link instead of an unsupported card, changes image alignment to its static
+projection, and removes the blank second page caused by capturing the hydrated
+1400px iframe body. Single-page exports do not resolve a database roster; a
+resolved database-site export stays on the already-static path. Canvas text
+remains rasterized, without a searchable text layer. PDF-only PNGs use 3× CSS
+pixel density; HTML/Markdown/clipboard keep their regular density. The fixture's
+PNG grows from 16,583 to 76,217 B (+59,634 output-content B, zero viewer-code B).
+Both PDF document modes enable lossless Flate compression for RGB and alpha
+streams. At 3× the paged PDF is 37,371 B and continuous is 37,397 B; same-scene
+compressed 1× controls are 12,989 / 13,016 B (+24,382 / +24,381 B for density).
+The rejected uncompressed 3× candidate was about 8MB. Full rendered-page pixels
+are unchanged by compression; the PDF meter checks both stream filters and
+fires controls when either is removed. The viewer artifact remains unchanged.
+
+The direct canvas keyboard-focus rule survives browsers without parent-selector
+support. Native pointer and keyboard cases each have a firing control, and the
+fallback is tested with parent-selector rules removed. H2/H3 and figure-last
+fixtures extend document box/paint identity; no arbitrary nested-block claim.
 
 ## Acceptance coverage
 
@@ -47,9 +88,9 @@ Manager-side design review runs first on the initial push; polish captures, toke
 
 ## Reproduction
 
-Build prerequisites in workspace order (`pnpm run build:libs`), then `pnpm test`, `pnpm lint`, and `pnpm typecheck`. The viewer ledger tests exercise the actual artifact plus +9,413/+9,414 and −506/−507 boundaries. Full production UI build includes viewer and TypeScript.
+Build prerequisites in workspace order (`pnpm run build:libs`), then `pnpm test`, `pnpm lint`, and `pnpm typecheck`. The viewer ledger tests exercise the actual artifact plus +10,086/+10,087 and −506/−507 boundaries. Full production UI build includes viewer and TypeScript.
 
-From `packages/ui`, build this harness with `pnpm exec vite build --config scripts/canvas-export-measure/vite.config.mjs`, then preview with the same config (loopback port 5186). Browser scripts launch a fresh Chromium per case with the documented sandbox-compatible single-process recipe. Set `BUILD6_HANDOFF_OUTPUT` to an evidence JSON path; `BUILD6_MIXED` accepts `rich`, `preceding`, `following`, or `surrounding`; `BUILD6_RUNS` defaults to 10. `BUILD6_INTEROP_OUTPUT` names the interop JSON and adjacent PDFs/reference PNG. Run `checkPdf.py` with that path in a separate Python environment containing PyMuPDF. Source stamps, built artifact hashes and output readbacks are asserted.
+From `packages/ui`, build this harness with `pnpm exec vite build --config scripts/canvas-export-measure/vite.config.mjs`, then preview with the same config (loopback port 5186). Browser scripts launch a fresh Chromium per case with the documented sandbox-compatible single-process recipe. Set `BUILD6_HANDOFF_OUTPUT` to an evidence JSON path; `BUILD6_MIXED` accepts `rich`, `preceding`, `following`, `surrounding`, `h2`, `h3`, `last`, or `empty`; `BUILD6_RUNS` defaults to 10. `BUILD6_INTEROP_OUTPUT` names the interop JSON and adjacent PDFs/reference PNG. Run `checkPdf.py` with that path in a separate Python environment containing PyMuPDF. Source stamps, built artifact hashes and output readbacks are asserted.
 
 `finalAccounting.mjs` takes `BUILD6_ACCOUNTING_OUTPUT`, regenerates the partition, reconciles raw consumer deltas exactly, and verifies the unchanged owner ceiling. `measureCosts.mjs` takes `BUILD6_COST_OUTPUT`, builds deliberately noncompliant independent subtraction controls and restores the byte-identical full artifact; it is evidence tooling, never a release configuration. Do not run these concurrent with production builds.
 
@@ -62,3 +103,9 @@ its full-page outside-figure comparison is exact zero, with title-ink control.
 navigation (token ring), centre-anchored zoom before/after pan, and firing CSS
 and origin-translation controls. Paint-context identity is export-scoped;
 figure-scoped hydration is a future architecture question, not implemented here.
+
+The paint guard also observes the caption strip INSIDE the figure (unmasked),
+with its own ink control. Chromium's 1/64px intrinsic text-width difference from
+one parsed text node versus three React text nodes is diagnostic geometry only:
+caption pixels, figure rect and outside-figure pixels remain exact. See the
+ledger's named LayoutUnit mechanism and measured controls; no epsilon is used.

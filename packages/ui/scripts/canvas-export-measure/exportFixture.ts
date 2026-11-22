@@ -5,22 +5,22 @@ import {unzipSync,strFromU8} from 'fflate';
 import * as Y from 'yjs';
 import {createDoc,rootBlocks,encodeSnapshot,decodeSnapshot,registerPropsProjection,blockToJSON} from '../../src/blockeditor/model';
 import {canvasDefaults,constructCanvasProps,createShape,projectCanvas} from '../../src/blockeditor/canvas/schema';
-import {toHtml} from '../../src/export/toHtml';
+import {toHtml,toHtmlSite} from '../../src/export/toHtml';
 import {readIsland,type PageSnapshot} from '@book.dev/sdk';
 declare const __CANVAS_EXPORT_BUILD__:Record<string,string>;
 registerPropsProjection('canvas',projectCanvas);
 export function exportFixture(mixed:boolean|string=false):{html:string;snapshot:PageSnapshot;stamp:Record<string,string>;surfaces:Record<string,unknown>} {
-  const before=!!mixed&&mixed!=='following',after=!!mixed&&mixed!=='preceding';
+  const before=!!mixed&&mixed!=='following',after=!!mixed&&mixed!=='preceding'&&mixed!=='last';
   const prefix = [
-    ...(mixed==='rich'?[{id:'heading',type:'heading',props:{level:1},text:[{t:'Drawing in context'}]}]:[]),
+    ...(['rich','last','h2','h3'].includes(String(mixed))?[{id:'heading',type:'heading',props:{level:mixed==='h2'?2:mixed==='h3'?3:1},text:[{t:'Drawing in context'}]}]:[]),
     ...(before?[{id:'before',type:'paragraph',text:[{t:'Before the drawing: mixed document context.'}]}]:[]),
-    ...(mixed==='rich'?[{id:'second',type:'paragraph',text:[{t:'A second paragraph checks document ink and rhythm.'}]}]:[]),
+    ...(['rich','last'].includes(String(mixed))?[{id:'second',type:'paragraph',text:[{t:'A second paragraph checks document ink and rhythm.'}]}]:[]),
   ];
   const doc=createDoc([...prefix,{id:'drawing',type:'canvas'},...(after?[{id:'after',type:'paragraph',text:[{t:'After the drawing: content must remain in place.'}]}]:[])]);
   const drawingIndex=prefix.length;
   const props=constructCanvasProps({...canvasDefaults,shapes:{}});rootBlocks(doc).get(drawingIndex).set('props',props);
   const shapes=props.get('shapes') as Y.Map<Y.Map<unknown>>;
-  for(const [i,kind] of ['rect','ellipse','arrow','text','stroke'].entries())shapes.set(String(i),createShape({id:String(i),kind,x:15+i*95,y:40,w:80,h:70,basisW:80,basisH:70,fill:'#e2e8f0',text:'Export text',pressureMode:kind==='stroke'?'variable':'constant',pointArity:kind==='stroke'?3:2,points:kind==='stroke'?[0,0,0,10,20,255,30,5,80,60,40,200]:[]}));
+  for(const [i,kind] of (mixed==='empty'?[]:['rect','ellipse','arrow','text','stroke']).entries())shapes.set(String(i),createShape({id:String(i),kind,x:15+i*95,y:40,w:80,h:70,basisW:80,basisH:70,fill:'#e2e8f0',text:'Export text',pressureMode:kind==='stroke'?'variable':'constant',pointArity:kind==='stroke'?3:2,points:kind==='stroke'?[0,0,0,10,20,255,30,5,80,60,40,200]:[]}));
   const snapshot={editorjs:{blocks:[]},values:[],names:[],editor:'blocks',blockdoc:encodeSnapshot(doc)} as unknown as PageSnapshot;
   const binary=Y.encodeStateAsUpdate(doc);
   const html=toHtml(snapshot,'Canvas export','',undefined,{id:'canvas-export'});
@@ -34,9 +34,17 @@ export function exportFixture(mixed:boolean|string=false):{html:string;snapshot:
   const zip=packageCanvasMarkdown(buildDocumentModel({title:'Canvas export',icon:'',snapshot}));
   if(!zip)throw new Error('Missing Markdown package');
   const files=unzipSync(zip),markdown=strFromU8(files['document.md']);
-  if(!markdown.includes('assets/canvas-0.png')||!markdown.includes('Export text'))throw new Error('Missing Markdown image/text alternative');
+  if(!markdown.includes('assets/canvas-0.png')||!markdown.includes(mixed==='empty'?'Empty drawing':'Export text'))throw new Error('Missing Markdown image/text alternative');
   if(String(files['assets/canvas-0.png'].slice(0,8))!=='137,80,78,71,13,10,26,10')throw new Error('Invalid packaged PNG');
   if(String(Y.encodeStateAsUpdate(doc))!==String(binary))throw new Error('Export surfaces mutated document bytes');
   return {html,snapshot,stamp:__CANVAS_EXPORT_BUILD__,surfaces:{clipboardHtmlBytes:new TextEncoder().encode(clipboard).length,markdownZipBytes:zip.length,markdown,sourceIslandFreshImport:true,documentBytesUnchanged:true}};
 }
 Object.assign(window,{exportCanvasFixture:exportFixture});
+
+/** Database-bearing sites deliberately retain the dual-scheme static path. */
+export function darkSiteFixture():string {
+  const {snapshot}=exportFixture('surrounding');
+  return toHtmlSite({rootId:'root',pages:[{id:'root',title:'Dark canvas database',icon:'',snapshot,
+    database:{schema:{properties:[],views:[]},rows:[{id:'row',name:'Readable database row',properties:{},exports:{},parentId:null,createdAt:'',updatedAt:''}]}}],space:{pages:[],databases:[]}});
+}
+Object.assign(window,{darkSiteFixture});

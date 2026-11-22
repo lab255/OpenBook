@@ -4,6 +4,7 @@ import {registerPropsProjection} from '@/blockeditor/model';
 import {StaticKeepBlock,useStaticKeep} from '@/blockeditor/staticKeep';
 import {get, projectCanvas, readViewerCanvas} from './canvasScene';
 import {paintViewer as paint} from './canvasPaint';
+import {fitCanvas} from './canvasCamera';
 
 /** Export-only renderer. The camera is local renderer state; no editor controller,
  * commands, history, persistence, transport or document mutation is used. */
@@ -22,29 +23,32 @@ export const CanvasViewer: React.FC<CustomBlockProps> = ({block}) => {
     if (!element) return;
     // Export scenes are immutable. Camera changes repaint synchronously and
     // cannot enter React/document history or any persistence path.
-    let camera = {x:0,y:0,zoom:1}, drag:{x:number;y:number}|null = null;
+    const initial=kept?.getAttribute('data-canvas-camera');
+    const fitted=initial?JSON.parse(initial):fitCanvas(scene.shapes,624,height);
+    let camera = {...fitted}, drag:{x:number;y:number}|null = null;
     const draw = ():void => {
       if(!element.getContext('2d'))return;
-      paint(element, scene.shapes, camera, element.getBoundingClientRect().width, height);
+      paint(element, scene.shapes, camera, 624, height);
       element.style.visibility='visible';
       if(kept instanceof HTMLElement)kept.style.visibility='hidden';
     };
     element.onpointerdown = event => {
       if(event.button!==0)return;
       element.setPointerCapture(event.pointerId);
-      drag={x:event.clientX-camera.x,y:event.clientY-camera.y};
+      const scale=624/element.getBoundingClientRect().width;
+      drag={x:event.clientX*scale-camera.x,y:event.clientY*scale-camera.y};
     };
     element.onpointermove = event => {
-      if(drag){camera.x=event.clientX-drag.x;camera.y=event.clientY-drag.y;draw();}
+      if(drag){const scale=624/element.getBoundingClientRect().width;camera.x=event.clientX*scale-drag.x;camera.y=event.clientY*scale-drag.y;draw();}
     };
     element.onpointerup=element.onpointercancel=element.onlostpointercapture=()=>{drag=null;};
     element.onkeydown = event => {
       const axis=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].indexOf(event.key);
       if(axis>=0)camera[axis<2?'x':'y']+=(axis%2?-1:1)*40;
-      else if(event.key==='0')camera={x:0,y:0,zoom:1};
+      else if(event.key==='0')camera={...fitted};
       else if(['+','=','-'].includes(event.key)) {
         const zoom=Math.max(.1,Math.min(8,camera.zoom*(event.key==='-'?.8:1.25))),ratio=zoom/camera.zoom;
-        for(const [axis,center] of [['x',element.getBoundingClientRect().width/2],['y',height/2]] as const)
+        for(const [axis,center] of [['x',312],['y',height/2]] as const)
           camera[axis]=center+(camera[axis]-center)*ratio;
         camera.zoom=zoom;
       }
@@ -52,17 +56,15 @@ export const CanvasViewer: React.FC<CustomBlockProps> = ({block}) => {
       event.preventDefault();draw();
     };
     draw();
-    const observer = new ResizeObserver(draw);observer.observe(element);
     return () => {
-      observer.disconnect();
       element.onpointerdown=element.onpointermove=element.onpointerup=element.onpointercancel=element.onlostpointercapture=element.onkeydown=null;
     };
   }, [scene, height, kept]);
   return <figure data-canvas-export="" >
-    <div style={{height}}>
+    <div style={{position:'relative',aspectRatio:`624/${height}`,maxWidth:624,overflow:'hidden'}}>
       {kept && <StaticKeepBlock node={kept} />}
       <canvas ref={canvas} tabIndex={0} aria-label="Drawing. Drag to pan; plus and minus to zoom; zero to reset."
-        style={{height,backgroundColor:String(get(props,'background') ?? '#ffffff')}}
+        style={{position:'absolute',inset:0,width:'100%',height:'100%',backgroundColor:String(get(props,'background') ?? '#ffffff'),touchAction:'none'}}
       />
     </div>
     {scene.diagnostics.length>0 && <figcaption role="status">{scene.diagnostics.join('; ')}</figcaption>}

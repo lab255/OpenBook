@@ -6,12 +6,12 @@ import type {Camera,Point} from '@/blockeditor/canvas/geometry';
 import {wrapText} from '@/blockeditor/canvas/geometry';
 import {strokeCurves,splitCurve} from '@/blockeditor/canvas/strokeCurve';
 type PaintScalars = Record<'x'|'y'|'w'|'h'|'basisW'|'basisH'|'strokeWidth'|'opacity'|'fontSize'|'startX'|'startY'|'endX'|'endY',number> & Record<'kind'|'stroke'|'fill'|'dash'|'fontFamily'|'textAlign'|'text'|'startHead'|'endHead',string>;
-function viewerPoints(s:SceneShape):Point[] {
+export function viewerPoints(s:SceneShape):Point[] {
   const v=s.scalars as PaintScalars,result:Point[]=[];
   for(let i=0;i<s.points.length;i+=s.pointArity)result.push({x:v.x+s.points[i]*v.w/v.basisW,y:v.y+s.points[i+1]*v.h/v.basisH});
   return result;
 }
-function viewerEndpoints(s:SceneShape):[Point,Point] {
+export function viewerEndpoints(s:SceneShape):[Point,Point] {
   const v=s.scalars as PaintScalars;
   return [{x:v.x+v.startX*v.w,y:v.y+v.startY*v.h},{x:v.x+v.endX*v.w,y:v.y+v.endY*v.h}];
 }

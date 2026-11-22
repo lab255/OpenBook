@@ -6,11 +6,11 @@
   "hardDeltaCeilingRationale": "256KB chosen 2026-10-28: owner direct confirmation — protects shareability, not subset purity; current bundle is 1.92MB raw/~500KB gz. Leaves room for layout-class features (~48KB) without changing the order of magnitude. Re-evaluate when transport expectations change.",
   "blockOwnBytesCeiling": 2048,
   "endpoint": {
-    "measuredAt": "BUILD-6 complete artifact on base 99cd2dc7; owner authorized exactly 9,413 B on 2026-11-22 via PM² relay; landing UNLANDED",
+    "measuredAt": "Owner ruling 2026-11-22: complete re-gate artifact on base 05eac936; measured and authorized coordinate 10086 B, raw 1942461 B.",
     "motionRenderedBytes": 211511,
     "nonMotionShrinkageBytes": 506,
-    "nonMotionGrowthBytes": 9413,
-    "rationale": "Owner ruling 2026-11-22 via PM² relay: authorize EXACTLY 9,413 B, NO INFERRED MARGIN. 1,932,375 + 9,413 = 1,941,788 raw IIFE B, equal to the complete artifact SHA256 b8b9ec51b52eeed2ce0886c3b636743d1f460b0eef4d51d16b460ea8ed4a14c8 on base 99cd2dc7; slice net cost 8,561 B. Superseded 4,096 B is CALIBRATED-TWO-CONTRACTS-AGO, not a miss: it was a correct calibration for the pre-option-B design at 59c49f80. Three ruled contracts were added after it: curve-fidelity ladder, quarantine-never-silent-default, and producer projection. The new number prices those contracts. Independent non-additive raw subtraction costs: curve 1,192 B, quarantine 1,886 B, projection 309 B, camera 659 B, handoff 144 B. Any growth past 9,413 is a NEW OWNER RULING; stop unpushed at that owner decision boundary. Historical quantities remain distinct: 2,981 B raw slice, 3,159 B coordinate, 4,096 B former authorization, 656 B projected remainder. Historical ruling record (superseded): R1 owner ruling 2026-11-12 via PM² relay: AUTHORIZED nonMotionGrowthBytes 4,096 B; measured coordinate 3,159 B at 59c49f80e17deedc67f6cf8d5f16835bdd5e0534 (CANVAS-7). This is a ruled widening of the measured non-motion window for the canvas live-but-inert viewer slice: the superseded 571 B came from CARD-10 (+100 B FF-7a explicit dark ladder declarations +471 B command-palette polish). 3,159 - 571 = 2,588 B measured widening; 4,096 - 3,159 = 937 B deliberate bounded allowance, not slack. Growth past 4,096 B requires a NEW owner decision. The 2,981 B raw slice net cost is distinct from the 3,159 B coordinate and 4,096 B authorization. Measurement uses clean production whole-IIFE UTF-8 byteLength including injected CSS and emitted dependency-graph inspection. Historical precedent (superseded upper window; independent guards unchanged): Option (b) as amended 2026-11-10 by owner ruling (thr_yipm6kxdnm) for CARD-10: preserve ordered feature costs; require the emitted Motion module-byte sum exactly and allow a bounded window around the final feature row: -506 bytes (FF-7e non-motion shrinkage) .. +571 bytes (+100 FF-7a explicit dark ladder declarations from PR #435 CI, plus the measured +471 B command-palette polish of CARD-10). The +471 B is entirely embedded CSS (viewer CSS payload 223,775 -> 224,246 B) measured on a clean build:viewer with generated JS/graph deleted first; viewer JavaScript (1,706,571 B) is byte-identical before/after, the Motion module-byte sum is unchanged at 211511, and no new emitted Motion modules exist. The window absorbs legal measured non-motion movement only; it is never an allowance for a new Motion feature cost. Precedent for widening: 9924500d. Module/export coverage, historical calibration seed, block-own-code and transportability guards remain independent and unchanged."
+    "nonMotionGrowthBytes": 10086,
+    "rationale": "Owner ruling 2026-11-22 via PM²: authorize EXACTLY 10,086 B, no inferred margin. 1,932,375 + 10,086 = 1,942,461 raw IIFE B, equal to artifact SHA256 3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc. Superseded 9,413 is superseded-by-re-gate-findings: it was correct for a candidate that had not yet been through the design re-gate; this is a sequence of better-informed decisions. Ruling chain: 9,343 → +111 M1 mirror regression repair → +5 crop repair → +627 fit-and-centre = 10,086 B. Growth past 10,086 is a NEW OWNER RULING. Superseded 4,096 is CALIBRATED-TWO-CONTRACTS-AGO, not a miss: correct for the pre-option-B design at 59c49f80; curve-fidelity ladder, quarantine-never-silent-default and producer projection were ruled in afterward. Historical quantities stay distinct: 2,981 B raw slice, 3,159 B coordinate, 4,096 B former authorization, 656 B projected remainder. The prior 9,413 owner-calibration artifact b8b9ec51 measured slice net cost 8,561 B; the pushed 9,343 artifact a60114ce measured 8,491 B; the newly authorized 10,086 artifact measures 9,234 B. Independent non-additive subtraction controls at the prior 9,413 calibration: curve 1,192, quarantine 1,886, projection 309, camera 659, handoff 144 raw B. Historical ruling record (superseded): R1 owner ruling 2026-11-12 via PM² relay: AUTHORIZED nonMotionGrowthBytes 4,096 B; measured coordinate 3,159 B at 59c49f80e17deedc67f6cf8d5f16835bdd5e0534 (CANVAS-7). This is a ruled widening of the measured non-motion window for the canvas live-but-inert viewer slice: the superseded 571 B came from CARD-10 (+100 B FF-7a explicit dark ladder declarations +471 B command-palette polish). 3,159 - 571 = 2,588 B measured widening; 4,096 - 3,159 = 937 B deliberate bounded allowance, not slack. Growth past 4,096 B requires a NEW owner decision. The 2,981 B raw slice net cost is distinct from the 3,159 B coordinate and 4,096 B authorization. Measurement uses clean production whole-IIFE UTF-8 byteLength including injected CSS and emitted dependency-graph inspection. Historical precedent (superseded upper window; independent guards unchanged): Option (b) as amended 2026-11-10 by owner ruling (thr_yipm6kxdnm) for CARD-10: preserve ordered feature costs; require the emitted Motion module-byte sum exactly and allow a bounded window around the final feature row: -506 bytes (FF-7e non-motion shrinkage) .. +571 bytes (+100 FF-7a explicit dark ladder declarations from PR #435 CI, plus the measured +471 B command-palette polish of CARD-10). The +471 B is entirely embedded CSS (viewer CSS payload 223,775 -> 224,246 B) measured on a clean build:viewer with generated JS/graph deleted first; viewer JavaScript (1,706,571 B) is byte-identical before/after, the Motion module-byte sum is unchanged at 211511, and no new emitted Motion modules exist. The window absorbs legal measured non-motion movement only; it is never an allowance for a new Motion feature cost. Precedent for widening: 9924500d. Module/export coverage, historical calibration seed, block-own-code and transportability guards remain independent and unchanged."
   },
   "features": [
     {
@@ -2755,20 +2755,21 @@
     },
     {
       "name": "canvasF1Viewer",
-      "status": "UNLANDED; owner authorized exactly 9413 B on 2026-11-22; squash-merge provenance follows merge",
-      "rawCostBytes": 8491,
-      "measuredAt": "UNLANDED: BUILD-6 design correction on base 05eac93657e076c7ee745e332f8851fd16c7618b",
+      "status": "UNLANDED; owner authorized exactly 10086 B on 2026-11-22; squash-merge provenance follows merge",
+      "rawCostBytes": 9234,
+      "measuredAt": "UNLANDED: BUILD-6 complete re-gate artifact on base 05eac93657e076c7ee745e332f8851fd16c7618b",
       "beforeRawBytes": 1933227,
-      "afterRawBytes": 1941718,
-      "artifactSha256": "a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3",
-      "mechanism": "Live inert canvas renderer, shared curve ladder, committed-input quarantine, JSON pointArity producer projection, kept-static hydration handoff. Raster serializer and layout mirror remain export-side.",
-      "evidence": "BUILD-6 design-final-accounting.json, design-fix-raw-costs.json, final-artifact acceptance; COMMENT-TOKEN SCANNER EMISSION control documented in ledger",
+      "afterRawBytes": 1942461,
+      "artifactSha256": "3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc",
+      "mechanism": "Live inert canvas renderer, shared curve ladder, committed-input quarantine, JSON pointArity producer projection, kept-static handoff, self-sufficient mirror layout, canonical fitted camera and responsive box scaling. Raster serializer, PDF density and export-document CSS stay export-side.",
+      "evidence": "BUILD-6 combined-accounting.json, combined-costs.json, combined composed acceptance; partition regenerated at measured artifact",
       "exportedObservable": "No motion: drawing present immediately as static fallback; live pan/zoom/inspection after hydration, no edits, network, persistence or document undo.",
       "modules": [
         "src/blockeditor/canvas/geometry.ts",
         "src/blockeditor/canvas/schema.ts",
         "src/blockeditor/canvas/strokeCurve.ts",
         "src/viewer/CanvasViewer.tsx",
+        "src/viewer/canvasCamera.ts",
         "src/viewer/canvasPaint.ts",
         "src/viewer/canvasScene.ts"
       ],
@@ -2777,13 +2778,14 @@
         "src/blockeditor/registry.tsx",
         "src/blockeditor/staticKeep.tsx",
         "src/viewer/index.tsx"
-      ]
+      ],
+      "ownerRuling": "Superseded 9,413 is superseded-by-re-gate-findings: correct before the design re-gate, followed by better-informed decisions. 9,343 → +111 M1 mirror regression repair → +5 crop repair → +627 fit-and-centre = 10,086 B. Growth past 10,086 is a NEW OWNER RULING."
     }
   ],
   "endpointAttribution": {
-    "artifactSha256": "a60114ce9ba9c0977a3d5ab5bc725c5e3ae4fde350afd3231bf07885c0a351f3",
-    "graphSha256": "ec238b2d2c08975e3ca64a63fb183e2ed9e885403aaf93a97eb9b7688b11bb73",
-    "measuredAt": "BUILD-6 design corrections on base 05eac936; final production measurement",
+    "artifactSha256": "3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc",
+    "graphSha256": "d4bfd134064fd49a240745604bbeab66c7f2c9d4fe7e5e69d9fdd11568ff7c00",
+    "measuredAt": "BUILD-6 complete re-gate artifact on base 05eac936; final production measurement",
     "scope": "Partition regenerated from THIS final graph. Raw IIFE deltas reconcile exactly; unique normalized-ID ownership aggregates repeated rendered instances for diagnostics only."
   }
 }

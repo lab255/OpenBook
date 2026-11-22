@@ -943,7 +943,7 @@ function document_(
   const csp = pageCsp(scriptHashes);
 
   return `<!doctype html>
-<html lang="en"${bodyHtml.includes('<figure data-canvas-export=')?' data-ob-canvas-export=""':''}>
+<html lang="en"${bodyHtml.includes('<figure data-canvas-export=')?` data-ob-canvas-export=""${hydrate?' data-ob-canvas-hydrate=""':''}`:''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

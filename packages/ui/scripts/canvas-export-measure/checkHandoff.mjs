@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+const origin=process.env.BUILD6_ORIGIN??'http://127.0.0.1:5186';
 const require=createRequire(new URL('../../../web/package.json',import.meta.url)),{chromium}=require('@playwright/test');
+const viewportWidth=Number(process.env.BUILD6_WIDTH??1100);
 const dpr=Number(process.env.BUILD6_DPR??1),runs=Number(process.env.BUILD6_RUNS??10);
 const launch=()=>chromium.launch({headless:true,args:['--single-process','--no-zygote']});
 let browser=await launch();
 let exported;
 try {
- const page=await browser.newPage({viewport:{width:1100,height:900},deviceScaleFactor:dpr});
- await page.goto('http://127.0.0.1:5186/');await page.waitForFunction(()=>window.exportCanvasFixture);
+ const page=await browser.newPage({viewport:{width:viewportWidth,height:900},deviceScaleFactor:dpr});
+ await page.goto(`${origin}/`);await page.waitForFunction(()=>window.exportCanvasFixture);
  exported=await page.evaluate(mixed=>window.exportCanvasFixture(mixed),process.env.BUILD6_MIXED||false);
  for(const [path,hash] of Object.entries(exported.stamp))assert.equal(createHash('sha256').update(readFileSync(new URL(path,import.meta.url))).digest('hex'),hash,'Built harness source drift');
  writeFileSync(new URL('./dist/canvas-export.html',import.meta.url),exported.html);
@@ -19,19 +21,20 @@ const rows=[];
 for(const [run,js] of [false,...Array(runs).fill(true)].entries()) {
  browser=await launch();
  try {
-  const page=await browser.newPage({viewport:{width:1100,height:900},deviceScaleFactor:dpr,javaScriptEnabled:js});
+  const page=await browser.newPage({viewport:{width:viewportWidth,height:900},deviceScaleFactor:dpr,javaScriptEnabled:js});
   if(js)await page.addInitScript(()=>{
    window.__OB_NO_HYDRATE=true;window.canvasShifts=[];
    new PerformanceObserver(list=>{for(const e of list.getEntries())if(!e.hadRecentInput)window.canvasShifts.push({value:e.value,sources:e.sources?.map(s=>({node:s.node?.outerHTML,previous:s.previousRect,current:s.currentRect}))});}).observe({type:'layout-shift',buffered:true});
   });
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('http://127.0.0.1:5186/canvas-export.html');await page.waitForTimeout(800);
+  await page.goto(`${origin}/canvas-export.html`);await page.waitForTimeout(800);
   const measure=()=>page.evaluate(()=>{
    const figure=document.querySelector('[data-canvas-export]');if(!figure)throw new Error('Missing canvas export');
    const r=figure.getBoundingClientRect(),image=figure.querySelector('img'),canvas=figure.querySelector('canvas');
    const paragraphs=Array.from(document.querySelectorAll('main > p,.ob-viewer .obe-text-paragraph')).map(e=>{const box=e.getBoundingClientRect();return {text:e.textContent,x:box.x,y:box.y,width:box.width,height:box.height};});
    return {paragraphs,rect:{x:r.x,y:r.y,width:r.width,height:r.height},text:figure.textContent,hasImage:!!image,imageLoaded:!!image?.naturalWidth,hasCanvas:!!canvas,canvasVisible:canvas?getComputedStyle(canvas).visibility:null,body:document.body.innerText,styles:{figure:getComputedStyle(figure).cssText}};
   });
+  assert.equal(await page.evaluate(()=>window.innerWidth),viewportWidth,'Actual viewport width');
   const before=await measure();assert(before.imageLoaded);assert(!before.hasCanvas);assert(!before.body.includes('Unsupported block'));
   if(js) {
    const boot=await page.evaluate(()=>Array.from(document.scripts).find(s=>s.textContent.includes('main.querySelectorAll')&&s.textContent.includes('cloneNode'))?.textContent);
@@ -58,6 +61,6 @@ for(const [run,js] of [false,...Array(runs).fill(true)].entries()) {
  }finally{await browser.close();}
 }
 const output=process.env.BUILD6_HANDOFF_OUTPUT;
-writeFileSync(output,JSON.stringify({scope:`Actual toHtml output, production-built viewer, delayed original boot with no local input or scrolling, DPR${dpr} 1100x900. CLS excludes input-window shifts and cannot reliably observe replacement-tree motion: exact before/after geometry is separately asserted. Control grows stable canvas viewport by 40px, shifting existing summary. One no-JS + ${runs} hydration runs. No screenshots.`,stamp:exported.stamp,surfaces:exported.surfaces,htmlBytes:Buffer.byteLength(exported.html),rows},null,2));
+writeFileSync(output,JSON.stringify({scope:`Actual toHtml output, production-built viewer, delayed original boot with no local input or scrolling, DPR${dpr} ${viewportWidth}x900. CLS excludes input-window shifts and cannot reliably observe replacement-tree motion: exact before/after geometry is separately asserted. Control grows stable canvas viewport by 40px, shifting existing summary. One no-JS + ${runs} hydration runs. No screenshots.`,viewport:{width:viewportWidth,height:900},stamp:exported.stamp,surfaces:exported.surfaces,htmlBytes:Buffer.byteLength(exported.html),rows},null,2));
 assert.deepEqual(JSON.parse(readFileSync(output,'utf8')).rows,rows);
 console.log(JSON.stringify({runs:rows.length,hydrationMedian:0,controlMinimum:Math.min(...rows.filter(r=>r.js).map(r=>r.control)),pixelDifference:0}));

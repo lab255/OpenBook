@@ -156,11 +156,11 @@ it('keeps historical rows continuous and bounds non-motion drift at the measured
 it('accepts only the authorized non-motion window, never unledgered Motion or extra Motion bytes', () => {
   const historical = ledger.features.at(-1)!.afterRawBytes;
   expect(ledger.endpoint.nonMotionShrinkageBytes).toBe(506);
-  expect(ledger.endpoint.nonMotionGrowthBytes).toBe(9413);
-  for (const bytes of [historical, historical - 506, historical + 9413]) {
+  expect(ledger.endpoint.nonMotionGrowthBytes).toBe(10086);
+  for (const bytes of [historical, historical - 506, historical + 10086]) {
     expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).not.toThrow();
   }
-  for (const bytes of [historical + 9414, historical - 507]) {
+  for (const bytes of [historical + 10087, historical - 507]) {
     expect(() => assertLedgerEndpoint(productionGraph, bytes, ledger)).toThrow('outside non-motion window');
   }
   const changed = {modules: productionGraph.modules.map((module: {id: string; bytes: number}) =>
@@ -170,5 +170,5 @@ it('accepts only the authorized non-motion window, never unledgered Motion or ex
   // allowed window must still reject an unledgered Motion feature.
   const missing = {...ledger, features: ledger.features.map(feature => feature.name === 'animate' ? {...feature, modules: []} : feature)};
   expect(() => assertLedgerEndpoint(productionGraph, historical - 506, missing)).toThrow('Unledgered motion feature');
-  process.stdout.write(`ENDPOINT ${historical - 506} and ${historical + 9413} GREEN; ${historical + 9414} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
+  process.stdout.write(`ENDPOINT ${historical - 506} and ${historical + 10086} GREEN; ${historical + 10087} and ${historical - 507} RED; changed Motion bytes RED; unledgered animate within window RED\n`);
 });
