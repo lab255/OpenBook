@@ -15,7 +15,45 @@ export const HudContext = createContext<HudContext>({
 export const useHud = () => useContext(HudContext);
 
 export const HudProvider: React.FC<PropsWithChildren<unknown>> = ({children}) => {
-  const [hud, setHud] = useImmer<HudProps>(loadHudStorage);
+  const [hud, setHudRaw] = useImmer<HudProps>(loadHudStorage);
+  // Throwaway CI diagnostic only. The target test opts in before app boot.
+  // Requests, updater evaluations (including StrictMode replay), and committed
+  // state are distinct phases: an evaluation is not a second user command.
+  const trace = React.useRef({instance: '', call: 0});
+  const emit = React.useCallback((entry: Record<string, unknown>) => {
+    if (typeof window === 'undefined' || !(window as Window & {__BUILD6_TRACE_SETTINGS__?: boolean}).__BUILD6_TRACE_SETTINGS__) return;
+    try {
+      trace.current.instance ||= `${Date.now()}:${performance.now()}`;
+      console.info(`BUILD6_SETTINGS_TRACE ${JSON.stringify({instance: trace.current.instance, time: performance.now(), wallTime: Date.now(), ...entry})}`);
+    } catch { /* diagnostics must not change application behavior */ }
+  }, []);
+  const setHud = React.useCallback<HudContext['setHud']>((update) => {
+    if (typeof window === 'undefined' || !(window as Window & {__BUILD6_TRACE_SETTINGS__?: boolean}).__BUILD6_TRACE_SETTINGS__) {
+      setHudRaw(update);
+      return;
+    }
+    const call = ++trace.current.call;
+    const stack = new Error('Settings HUD setter caller').stack;
+    const event = window.event;
+    emit({phase: 'request', call, stack, kind: typeof update, event: event?.type,
+      key: event instanceof KeyboardEvent ? event.key : undefined,
+      code: event instanceof KeyboardEvent ? event.code : undefined,
+      active: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName});
+    if (typeof update !== 'function') {
+      emit({phase: 'replacement', call, open: update.settings.open, stack});
+      setHudRaw(update);
+      return;
+    }
+    setHudRaw((draft) => {
+      const before = draft.settings.open;
+      const next = update(draft);
+      emit({phase: 'evaluation', call, before, after: next.settings.open, paletteOpen: next.commandPalette.open, stack});
+      return next;
+    });
+  }, [emit, setHudRaw]);
+  React.useEffect(() => {
+    emit({phase: 'commit', open: hud.settings.open, lastRequest: trace.current.call, stack: new Error('Committed Settings state').stack});
+  }, [emit, hud.settings.open]);
   // Whether a HUD preference existed before this mount — captured at first
   // render, because the save effect below persists one immediately.
   const hadStoredHud = React.useRef(

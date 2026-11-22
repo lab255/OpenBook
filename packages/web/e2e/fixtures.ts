@@ -338,7 +338,24 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   page: async ({page}, use, testInfo) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.stack ?? err.message));
+    const settingsTrace: string[] = [];
+    const traceSettings = testInfo.title === 'BUILD-5 real shell layer relationships';
+    if (traceSettings) {
+      await page.addInitScript(() => {
+        (window as Window & {__BUILD6_TRACE_SETTINGS__?: boolean}).__BUILD6_TRACE_SETTINGS__ = true;
+      });
+      page.on('console', (message) => {
+        const text = message.text();
+        if (text.startsWith('BUILD6_SETTINGS_TRACE ')) settingsTrace.push(text);
+      });
+    }
     await use(page);
+    if (traceSettings) {
+      await testInfo.attach('build6-settings-transitions', {
+        body: JSON.stringify({test: testInfo.title, retry: testInfo.retry, worker: testInfo.workerIndex, records: settingsTrace}, null, 2),
+        contentType: 'application/json',
+      });
+    }
     if (errors.length > 0) {
       await testInfo.attach('pageerrors', {body: errors.join('\n\n---\n\n'), contentType: 'text/plain'});
     }
