@@ -2755,9 +2755,9 @@
     },
     {
       "name": "canvasF1Viewer",
-      "status": "UNLANDED; owner authorized exactly 10086 B on 2026-11-22; squash-merge provenance follows merge",
+      "status": "LANDED; owner authorized exactly 10086 B on 2026-11-22",
       "rawCostBytes": 9178,
-      "measuredAt": "UNLANDED: BUILD-6 camera-input repair on base 05eac93657e076c7ee745e332f8851fd16c7618b",
+      "measuredAt": "ea237bdbc9fb80de2dcc5f511cca4e106f3d449a",
       "beforeRawBytes": 1933227,
       "afterRawBytes": 1942405,
       "artifactSha256": "60c516011e03c091f31156cb8105b5c83f794fe163165bb124c07f440691cab4",
@@ -2779,7 +2779,8 @@
         "src/blockeditor/staticKeep.tsx",
         "src/viewer/index.tsx"
       ],
-      "ownerRuling": "Superseded 9,413 is superseded-by-re-gate-findings: correct before the design re-gate, followed by better-informed decisions. 9,343 → +111 M1 mirror regression repair → +5 crop repair → +627 fit-and-centre = 10,086 B. Growth past 10,086 is a NEW OWNER RULING."
+      "ownerRuling": "Superseded 9,413 is superseded-by-re-gate-findings: correct before the design re-gate, followed by better-informed decisions. 9,343 → +111 M1 mirror regression repair → +5 crop repair → +627 fit-and-centre = 10,086 B. Growth past 10,086 is a NEW OWNER RULING.",
+      "measurementProvenance": "BUILD-6 camera-input repair on base 05eac93657e076c7ee745e332f8851fd16c7618b"
     }
   ],
   "endpointAttribution": {

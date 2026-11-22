@@ -30,8 +30,10 @@ The historical 4,096 correctly calibrated pre-option-B; curve fidelity,
 quarantine and producer projection were ruled in afterward. See the ledger for
 historical contract prices, final partition and separate raw/rendered units.
 
-UNLANDED provenance stays through merge; a tiny follow-up records main's actual
-squash SHA. Commit identity is metadata, not Git-existence validation. The module
+LANDED provenance records main's squash `ea237bdbc9fb80de2dcc5f511cca4e106f3d449a`.
+Artifact SHA and build provenance are separate fields. The squash tree is identical
+to gated head e471daf3, so no remeasurement is needed. Commit identity is metadata,
+not Git-existence validation. The module
 partition is regenerated at the measured artifact; shared modules count once.
 
 Taste rulings 2026-11-22: **28px caption-link ladder and muted caption ink**.
