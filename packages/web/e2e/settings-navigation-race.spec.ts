@@ -82,13 +82,16 @@ test('settings: external Back and Forward retain URL authority', async ({page}) 
   // Hold Next's render completion AFTER pushState, so Back also exercises a
   // late completion from the now-superseded forward navigation.
   await page.evaluate(() => {
-    type Router = {set: (state: {query: Record<string, unknown>}, ...rest: unknown[]) => Promise<unknown>};
-    const w = window as typeof window & {next: {router: Router}; backGate?: {held: boolean; release: () => Promise<void>}};
+    type Router = {set: (state: {query: Record<string, unknown>}, ...rest: unknown[]) => Promise<unknown>; events: {on: (name: string, fn: (url: string) => void) => void}};
+    const w = window as typeof window & {next: {router: Router}; backGate?: {held: boolean; completed: boolean; release: () => Promise<void>}};
     const router = w.next.router, original = router.set;
     let release!: () => void, complete!: () => void;
     const gate = new Promise<void>(resolve => {release = resolve;});
     const done = new Promise<void>(resolve => {complete = resolve;});
-    const control: NonNullable<typeof w.backGate> = w.backGate = {held: false, release: async () => {release(); await done;}};
+    const control: NonNullable<typeof w.backGate> = w.backGate = {held: false, completed: false, release: async () => {release(); await done;}};
+    router.events.on('routeChangeComplete', url => {
+      if (control.held && url.includes('settings=')) control.completed = true;
+    });
     router.set = async function(state, ...rest) {
       if (!control.held && state.query.settings !== undefined) {
         control.held = true;
@@ -108,6 +111,8 @@ test('settings: external Back and Forward retain URL authority', async ({page}) 
   await expect(page).not.toHaveURL(/settings=/);
   await expect(dialog).toBeHidden();
   await page.evaluate(() => (window as typeof window & {backGate: {release: () => Promise<void>}}).backGate.release());
+  await expect.poll(() => page.evaluate(() => (window as typeof window & {backGate: {completed: boolean}}).backGate.completed)).toBe(true);
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
   await expect(page).not.toHaveURL(/settings=/);
   await expect(dialog).toBeHidden();
   await page.goForward();
@@ -121,9 +126,19 @@ test('settings: genuine deep links and reload retain URL authority', async ({pag
   await page.goto('/?settings=profile');
   const dialog = page.getByRole('dialog', {name: 'Settings', exact: true});
   await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/settings=profile/);
+  // Stability observation: a transient open-then-close is not restoration.
+  await page.waitForTimeout(250);
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/settings=profile/);
   await expect(page.locator('#ob-profile-name')).toBeVisible();
   await page.reload();
   await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/settings=profile/);
+  // Stability observation: a transient open-then-close is not restoration.
+  await page.waitForTimeout(250);
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/settings=profile/);
   await expect(page.locator('#ob-profile-name')).toBeVisible();
   await page.goto('/');
   await expect(dialog).toBeHidden();

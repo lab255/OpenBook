@@ -64,15 +64,18 @@ export default function SettingsDeepLink() {
       if (own && !own.started && url === own.url) own.started = true;
       else state.current.owned = null; // External navigation takes authority.
     };
-    const complete = () => {
+    const complete = (url: string) => {
       // Back may already have changed the address after pushState but before
       // Next finishes rendering that push. The current browser URL wins.
       const param = readParam(window.location.href);
       const own = state.current.owned;
-      state.current.owned = null; // One-shot: consumed on first observation.
-      if (own?.started && own.param === param && own.intent !== state.current.intent) {
-        writeUrl(true);
-        return;
+      // A late shallow completion cannot consume a newer navigation's token.
+      if (!own || url === own.url) {
+        state.current.owned = null; // One-shot: consumed by its own completion.
+        if (own?.started && own.param === param && own.intent !== state.current.intent) {
+          writeUrl(true);
+          return;
+        }
       }
       applyUrl(param);
     };
@@ -82,10 +85,15 @@ export default function SettingsDeepLink() {
       // ignores those popstates; the browser URL still has Settings authority.
       applyUrl(readParam(window.location.href));
     };
+    const clear = () => { state.current.owned = null; };
+    router.events.on('routeChangeError', clear);
+    router.events.on('hashChangeComplete', clear);
     router.events.on('routeChangeStart', start);
     router.events.on('routeChangeComplete', complete);
     window.addEventListener('popstate', pop);
     return () => {
+      router.events.off('routeChangeError', clear);
+      router.events.off('hashChangeComplete', clear);
       router.events.off('routeChangeStart', start);
       router.events.off('routeChangeComplete', complete);
       window.removeEventListener('popstate', pop);
