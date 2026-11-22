@@ -1,47 +1,37 @@
-import {useEffect, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {useRouter} from 'next/router';
 import {isTabParam, normalizeTab, useHud, SETTINGS_ALIAS_SECTIONS, type HudProps} from '@book.dev/ui';
 
-// Settings state lives in the URL as `?settings=<tab>` so it can be shared,
-// bookmarked, and restored on reload. Presence of the param means "open"; its
-// value selects the active panel.
 const SETTINGS_PARAM = 'settings';
-
-const readParam = (value: string | string[] | undefined): string | undefined =>
-  Array.isArray(value) ? value[0] : value;
+const readParam = (url: string) => new URL(url, window.location.href).searchParams.get(SETTINGS_PARAM) ?? undefined;
+type OwnedNavigation = {url: string; param: string | undefined; intent: number; started: boolean};
 
 /**
- * Two-way binding between `hud.settings` and the address bar (web only). Lives
- * in the web shell rather than `@book.dev/ui` so the shared library stays free
- * of any Next.js routing dependency.
- *
- * The two effects are deliberately scoped so they can't echo each other into a
- * loop: URL->HUD runs only when the URL's settings param changes, HUD->URL runs
- * only when the HUD open/tab values change. The HUD->URL effect reaches the
- * router through a ref so a navigation alone never re-triggers it with a stale
- * `open` (which is what made Back re-push the param and leave settings stuck
- * open).
+ * Navigation ownership policy: a user's newer HUD intent supersedes the HUD's
+ * own opening navigation. Exactly that stale completion is consumed without
+ * applying its param, and the URL is replaced with the current intent.
+ * All other URL observations retain authority, including mount and popstate.
  */
 export default function SettingsDeepLink() {
   const router = useRouter();
   const {hud, setHud} = useHud();
   const {open, tab} = hud.settings;
-
+  const renderedHud = useRef({open, tab});
   const routerRef = useRef(router);
   routerRef.current = router;
+  const state = useRef({
+    initialized: false, open, tab, intent: 0,
+    owned: null as OwnedNavigation | null,
+  });
 
-  const param = readParam(router.query[SETTINGS_PARAM]);
-
-  // URL -> HUD. The address bar is the source of truth here, so a fresh load or
-  // a back/forward navigation drives whether settings are open and which tab.
-  useEffect(() => {
-    if (!router.isReady) return;
+  const applyUrl = useCallback((param: string | undefined) => {
+    // Record the URL-derived HUD value before scheduling its render. Otherwise
+    // the HUD effect can echo a pre-hydration snapshot back over a deep link.
+    const next = state.current;
+    next.open = param !== undefined;
+    if (isTabParam(param)) next.tab = normalizeTab(param);
     setHud((draft: HudProps) => {
       draft.settings.open = param !== undefined;
-      // Resolve a real tab or a legacy alias (`members` → the Sharing tab); an
-      // unrecognised value leaves the current tab alone. When the alias also
-      // names an in-tab group (`members` → People), carry that scroll hint —
-      // never null it here, so a plain-tab param can't clobber a pending one.
       if (isTabParam(param)) {
         draft.settings.tab = normalizeTab(param);
         const section = param !== undefined ? SETTINGS_ALIAS_SECTIONS[param] : undefined;
@@ -49,27 +39,86 @@ export default function SettingsDeepLink() {
       }
       return draft;
     });
-  }, [router.isReady, param, setHud]);
+  }, [setHud]);
 
-  // HUD -> URL. Reflect open/close and tab changes back into a shareable link.
-  // Opening pushes a history entry (so Back closes settings); everything else
-  // replaces in place to avoid cluttering history while switching tabs.
-  useEffect(() => {
+  const writeUrl = useCallback((replace: boolean) => {
+    const next = state.current;
+    const param = next.open ? next.tab : undefined;
+    const url = new URL(window.location.href);
+    const current = readParam(url.href);
+    if (param === current) return;
+    if (param === undefined) url.searchParams.delete(SETTINGS_PARAM);
+    else url.searchParams.set(SETTINGS_PARAM, param);
+    const path = `${url.pathname}${url.search}${url.hash}`;
+    next.owned = {url: path, param, intent: next.intent, started: false};
     const r = routerRef.current;
-    if (!r.isReady) return;
-    const current = readParam(r.query[SETTINGS_PARAM]);
-    const desired = open ? tab : undefined;
-    if (current === desired) return;
+    const options = {shallow: true, scroll: false};
+    // An ordinary opening gets a Back entry. Reconciliation and tab/close
+    // changes replace it; a stale completion never creates another entry.
+    void (replace || current !== undefined ? r.replace(path, undefined, options) : r.push(path, undefined, options));
+  }, []);
 
-    const query = {...r.query};
-    if (desired === undefined) delete query[SETTINGS_PARAM];
-    else query[SETTINGS_PARAM] = desired;
+  useEffect(() => {
+    const start = (url: string) => {
+      const own = state.current.owned;
+      if (own && !own.started && url === own.url) own.started = true;
+      else state.current.owned = null; // External navigation takes authority.
+    };
+    const complete = (url: string) => {
+      // Back may already have changed the address after pushState but before
+      // Next finishes rendering that push. The current browser URL wins.
+      const param = readParam(window.location.href);
+      const own = state.current.owned;
+      // A late shallow completion cannot consume a newer navigation's token.
+      if (!own || url === own.url) {
+        state.current.owned = null; // One-shot: consumed by its own completion.
+        if (own?.started && own.param === param && own.intent !== state.current.intent) {
+          writeUrl(true);
+          return;
+        }
+      }
+      applyUrl(param);
+    };
+    const pop = () => {
+      state.current.owned = null;
+      // App page-history entries carry obIndex, not Next's __N marker. Next
+      // ignores those popstates; the browser URL still has Settings authority.
+      applyUrl(readParam(window.location.href));
+    };
+    const clear = () => { state.current.owned = null; };
+    router.events.on('routeChangeError', clear);
+    router.events.on('hashChangeComplete', clear);
+    router.events.on('routeChangeStart', start);
+    router.events.on('routeChangeComplete', complete);
+    window.addEventListener('popstate', pop);
+    return () => {
+      router.events.off('routeChangeError', clear);
+      router.events.off('hashChangeComplete', clear);
+      router.events.off('routeChangeStart', start);
+      router.events.off('routeChangeComplete', complete);
+      window.removeEventListener('popstate', pop);
+    };
+  }, [router.events, applyUrl, writeUrl]);
 
-    const url = {pathname: r.pathname, query};
-    const opts = {shallow: true, scroll: false};
-    const opening = current === undefined && desired !== undefined;
-    void (opening ? r.push(url, undefined, opts) : r.replace(url, undefined, opts));
-  }, [open, tab]);
+  useEffect(() => {
+    if (!router.isReady || state.current.initialized) return;
+    state.current.initialized = true;
+    applyUrl(readParam(window.location.href));
+  }, [router.isReady, applyUrl]);
+
+  useEffect(() => {
+    const previous = renderedHud.current;
+    renderedHud.current = {open, tab};
+    if (previous.open === open && previous.tab === tab) return;
+    const next = state.current;
+    if (!next.initialized) return;
+    // The initial render (and each URL-driven update) is not a user intent.
+    if (next.open === open && next.tab === tab) return;
+    next.open = open;
+    next.tab = tab;
+    next.intent++;
+    if (!next.owned) writeUrl(false);
+  }, [open, tab, writeUrl]);
 
   return null;
 }
