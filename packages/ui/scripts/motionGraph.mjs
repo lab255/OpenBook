@@ -57,6 +57,44 @@ export function assertBlockOwnBytes(graph, ledger) {
   }
 }
 
+/** Non-Motion rows itemize consumption; they never re-anchor the window. */
+export function assertEndpointConsumers(bytes, ledger, graph) {
+  if (graph) assertEndpointOwnership(graph, ledger);
+  const names = new Set();
+  const total = ledger.endpointConsumers.reduce((sum, row) => {
+    if (names.has(row.name) || !Number.isSafeInteger(row.rawCostBytes) || !row.measuredAt || !row.mechanism) {
+      throw new Error(`Invalid endpoint consumer: ${row.name}`);
+    }
+    names.add(row.name);
+    return sum + row.rawCostBytes;
+  }, 0);
+  const coordinate = bytes - ledger.features.at(-1).afterRawBytes;
+  if (total !== coordinate) throw new Error(`Endpoint consumers ${total} != measured coordinate ${coordinate}`);
+}
+
+/** Ownership is module space, NOT an allocation of final minified IIFE bytes.
+ * Inherited infrastructure has an owner too, so subsequent consumers reference
+ * shared modules through usesModules without charging their ownership twice. */
+export function assertEndpointOwnership(graph, ledger) {
+  const owners = new Map();
+  for (const row of ledger.endpointConsumers) {
+    for (const id of row.modules) {
+      if (owners.has(id)) throw new Error(`Module ${id} claimed twice: ${owners.get(id)} and ${row.name}`);
+      if (motionModule(id)) throw new Error(`Motion module ${id} cannot be owned by a non-Motion consumer`);
+      owners.set(id, row.name);
+    }
+  }
+  const missing = new Map();
+  for (const module of graph.modules) if (module.bytes > 0 && !motionModule(module.id) && !owners.has(module.id)) {
+    missing.set(module.id, (missing.get(module.id) ?? 0) + module.bytes);
+  }
+  if (missing.size) throw new Error([...missing].map(([id, bytes]) =>
+    `Unclaimed module ${id}: ${bytes} rendered B (pre-final-minification); no consumer row claims it`).join('\n'));
+  for (const row of ledger.endpointConsumers) for (const id of row.usesModules ?? []) {
+    if (!owners.has(id)) throw new Error(`Consumer ${row.name} references unowned shared module ${id}`);
+  }
+}
+
 /** 256KB chosen 2026-10-28, owner direct confirmation: protects shareability,
  * not subset purity. The 1.92MB raw/~500KB gz viewer is already shareable;
  * room for layout-class features (~48KB) does not change its order of magnitude.

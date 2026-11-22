@@ -1,3 +1,4 @@
+import {KEEP_STATIC_ATTR} from './staticMarker';
 /**
  * LX-3: static ledger REPORT tables for the HTML export.
  *
@@ -255,7 +256,7 @@ const esc = (s: string): string =>
  * viewer bundle gains no ledger knowledge (and no ledger bytes) at all. The
  * value documents WHY this node is authoritative.
  */
-export const KEEP_STATIC_ATTR = 'data-ob-keep-static';
+export {KEEP_STATIC_ATTR} from './staticMarker';
 
 /**
  * `data-block-id` plus the keep marker, for a ledger block whose static render
