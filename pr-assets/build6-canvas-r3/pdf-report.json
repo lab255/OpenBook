@@ -1,0 +1,40 @@
+{
+  "pagedBytes": 37371,
+  "continuousBytes": 37397,
+  "pages": 1,
+  "renderSize": [
+    1224,
+    1584
+  ],
+  "imageCount": 1,
+  "imageRects": [
+    [
+      82.39999389648438,
+      187.88436889648438,
+      529.5999755859375,
+      445.8843688964844
+    ]
+  ],
+  "streamFilters": [
+    "/FlateDecode"
+  ],
+  "drawingRegion": {
+    "w": 895,
+    "h": 516,
+    "inkPx": 44971,
+    "stddev": 34.65,
+    "inkBbox": {
+      "x0": 25,
+      "y0": 188,
+      "x1": 870,
+      "y1": 328,
+      "marginLeft": 25,
+      "marginTop": 188,
+      "marginRight": 24,
+      "marginBottom": 187,
+      "fillW": 0.9453,
+      "fillH": 0.2733
+    }
+  },
+  "text": "Canvas export\nBefore the drawing: mixed document context.\nAfter the drawing: content must remain in place."
+}

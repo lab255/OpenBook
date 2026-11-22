@@ -1,0 +1,137 @@
+{
+  "initial": {
+    "matrix": {
+      "a": 1.3272727727890015,
+      "d": 1.3272727727890015,
+      "e": 0.09090909361839294,
+      "f": 80.45454406738281
+    },
+    "hash": -860000684,
+    "w": 624,
+    "h": 360,
+    "focusVisible": false,
+    "expectedRing": "rgb(28, 121, 196)",
+    "outline": "none",
+    "outlineWidth": "3px",
+    "outlineColor": "rgb(26, 26, 26)",
+    "elementCount": 89,
+    "bodyHash": 1927334
+  },
+  "kb": {
+    "focusVisible": true,
+    "outline": "solid",
+    "width": "2px",
+    "color": "rgb(28, 121, 196)"
+  },
+  "zoomCentreDelta": {
+    "step1": {
+      "dx": 0.0000152587890625,
+      "dy": 0.00000762939453125
+    },
+    "step2": {
+      "dx": 0.000030517578125,
+      "dy": 0.0000133514404296875
+    }
+  },
+  "z1": {
+    "a": 1.6590908765792847,
+    "d": 1.6590908765792847,
+    "e": -77.88636016845703,
+    "f": 55.568180084228516
+  },
+  "z2": {
+    "a": 2.0738637447357178,
+    "d": 2.0738637447357178,
+    "e": -175.3579559326172,
+    "f": 24.460227966308594
+  },
+  "reset": {
+    "matrixEqual": true,
+    "hashEqual": true
+  },
+  "midPan": {
+    "a": 1.3272727727890015,
+    "d": 1.3272727727890015,
+    "e": 80.09091186523438,
+    "f": 120.45454406738281
+  },
+  "pan": {
+    "matrix": {
+      "a": 1.3272727727890015,
+      "d": 1.3272727727890015,
+      "e": 160.09091186523438,
+      "f": 80.45454406738281
+    },
+    "focusVisible": false,
+    "outline": "none"
+  },
+  "inert": {
+    "elementCountDelta": 0,
+    "domChanged": false
+  },
+  "drawGesture": {
+    "hashChangedFromBaseline": true,
+    "matrix": {
+      "a": 1.3272727727890015,
+      "d": 1.3272727727890015,
+      "e": 240.09091186523438,
+      "f": 180.4545440673828
+    }
+  },
+  "finalReset": {
+    "hashEqual": true,
+    "matrixEqual": true
+  },
+  "frames": [
+    {
+      "path": "./frames/f00.png",
+      "label": "initial fitted view",
+      "ms": 900
+    },
+    {
+      "path": "./frames/f01.png",
+      "label": "keyboard focus: token ring",
+      "ms": 900
+    },
+    {
+      "path": "./frames/f02.png",
+      "label": "+ zoom 1",
+      "ms": 600
+    },
+    {
+      "path": "./frames/f03.png",
+      "label": "+ zoom 2",
+      "ms": 800
+    },
+    {
+      "path": "./frames/f04.png",
+      "label": "0 reset: fitted view restored",
+      "ms": 900
+    },
+    {
+      "path": "./frames/f05.png",
+      "label": "pointer drag: pans, no ring",
+      "ms": 600
+    },
+    {
+      "path": "./frames/f06.png",
+      "label": "pan continues: still no ring",
+      "ms": 800
+    },
+    {
+      "path": "./frames/f07.png",
+      "label": "click shape + type: inert, no handles, no ink",
+      "ms": 900
+    },
+    {
+      "path": "./frames/f08.png",
+      "label": "draw-gesture only pans: no ink",
+      "ms": 700
+    },
+    {
+      "path": "./frames/f09.png",
+      "label": "0 reset again: exact fitted baseline",
+      "ms": 900
+    }
+  ]
+}

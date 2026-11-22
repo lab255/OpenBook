@@ -1,0 +1,20 @@
+{
+  "regionW": 624,
+  "regionH": 361,
+  "threshold": 16,
+  "inkPx": 21711,
+  "inkBbox": {
+    "x0": 18,
+    "y0": 131,
+    "x1": 606,
+    "y1": 228,
+    "inkW": 589,
+    "inkH": 98,
+    "marginLeft": 18,
+    "marginTop": 131,
+    "marginRight": 17,
+    "marginBottom": 132,
+    "fillW": 0.9439,
+    "fillH": 0.2715
+  }
+}

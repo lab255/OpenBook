@@ -1,0 +1,55 @@
+{
+  "figure": {
+    "x": 304,
+    "y": 282.1875,
+    "width": 672,
+    "height": 448
+  },
+  "summary": {
+    "tag": "SUMMARY",
+    "text": "Inspect drawing (5 objects)",
+    "rect": {
+      "x": 328,
+      "y": 678.1875,
+      "width": 170.625,
+      "height": 28
+    },
+    "color": "rgb(113, 111, 107)",
+    "fontSize": "12px",
+    "lineHeight": "28px",
+    "height": "28px",
+    "minHeight": "0px",
+    "display": "flex",
+    "alignItems": "center",
+    "textDecoration": "none",
+    "cursor": "pointer"
+  },
+  "caption": null,
+  "captionHtml": "<summary>Inspect drawing (5 objects)</summary>",
+  "links": [
+    {
+      "tag": "SUMMARY",
+      "text": "Inspect drawing (5 objects)",
+      "rect": {
+        "x": 328,
+        "y": 678.1875,
+        "width": 170.625,
+        "height": 28
+      },
+      "color": "rgb(113, 111, 107)",
+      "fontSize": "12px",
+      "lineHeight": "28px",
+      "height": "28px",
+      "minHeight": "0px",
+      "display": "flex",
+      "alignItems": "center",
+      "textDecoration": "none",
+      "cursor": "pointer"
+    }
+  ],
+  "bodyColors": {
+    "paragraph": "rgb(26, 26, 26)"
+  },
+  "detailsOpen": false,
+  "figureHtmlHead": "<figure data-canvas-export=\"\"><div style=\"position: relative; aspect-ratio: 624 / 360; max-width: 624px; overflow: hidden;\"><div class=\"obe-static-keep\" contenteditable=\"false\"><div data-canvas-fallback=\"\" data-canvas-camera=\"{&quot;zoom&quot;:1.3272727272727274,&quot;x&quot;:0.09090909090908994,&quot;y&quot;:80.45454545454544}\" style=\"aspect-ratio: 624 / 360; max-width: 624px; overflow: hidden; background: rgb(255, 255, 255); visibility: hidden;\"><img alt=\"rect; ellipse; arrow; text: Export text; stroke\" src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnAAAAFoCAYAAADXfsbIAAAQAElEQVR4AeydB7gkRbmGC5CLAoIiGQSRS845IyAgmQUJsuSgCCiSRXIUEARBEAHJOUiSJDlLVJISDGTJCAJLuIT7fbPbQ3efmbMn9MxUd7/7VE2FTn+9dXbm6+qqv8cN/IMABCAAAQhAAAIQKBUBBFypugtjIQABCMRCADsgAIFeEkDA9ZI+14YABCAAAQhAAAJDIICAGwI0DomDAFZAAA"
+}

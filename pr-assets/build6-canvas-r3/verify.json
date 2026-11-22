@@ -1,0 +1,252 @@
+{
+  "round": 3,
+  "head": "4315517c3802822616b068b9f0b04e0363a95652",
+  "viewerArtifact": {
+    "bytes": 1942461,
+    "sha256": "3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc"
+  },
+  "recipe": "CI=true pnpm install; sdk build; build:viewer; ui build after viewer; harness vite build + vite preview loopback :5186; fresh --single-process --no-zygote Chromium per case; 1280x800 DPR1 (narrow case 390x800); real export path via committed toHtml acceptance fixture; GIF frames via Pillow MEDIANCUT no dither; PDF via committed checkInterop.mjs + PyMuPDF 1.28.6",
+  "case1_pair_1280": {
+    "figureRect": {
+      "x": 304,
+      "y": 171.1875,
+      "width": 672,
+      "height": 448
+    },
+    "drawingRect": {
+      "x": 328,
+      "y": 195.1875,
+      "width": 624,
+      "height": 360
+    },
+    "figureOffsetPx": 0,
+    "paragraphOffsetPx": 0,
+    "outsideFigureDiffPx": 0,
+    "figureOutsideDrawingDiffPx": 0,
+    "drawingRegionDiffPx": 21,
+    "drawingRegionMaxChannelDelta": 1,
+    "inkBbox": {
+      "x0": 18,
+      "y0": 131,
+      "x1": 606,
+      "y1": 228,
+      "inkW": 589,
+      "inkH": 98,
+      "marginLeft": 18,
+      "marginTop": 131,
+      "marginRight": 17,
+      "marginBottom": 132,
+      "fillW": 0.9439,
+      "fillH": 0.2715
+    }
+  },
+  "case2_gif": {
+    "keyboardRing": {
+      "focusVisible": true,
+      "outline": "solid",
+      "width": "2px",
+      "color": "rgb(28, 121, 196)"
+    },
+    "zoomCentreDeltaPx": {
+      "step1": {
+        "dx": 1.52587890625e-05,
+        "dy": 7.62939453125e-06
+      },
+      "step2": {
+        "dx": 3.0517578125e-05,
+        "dy": 1.33514404296875e-05
+      }
+    },
+    "initialFittedMatrix": {
+      "a": 1.3272727727890015,
+      "d": 1.3272727727890015,
+      "e": 0.09090909361839294,
+      "f": 80.45454406738281
+    },
+    "resetEqualsFitted": {
+      "matrixEqual": true,
+      "hashEqual": true
+    },
+    "pan": {
+      "matrix": {
+        "a": 1.3272727727890015,
+        "d": 1.3272727727890015,
+        "e": 160.09091186523438,
+        "f": 80.45454406738281
+      },
+      "focusVisible": false,
+      "outline": "none"
+    },
+    "inert": {
+      "elementCountDelta": 0,
+      "domChanged": false
+    },
+    "finalReset": {
+      "hashEqual": true,
+      "matrixEqual": true
+    },
+    "frames": 10,
+    "totalSeconds": 8.0,
+    "gifBytes": 180340
+  },
+  "case3_mixed": {
+    "captionControl": {
+      "tag": "SUMMARY",
+      "heightPx": 28,
+      "computedHeight": "28px",
+      "lineHeight": "28px",
+      "fontSize": "12px",
+      "color": "rgb(113, 111, 107)",
+      "bodyInk": "rgb(26, 26, 26)"
+    },
+    "figureRect": {
+      "x": 304,
+      "y": 282.1875,
+      "width": 672,
+      "height": 448
+    },
+    "captionRect": {
+      "x": 328,
+      "y": 678.1875,
+      "width": 170.625,
+      "height": 28
+    }
+  },
+  "case4_narrow_390": {
+    "figureRect": {
+      "x": 24,
+      "y": 171.1875,
+      "width": 342,
+      "height": 257.609375
+    },
+    "drawingRect": {
+      "x": 48,
+      "y": 195.1875,
+      "width": 294,
+      "height": 169.609375
+    },
+    "figureOffsetPx": 0,
+    "paragraphOffsetPx": 0,
+    "outsideFigureDiffPx": 0,
+    "overflowX": false,
+    "scrollWidth": 390,
+    "inkBbox": {
+      "x0": 8,
+      "y0": 62,
+      "x1": 285,
+      "y1": 107,
+      "inkW": 278,
+      "inkH": 46,
+      "marginLeft": 8,
+      "marginTop": 62,
+      "marginRight": 8,
+      "marginBottom": 62,
+      "fillW": 0.9456,
+      "fillH": 0.2706
+    },
+    "drawingRegionDiffPx": 2251,
+    "drawingRegionMaxChannelDelta": 108
+  },
+  "case5_pdf": {
+    "pagedBytes": 37371,
+    "continuousBytes": 37397,
+    "pages": 1,
+    "renderSize": [
+      1224,
+      1584
+    ],
+    "imageCount": 1,
+    "imageRects": [
+      [
+        82.39999389648438,
+        187.88436889648438,
+        529.5999755859375,
+        445.8843688964844
+      ]
+    ],
+    "streamFilters": [
+      "/FlateDecode"
+    ],
+    "drawingRegion": {
+      "w": 895,
+      "h": 516,
+      "inkPx": 44971,
+      "stddev": 34.65,
+      "inkBbox": {
+        "x0": 25,
+        "y0": 188,
+        "x1": 870,
+        "y1": 328,
+        "marginLeft": 25,
+        "marginTop": 188,
+        "marginRight": 24,
+        "marginBottom": 187,
+        "fillW": 0.9453,
+        "fillH": 0.2733
+      }
+    },
+    "text": "Canvas export\nBefore the drawing: mixed document context.\nAfter the drawing: content must remain in place."
+  },
+  "pngs": {
+    "export-nojs.png": {
+      "size": [
+        1280,
+        800
+      ],
+      "stddev": [
+        23.41,
+        23.34,
+        23.28
+      ],
+      "sha256": "b9c0fceea4b17a7b00f16312968569de9d82a1547a0ae0e2ba1ec477fd0c9a45"
+    },
+    "export-hydrated.png": {
+      "size": [
+        1280,
+        800
+      ],
+      "stddev": [
+        23.41,
+        23.34,
+        23.28
+      ],
+      "sha256": "a0afec6077acc2702acaa55d313cd56867b4604acf5e2288e074c2069f4fe2ff"
+    },
+    "export-mixed.png": {
+      "size": [
+        1280,
+        800
+      ],
+      "stddev": [
+        26.53,
+        26.47,
+        26.41
+      ],
+      "sha256": "02719efe3cb042a3740627f5db1a2863a8d69591710e068706b16a069b7a02ba"
+    },
+    "narrow-hydrated.png": {
+      "size": [
+        390,
+        800
+      ],
+      "stddev": [
+        32.37,
+        32.34,
+        32.34
+      ],
+      "sha256": "883478c4f5f2f555812fafd2f7994925b9bcb6263eb0639095d895e5c216b937"
+    },
+    "pdf-page.png": {
+      "size": [
+        1224,
+        1584
+      ],
+      "stddev": [
+        23.75,
+        23.65,
+        23.55
+      ],
+      "sha256": "ba57a9bf03b156da433813d828a5327b8ecc54bbf32d35b48362292de1d212b0"
+    }
+  }
+}

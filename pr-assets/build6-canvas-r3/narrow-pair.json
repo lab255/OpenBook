@@ -1,0 +1,94 @@
+{
+  "width": 390,
+  "height": 800,
+  "doc": "canvas-export.html",
+  "figureOffsetPx": 0,
+  "viewportOffsetPx": 0,
+  "paragraphOffsetPx": 0,
+  "nojs": {
+    "js": false,
+    "errors": [],
+    "figure": {
+      "x": 24,
+      "y": 171.1875,
+      "width": 342,
+      "height": 257.609375
+    },
+    "viewport": {
+      "x": 48,
+      "y": 195.1875,
+      "width": 294,
+      "height": 169.609375
+    },
+    "drawing": {
+      "x": 48,
+      "y": 195.1875,
+      "width": 294,
+      "height": 169.609375
+    },
+    "drawingTag": "IMG",
+    "paragraphs": [
+      {
+        "text": "Before the drawing: mixed document conte",
+        "x": 24,
+        "y": 115.1875,
+        "width": 342,
+        "height": 32
+      },
+      {
+        "text": "After the drawing: content must remain i",
+        "x": 24,
+        "y": 452.796875,
+        "width": 342,
+        "height": 56
+      }
+    ],
+    "scrollY": 0,
+    "innerWidth": 390,
+    "scrollWidth": 390,
+    "docOverflowX": false
+  },
+  "hydrated": {
+    "js": true,
+    "errors": [],
+    "figure": {
+      "x": 24,
+      "y": 171.1875,
+      "width": 342,
+      "height": 257.609375
+    },
+    "viewport": {
+      "x": 48,
+      "y": 195.1875,
+      "width": 294,
+      "height": 169.609375
+    },
+    "drawing": {
+      "x": 48,
+      "y": 195.1875,
+      "width": 294,
+      "height": 169.609375
+    },
+    "drawingTag": "CANVAS",
+    "paragraphs": [
+      {
+        "text": "Before the drawing: mixed document conte",
+        "x": 24,
+        "y": 115.1875,
+        "width": 342,
+        "height": 32
+      },
+      {
+        "text": "After the drawing: content must remain i",
+        "x": 24,
+        "y": 452.796875,
+        "width": 342,
+        "height": 56
+      }
+    ],
+    "scrollY": 0,
+    "innerWidth": 390,
+    "scrollWidth": 390,
+    "docOverflowX": false
+  }
+}

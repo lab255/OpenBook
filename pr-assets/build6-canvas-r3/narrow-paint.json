@@ -1,0 +1,21 @@
+{
+  "outsideFigureDiffPx": 0,
+  "figureOutsideDrawingDiffPx": 0,
+  "drawingRegionDiffPx": 2251,
+  "drawingRegionTotalPx": 49980,
+  "drawingRegionMaxChannelDelta": 108,
+  "inkBbox": {
+    "x0": 8,
+    "y0": 62,
+    "x1": 285,
+    "y1": 107,
+    "inkW": 278,
+    "inkH": 46,
+    "regionW": 294,
+    "regionH": 170,
+    "marginLeft": 8,
+    "marginTop": 62,
+    "marginRight": 8,
+    "marginBottom": 62
+  }
+}
