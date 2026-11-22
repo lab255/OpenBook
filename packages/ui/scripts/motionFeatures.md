@@ -60,9 +60,12 @@ rendered instances. The inherited inventory is from baseline 99cd2dc7, not a
 claim that its rendered sum equals historical raw residue. `endpointAttribution`
 binds the partition regenerated from the final graph to the artifact/graph SHAs.
 
-Provenance stays **UNLANDED through merge**. The tiny post-merge follow-up records
-the actual main squash SHA, never the branch SHA. `measuredAt` is provenance
-metadata, not Git-existence or ancestry validation.
+Canvas provenance is **LANDED** at main squash `ea237bdbc9fb80de2dcc5f511cca4e106f3d449a`.
+`measuredAt` records that squash SHA, never the worker or follow-up commit.
+`artifactSha256` identifies the measured viewer; `measurementProvenance` separately
+records the build context. No remeasurement: the squash and gated head e471daf3
+have identical Git trees (`31958efc40a08683ea1c708993dde5d74ff3b252`), preserving
+the measured artifact. `measuredAt` remains metadata, not Git-existence or ancestry validation.
 
 Motion stays **211,511 rendered B**. Canvas is non-Motion and uses the endpoint
 window; it is not a direct Motion adopter under the separate 2,048 B guard.
