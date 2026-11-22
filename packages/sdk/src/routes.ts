@@ -9,18 +9,56 @@ export const API = {
   pages: '/api/pages',
   /** Single page: `GET` / `PUT` (upsert) / `PATCH` (rename) / `DELETE` (to trash). */
   page: (id: string): string => `/api/pages/${encodeURIComponent(id)}`,
+  /** Capability-gated form row creation: `POST`. */
+  formSubmissions: (pageId: string, formId: string): string =>
+    `/api/pages/${encodeURIComponent(pageId)}/forms/${encodeURIComponent(formId)}/submissions`,
+  /** Capability-gated database form-view row creation: `POST` (F-4). */
+  databaseFormSubmissions: (databaseId: string, viewId: string): string =>
+    `/api/databases/${encodeURIComponent(databaseId)}/views/${encodeURIComponent(viewId)}/submissions`,
+  /** Capability-gated database form descriptor: `POST` (F-4). */
+  databaseForm: (databaseId: string, viewId: string): string =>
+    `/api/databases/${encodeURIComponent(databaseId)}/views/${encodeURIComponent(viewId)}/form`,
+  /** Owner/manager publication lifecycle: `GET` status / `POST` mint-or-rotate / `DELETE` revoke. */
+  databaseFormCapability: (databaseId: string, viewId: string): string =>
+    `/api/databases/${encodeURIComponent(databaseId)}/views/${encodeURIComponent(viewId)}/capability`,
+  /** Capability-gated staged upload for a database form view: `POST`. */
+  databaseFormUploads: (databaseId: string, viewId: string): string =>
+    `/api/databases/${encodeURIComponent(databaseId)}/views/${encodeURIComponent(viewId)}/uploads`,
+  /** Capability-gated staged form-file upload: `POST`. */
+  formUploads: (pageId: string, formId: string): string =>
+    `/api/pages/${encodeURIComponent(pageId)}/forms/${encodeURIComponent(formId)}/uploads`,
   /** A page's structured properties (owner, verification, …): `PATCH` (shallow merge). */
   pageProperties: (id: string): string => `/api/pages/${encodeURIComponent(id)}/properties`,
   /** Pages that link to this one (the backlink graph): `GET`. */
   pageBacklinks: (id: string): string => `/api/pages/${encodeURIComponent(id)}/backlinks`,
+  /**
+   * The whole-library page-link graph — every readable page as a node, plus every
+   * mention/relation edge whose both endpoints are readable: `GET`. Edges are
+   * derived on the fly (no persisted edge table). Read-gated per principal like
+   * the page list; a guest passes the STAB-8 read gate. Returns {@link PageGraph}.
+   */
+  pageGraph: '/api/page-graph',
   /** Restore a trashed page (and the subtree trashed with it): `POST`. */
   pageRestore: (id: string): string => `/api/pages/${encodeURIComponent(id)}/restore`,
+  /** A page's captured version history (PVH-1): `GET` (metadata list, newest first;
+   *  optional `?limit=`). Read-gated on the page — a caller who can't read the page
+   *  can't list its versions. */
+  pageVersions: (id: string): string => `/api/pages/${encodeURIComponent(id)}/versions`,
+  /** One captured version WITH its snapshot payload: `GET` (or 404 if it isn't that
+   *  page's version). Read-gated on the page. */
+  pageVersion: (id: string, versionId: string): string =>
+    `/api/pages/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}`,
+  /** Roll the page back to a captured version: `POST` (writes the version's snapshot
+   *  back through the save path, which captures the pre-restore state as a new version
+   *  → non-destructive). Write-gated on the page. Returns the restored page. */
+  pageVersionRestore: (id: string, versionId: string): string =>
+    `/api/pages/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/restore`,
   /** Move/reorder a page in the sidebar tree (re-parent + reorder siblings): `PUT`. */
   pageMove: (id: string): string => `/api/pages/${encodeURIComponent(id)}/move`,
   /** Whole-space backup: `GET` returns every live page + database as one bundle. */
-  exportSpace: '/api/export',
+  exportLibrary: '/api/export',
   /** Restore a backup: `POST` `{pages, databases, mode}` → import summary. */
-  importSpace: '/api/import',
+  importLibrary: '/api/import',
   /** The trash: `GET` (list trashed pages) / `DELETE` (empty the whole trash). */
   trash: '/api/trash',
   /** A single trashed page: `DELETE` (permanently purge it and its subtree). */
@@ -37,6 +75,8 @@ export const API = {
    * debounced snapshot save (`PUT /api/pages/:id`) remains the sole durable
    * checkpoint, so the relay is a best-effort live nudge, never a system of record.
    */
+  /** Durable CRDT delta merge; 404 is definitive (never inserts). */
+  pageUpdateApply: (id: string): string => `/api/pages/${encodeURIComponent(id)}/updates/apply`,
   pageUpdates: (id: string): string => `/api/pages/${encodeURIComponent(id)}/updates`,
   /**
    * Live collaboration — late-joiner sync handshake (Collab T1). `POST {sv}` (the
@@ -99,14 +139,35 @@ export const API = {
   aiTasks: '/api/ai/tasks',
   /** Continue/complete document text: `POST` `{text, instruction?}` → SSE. */
   aiComplete: '/api/ai/complete',
+  aiTranscribe: '/api/ai/transcribe',
   /** Download a model file for the in-process engine: `POST` `{url?}`. */
   aiModelDownload: '/api/ai/models/download',
   /** The agent harness: `POST` `{messages, effort?, thinking?, skills?}` → SSE tool/reasoning/proposal/final events. */
   agentChat: '/api/agent/chat',
+  /**
+   * External tools (MCP client) config (admin only): `GET` returns
+   * {@link McpConfigResponse} (redacted config + `stdioAllowed`); `PUT`
+   * `{enabled, servers}` merges it (write-only auth tokens preserved/replaced/
+   * cleared) and returns the redacted result. Managing external tool servers is
+   * host command-execution territory — gated by `requireInstanceAdmin`. */
+  aiMcp: '/api/ai/mcp',
+  /** Dry-run one MCP server config (admin only): `POST` a {@link McpServerConfig}
+   *  → {@link McpTestResult} (connect + list tools; never returns secrets). */
+  aiMcpTest: '/api/ai/mcp/test',
   /** User-authored prompt/recipe skills: `GET` (list) / `PUT` `{skill}` (upsert). */
   aiSkills: '/api/ai/skills',
   /** One skill by name: `DELETE`. */
   aiSkill: (name: string) => `/api/ai/skills/${encodeURIComponent(name)}`,
+  /** Usage-attribution pricing (admin only): `GET` (default+override merged) /
+   *  `PUT` `{[provider]:{[model]:{inputPerMtok,outputPerMtok}}}` (set override). */
+  aiPricing: '/api/ai/pricing',
+  /** Usage-attribution viewer (admin only): `GET` returns `{exists, databaseId,
+   *  hostPageId, retentionDays, rows?, totals?}`. Never seeds the usage DB (a
+   *  fresh library reports `exists:false`). */
+  aiUsage: '/api/ai/usage',
+  /** Admin retention setter for the AI usage database: `PUT` `{days}` → updates
+   *  the usage DB's auto-expiry window. */
+  aiUsageRetention: '/api/ai/usage/retention',
   plugins: '/api/plugins',
   plugin: (id: string) => `/api/plugins/${id}`,
 
@@ -146,6 +207,14 @@ export const API = {
    */
   compact: '/api/maintenance/compact',
 
+  // ── Optional able OIDC sign-in delegation (ABLE-1) ─────────────────────────
+  /** Begin the server-side OAuth authorization-code flow with able. */
+  ableOauthAuthorize: '/api/auth/oauth2/authorize/able',
+  /** Registered OAuth callback: exchanges the code and bridges the identity. */
+  ableOauthCallback: '/api/auth/oauth2/callback/able',
+  /** Renew or remove an able bridge session using its prior signed assertion. */
+  ableOauthRefresh: '/api/auth/oauth2/refresh/able',
+
   // ── Multi-user (identity, policy, provenance) — OB-165 ───────────────────────
   /**
    * Instance multi-user policy: `GET` returns {@link InstanceInfo} (guest
@@ -177,13 +246,34 @@ export const API = {
    * "you manage sharing of pages you can write" rule as the ACL).
    */
   pageVisibility: (id: string): string => `/api/pages/${encodeURIComponent(id)}/visibility`,
+  /**
+   * A page's agent-edits policy (AGED-1): `GET` returns `{agentEdits, effective}` —
+   * the raw stored policy (`inherit` | `suggest` | `direct`, read-gated) plus the
+   * SERVER-RESOLVED `effective` mode (`suggest` | `direct`; AGED-6), so a PAT client
+   * can learn the effective mode of an `inherit` page without the privileged instance
+   * read. `PUT` `{agentEdits}` sets it. Unlike visibility, the `PUT` is jws-only — an
+   * agent PAT must NOT change the policy that governs whether agents edit directly
+   * (self-authorization).
+   */
+  pageAgentEdits: (id: string): string => `/api/pages/${encodeURIComponent(id)}/agent-edits`,
 
-  // ── Managed workspace: instance ↔ workspace roster sync — OB-199 ─────────────
+  // ── Managed library: instance ↔ library roster sync — OB-199 / LIB-5 ─────────
   /**
    * On-demand roster sync of a managed instance: `GET` reports the binding +
-   * last-sync status; `POST` pulls the bound workspace roster from the account and
+   * last-sync status; `POST` pulls the bound library roster from the account and
    * reconciles it into the local roster (managed rows only). Instance-writer
    * (owner/admin/loopback) only. The same sync also runs periodically.
+   */
+  librarySync: '/api/library/sync',
+  /**
+   * Legacy alias of {@link librarySync} (LIB-5 renamed `/api/workspace/sync` →
+   * `/api/library/sync`). Kept live so a not-yet-updated caller still resolves;
+   * both paths hit the same handler. Retire only in the last, reversible phase.
+   *
+   * @deprecated Wire residue — removal target **v3.0.0** (see `docs/wire-sunset.md`).
+   * Use {@link librarySync} (`/api/library/sync`). DO NOT delete before v3.0.0: an
+   * un-updatable client may still POST this path. Before cutover, confirm no caller
+   * hits `/api/workspace/sync` (the server logs a dev-only warning when it does).
    */
   workspaceSync: '/api/workspace/sync',
 
@@ -193,6 +283,156 @@ export const API = {
   backups: '/api/backups',
   /** Run a backup immediately: `POST` `{cadence?}` → the written file's name. */
   backupRun: '/api/backups/run',
+
+  // ── Agent access: PAT credential management (AGENT-6) ─────────────────────────
+  /**
+   * Agent Personal-Access-Token management (admin only — `requireInstanceAdmin`;
+   * a PAT can never reach this route, both by `requireInstanceAdmin` and the
+   * scope-gate). `GET` → `{enabled, tokens}` (redacted list + the `agentApi`
+   * on/off state); `PUT` `{enabled}` toggles the dark `agentApi` setting; `POST`
+   * `{name, scope?, expiresInDays?}` mints a token (404 while `agentApi` is off) and
+   * returns the plaintext exactly ONCE. */
+  agentTokens: '/api/agent-tokens',
+  /** Revoke one agent token by id: `DELETE`. `true` if one was removed. */
+  agentToken: (id: string): string => `/api/agent-tokens/${encodeURIComponent(id)}`,
+  /**
+   * Remote streamable-HTTP MCP transport (AGENT-5 — handler built separately).
+   * Declared here so the AGENT-6 scope-gate can allowlist it; harmless until the
+   * handler is mounted. */
+  mcp: '/api/mcp',
+
+  // ── Ledger: server-enforced double-entry accounting (LGR-3) ──────────────────
+  /**
+   * The ledger itself: `GET` reports {@link LedgerInfo} (whether the four managed
+   * ledger databases are seeded, and where); `POST` seeds them (idempotent —
+   * a re-POST adopts the existing databases). All ledger reads/writes are gated on
+   * the restricted host page's access; the seeded databases REJECT every generic
+   * page/row mutation (server-managed) — only these ledger routes write them.
+   */
+  ledger: '/api/ledger',
+  /**
+   * LX-4: restore an export's embedded ledger-records section into an EMPTY
+   * ledger by replaying it through the server's ledger writer. `POST` with a
+   * {@link LedgerExportSection} body; instance-administration gated (the same
+   * gate as {@link API.importLibrary} — it writes a whole book). A target that
+   * already keeps any ledger data refuses with a typed 409 (`invalid-state`) —
+   * merging is explicitly out of scope.
+   */
+  ledgerRestoreSection: '/api/ledger/restore-section',
+  /** Accounts: `GET` (list) / `POST` (create — hierarchical colon-delimited name). */
+  ledgerAccounts: '/api/ledger/accounts',
+  /** One account: `GET` / `PATCH` (rename; close — rejected at nonzero balance). */
+  ledgerAccount: (id: string): string => `/api/ledger/accounts/${encodeURIComponent(id)}`,
+  /** Transactions: `GET` (list, `?state=&limit=`) / `POST` (create a DRAFT with postings). */
+  ledgerTransactions: '/api/ledger/transactions',
+  /** One transaction (with postings): `GET` / `PATCH` (draft only) / `DELETE` (draft only). */
+  ledgerTransaction: (id: string): string => `/api/ledger/transactions/${encodeURIComponent(id)}`,
+  /**
+   * Post a draft atomically: `POST`. Validates Σ amount = 0, ≥2 postings, open
+   * resolvable accounts, integer amounts, uniform currency; assigns the
+   * server-monotonic entry number and stamps posted_at/posted_by — all in ONE
+   * store transaction with the audit event.
+   */
+  ledgerTransactionPost: (id: string): string => `/api/ledger/transactions/${encodeURIComponent(id)}/post`,
+  /**
+   * Reverse a posted transaction: `POST`. Atomically creates AND posts the
+   * reversing entry (negated postings, `reverses` linked) and marks the original
+   * `void` — the only sanctioned way to void a posted entry.
+   */
+  ledgerTransactionReverse: (id: string): string => `/api/ledger/transactions/${encodeURIComponent(id)}/reverse`,
+  /** A posting's cleared state: `PUT` `{cleared}` (pending ↔ cleared only;
+   *  anything touching `reconciled` is locked until reconciliation flows, LGR-11). */
+  ledgerPostingCleared: (id: string): string => `/api/ledger/postings/${encodeURIComponent(id)}/cleared`,
+  /**
+   * Statement reconciliations (LGR-11): `GET` lists them (`?accountId=&status=`),
+   * `POST` STARTS one (`{accountId, statementDate, statementBalanceMinor}`).
+   * Starting a second OPEN reconciliation on the same account is rejected —
+   * two open matches against one account cannot both be the truth.
+   */
+  ledgerReconciliations: '/api/ledger/reconciliations',
+  /**
+   * One reconciliation: `GET` returns the {@link LedgerReconciliationSummary}
+   * (cleared balance + difference); `PATCH` AMENDS the statement it is matched
+   * against (`{statementDate?, statementBalanceMinor?}` — LGR-22), which is the
+   * recovery path for a mistyped closing balance. Allowed only while `open`
+   * (409 `invalid-state` otherwise), touches no posting's cleared state, and
+   * returns the summary with the difference RECOMPUTED against the new target.
+   * There is no `DELETE`: a reconciliation ends by being finished or abandoned,
+   * both of which leave a record.
+   */
+  ledgerReconciliation: (id: string): string => `/api/ledger/reconciliations/${encodeURIComponent(id)}`,
+  /**
+   * Match/unmatch ONE posting inside an OPEN reconciliation: `PUT` `{cleared}`
+   * (`pending` ↔ `cleared`). Unlike {@link API.ledgerPostingCleared} this route
+   * additionally enforces that the posting belongs to the reconciliation's
+   * account, is on a POSTED entry, and is not frozen under another finished
+   * reconciliation.
+   */
+  ledgerReconciliationPosting: (id: string, postingId: string): string =>
+    `/api/ledger/reconciliations/${encodeURIComponent(id)}/postings/${encodeURIComponent(postingId)}`,
+  /**
+   * FINISH a reconciliation: `POST`. Rejects (`reconciliation-unbalanced`)
+   * unless the difference is EXACTLY zero — the whole point of the workflow, and
+   * enforced in the store so bypassing the UI changes nothing. On success every
+   * matched posting freezes at `reconciled` (invariant 4).
+   */
+  ledgerReconciliationFinish: (id: string): string => `/api/ledger/reconciliations/${encodeURIComponent(id)}/finish`,
+  /** REOPEN a finished reconciliation: `POST`. Explicit and audited; unfreezes
+   *  every posting it had frozen (back to `cleared`, `reconciliationId` null). */
+  ledgerReconciliationReopen: (id: string): string => `/api/ledger/reconciliations/${encodeURIComponent(id)}/reopen`,
+  /**
+   * ABANDON an OPEN reconciliation: `POST` (LGR-22). The way out of a match
+   * that will never balance — a statement opened on the wrong account, a
+   * duplicate started by mistake — WITHOUT posting anything to the books to
+   * force the difference to zero. Terminal (`abandoned` is not reopenable),
+   * audited, and posting-neutral: every tick keeps the cleared state it had.
+   * The account is free for a new reconciliation immediately.
+   */
+  ledgerReconciliationAbandon: (id: string): string => `/api/ledger/reconciliations/${encodeURIComponent(id)}/abandon`,
+  /**
+   * Accounting periods (LGR-12). `GET` lists every period record (closed and
+   * reopened — the settings-UI surface); `POST` CLOSES a range: generates the
+   * closing entry (income-statement accounts → retained earnings), locks the
+   * range (the STORE rejects `period-closed` for any posting/reversal dated
+   * inside it — bypassing the UI changes nothing), and returns the open
+   * reconciliations it warned about (warn-not-block).
+   */
+  ledgerPeriods: '/api/ledger/periods',
+  /**
+   * REOPEN a closed period: `POST`. Explicit and audited; voids the closing
+   * entry via a reversal through the ordinary reversal machinery and restores
+   * postability for the range.
+   */
+  ledgerPeriodReopen: (id: string): string => `/api/ledger/periods/${encodeURIComponent(id)}/reopen`,
+  /** The append-only ledger audit log: `GET` (paginated, `?limit=&before=<seq>`,
+   *  newest first). Read-only — no mutation route exists. */
+  ledgerAudit: '/api/ledger/audit',
+  /**
+   * Canonical postings CSV export (LGR-7): `GET` returns the whole ledger as
+   * `text/csv` — one row per posting, byte-stable (same data ⇒ identical bytes;
+   * see sdk `buildLedgerPostingsCsv` for the column contract). Read-gated like
+   * every other ledger read (the restricted host page's decision). Built
+   * in-memory — a book is small; revisit streaming only if that ever changes.
+   */
+  ledgerExportCsv: '/api/ledger/export.csv',
+  /**
+   * Beancount journal export (LGR-13): `GET` returns the whole ledger as a
+   * `text/plain` Beancount journal — byte-stable (same data ⇒ identical bytes;
+   * see sdk `buildLedgerBeancount` for the directive contract), built from the
+   * SAME read model as the CSV export. Read-gated like every other ledger
+   * read. The point of the format: `bean-check`/Fava re-verify the whole book
+   * with an independent implementation.
+   */
+  ledgerExportBeancount: '/api/ledger/export.beancount',
+  /**
+   * Independent invariant verifier (LGR-7): `GET` re-checks the ledger against
+   * RAW storage (its own SQL, not the LedgerStore validators) — balance, audit
+   * hash chain, referential integrity, audit replay, entry-number density —
+   * and returns a typed findings report (empty findings = clean). Gated
+   * `requireInstanceAdmin` (owner/admin/loopback): the report names entity ids
+   * across the whole book, an administration-level view.
+   */
+  ledgerVerify: '/api/ledger/verify',
 } as const;
 
 /** Result of a {@link API.compact} run: the database's on-disk size before/after,

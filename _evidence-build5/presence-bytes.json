@@ -1,0 +1,38 @@
+{
+  "scope": "UTF-8 JSON canvas facet separately from complete binary awareness update; synthetic ids, 36-character block id, finite fractional world position. No claim about identity/HTTP/SSE envelope size.",
+  "measurements": [
+    {
+      "name": "ordinary",
+      "inputIds": 8,
+      "selectedIds": 8,
+      "truncated": false,
+      "facetUtf8Bytes": 236,
+      "wholeAwarenessUpdateBytes": 256
+    },
+    {
+      "name": "ascii-limit",
+      "inputIds": 64,
+      "selectedIds": 64,
+      "truncated": false,
+      "facetUtf8Bytes": 8540,
+      "wholeAwarenessUpdateBytes": 8560
+    },
+    {
+      "name": "unicode-limit",
+      "inputIds": 64,
+      "selectedIds": 31,
+      "truncated": true,
+      "facetUtf8Bytes": 12048,
+      "wholeAwarenessUpdateBytes": 12068
+    },
+    {
+      "name": "selection-overflow",
+      "inputIds": 100,
+      "selectedIds": 64,
+      "truncated": true,
+      "facetUtf8Bytes": 849,
+      "wholeAwarenessUpdateBytes": 869
+    }
+  ],
+  "unboundedUnicodeNegativeControlBytes": 24635
+}

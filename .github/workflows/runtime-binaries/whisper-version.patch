@@ -1,0 +1,16 @@
+diff --git a/examples/cli/cli.cpp b/examples/cli/cli.cpp
+index 9a54742..0dae162 100644
+--- a/examples/cli/cli.cpp
++++ b/examples/cli/cli.cpp
+@@ -919,6 +919,11 @@ static void output_lrc(struct whisper_context * ctx, std::ofstream & fout, const
+ static void cb_log_disable(enum ggml_log_level , const char * , void * ) { }
+ 
+ int main(int argc, char ** argv) {
++    // OpenBook runtime probe; upstream v1.8.2 has no --version option.
++    if (argc == 2 && std::string(argv[1]) == "--version") {
++        printf("whisper-cli 1.8.2 (OpenBook runtime build)\n");
++        return 0;
++    }
+     ggml_backend_load_all();
+ 
+ #if defined(_WIN32)

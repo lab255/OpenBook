@@ -1,14 +1,17 @@
 import {describe, it, expect} from 'vitest';
+import {LedgerError} from '@book.dev/sdk';
 import type {
   DatabaseSchema,
   ImportRequest,
   ImportResult,
+  LedgerExportSection,
   PageInput,
   PageSnapshot,
   StoredPage,
 } from '@book.dev/sdk';
+import {mintMissingFormSubmissionKeys} from '../../blockeditor/formBlock';
 import {createDoc, encodeSnapshot, type NewBlock} from '../../blockeditor/model';
-import {blockSnapshotToEditorJs} from '../../blockeditor/exportBlocks';
+import {projectSnapshotForExport} from '../../blockeditor/exportBlocks';
 import {toHtml, toHtmlSite} from '../../export/toHtml';
 import type {SiteBundle} from '../../export/exportSite';
 import {bytesToDataUri} from '../../export/exportAssets';
@@ -19,6 +22,7 @@ import {
   readExportAssetMap,
   runIslandImport,
   snapshotAssetIds,
+  summarizeIslandLedger,
   type IslandImportClient,
 } from '../islandImport';
 
@@ -76,7 +80,7 @@ function mockClient() {
     createRow: async () => {
       throw new Error('unused in these tests');
     },
-    importSpace: async (req: ImportRequest): Promise<ImportResult> => {
+    importLibrary: async (req: ImportRequest): Promise<ImportResult> => {
       importRequests.push(req);
       const idMap: Record<string, string> = {};
       req.pages.forEach((p, i) => {
@@ -125,6 +129,99 @@ describe('single-page export → island-first import (round trip)', () => {
     // The landed block-doc deep-equals the original (ids included) — the island
     // carried the source, not the rendered HTML.
     expect(blocksOf(saved[0].data)).toEqual(blocksOf(snapshot));
+  });
+
+  it('mints a fresh form submission key when a sanitized export is imported', async () => {
+    const sourceKey = 'Qx7_vN2kL9pR4tY8mC3sJw';
+    const formId = 'form-contact';
+    const schema = {
+      formId,
+      submissionKey: sourceKey,
+      enabled: true,
+      fields: [],
+      confirmation: {message: 'Received'},
+    };
+    const snapshot = projectSnapshotForExport(blockSnapshot([{
+      id: 'form-block',
+      type: 'form',
+      props: {formId, submissionKey: sourceKey, enabled: true, schema},
+    }]));
+    const html = toHtml(snapshot, 'Contact', '', new Map(), {id: 'contact'});
+    expect(html).not.toContain(sourceKey);
+
+    const parsed = parseHtmlImport(html);
+    expect(parsed.kind).toBe('island');
+    if (parsed.kind !== 'island') return;
+    const {client, saved} = mockClient();
+    await runIslandImport(client, parsed.island, parsed.assets);
+
+    const imported = (blocksOf(saved[0].data) as Array<{props: Record<string, unknown>}>)[0].props;
+    const importedSchema = imported.schema as Record<string, unknown>;
+    expect(imported.formId).toBe(formId);
+    expect(importedSchema.formId).toBe(formId);
+    expect(imported.submissionKey).toMatch(/^[A-Za-z0-9_-]{22,}$/);
+    expect(imported.submissionKey).not.toBe(sourceKey);
+    expect(importedSchema.submissionKey).toBe(imported.submissionKey);
+  });
+
+  it('mints a fresh form submission key inside a columns layout on import', async () => {
+    const sourceKey = 'Qx7_vN2kL9pR4tY8mC3sJw';
+    const formId = 'form-columns-contact';
+    const schema = {
+      formId,
+      submissionKey: sourceKey,
+      enabled: true,
+      fields: [],
+      confirmation: {message: 'Received'},
+    };
+    const snapshot = projectSnapshotForExport(blockSnapshot([{
+      id: 'columns-block',
+      type: 'columns',
+      children: [{
+        id: 'form-column',
+        type: 'column',
+        children: [{
+          id: 'nested-form-block',
+          type: 'form',
+          props: {formId, submissionKey: sourceKey, enabled: true, schema},
+        }],
+      }],
+    }]));
+    const html = toHtml(snapshot, 'Contact columns', '', new Map(), {id: 'contact-columns'});
+    expect(html.split(sourceKey).length - 1).toBe(0);
+
+    const parsed = parseHtmlImport(html);
+    expect(parsed.kind).toBe('island');
+    if (parsed.kind !== 'island') return;
+    expect(parsed.island.kind).toBe('page');
+    if (parsed.island.kind !== 'page') return;
+
+    const reminted = mintMissingFormSubmissionKeys(parsed.island.record.data);
+    const remintedRoot = (reminted.editorjs as {
+      blocks: Array<{data: {columns: Array<Array<{data: Record<string, unknown>}>>}}>;
+    }).blocks[0];
+    const remintedProjected = remintedRoot.data.columns[0][0].data;
+    const remintedProps = remintedProjected.props as Record<string, unknown>;
+    expect(remintedProjected.submissionKey).toMatch(/^[A-Za-z0-9_-]{22,}$/);
+    expect(remintedProjected.submissionKey).not.toBe(sourceKey);
+    expect((remintedProjected.schema as Record<string, unknown>).submissionKey)
+      .toBe(remintedProjected.submissionKey);
+    expect(remintedProps.submissionKey).toBe(remintedProjected.submissionKey);
+    expect((remintedProps.schema as Record<string, unknown>).submissionKey)
+      .toBe(remintedProjected.submissionKey);
+
+    const {client, saved} = mockClient();
+    await runIslandImport(client, parsed.island, parsed.assets);
+
+    const importedRoot = (blocksOf(saved[0].data) as Array<{
+      children: Array<{children: Array<{props: Record<string, unknown>}>}>;
+    }>)[0];
+    const imported = importedRoot.children[0].children[0].props;
+    const importedSchema = imported.schema as Record<string, unknown>;
+    expect(imported.formId).toBe(formId);
+    expect(imported.submissionKey).toMatch(/^[A-Za-z0-9_-]{22,}$/);
+    expect(imported.submissionKey).not.toBe(sourceKey);
+    expect(importedSchema.submissionKey).toBe(imported.submissionKey);
   });
 
   it('restores asset bytes byte-identically — content addressing yields the SAME id', async () => {
@@ -214,7 +311,7 @@ describe('site export → island-first import (round trip)', () => {
     const bundle: SiteBundle = {
       rootId: 'root',
       // gatherSite projects each page for rendering; the island keeps the raw space.
-      pages: space.pages.map((p) => ({id: p.id, title: p.name ?? '', icon: '', snapshot: blockSnapshotToEditorJs(p.data)})),
+      pages: space.pages.map((p) => ({id: p.id, title: p.name ?? '', icon: '', snapshot: projectSnapshotForExport(p.data)})),
       space,
     };
     const html = toHtmlSite(bundle, new Map([[assetId, bytesToDataUri(PNG, 'image/png')]]));
@@ -271,6 +368,124 @@ describe('foreign / legacy HTML (no island) — regression', () => {
     expect(detectHtmlIsland('<p>no island</p>')).toBeNull();
     // The export runtime's own JSON payload is NOT an island.
     expect(detectHtmlIsland('<script type="application/json" id="ob-data">{"values":{}}</script>')).toBeNull();
+  });
+});
+
+// ── LX-4: embedded ledger records through the island import ─────────────────
+
+/** A minimal coherent ledger section (mirrors the SDK parse test's book). */
+function ledgerSection(): LedgerExportSection {
+  const IDS = {accounts: 'db-a', transactions: 'db-t', postings: 'db-p', reconciliations: 'db-r'};
+  const db = (id: string, pageId: string) => ({id, pageId, name: id, schema: {properties: [], views: []}, createdAt: '', updatedAt: ''});
+  const row = (id: string, databaseId: string, properties: Record<string, unknown>, name: string | null = null, position = 0): StoredPage => ({
+    id, name, data: {editorjs: {blocks: []}, values: [], names: []}, hostedDatabaseId: null, databaseId,
+    parentId: null, properties, deletedAt: null, position, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '',
+  });
+  return {
+    settings: {
+      ledgerDb: {hostPageId: 'host-root', ...IDS, hostPages: {accounts: 'host-a', transactions: 'host-t', postings: 'host-p', reconciliations: 'host-r'}},
+    },
+    library: {
+      databases: [db(IDS.accounts, 'host-a'), db(IDS.transactions, 'host-t'), db(IDS.postings, 'host-p'), db(IDS.reconciliations, 'host-r')],
+      pages: [
+        row('acc-cash', IDS.accounts, {lp_type: 'asset', lp_status: 'open', lp_currency: 'USD'}, 'Assets:Cash'),
+        row('acc-sales', IDS.accounts, {lp_type: 'revenue', lp_status: 'open', lp_currency: 'USD'}, 'Revenue:Sales'),
+        row('tx-1', IDS.transactions, {lp_date: '2026-01-05', lp_description: 'sale', lp_state: 'posted', lp_entry_no: 1}),
+        row('post-1', IDS.postings, {lp_transaction: 'tx-1', lp_account: 'acc-cash', lp_amount_minor: 500, lp_cleared: 'pending'}, null, 0),
+        row('post-2', IDS.postings, {lp_transaction: 'tx-1', lp_account: 'acc-sales', lp_amount_minor: -500, lp_cleared: 'pending'}, null, 1),
+      ],
+    },
+    auditHead: null,
+  };
+}
+
+/** A one-page site whose island additionally carries the ledger section. */
+function ledgerSiteHtml(section: LedgerExportSection | undefined): string {
+  const space = {
+    pages: [{
+      id: 'root', name: 'Root', data: blockSnapshot([{type: 'paragraph', text: [{t: 'body'}]}]),
+      hostedDatabaseId: null, databaseId: null, parentId: null, properties: {}, deletedAt: null, createdAt: '', updatedAt: '',
+    } as StoredPage],
+    databases: [],
+  };
+  const bundle: SiteBundle = {
+    rootId: 'root',
+    pages: [{id: 'root', title: 'Root', icon: '', snapshot: projectSnapshotForExport(space.pages[0].data)}],
+    space,
+    ...(section ? {ledger: section} : {}),
+  };
+  return toHtmlSite(bundle, new Map());
+}
+
+describe('LX-4 — embedded ledger records through the island import', () => {
+  it('summarizeIslandLedger: tallies a coherent section, refuses an incoherent one, null when absent', () => {
+    const withLedger = detectHtmlIsland(ledgerSiteHtml(ledgerSection()));
+    expect(withLedger?.kind).toBe('space');
+    expect(summarizeIslandLedger(withLedger!)).toEqual({ok: true, accounts: 2, entries: 1, evidenceDropped: 0});
+
+    const doctored = ledgerSection();
+    (doctored.library.pages.find((p) => p.id === 'post-1')!.properties as Record<string, unknown>).lp_amount_minor = 501;
+    const bad = detectHtmlIsland(ledgerSiteHtml(doctored));
+    expect(summarizeIslandLedger(bad!)).toMatchObject({ok: false, reason: expect.stringContaining('balance')});
+
+    const none = detectHtmlIsland(ledgerSiteHtml(undefined));
+    expect(summarizeIslandLedger(none!)).toBeNull();
+  });
+
+  it('restores the section through the client and reports the outcome', async () => {
+    const island = detectHtmlIsland(ledgerSiteHtml(ledgerSection()))!;
+    const {client} = mockClient();
+    const calls: LedgerExportSection[] = [];
+    (client as {ledgerRestoreSection?: unknown}).ledgerRestoreSection = async (section: LedgerExportSection) => {
+      calls.push(section);
+      return {restored: {accounts: 2, transactions: 1, postings: 2, reconciliations: 0, periods: 0}, evidenceDropped: 0, reconciliationsDowngraded: 0};
+    };
+    const result = await runIslandImport(client, island, new Map(), {restoreLedger: true});
+    expect(calls).toHaveLength(1);
+    // The section travels VERBATIM off the island — the server re-validates.
+    expect(calls[0].settings.ledgerDb).toEqual(ledgerSection().settings.ledgerDb);
+    expect(result.ledger).toMatchObject({status: 'restored', result: {restored: {accounts: 2}}});
+  });
+
+  it('maps the server refusal (non-empty ledger) to `refused`, everything else to `failed`', async () => {
+    const island = detectHtmlIsland(ledgerSiteHtml(ledgerSection()))!;
+    const {client: refusing} = mockClient();
+    (refusing as {ledgerRestoreSection?: unknown}).ledgerRestoreSection = async () => {
+      throw new LedgerError('invalid-state', 'this library already keeps books — 3 accounts');
+    };
+    const refused = await runIslandImport(refusing, island, new Map(), {restoreLedger: true});
+    expect(refused.ledger).toMatchObject({status: 'refused', message: expect.stringContaining('already keeps books')});
+    // The refusal never cost the page import.
+    expect(refused.pageIds.length).toBeGreaterThan(0);
+
+    const {client: failing} = mockClient();
+    (failing as {ledgerRestoreSection?: unknown}).ledgerRestoreSection = async () => {
+      throw new Error('network down');
+    };
+    const failed = await runIslandImport(failing, island, new Map(), {restoreLedger: true});
+    expect(failed.ledger).toMatchObject({status: 'failed', message: expect.stringContaining('network down')});
+
+    // A client with no restore surface reports that too — never a silent drop.
+    const {client: bare} = mockClient();
+    const noSurface = await runIslandImport(bare, island, new Map(), {restoreLedger: true});
+    expect(noSurface.ledger).toMatchObject({status: 'failed'});
+  });
+
+  it('runs the ledger half only when asked and only when the island carries records', async () => {
+    const island = detectHtmlIsland(ledgerSiteHtml(ledgerSection()))!;
+    const {client} = mockClient();
+    let called = 0;
+    (client as {ledgerRestoreSection?: unknown}).ledgerRestoreSection = async () => {
+      called += 1;
+      throw new Error('should not run');
+    };
+    const notAsked = await runIslandImport(client, island, new Map());
+    expect(notAsked.ledger).toBeUndefined();
+
+    const plain = detectHtmlIsland(ledgerSiteHtml(undefined))!;
+    const noRecords = await runIslandImport(client, plain, new Map(), {restoreLedger: true});
+    expect(noRecords.ledger).toBeUndefined();
+    expect(called).toBe(0);
   });
 });
 

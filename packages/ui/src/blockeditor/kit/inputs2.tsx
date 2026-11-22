@@ -2,11 +2,12 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Check, Plus, X} from 'lucide-react';
 import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from '@/components/ui/command';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {t} from '@/i18n';
 import {blockId, blockProp, type BlockMap, type TextRun} from '../model';
 import {domToRuns, runsToHtml} from '../RichTextEditor';
 import {isColorToken} from '../colors';
 import type {CustomBlockProps} from '../registry';
-import {computeScope, evalExpr} from './scope';
+import {useCachedEval} from './useCachedEval';
 import {ConfigField, ConfigInput, ConfigToggle, KitFrame, kitSet} from './KitFrame';
 import {labelOf, resolveOptions, type KitOption} from './options';
 import {OptionsEditor} from './OptionsEditor';
@@ -26,6 +27,8 @@ import {OptionsEditor} from './OptionsEditor';
 
 const ChoiceCardsBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const name = blockProp<string>(block, 'name') ?? 'choice';
+  // Match the kit's visible display label while preserving the symbol fallback.
+  const ariaLabel = blockProp<string>(block, 'label')?.trim() || name;
   const multi = Boolean(blockProp<boolean>(block, 'multi'));
   const options = resolveOptions(block);
   const value = blockProp<string>(block, 'value') ?? null;
@@ -46,7 +49,7 @@ const ChoiceCardsBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const isOn = (val: string): boolean => (multi ? selected.has(val) : value === val);
 
   const control = (
-    <div className="obe-kit-cardgrid" role={multi ? 'group' : 'radiogroup'} aria-label={name}>
+    <div className="obe-kit-cardgrid" role={multi ? 'group' : 'radiogroup'} aria-label={ariaLabel}>
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -231,10 +234,10 @@ const RichTextBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
 /** Options for a search/tag block: the static `opts` list, OR — when a
  *  `dynamic` expression is set — a comma-expression evaluated over the page's
  *  input scope (a string list, an array, or another input's value). */
-function dynamicOptions(block: BlockMap, editor: CustomBlockProps['editor']): KitOption[] {
+function useDynamicOptions(block: BlockMap, editor: CustomBlockProps['editor']): KitOption[] {
   const source = (blockProp<string>(block, 'dynamic') ?? '').trim();
+  const {value} = useCachedEval(editor, blockId(block), source, 'expression', Boolean(source));
   if (!source) return resolveOptions(block);
-  const {value} = evalExpr(source, computeScope(editor.doc).scope);
   const list = Array.isArray(value)
     ? value
     : typeof value === 'string'
@@ -246,7 +249,7 @@ function dynamicOptions(block: BlockMap, editor: CustomBlockProps['editor']): Ki
 const SearchSelectBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const name = blockProp<string>(block, 'name') ?? 'pick';
   const multi = Boolean(blockProp<boolean>(block, 'multi'));
-  const options = dynamicOptions(block, editor);
+  const options = useDynamicOptions(block, editor);
   const value = blockProp<string>(block, 'value') ?? '';
   const selectedRaw = blockProp<string[]>(block, 'selected');
   const selected = multi ? (Array.isArray(selectedRaw) ? selectedRaw : []) : value ? [value] : [];
@@ -306,7 +309,7 @@ const SearchSelectBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
 const TagFieldBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const name = blockProp<string>(block, 'name') ?? 'tags';
   const freeEntry = blockProp<boolean>(block, 'freeEntry') !== false; // default ON
-  const options = dynamicOptions(block, editor);
+  const options = useDynamicOptions(block, editor);
   const selectedRaw = blockProp<string[]>(block, 'selected');
   const selected = Array.isArray(selectedRaw) ? selectedRaw : [];
   const [draft, setDraft] = useState('');
@@ -451,7 +454,7 @@ const SearchPicker: React.FC<{
         <Command>
           <CommandInput placeholder="Search…" aria-label="Search options" />
           <CommandList>
-            <CommandEmpty>No options</CommandEmpty>
+            <CommandEmpty>{t('common.noOptions')}</CommandEmpty>
             <CommandGroup>
               {options.map((opt) => (
                 <CommandItem

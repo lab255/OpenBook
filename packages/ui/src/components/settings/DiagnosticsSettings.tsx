@@ -1,28 +1,29 @@
+import {WARN_SURFACE_CLASS, STATUS_INK_CLASS} from '@/lib/statusStyles';
 import {useCallback, useEffect, useState} from 'react';
 import {getForwardingAudience, type InstanceInfo} from '@book.dev/sdk';
 import {useData} from '@/data/DataProvider';
-import {useAccount, useConfirm, useForwarding, useTranslation, type IdentityIssuance} from '@/providers';
+import {useAccount, useConfirm, useForwarding, usePlatformCapabilities, useTranslation, type IdentityIssuance} from '@/providers';
 import {Button} from '@/components/ui/button';
 import {SettingsScreen, SettingsSection} from '@/components/settings/primitives';
 import {cn} from '@/lib/utils';
 
 /**
- * The "Diagnostics" settings screen: how this workspace resolves YOU — identity,
+ * The "Diagnostics" settings screen: how this library resolves YOU — identity,
  * ownership, and publishing/audience state — with the repairs for the common
  * lockouts surfaced right next to the check that detects them. Born from the
  * 2026-07 support cluster ("Export failed: you do not have write access", "only
  * the instance owner can change multi-user", the silent identity loss behind
  * both): every one of those was invisible without curl. The screen is read-only
  * except for two explicit actions — refresh identity, and the ownership repair
- * the server only permits from the workspace's own device (machine-owner
+ * the server only permits from the library's own device (machine-owner
  * authority, `InstanceInfo.localOwner`).
  */
 
 type Tone = 'ok' | 'warn' | 'bad' | 'muted';
 
 const TONE_CLASS: Record<Tone, string> = {
-  ok: 'text-emerald-600 dark:text-emerald-400',
-  warn: 'text-amber-600 dark:text-amber-400',
+  ok: STATUS_INK_CLASS.ok,
+  warn: STATUS_INK_CLASS.warn,
   bad: 'text-destructive',
   muted: 'text-muted-foreground',
 };
@@ -61,6 +62,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
   const forwarding = useForwarding();
   const confirm = useConfirm();
   const {t} = useTranslation();
+  const sidecar = usePlatformCapabilities().sidecar;
 
   const [info, setInfo] = useState<InstanceInfo | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
   const [repair, setRepair] = useState<'idle' | 'busy' | 'done' | 'failed'>('idle');
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [restartingSidecar, setRestartingSidecar] = useState(false);
 
   const probe = useCallback(async () => {
     setChecking(true);
@@ -148,6 +151,47 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }, [forwarding, info, issuance, localAudience, probeError]);
+
+  const sidecarError = sidecar?.state?.lastStderrTail.join('\n').trim() || probeError || '';
+  const copySidecarError = useCallback(() => {
+    void navigator.clipboard?.writeText(sidecarError);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, [sidecarError]);
+
+  if (sidecar?.degraded && sidecar.state) {
+    const status = sidecar.state.state === 'dead'
+      ? t('sidecar.dead')
+      : sidecar.state.state === 'respawning'
+        ? t('sidecar.respawning', {attempts: sidecar.state.attempts})
+        : t('sidecar.notReady');
+    return (
+      <SettingsSection title={t('sidecar.diagnosticsTitle')} description={t('sidecar.diagnosticsHint')}>
+        <DiagnosticRow
+          label={t('sidecar.status')}
+          value={status}
+          tone="bad"
+          detail={sidecar.state.lastExitCode == null ? undefined : t('sidecar.exitCode', {code: sidecar.state.lastExitCode})}
+        />
+        <Button type="button" variant="outline" onClick={copySidecarError}>
+          {copied ? t('sidecar.copied') : t('sidecar.copyError')}
+        </Button>
+        <pre tabIndex={0} aria-label={t('sidecar.copyError')} className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-background p-3 font-mono text-xs text-muted-foreground">{sidecarError || t('sidecar.noError')}</pre>
+        <div>
+          <Button
+            size="sm"
+            disabled={restartingSidecar}
+            onClick={() => {
+              setRestartingSidecar(true);
+              void sidecar.restart().catch(() => undefined).finally(() => setRestartingSidecar(false));
+            }}
+          >
+            {restartingSidecar ? t('sidecar.restarting') : t('sidecar.restart')}
+          </Button>
+        </div>
+      </SettingsSection>
+    );
+  }
 
   // The whole screen keys off one probe; a failure IS the diagnostic (a legacy
   // server without the multi-user endpoint, or an unreachable one) — show it,
@@ -230,9 +274,9 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
               />
             </div>
             {drifted && (
-              <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">{t('diagnostics.drift')}</p>
-                <p className="text-xs text-muted-foreground">{t('diagnostics.driftExplain')}</p>
+              <div className={cn('flex flex-col gap-2 rounded-md px-3 py-2', WARN_SURFACE_CLASS)}>
+                <p className="text-xs font-medium">{t('diagnostics.drift')}</p>
+                <p className="text-xs">{t('diagnostics.driftExplain')}</p>
                 {canRepair ? (
                   <div>
                     <Button size="sm" variant="outline" disabled={repair === 'busy'} onClick={() => void repairOwnership()}>
@@ -240,13 +284,13 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">{t('diagnostics.repairNeedsDevice')}</p>
+                  <p className="text-xs">{t('diagnostics.repairNeedsDevice')}</p>
                 )}
                 {repair === 'failed' && <p className="text-xs text-destructive">{t('diagnostics.repairFailed')}</p>}
               </div>
             )}
             {repair === 'done' && !drifted && (
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('diagnostics.repaired')}</p>
+              <p className={cn('text-xs font-medium', STATUS_INK_CLASS.ok)}>{t('diagnostics.repaired')}</p>
             )}
           </SettingsSection>
 
@@ -260,11 +304,21 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
                     ? t('diagnostics.forwardingOff')
                     : forwarding.status === 'online'
                       ? t('forwarding.status.live')
-                      : forwarding.status === 'connecting' || forwarding.status === 'reconnecting'
-                        ? t('forwarding.status.connecting')
-                        : t('forwarding.status.offline')
+                      : forwarding.status === 'stalled'
+                        ? t('forwarding.status.stalled')
+                        : forwarding.status === 'connecting' || forwarding.status === 'reconnecting'
+                          ? t('forwarding.status.connecting')
+                          : t('forwarding.status.offline')
                 }
-                tone={forwarding.enabled ? (forwarding.status === 'online' ? 'ok' : 'warn') : 'muted'}
+                tone={
+                  forwarding.enabled
+                    ? forwarding.status === 'online'
+                      ? 'ok'
+                      : forwarding.status === 'stalled'
+                        ? 'bad'
+                        : 'warn'
+                    : 'muted'
+                }
                 detail={forwarding.host ? `https://${forwarding.host}` : undefined}
               />
               <DiagnosticRow
@@ -281,7 +335,7 @@ export function DiagnosticsBody({issuance, onRefreshIdentity}: DiagnosticsBodyPr
               {localAudience && <DiagnosticRow label={t('diagnostics.localAudience')} value={localAudience} tone="muted" />}
             </div>
             {forwarding.host && info.audience && info.audience !== forwarding.host && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">{t('diagnostics.audienceMismatch')}</p>
+              <p className={cn('text-xs', STATUS_INK_CLASS.warn)}>{t('diagnostics.audienceMismatch')}</p>
             )}
           </SettingsSection>
 
@@ -306,7 +360,7 @@ export default function DiagnosticsSettings() {
   const {t} = useTranslation();
   const {remintIdentity, identityIssuance} = useAccount();
   return (
-    <SettingsScreen title={t('diagnostics.title')} description={t('diagnostics.description')}>
+    <SettingsScreen title={t('diagnostics.title')} description={t('diagnostics.description')} scope="device">
       <DiagnosticsBody issuance={identityIssuance} onRefreshIdentity={remintIdentity} />
     </SettingsScreen>
   );

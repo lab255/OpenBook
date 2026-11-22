@@ -27,7 +27,7 @@ web (Next.js)─┘        ▲
 |---------|------|
 | **`@book.dev/sdk`** | The contract: TypeScript types (`StoredPage`, `PageSnapshot`, `DatabaseSchema`, …), the route table (`API`), `HttpDataClient` (the isomorphic `fetch` client), and the shared content helpers (`snapshotText`, `textSnapshot`, …). No React, no Node. |
 | **`@book.dev/server`** | `PageStore` (all SQL) + a Hono HTTP API + a `PageHub` (in-memory pub/sub for live updates). Runs over **embedded PGlite** (desktop/local) or **external Postgres** (headless). |
-| **`@book.dev/ui`** | The React app: the EditorJS document, reactive blocks, the sidebar tree, providers, and the design primitives (`components/ui/*`). Consumed as a built library. |
+| **`@book.dev/ui`** | The React app: the block editor, reactive blocks, the sidebar tree, providers, and the design primitives (`components/ui/*`). Consumed as a built library. |
 | **`@book.dev/app`** | The Tauri desktop shell. Spawns the server as a sidecar and points the UI at it. |
 | **`@book.dev/web`** | The Next.js web shell. Talks to a deployed server. Hosts the Playwright e2e + Chromatic config. |
 | **`@book.dev/mcp`** | A stdio [MCP](https://modelcontextprotocol.io) server (`openbook-mcp`) exposing the workspace to external agents (Claude Desktop/Code) as tools, over `HttpDataClient`. See its README. |
@@ -133,7 +133,7 @@ PageSnapshot = {
 ```
 
 - **Nesting**: a page's `parentId` builds the sidebar tree (`buildTree` in
-  `WorkspaceNavigationTree.tsx`). `upsertPage` writes `parent_id` only on insert,
+  `LibraryNavigationTree.tsx`). `upsertPage` writes `parent_id` only on insert,
   so a content save never detaches a page from its parent.
 - **Databases**: a database is owned 1:1 by a host page. Its **rows are pages**
   tagged with `database_id` (excluded from the sidebar list, listed via the
@@ -210,46 +210,10 @@ expired trash; `purgePage` / `emptyTrash` do it on demand. See `README.md`.
 
 ## 4. The editor & reactive system
 
-The document is **EditorJS** (vanilla JS) hosting **React** blocks via a small
-adapter (`packages/ui/src/reactive/editorJsReactAdapter.ts`): each block tool
-mounts its own React root.
+### The block editor (`packages/ui/src/blockeditor/`)
 
-### Reactive blocks (`packages/ui/src/reactive/`)
-- **`ReactiveStore`** — a Preact-signals store of named cells. Lazy signal
-  creation keyed by `cellId`; downstream blocks subscribe by reading a signal.
-- **`ExprBlock`** — a formula cell; `compile.ts` turns `@name` / `__C__{id}__`
-  references into a function that re-runs (via a signals `effect`) whenever a
-  referenced cell changes.
-- **`ChartBlock`** — plots one or more cells (Observable Plot); re-renders on
-  value change; shows a height-reserving skeleton while pending.
-- **`SliderBlock`** — an input cell.
-- **`SubpageBlock`** — an inline link to a nested page; creates the child once on
-  first mount and records its `pageId` in the block data.
-
-### Live sync — `packages/ui/src/screens/liveSync.ts`
-The trickiest part, and the source of two classes of bug, so the logic is **pure
-and unit-tested** (`liveSync.test.ts`):
-
-- **`planBlockSync(current, next, focusedBlockId)`** diffs the editor against an
-  incoming snapshot and returns *only* the delete/update/insert ops for blocks
-  that changed. An identical snapshot → an empty plan. `PageDocument` executes the
-  plan via the EditorJS block API; it **never calls `editor.render(next)`**.
-  - *Why*: a full render tears down and rebuilds every block — shifting layout and
-    re-mounting reactive/subpage blocks, which re-runs their side effects. With
-    the SSE echo of a save, that becomes an infinite **save loop + layout jump** on
-    pages with reactive blocks.
-  - The block under the caret (`focusedBlockId`) is never touched, so typing
-    survives a peer's edits.
-- **`isPersistWorthyChange(event)`** decides whether an `onChange` is a real edit
-  worth autosaving. Structural changes (add/remove/move) count; a subpage
-  recording its new child id counts; **reactive `block-changed` events do not** —
-  reactive blocks fire them constantly as they recompute, and treating those as
-  edits is the other half of the save loop.
-
-### The block editor (`packages/ui/src/blockeditor/`) — the successor
-
-A fully custom, CRDT-native block editor being introduced **in parallel** with
-the EditorJS surface (per-page dispatch in `ConnectedPageDocument`):
+A fully custom, CRDT-native block editor — OpenBook's sole editor (per-page
+dispatch in `ConnectedPageDocument`):
 
 - **Model** (`model.ts`) — a Y.Doc holding one uniform recursive tree:
   `Y.Array` of block `Y.Map`s (`id`, `type`, `text: Y.Text` with attribute
@@ -302,6 +266,84 @@ the EditorJS surface (per-page dispatch in `ConnectedPageDocument`):
   Settings → General toggle opts *empty* pages in. The sandbox lives at
   `/editor-lab` (localStorage-persisted, cross-tab sync); e2e in
   `packages/web/e2e/block-editor.spec.ts`.
+
+### Forms
+
+Forms are native `type:'form'` blocks registered from
+`packages/ui/src/blockeditor/FormBlockView.tsx` and declared in the SDK block
+catalogue. Their durable block props mirror the server gate:
+`{formId, submissionKey, enabled, databaseId, schema}`. `FormBuilder.tsx` owns
+the drag-and-drop field canvas, same-page database binding, compatible-column
+planning, and author settings; `FormSubmissionView.tsx` revives only the form
+controls on an otherwise locked public page. The ordered field model and
+server/client validation live in `packages/sdk/src/formSchema.ts`. New
+capabilities come from the 256-bit generator in `packages/sdk/src/forms.ts`.
+
+Anonymous writes use the narrow page-scoped capability routes
+`POST /api/pages/:pageId/forms/:formId/submissions` and
+`POST /api/pages/:pageId/forms/:formId/uploads`. The gate in
+`packages/server/src/formAccess.ts` scans only the authoritative recursive
+`PageSnapshot.blockdoc.blocks`, compares the key in constant time, reuses the
+ordinary page-READ decision, and requires the bound database to be hosted by
+the same page. It returns the same 404 for every failed capability/access check;
+the key grants one row-create/upload-staging operation, never page or database
+access. The full contract is
+[§9 of the sharing/access amendment](docs/sharing-access-contract-spike-OB-182.md#9-form-1--page-scoped-form-submission-capabilities),
+and the user workflow is in [docs/forms.md](docs/forms.md).
+
+The abuse posture is layered. Upload and submit share the fixed-window rate
+limits in `packages/server/src/formAccess.ts` (30 requests per peer/form per
+minute, with a 600-request shared fallback when no trustworthy peer is
+available). The staged-upload carve-out grants no general asset write: a token
+is field/form-bound, becomes readable only when an idempotent accepted row
+claims it, and otherwise ages out. Public quotas are shared with the browser in
+`packages/sdk/src/forms.ts`: `FORM_UPLOAD_MAX_FILE_BYTES` (5 MiB),
+`FORM_UPLOAD_MAX_FILES` (5), `FORM_UPLOAD_MAX_FORM_STAGED_BYTES` (10 MiB),
+`FORM_UPLOAD_MAX_FORM_BYTES` (50 MiB), and `FORM_UPLOAD_ORPHAN_TTL_MS` (30
+minutes). The schema can additionally cap total submissions; the server default
+is 10,000 rows per form.
+
+The FORM-7 MCP surface in `packages/mcp/src/server.ts` provides `list_forms`,
+`get_form_schema`, `update_form_field`, `set_form_settings`, and
+`list_form_submissions`. Reads recursively redact `submissionKey`; writes go
+through the resolved per-page agent-edits policy (suggest by default), and key
+regeneration is intentionally author-UI-only.
+
+### Meeting blocks
+
+Meetings are native `type:'meeting'` container blocks registered by
+`packages/ui/src/blockeditor/MeetingBlockView.tsx`. The
+[representation contract](docs/meeting-block.md) defines audio asset references,
+timestamped transcript segments, summary, title, and status props. Manual notes
+remain ordinary CRDT child blocks; generated transcript and summary are prop
+snapshots. The user workflow is in [meeting notes](docs/meeting-notes.md).
+
+`MeetingRecorder` restarts MediaRecorder every 45 seconds and on pause/resume.
+Each uploaded chunk has its own container header, unlike recorder timeslices,
+so playback, retries, transcription, and export work on standalone files.
+Uploads use page-associated assets; `POST /api/ai/transcribe` receives the asset
+and page IDs, enforces access, and records usage. Completed chunks append
+transcript segments progressively. Summary generation is an explicit streamed
+AI request; cancellation preserves the previous durable summary.
+
+Transcription resolves separately from chat: explicit off rejects; an explicit
+OpenAI-compatible transcription provider opts into that endpoint; otherwise the
+local resolver runs, followed by the deterministic mock fallback only when chat
+provider is mock. An unavailable local engine returns a configuration error,
+never implicit cloud fallback. **Settings → AI → Enable local transcription**
+provisions supported pinned runtimes into `<dataDir>/bin` and the verified model,
+with staged progress and generation receipts. Pin changes trigger re-provisioning
+when enabled configuration loads; Settings also offers Update. Resolution is
+explicit `OPENBOOK_*_BIN` override → current managed runtime → PATH. See
+[local transcription](docs/local-transcription.md) for platform availability and
+advanced custom-build overrides.
+
+Audio export downloads a single original file or an ordered timestamped ZIP of
+chunks, without remuxing or deleting library assets. Markdown and HTML exports
+include transcript, summary, and child notes with audio references; audio bytes
+are exported separately. The browser epic proof is
+`packages/web/e2e/meeting-epic.spec.ts`, using a WebAudio microphone substitute
+with real recording, asset, transcription, generation, and download paths.
 
 ### Optional local AI (`packages/server/src/ai/`)
 
@@ -374,7 +416,7 @@ Two ways for a model to *act on* the workspace, sharing one tool contract
 - **Providers** (`packages/ui/src/providers/`): `DataProvider` (the client),
   `NavigationProvider` (page list, current window/tabs/panes, create/delete/rename),
   `HudProvider` (view state incl. `viewMode.fullWidth`, sidebar), `ThemeProvider`,
-  `WorkspaceProvider`, and `ConfirmProvider` (promise-based confirm dialog).
+  `LibraryProvider`, and `ConfirmProvider` (promise-based confirm dialog).
 - **`windowModel.ts`** — pure tab/split-pane navigation model (history, reconcile);
   unit-tested.
 - **Template gallery** (`components/TemplateGallery.tsx` over `sdk/templates.ts`):
@@ -386,7 +428,7 @@ Two ways for a model to *act on* the workspace, sharing one tool contract
   `dropdown-menu`, `context-menu`, `tree`, `skeleton`, `button`, etc. Tailwind v4
   tokens live in `index.css`.
 - **`DefaultLayout`** composes the titlebar, sidebar (`SideNav` →
-  `WorkspaceNavigationTree`), and the `DocumentArea` (one or two `PageDocument`
+  `LibraryNavigationTree`), and the `DocumentArea` (one or two `PageDocument`
   panes). It also mounts the `ConfirmProvider`, the toast stack, and the
   Move-to dialog.
 - **First run**: an empty workspace lands on **Home** (`HOME_PAGE_ID`), whose
@@ -411,9 +453,18 @@ Two ways for a model to *act on* the workspace, sharing one tool contract
 pnpm verify
 ```
 
-Runs, in order: **build:libs** (sdk → ui → server) → **typecheck** (all packages)
-→ **lint** (all) → **test** (vitest unit suites) → **test:e2e** (server e2e). This
-is the gate to run before committing and in CI (`.github/workflows/ci.yml`).
+Runs, in order: **test:eslint-rules** → **build:libs** (sdk → ui → mcp → server)
+→ **check:gen** → **typecheck** (all packages) → **lint** (all) → **test**
+(all unit suites, including server) → **test:e2e** (server + mcp e2e). Full
+verification runs nightly at 06:30 UTC and on demand via
+`.github/workflows/nightly-verify.yml`; failures open or update a pinned
+"Nightly verify failing" issue, which closes on recovery.
+
+PRs and pushes to main use the fast **Gate (typecheck · lint · unit)** in
+`.github/workflows/ci.yml`: restore/build libs, test ESLint rules, check generated
+files, typecheck, lint, and explicitly run sdk/ui/app/mcp unit tests. Full
+`verify` does not run on either event. The existing Playwright shards, PR P1
+gate, Beancount, durability, Postgres concurrency, and Chromatic jobs remain.
 
 Other commands:
 
@@ -445,7 +496,9 @@ Other commands:
    and sidebar toggle) is web-invisible, so the web shell exposes a `?shell=desktop`
    preview seam (`packages/web/src/pages/index.tsx`) the snapshot drives.
    `chromatic --playwright` uploads them. Set the `CHROMATIC_PROJECT_TOKEN` repo
-   secret to enable the CI step.
+   secret to enable the CI step. Chromatic diffs, including new snapshots, now
+   fail the job. Review and accept intentional changes in the Chromatic UI,
+   then re-run the job.
 
 > **What automated tests can't cover.** WKWebView-only behavior (see §7) doesn't
 > reproduce in headless Chromium — verify those on the real desktop app.
@@ -468,4 +521,4 @@ tests can't catch:
    the `translate` CSS property, which WKWebView didn't apply (modals jumped to the
    top-left). `dialog.tsx` centers with `fixed inset-0 flex items-center justify-center`.
 5. **HTML5 drag needs `fileDropEnabled: false`** in `tauri.conf.json`, or the native
-   OS file-drop handler eats EditorJS block reordering.
+   OS file-drop handler eats block drag-reordering in the editor.

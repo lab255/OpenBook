@@ -1,0 +1,39 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_yr3pisy978-1/OpenBook/packages/ui
+
+ ❯ src/blockeditor/canvas/CanvasBlock.test.tsx (39 tests | 1 failed | 38 skipped) 28ms
+   × fresh touch pans after pen capture loss without a subsequent pen-up event 27ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/blockeditor/canvas/CanvasBlock.test.tsx > fresh touch pans after pen capture loss without a subsequent pen-up event
+AssertionError: expected [ +0, +0 ] to deeply equal [ 40, +0 ]
+
+- Expected
++ Received
+
+  [
+-   40,
++   0,
+    0,
+  ]
+
+ ❯ src/blockeditor/canvas/CanvasBlock.test.tsx:183:47
+    181|   pointer(a.viewport,'move',140,100,{pointerType:'touch',pointerId:2});
+    182|   pointer(a.viewport,'up',140,100,{pointerType:'touch',pointerId:2});
+    183|   expect(context.translate.mock.calls.at(-1)).toEqual([before[0]+40,be…
+       |                                               ^
+    184| });
+    185|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 skipped (39)
+   Start at  10:56:13
+   Duration  611ms (transform 308ms, setup 0ms, import 425ms, tests 28ms, environment 92ms)
+
+undefined
+/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_yr3pisy978-1/OpenBook/packages/ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/blockeditor/canvas/CanvasBlock.test.tsx -t fresh touch pans after pen capture loss

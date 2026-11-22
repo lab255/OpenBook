@@ -1,0 +1,374 @@
+import type {APIRequestContext} from '@playwright/test';
+import {expect, test} from './fixtures';
+import {newPage} from './seed';
+
+test.describe.configure({mode: 'parallel'});
+
+type Rect = {x: number; y: number; width: number; height: number};
+
+function rectanglesIntersect(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+async function columnsPage(request: APIRequestContext): Promise<string> {
+  return newPage(request, `TABLE-2 columns ${Date.now()}`, {
+    editor: 'blocks',
+    blockdoc: {
+      blocks: [{
+        id: 'layout',
+        type: 'columns',
+        children: [0, 1].map((i) => ({
+          id: `col-${i}`,
+          type: 'column',
+          props: {span: 6},
+          children: [{id: `text-${i}`, type: 'paragraph', text: [{t: `Column ${i + 1}`}]}],
+        })),
+      }],
+    },
+    editorjs: {blocks: []},
+    values: [],
+    names: [],
+  });
+}
+
+async function freshTable(page: import('@playwright/test').Page): Promise<import('@playwright/test').Locator> {
+  await page.addInitScript(() => {
+    localStorage.removeItem('obe-lab-doc');
+  });
+  await page.goto('/editor-lab');
+  const lastText = page.locator('.obe-text').last();
+  await lastText.click();
+  await page.keyboard.press('ControlOrMeta+ArrowDown');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  const table = page.locator('.obe-table');
+  await expect(table).toBeVisible();
+  return table;
+}
+
+async function mergeTopLeft2x2(page: import('@playwright/test').Page): Promise<import('@playwright/test').Locator> {
+  const table = await freshTable(page);
+  const cells = table.locator('td');
+  const from = (await cells.nth(0).boundingBox())!;
+  const to = (await cells.nth(4).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {steps: 10});
+  await page.mouse.up();
+  await expect(table.locator('td.obe-cell-selected')).toHaveCount(4);
+  await cells.nth(0).click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Merge cells'}).click();
+  await expect(table.locator('tbody > tr').nth(0).locator('td').first()).toHaveAttribute('colspan', '2');
+  await expect(table.locator('tbody > tr').nth(0).locator('td').first()).toHaveAttribute('rowspan', '2');
+  return table;
+}
+
+test('table rows share the 33px pitch and compact chrome geometry', {tag: ['@editor', '@p1']}, async ({page}) => {
+  const table = await freshTable(page);
+  const metrics = await table.evaluate((element) => {
+    const wrap = element.parentElement!;
+    return {
+      rows: [...element.querySelectorAll('tr')].map((row) => row.getBoundingClientRect().height),
+      top: getComputedStyle(wrap).paddingTop,
+      bottom: getComputedStyle(wrap).paddingBottom,
+      fontSize: getComputedStyle(element).fontSize,
+      lineHeight: getComputedStyle(element).lineHeight,
+      blockHeight: element.closest('.obe-row')!.getBoundingClientRect().height,
+      spaceAbove: getComputedStyle(element.closest('.obe-row')!).getPropertyValue('--obe-row-space-above').trim(),
+      handleOffset: element.closest('.obe-row')!.querySelector('.obe-handle')!.getBoundingClientRect().y
+        - element.closest('.obe-row')!.getBoundingClientRect().y,
+    };
+  });
+  expect(metrics.rows).toHaveLength(3);
+  for (const height of metrics.rows) expect(Math.abs(height - 33.02)).toBeLessThan(0.1);
+  expect(metrics.top).toBe('0px');
+  expect(metrics.spaceAbove).toBe('0px');
+  expect(metrics.handleOffset).toBeCloseTo(-16, 1);
+  expect(metrics.bottom).toBe('16px');
+  expect(metrics.fontSize).toBe('14px');
+  expect(metrics.lineHeight).toBe('20.02px');
+  console.log('DSX-5b editable table metrics', JSON.stringify(metrics));
+  const rowGrip = (await table.locator('.obe-table-row-grip').first().boundingBox())!;
+  const colGrip = (await table.locator('.obe-table-col-grip').first().boundingBox())!;
+  expect([rowGrip.width, rowGrip.height]).toEqual([18, 24]);
+  expect([colGrip.width, colGrip.height]).toEqual([24, 18]);
+});
+
+test('column boundary resizes by pointer and stays clear of table chrome', {tag: ['@editor', '@p1']}, async ({page}) => {
+  const table = await freshTable(page);
+  const firstCell = table.locator('tbody > tr').first().locator('td').first();
+  const handle = page.getByRole('separator', {name: 'Resize column A'});
+  await expect(handle).toBeVisible();
+
+  const before = (await firstCell.boundingBox())!;
+  const handleBox = (await handle.boundingBox())!;
+  const rowGripBox = (await table.locator('tbody > tr').first().locator('.obe-table-row-grip').boundingBox())!;
+  const colGripBox = (await firstCell.locator('.obe-table-col-grip').boundingBox())!;
+  const addColBox = (await page.locator('.obe-table-add-col').boundingBox())!;
+  expect(rectanglesIntersect(handleBox, rowGripBox)).toBe(false);
+  expect(rectanglesIntersect(handleBox, colGripBox)).toBe(false);
+  expect(rectanglesIntersect(handleBox, addColBox)).toBe(false);
+
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2 + 40, handleBox.y + handleBox.height / 2, {steps: 5});
+  await page.mouse.up();
+  await expect.poll(async () => (await firstCell.boundingBox())!.width).toBeGreaterThan(before.width + 36);
+  await expect.poll(async () => (await firstCell.boundingBox())!.width).toBeLessThan(before.width + 44);
+});
+
+test('table fills the content column without blocking the block drag handle', {tag: ['@editor', '@p1']}, async ({
+  page,
+}) => {
+  const table = await freshTable(page);
+  const paragraph = page.locator('.obe-row[data-block-type="paragraph"] .obe-text').first();
+  const tableBox = (await table.boundingBox())!;
+  const paragraphBox = (await paragraph.boundingBox())!;
+  expect(Math.abs(tableBox.x - paragraphBox.x)).toBeLessThanOrEqual(1);
+
+  const tableBlock = table.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " obe-row ")][1]');
+  const bodyRow = table.locator('tbody > tr').first();
+  await bodyRow.hover();
+  const rowGrip = bodyRow.locator('.obe-table-row-grip');
+  await expect(rowGrip).toBeVisible();
+
+  const dragHandle = tableBlock.locator('.obe-gutter .obe-handle');
+  const gripBox = (await rowGrip.boundingBox())!;
+  const handleBox = (await dragHandle.boundingBox())!;
+  expect(rectanglesIntersect(gripBox, handleBox)).toBe(false);
+
+  const hitTargetIsHandle = await dragHandle.evaluate((handle) => {
+    const box = handle.getBoundingClientRect();
+    return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest('.obe-handle') === handle;
+  });
+  expect(hitTargetIsHandle).toBe(true);
+});
+
+test.describe('in groups', () => {
+  test.use({freshWorkspace: true});
+
+  test('first editable table clears the group header rule', {tag: ['@editor', '@p1']}, async ({page, request}) => {
+    const pageId = await newPage(request, `Table header clearance ${Date.now()}`, {
+      editor: 'blocks',
+      blockdoc: {blocks: [{
+        id: 'group', type: 'group', props: {name: 'Table group'},
+        children: [{id: 'text', type: 'paragraph', text: []}],
+      }]},
+      editorjs: {blocks: []}, values: [], names: [],
+    });
+    await page.goto(`/?page=${pageId}`);
+    await page.locator('.obe-group-body .obe-text').click();
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+    const row = page.locator('.obe-group-body > .obe-row[data-block-type="table"]:first-child');
+    await expect(row).toHaveCSS('padding-top', '12px');
+    await row.locator('.obe-table').hover();
+    const header = (await page.locator('.obe-group-head').boundingBox())!;
+    const handle = (await row.locator(':scope > .obe-gutter .obe-handle').boundingBox())!;
+    const headerBottom = header.y + header.height;
+    console.log('DSX-5b F2 group clearance', JSON.stringify({
+      headerBottom, handleTop: handle.y, handleBottom: handle.y + handle.height,
+      clearance: handle.y - headerBottom,
+    }));
+    expect(handle.y).toBeGreaterThanOrEqual(headerBottom);
+    const geometry = await row.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const table = element.querySelector('.obe-table')!.getBoundingClientRect();
+      const grip = element.querySelector('.obe-table-row-grip')!.getBoundingClientRect();
+      return {rowTop: box.y, tableTop: table.y, gripTop: grip.y};
+    });
+    console.log('DSX-5b F2b nested geometry', JSON.stringify(geometry));
+    expect(handle.y + handle.height).toBeLessThanOrEqual(geometry.gripTop);
+    // The 12px gap precedes the ordinary block box, including its 4px inset.
+    expect(geometry.rowTop + 12 - handle.y).toBeCloseTo(16, 1);
+    expect(geometry.tableTop - geometry.rowTop).toBe(16);
+    await row.locator(':scope > .obe-gutter .obe-handle').click();
+    await expect(row).toHaveClass(/obe-row-selected/);
+    expect(await row.evaluate((element) => getComputedStyle(element, '::before').top)).toBe('12px');
+  });
+});
+
+test.describe('in tabs', () => {
+  test.use({freshWorkspace: true});
+
+  test('first editable table clears the tab header rule', {tag: ['@editor', '@p1']}, async ({page, request}) => {
+    const pageId = await newPage(request, `Table header clearance ${Date.now()}`, {
+      editor: 'blocks',
+      blockdoc: {blocks: [{
+        id: 'tabs', type: 'tabs', props: {active: 0},
+        children: [{id: 'tab', type: 'tab', props: {label: 'Table tab'},
+          children: [{id: 'text', type: 'paragraph', text: []}]}],
+      }]},
+      editorjs: {blocks: []}, values: [], names: [],
+    });
+    await page.goto(`/?page=${pageId}`);
+    await page.locator('.obe-cnt-panel .obe-text').click();
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+    const row = page.locator('.obe-cnt-panel > .obe-row[data-block-type="table"]:first-child');
+    await expect(row).toHaveCSS('padding-top', '12px');
+    await row.locator('.obe-table').hover();
+    const header = (await page.locator('.obe-cnt-head').boundingBox())!;
+    const handle = (await row.locator(':scope > .obe-gutter .obe-handle').boundingBox())!;
+    const headerBottom = header.y + header.height;
+    console.log('DSX-5b F2b tabs clearance', JSON.stringify({
+      headerBottom, handleTop: handle.y, handleBottom: handle.y + handle.height,
+      clearance: handle.y - headerBottom,
+    }));
+    expect(handle.y).toBeGreaterThanOrEqual(headerBottom);
+    const geometry = await row.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const table = element.querySelector('.obe-table')!.getBoundingClientRect();
+      const grip = element.querySelector('.obe-table-row-grip')!.getBoundingClientRect();
+      return {rowTop: box.y, tableTop: table.y, gripTop: grip.y};
+    });
+    console.log('DSX-5b F2b nested geometry', JSON.stringify(geometry));
+    expect(handle.y + handle.height).toBeLessThanOrEqual(geometry.gripTop);
+    // The 12px gap precedes the ordinary block box, including its 4px inset.
+    expect(geometry.rowTop + 12 - handle.y).toBeCloseTo(16, 1);
+    expect(geometry.tableTop - geometry.rowTop).toBe(16);
+    await row.locator(':scope > .obe-gutter .obe-handle').click();
+    await expect(row).toHaveClass(/obe-row-selected/);
+    expect(await row.evaluate((element) => getComputedStyle(element, '::before').top)).toBe('12px');
+  });
+});
+
+test.describe('in columns', () => {
+  test.use({freshWorkspace: true});
+
+  test('row grip stays outside the cells inside a column layout', {tag: ['@editor', '@p1']}, async ({
+    page,
+    request,
+  }) => {
+    const pageId = await columnsPage(request);
+    await page.goto(`/?page=${pageId}`);
+
+    const secondColumn = page.locator('.obe-columns > .obe-column').nth(1);
+    const paragraph = secondColumn.locator('.obe-text').first();
+    await paragraph.click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+
+    const table = secondColumn.locator('.obe-table');
+    await expect(table).toBeVisible();
+    const tableBlock = table.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " obe-row ")][1]');
+    const bodyRow = table.locator('tbody > tr').first();
+
+    await page.mouse.move(0, 0); // no row hovered: the grip is at rest
+    // At rest the grip sits UNDER the column-resize divider (stacking, not
+    // pointer-events — see index.css), so the divider stays grabbable.
+    const divider = secondColumn.locator('.obe-col-divider').first();
+    expect(await divider.evaluate((d) => {
+      const b = d.getBoundingClientRect();
+      return document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('.obe-col-divider') === d;
+    })).toBe(true);
+
+    await bodyRow.hover();
+
+    const rowGrip = bodyRow.locator('.obe-table-row-grip');
+    const firstCell = bodyRow.locator('td').first();
+    const blockHandle = tableBlock.locator('.obe-gutter .obe-handle');
+    await expect(rowGrip).toBeVisible();
+    await expect(blockHandle).toBeVisible();
+    expect(await rowGrip.evaluate((g) => {
+      const b = g.getBoundingClientRect();
+      return document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('.obe-table-row-grip') !== null;
+    })).toBe(true);
+
+    const gripBox = (await rowGrip.boundingBox())!;
+    const cellBox = (await firstCell.boundingBox())!;
+    const handleBox = (await blockHandle.boundingBox())!;
+    expect(rectanglesIntersect(gripBox, cellBox)).toBe(false);
+    expect(rectanglesIntersect(gripBox, handleBox)).toBe(false);
+  });
+});
+
+test('merged table rows keep grips bound to their own row payload', {tag: ['@editor', '@p1']}, async ({page}) => {
+  const table = await mergeTopLeft2x2(page);
+  const bindings = await table.locator('tbody > tr').evaluateAll((rows) =>
+    rows.map((row, from) => {
+      const host = row as HTMLElement;
+      const grips = [...row.querySelectorAll<HTMLElement>('.obe-table-row-grip')];
+      return {
+        from,
+        rowId: host.dataset.tableRowId,
+        grips: grips.map((grip) => {
+          const transfer = new DataTransfer();
+          grip.dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: transfer}));
+          grip.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: transfer}));
+          return {
+            axis: grip.dataset.dragAxis,
+            from: Number(grip.dataset.dragFrom),
+            id: grip.dataset.dragId,
+            payload: transfer.getData('text/plain'),
+          };
+        }),
+      };
+    }),
+  );
+
+  expect(bindings).toHaveLength(3);
+  for (const binding of bindings) {
+    expect(binding.grips).toEqual([
+      {axis: 'row', from: binding.from, id: binding.rowId, payload: binding.rowId},
+    ]);
+  }
+});
+
+test('merged top-row anchor exposes one correctly bound grip segment per column', {tag: ['@editor', '@p1']}, async ({
+  page,
+}) => {
+  const table = await mergeTopLeft2x2(page);
+  const grips = table.locator('.obe-table-col-grip');
+  const bindings = await grips.evaluateAll((elements) =>
+    elements.map((element) => {
+      const grip = element as HTMLElement;
+      const transfer = new DataTransfer();
+      grip.dispatchEvent(new DragEvent('dragstart', {bubbles: true, dataTransfer: transfer}));
+      grip.dispatchEvent(new DragEvent('dragend', {bubbles: true, dataTransfer: transfer}));
+      return {
+        axis: grip.dataset.dragAxis,
+        from: Number(grip.dataset.dragFrom),
+        id: grip.dataset.dragId,
+        payload: transfer.getData('text/plain'),
+      };
+    }),
+  );
+
+  expect(bindings.map(({from}) => from)).toEqual([0, 1, 2]);
+  expect(bindings.every(({axis, id, payload}) => axis === 'col' && id === payload)).toBe(true);
+
+  const anchorSegments = table.locator('tbody > tr').first().locator('td').first().locator('.obe-table-col-grip');
+  await expect(anchorSegments).toHaveCount(2);
+  const first = (await anchorSegments.nth(0).boundingBox())!;
+  const second = (await anchorSegments.nth(1).boundingBox())!;
+  expect(Math.abs(first.width - second.width)).toBeLessThanOrEqual(1);
+  const anchorCell = (await table.locator('tbody > tr').first().locator('td').first().boundingBox())!;
+  const firstCentre = first.x + first.width / 2;
+  const secondCentre = second.x + second.width / 2;
+  expect(Math.abs(secondCentre - firstCentre - anchorCell.width / 2)).toBeLessThanOrEqual(1);
+  expect(Math.abs(firstCentre - anchorCell.x - anchorCell.width / 4)).toBeLessThanOrEqual(1);
+});
+
+test('table grip menus insert a row and delete a column', {tag: ['@editor', '@p1']}, async ({page}) => {
+  const table = await freshTable(page);
+  const rows = table.locator('tbody > tr');
+  const initialRows = await rows.count();
+  const initialColumns = await table.locator('.obe-table-col-grip').count();
+
+  const firstRow = rows.first();
+  await firstRow.hover();
+  await firstRow.getByRole('button', {name: 'Row 1 options'}).click();
+  await expect(page.getByRole('menuitem', {name: 'Insert row below'})).toBeVisible();
+  await page.getByRole('menuitem', {name: 'Insert row below'}).click();
+  await expect(rows).toHaveCount(initialRows + 1);
+
+  const firstColumnGrip = table.getByRole('button', {name: 'Column A options'});
+  await firstColumnGrip.click({button: 'right'});
+  await expect(page.getByRole('menuitem', {name: 'Delete column'})).toBeVisible();
+  await page.getByRole('menuitem', {name: 'Delete column'}).click();
+  await expect(table.locator('.obe-table-col-grip')).toHaveCount(initialColumns - 1);
+});

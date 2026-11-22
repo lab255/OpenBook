@@ -1,17 +1,20 @@
+import {SharedGutter} from '@/blockeditor/SharedGutter';
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import * as Y from 'yjs';
 import type {PageSnapshot} from '@book.dev/sdk';
-import {ICON_PROPERTY_ID} from '@book.dev/sdk';
+import {ICON_PROPERTY_ID, gatherLedgerExportSection} from '@book.dev/sdk';
 import {BlockEditor, type BlockEditorHandle, type LocalSelection} from '@/blockeditor/BlockEditor';
 import {
   createSeededDoc,
   decodeSnapshot,
   encodeSnapshot,
-  migrateEditorJs,
+  migrateLegacyBlocks,
   type BlockDocSnapshot,
 } from '@/blockeditor/model';
-import {blockSnapshotToEditorJs} from '@/blockeditor/exportBlocks';
-import {computeScope} from '@/blockeditor/kit/scope';
+import {projectSnapshotForExport} from '@/blockeditor/exportBlocks';
+import {projectBlockPageSnapshot} from '@/blockeditor/saveProjection';
+import {resolveDbChartSeries} from '@/blockeditor/kit/chartData';
+import {computeExportCells} from '@/blockeditor/kit/scope';
 import {buildDocumentModel} from '@/export/documentModel';
 import {toMarkdown} from '@/export/toMarkdown';
 import {resolveExportAssets} from '@/export/exportAssets';
@@ -28,7 +31,10 @@ import {RemoteCursors} from '@/components/presence/RemoteCursors';
 import {registerReactiveBlocks} from '@/blockeditor/reactiveBlocks';
 import {registerArtifactKit} from '@/blockeditor/kit';
 import {registerDatabaseBlock} from '@/components/database/InlineDatabaseBlock';
+import {registerDatabaseFormBlock} from '@/components/database/DatabaseFormBlock';
+import {FormOriginContext, formOriginUrl, registerFormBlock} from '@/blockeditor/FormBlockView';
 import {PageContextMenu} from '@/components/PageContextMenu';
+import {ExportBooksDialog, type ExportBooksChoice} from '@/components/ExportBooksDialog';
 import {PageProperties} from '@/components/PageProperties';
 import {PageHeaderControls} from '@/components/PageHeaderControls';
 import {PageCoverBanner} from '@/components/PageCover';
@@ -36,13 +42,14 @@ import {usePageThemeStyle, usePageHasBackground} from '@/components/appearance/P
 import {usePageFullWidth} from '@/lib/pageFullWidth';
 import {pageFontStyle, usePageFonts} from '@/lib/pageFont';
 import {setPageSaveStatus} from '@/lib/pageSaveStatus';
+import {showToast} from '@/components/ui/toast';
 import {pageHasPluginManifest} from '@/plugins';
 import {registerPageDocActions, type ExportKind} from '@/lib/pageDocActions';
 import {registerOpenDoc} from '@/lib/openDocs';
 import {registerBlockEditorDoc} from '@/lib/aiBridge';
 import {SuggestHost} from '@/components/review/SuggestHost';
 import {BlockReviewMarkers} from '@/components/review/BlockReviewMarkers';
-import {useConfirm, usePreferences, useTranslation} from '@/providers';
+import {useConfirm, useNavigation, usePreferences, useTheme, useTranslation} from '@/providers';
 import {downloadText, safeFilename} from '@/lib/download';
 import {cn} from '@/lib/utils';
 import {PageHeader, type PageDocumentProps, type PageTitleHandle} from './pageChrome';
@@ -64,6 +71,66 @@ import {PageHeader, type PageDocumentProps, type PageTitleHandle} from './pageCh
 registerReactiveBlocks(); // built-in reactive plugins (slider + formula)
 registerArtifactKit(); // interactive artifact blocks (inputs, charts, cards)
 registerDatabaseBlock(); // inline database-view embeds ("Link to database")
+registerDatabaseFormBlock(); // reference-only database form embeds (F-3)
+registerFormBlock(); // provider-aware form shell (database summary + frozen preview)
+
+/**
+ * Honour a pending `blockAnchor` (a search pick, a copied block link, or
+ * `?block=`): once this document is the primary page and its blocks have
+ * rendered, scroll the target block into view and flash it, then consume the
+ * anchor. Mirrors the DatabaseView row/group anchor (rAF-retry for async layout,
+ * CSS.escape for the selector, single-fire), scoped to this editor's wrapper so
+ * a split view resolves to the right copy.
+ */
+function useBlockAnchor(
+  pageId: string | undefined,
+  containerRef: React.RefObject<HTMLElement | null>,
+  notReady: boolean,
+): void {
+  const {blockAnchor, clearBlockAnchor, primaryPageId} = useNavigation();
+  useEffect(() => {
+    if (notReady || !blockAnchor || !pageId || pageId !== primaryPageId) return;
+    const escaped =
+      typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(blockAnchor)
+        : blockAnchor.replace(/["\\]/g, '\\$&');
+    const selector = `[data-block-row="${escaped}"]`;
+    let tries = 0;
+    let raf = 0;
+    let timer = 0;
+    const attempt = (): void => {
+      const root: ParentNode = containerRef.current ?? document;
+      let el: Element | null;
+      try {
+        el = root.querySelector(selector);
+      } catch {
+        clearBlockAnchor();
+        return;
+      }
+      if (el) {
+        const reduce =
+          typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'center'});
+        el.classList.add('ob-anchor-flash');
+        timer = window.setTimeout(() => el!.classList.remove('ob-anchor-flash'), 1800);
+        clearBlockAnchor();
+        return;
+      }
+      // Give an async-loading document a few frames to render its blocks before
+      // giving up; then clear so a missing target doesn't re-fire forever.
+      if (++tries > 20) {
+        clearBlockAnchor();
+        return;
+      }
+      raf = requestAnimationFrame(attempt);
+    };
+    raf = requestAnimationFrame(attempt);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (timer) clearTimeout(timer);
+    };
+  }, [blockAnchor, clearBlockAnchor, primaryPageId, pageId, notReady, containerRef]);
+}
 
 const BlockPageDocument: React.FC<PageDocumentProps> = ({
   onSave,
@@ -81,6 +148,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
 }) => {
   const {t} = useTranslation();
   const {preferences} = usePreferences();
+  const {appearance} = useTheme();
   const client = useData();
   const confirm = useConfirm();
   // A viewer who can't write this instance reads the whole document locked: no
@@ -90,6 +158,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
   const [doc, setDoc] = useState<Y.Doc | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'save failed'>('idle');
   const lastSnapshot = useRef<PageSnapshot | null>(null);
+  const saveSeqRef = useRef(0);
   // The editor's positioned wrapper — inline review indicators portal into it.
   const editorWrapRef = useRef<HTMLDivElement | null>(null);
   // The title and the editor form one continuous caret surface: each holds an
@@ -105,6 +174,10 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
   // one rebuilds that surface on every render (e.g. each save-status tick).
   const leaveToTitle = useCallback(() => titleRef.current?.focusEnd(), []);
   const leaveToEditor = useCallback(() => editorRef.current?.focusStart(), []);
+
+  // Scroll/flash a block when navigated here with a pending block anchor (a
+  // search pick or a copied block link). Waits for the doc to decode + render.
+  useBlockAnchor(pageId, editorWrapRef, !doc);
 
   // ── Load (or migrate) ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -131,7 +204,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
       if (cancelled) return;
       // The reactive context (cell values + the name index) rides along so
       // sliders keep their live values and expr sources resolve to names.
-      setDoc(createSeededDoc(migrateEditorJs(legacy, {values: snap?.values, names: snap?.names, pageLabels}), `mig-${pageId ?? 'page'}`));
+      setDoc(createSeededDoc(migrateLegacyBlocks(legacy, {values: snap?.values, names: snap?.names, pageLabels}), `mig-${pageId ?? 'page'}`));
     })();
     return () => {
       cancelled = true;
@@ -152,15 +225,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
     // EXPORTS (a parent database's expr columns read them via projectExports), so they
     // must track the live document, and a named live-code output must publish its
     // computed value too — the projection only carries its runtime expression.
-    const projected = blockSnapshotToEditorJs({...base, editor: 'blocks', blockdoc: encodeSnapshot(doc)});
-    const values = new Map(projected.values);
-    const {results} = computeScope(doc);
-    for (const [, cellId] of projected.names) {
-      if (values.has(cellId)) continue;
-      const result = results.get(cellId);
-      if (result && !result.error) values.set(cellId, result.value);
-    }
-    const snapshot: PageSnapshot = {...projected, values: [...values]};
+    const snapshot = await projectBlockPageSnapshot(doc, base);
     // Skip a no-op save: a Y.Doc change that nets to no difference in what the page
     // persists (an undo/redo round-trip, an edit to an unprojected prop, or a recompute
     // yielding identical values) shouldn't write — re-saving identical content only
@@ -170,12 +235,16 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
       setStatus('saved');
       return;
     }
-    lastSnapshot.current = snapshot;
     setStatus('saving');
     try {
+      const seq = ++saveSeqRef.current;
       await onSave(snapshot);
+      // Safe only because ConnectedPageDocument.tsx:240 keys the ErrorBoundary by pageId;
+      // in-place page switching must also guard this assignment by pageId.
+      if (seq === saveSeqRef.current) lastSnapshot.current = snapshot;
       setStatus('saved');
     } catch (e) {
+      // The 600ms constant-interval retry is unbounded until CWD-6/7 lands backoff/queueing.
       setStatus('save failed');
       throw e;
     }
@@ -320,6 +389,25 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
     return () => doc.off('update', check);
   }, [doc]);
 
+  // LX-2: the "Include your books" step of an interactive-HTML export. Shown
+  // only when the export set contains ledger blocks; resolves to the exporter's
+  // choice (or null on cancel). Promise-based like ConfirmProvider so the
+  // export flow simply awaits it.
+  const [booksDialog, setBooksDialog] = useState<{canInclude: boolean; defaultOn: boolean} | null>(null);
+  const booksResolverRef = useRef<((choice: ExportBooksChoice) => void) | null>(null);
+  const askExportBooks = useCallback((canInclude: boolean, defaultOn: boolean): Promise<ExportBooksChoice> => {
+    booksResolverRef.current?.(null); // a fresh request supersedes a stale one
+    return new Promise<ExportBooksChoice>((resolve) => {
+      booksResolverRef.current = resolve;
+      setBooksDialog({canInclude, defaultOn});
+    });
+  }, []);
+  const settleExportBooks = useCallback((choice: ExportBooksChoice) => {
+    booksResolverRef.current?.(choice);
+    booksResolverRef.current = null;
+    setBooksDialog(null);
+  }, []);
+
   // ── Export ────────────────────────────────────────────────────────────────
   // The block document projects into the EditorJS shape, then rides the same
   // pipeline as classic pages — markdown, paged/continuous PDF, and the
@@ -342,13 +430,19 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
       }
       return;
     }
-    const snapshot = blockSnapshotToEditorJs({
+    // Resolve database-bound kit charts to their series live, via this in-app
+    // client, and thread them through the projection. Nothing is written to the
+    // doc — a DB chart persists no snapshot, so viewing/presenting is write-free.
+    const encoded = encodeSnapshot(doc);
+    const dbSeries = await resolveDbChartSeries(client, encoded.blocks ?? []);
+    const computed = await computeExportCells(doc, dbSeries);
+    const snapshot = projectSnapshotForExport({
       editorjs: {blocks: []},
       values: [],
       names: [],
       editor: 'blocks',
-      blockdoc: encodeSnapshot(doc),
-    });
+      blockdoc: encoded,
+    }, dbSeries, computed);
     const base = safeFilename(title);
     // Identity stamped into a single-page/deck export's source island (so a saved
     // page re-imports onto its own id). Unsaved pages leave it blank — the island
@@ -360,7 +454,7 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
         // embeds the picture rather than a dangling reference. Markdown has no
         // sandboxed-iframe equivalent, so only the image map applies here.
         const assets = await resolveExportAssets(client, [snapshot]);
-        downloadText(`${base}.md`, toMarkdown(buildDocumentModel({title, icon, snapshot, assets: assets.images})), 'text/markdown');
+        downloadText(`${base}.md`, toMarkdown(buildDocumentModel({title, icon, snapshot, assets: assets.images, audioAssets: assets.audio, dbSeries})), 'text/markdown');
       } else if (kind === 'pdf-paged' || kind === 'pdf-continuous' || kind === 'pdf-slides') {
         // PDF mirrors the HTML export (vector, selectable) rather than a separate
         // hand-drawn renderer — so it looks like the window. See export/toPdf.ts.
@@ -371,15 +465,15 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
         ]);
         const blob =
           kind === 'pdf-slides'
-            ? await toPdfSlides(toSlideDeck(snapshot, title, icon, assets, meta))
-            : await toPdf(toHtml(snapshot, title, icon, assets, meta), kind === 'pdf-continuous' ? 'continuous' : 'paged');
+            ? await toPdfSlides(toSlideDeck(snapshot, title, icon, assets, meta, appearance.dataColors, dbSeries))
+            : await toPdf(toHtml(snapshot, title, icon, assets, meta, appearance.dataColors, dbSeries), kind === 'pdf-continuous' ? 'continuous' : 'paged');
         downloadBlob(`${base}${kind === 'pdf-slides' ? '-slides' : ''}.pdf`, blob);
       } else if (kind === 'html-slides') {
         const [{toSlideDeck}, assets] = await Promise.all([import('@/export/toHtml'), resolveExportAssets(client, [snapshot])]);
-        downloadText(`${base}-slides.html`, toSlideDeck(snapshot, title, icon, assets, meta), 'text/html');
+        downloadText(`${base}-slides.html`, toSlideDeck(snapshot, title, icon, assets, meta, appearance.dataColors, dbSeries), 'text/html');
       } else {
-        const [{toHtmlSite}, {gatherSite}] = await Promise.all([import('@/export/toHtml'), import('@/export/exportSite')]);
-        const bundle = pageId
+        const [{toHtmlSite}, {gatherSite, bundleHasLedgerBlocks}] = await Promise.all([import('@/export/toHtml'), import('@/export/exportSite')]);
+        const bundle: import('@/export/exportSite').SiteBundle = pageId
           ? await gatherSite(client, pageId, {snapshot, title, icon})
           : {
             rootId: '',
@@ -403,9 +497,48 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
               databases: [],
             },
           };
+        // LX-2: the export set shows ledger blocks — OR the crawl reached
+        // ledger content (a subpage/mention to a host page; always pruned from
+        // the generic bundle, see gatherSite) → ask about embedding the
+        // machine-readable records. Detection runs on the RAW snapshots in the
+        // island bundle (the projection flattens plugin blocks to placeholders).
+        // The probe AND the capture both go through this principal's own client,
+        // so a guest/viewer can never receive records the API wouldn't serve
+        // them — their dialog simply reports that the books are excluded.
+        if (bundleHasLedgerBlocks(bundle.space) || bundle.ledgerReached) {
+          // Default the toggle ON only for the owner/admin: `ledgerInfo.exists`
+          // alone means "root host readable", which a granted reader also has —
+          // their toggle starts OFF-but-available. The role is the server-
+          // stamped effective role (InstanceInfo.youRole, the same signal
+          // useCanWrite trusts); unknown/unreachable resolves to OFF.
+          const [canInclude, isOwnerAdmin] = await Promise.all([
+            client
+              .ledgerInfo()
+              .then((i) => i.exists)
+              .catch(() => false),
+            client
+              .getInstanceInfo()
+              .then((i) => i.youRole === 'owner' || i.youRole === 'admin')
+              .catch(() => false),
+          ]);
+          const choice = await askExportBooks(canInclude, canInclude && isOwnerAdmin);
+          if (!choice) return; // cancelled
+          if (choice.includeBooks) {
+            // Fail-closed capture: null (revoked mid-flight, transport error,
+            // partial row grant tripping the completeness check) exports
+            // without records — placeholders, never half a book. The exporter
+            // OPTED IN, so tell them the file shipped without their books
+            // rather than letting the warning imply the records are inside.
+            bundle.ledger = (await gatherLedgerExportSection(client)) ?? undefined;
+            if (!bundle.ledger) showToast({message: t('page.exportBooksCaptureFailed')});
+          }
+        }
         // A whole-site export can embed images from every reachable page.
         const assets = await resolveExportAssets(client, bundle.pages.map((p) => p.snapshot));
-        downloadText(`${base}.html`, toHtmlSite(bundle, assets), 'text/html');
+        downloadText(`${base}.html`, toHtmlSite(bundle, assets, appearance.dataColors), 'text/html');
+        if (bundle.hiddenPagesSkipped) {
+          showToast({message: t('page.exportHiddenPagesSkipped', {count: bundle.hiddenPagesSkipped})});
+        }
       }
     } catch (e) {
       console.error('BlockPageDocument: export failed:', e);
@@ -451,9 +584,14 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
     return () => setPageSaveStatus(pageId, null);
   }, [pageId, status]);
 
-  // Full width is a per-page choice (see lib/pageFullWidth).
-  const fullWidth = usePageFullWidth(pageId ?? '');
-  const columnClass = cn('mx-auto w-full', fullWidth ? 'max-w-none' : 'max-w-content');
+  // Full width is a per-page choice (see lib/pageFullWidth); database-hosting
+  // pages default to full-width when the user hasn't set an explicit override.
+  const fullWidth = usePageFullWidth(pageId ?? '', hasDatabase);
+  const columnClass = cn(
+    'mx-auto w-full',
+    // eslint-disable-next-line tailwind/no-arbitrary-spacing -- BB-6: the gutter reserve is a pane-scoped CSS variable zeroed for read-only and coarse-pointer surfaces.
+    fullWidth ? 'max-w-none px-[var(--obe-gutter-room)]' : 'max-w-content',
+  );
 
   // Per-page overrides recolor (theme) and restyle (fonts) just this page.
   const pageThemeStyle = usePageThemeStyle(pageId ?? '');
@@ -464,7 +602,12 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
   // open in split, rename, duplicate, trash, …) — same menu as classic pages.
   const body = (
     <div
-      className={cn('w-full pb-40', fontStyle && 'ob-page-fonts', hasBackground && 'ob-page-bg')}
+      className={cn(
+        'obe-editor-pane w-full pb-40',
+        !canWrite && 'obe-readonly',
+        fontStyle && 'ob-page-fonts',
+        hasBackground && 'ob-page-bg',
+      )}
       style={{...pageThemeStyle, ...fontStyle}}
     >
       {/* The cover + title region. Hovering it reveals the header controls
@@ -505,21 +648,27 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
 
       <div className="px-6 md:px-10">
         <div className={columnClass}>
-          <div ref={editorWrapRef} className={cn(hasDatabase ? 'min-h-0' : 'min-h-[40vh]', 'relative pt-2')}>
+          <div
+            ref={editorWrapRef}
+            className={cn(hasDatabase ? 'min-h-[52px]' : 'min-h-[40vh]', 'obe-editor-wrap relative pt-2')}
+          >
             {doc && (
-              <BlockEditor
-                doc={doc}
-                readOnly={!canWrite}
-                ariaLabel={title || 'Page content'}
-                fullWidth={fullWidth}
-                compact={hasDatabase}
-                spellcheck={preferences.general.spellcheck}
-                pageId={pageId}
-                focusRef={editorRef}
-                onLeaveToTitle={leaveToTitle}
-                onSelectionChange={handleLocalSelection}
-              />
+              <FormOriginContext.Provider value={formOriginUrl(pageId)}>
+                <BlockEditor
+                  doc={doc}
+                  readOnly={!canWrite}
+                  ariaLabel={title || 'Page content'}
+                  fullWidth={fullWidth}
+                  compact={hasDatabase}
+                  spellcheck={preferences.general.spellcheck}
+                  pageId={pageId}
+                  focusRef={editorRef}
+                  onLeaveToTitle={leaveToTitle}
+                  onSelectionChange={handleLocalSelection}
+                />
+              </FormOriginContext.Provider>
             )}
+            {doc && canWrite && <SharedGutter key={pageId} containerRef={editorWrapRef} />}
             {/* Inline review affordances (provider-aware, portaled into the
                 editor wrapper since the editor's own root is provider-less). */}
             {pageId && doc && <BlockReviewMarkers pageId={pageId} containerRef={editorWrapRef} />}
@@ -538,7 +687,18 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
     </div>
   );
 
-  return pageId ? <PageContextMenu pageId={pageId}>{body}</PageContextMenu> : body;
+  return (
+    <>
+      {pageId ? <PageContextMenu pageId={pageId}>{body}</PageContextMenu> : body}
+      {/* LX-2: the export-time "Include your books" toggle + warning. */}
+      <ExportBooksDialog
+        open={booksDialog !== null}
+        canInclude={booksDialog?.canInclude ?? false}
+        defaultOn={booksDialog?.defaultOn ?? false}
+        onClose={settleExportBooks}
+      />
+    </>
+  );
 };
 
 export default BlockPageDocument;

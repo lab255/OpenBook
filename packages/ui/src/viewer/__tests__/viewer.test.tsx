@@ -1,4 +1,4 @@
-import {describe, it, expect, afterEach} from 'vitest';
+import {describe, it, expect, afterEach, vi} from 'vitest';
 import {act} from 'react';
 import {render, cleanup, fireEvent, screen, waitFor} from '@testing-library/react';
 import {createDoc, encodeSnapshot} from '../../blockeditor/model';
@@ -6,7 +6,7 @@ import {MAX_ASSET_BYTES} from '../../blockeditor/imageBlock';
 import {SANDBOX_FLAGS} from '../../lib/srcdoc';
 import {mount} from '../index'; // also registers the reactive + kit blocks
 import {ViewerApp} from '../ViewerApp';
-import type {IslandPageJson, SpaceBundleJson, ViewerHandle} from '../types';
+import type {IslandPageJson, LibraryBundleJson, ViewerHandle} from '../types';
 
 // Direct createRoot renders (the mount() test) run outside RTL's act wrapper.
 (globalThis as {IS_REACT_ACT_ENVIRONMENT?: boolean}).IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,7 +32,27 @@ function makeIsland(): IslandPageJson {
 }
 
 describe('viewer', () => {
-  it('renders an island from its base64 Y update, locked but interactive', () => {
+  it('hydrates togglelist with locked text and live disclosure from both snapshot formats', () => {
+    const doc = createDoc([{id: 't', type: 'togglelist', text: 'Summary', props: {collapsed: true}, children: [{type: 'paragraph', text: 'Hidden body'}]}]);
+    for (const blockdoc of [encodeSnapshot(doc), {...encodeSnapshot(doc), update: undefined}]) {
+      const source: IslandPageJson = {...makeIsland(), data: {editor: 'blocks', blockdoc}};
+      const before = JSON.stringify(source);
+      const {container, unmount} = render(<ViewerApp source={source} />);
+      const button = screen.getByRole('button', {name: 'Expand or collapse toggle list'});
+      expect(container.textContent).toContain('Summary');
+      expect(container.textContent).not.toContain('Hidden body');
+      fireEvent.click(button);
+      expect(button.getAttribute('aria-expanded')).toBe('true');
+      expect(container.textContent).toContain('Hidden body');
+      expect(container.querySelector('[contenteditable="true"]')).toBeNull();
+      fireEvent.click(button);
+      expect(container.textContent).not.toContain('Hidden body');
+      expect(JSON.stringify(source)).toBe(before);
+      unmount();
+    }
+  });
+
+  it('renders an island from its base64 Y update, locked but interactive', async () => {
     const island = makeIsland();
     const sourceBefore = JSON.stringify(island);
     const {container} = render(<ViewerApp source={island} />);
@@ -41,13 +61,20 @@ describe('viewer', () => {
     expect(screen.getByRole('heading', {level: 1, name: /Island page/})).toBeTruthy();
     expect(container.textContent).toContain('Bundle test');
 
-    // The slider is live (interactive exemption) and drives the formula.
+    // The slider is live (interactive exemption) and drives the formula. The
+    // formula's value now resolves through the async eval cache (SBX-1), so
+    // it starts pending ("—") for a tick before settling — wait for it rather
+    // than asserting synchronously right after render.
     const slider = container.querySelector<HTMLInputElement>('input[type="range"]');
     expect(slider).toBeTruthy();
     expect(slider!.disabled).toBe(false);
-    expect(container.querySelector('.obe-formula-out')?.textContent).toBe('20');
+    await waitFor(() => {
+      expect(container.querySelector('.obe-formula-out')?.textContent).toBe('20');
+    });
     fireEvent.change(slider!, {target: {value: '25'}});
-    expect(container.querySelector('.obe-formula-out')?.textContent).toBe('50');
+    await waitFor(() => {
+      expect(container.querySelector('.obe-formula-out')?.textContent).toBe('50');
+    });
 
     // Locked semantics: no editable text, no inline-label inputs, and the
     // source object the host handed over is byte-identical afterwards.
@@ -56,8 +83,29 @@ describe('viewer', () => {
     expect(JSON.stringify(island)).toBe(sourceBefore);
   });
 
+  it('keeps meeting tabs usable with frozen notes and recording controls', () => {
+    const doc = createDoc([{type: 'meeting', props: {summary: 'Recap', transcript: [{startMs: 0, endMs: 1000, text: 'Discussion'}]}, children: [{type: 'paragraph', text: 'Agenda'}]}]);
+    const island = {...makeIsland(), data: {editor: 'blocks', blockdoc: encodeSnapshot(doc)}};
+    const {container} = render(<ViewerApp source={island} />);
+    expect(screen.getByRole('tabpanel').textContent).toContain('Recap');
+    fireEvent.click(screen.getByRole('tab', {name: 'Notes'}));
+    expect(screen.getByRole('tabpanel').textContent).toContain('Agenda');
+    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+    expect(screen.getByRole('tabpanel').textContent).toContain('Discussion');
+    expect(container.querySelector('[contenteditable="true"]')).toBeNull();
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('tab', {name: 'Summary'}));
+    expect((screen.getByRole('button', {name: 'Regenerate summary'}) as HTMLButtonElement).disabled).toBe(true);
+    cleanup();
+    const emptyDoc = createDoc([{type: 'meeting', children: []}]);
+    const emptyIsland = {...makeIsland(), data: {editor: 'blocks', blockdoc: encodeSnapshot(emptyDoc)}};
+    const emptyView = render(<ViewerApp source={emptyIsland} />);
+    fireEvent.click(screen.getByRole('tab', {name: 'Notes'}));
+    expect(emptyView.container.querySelector('.obe-meeting-notes button')).toBeNull();
+  });
+
   it('renders a space bundle with page navigation', () => {
-    const bundle: SpaceBundleJson = {
+    const bundle: LibraryBundleJson = {
       pages: [
         {id: 'a', name: 'Alpha', data: {editor: 'blocks', blockdoc: {v: 1, blocks: [{id: 'ap', type: 'paragraph', text: [{t: 'alpha body'}]}]}}},
         {id: 'b', name: 'Beta', data: {editor: 'blocks', blockdoc: {v: 1, blocks: [{id: 'bp', type: 'paragraph', text: [{t: 'beta body'}]}]}}},
@@ -69,6 +117,36 @@ describe('viewer', () => {
     expect(container.querySelector('[data-viewer-page="b"]')).toBeTruthy();
     expect(container.textContent).toContain('beta body');
     expect(container.querySelectorAll('.ob-viewer-nav a').length).toBe(2);
+  });
+
+  it('registers forms as frozen field previews in the standalone viewer', () => {
+    const schema = {
+      formId: 'survey',
+      submissionKey: 'abcdefghijklmnopqrstuv',
+      enabled: true,
+      fields: [{id: 'answer', kind: 'longtext' as const, label: 'Answer', required: true}],
+      confirmation: {message: 'Thanks'},
+    };
+    const doc = createDoc([{id: 'form', type: 'form', props: {
+      formId: schema.formId,
+      submissionKey: schema.submissionKey,
+      enabled: true,
+      schema,
+    }}]);
+    const island: IslandPageJson = {
+      id: 'form-page',
+      name: 'Survey',
+      data: {editor: 'blocks', blockdoc: encodeSnapshot(doc)},
+    };
+    const {container} = render(
+      <ViewerApp source={island} formOrigins={{'form-page': 'https://published.example/?page=form-page'}} />,
+    );
+    const preview = container.querySelector<HTMLElement>('[data-form-mode="readonly"]')!;
+    expect(preview).toBeTruthy();
+    expect(preview.querySelector('textarea')?.disabled).toBe(true);
+    expect(preview.querySelector('button')?.disabled).toBe(true);
+    expect(preview.querySelector('a')?.href).toBe('https://published.example/?page=form-page');
+    expect(container.querySelector('[data-custom-type="form"]')).toBeTruthy();
   });
 
   it('bounds + validates the asset payload: over-cap and unknown encodings degrade to placeholders', async () => {
@@ -111,6 +189,40 @@ describe('viewer', () => {
 
     act(() => handle.unmount());
     container.remove();
+  });
+
+  it('hydrates meeting audio from island assets with one immutable playback timeline', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+    const doc = createDoc([{type: 'meeting', props: {audioChunks: [
+      {assetId: 'one', durationMs: 45000}, {assetId: 'two', durationMs: 5000},
+    ]}}]);
+    const island = {...makeIsland(), data: {editor: 'blocks', blockdoc: encodeSnapshot(doc)}};
+    const before = JSON.stringify(island);
+    const container = document.createElement('div'); document.body.appendChild(container);
+    let handle!: ViewerHandle;
+    try {
+      act(() => { handle = mount(container, island, {assets: {
+        one: {mime: 'audio/webm', encoding: 'base64', data: 'AQ=='},
+        two: {mime: 'audio/webm', encoding: 'base64', data: 'Ag=='},
+      }}); });
+      fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+      expect(container.querySelectorAll('audio[src]')).toHaveLength(0);
+      fireEvent.change(screen.getByRole('slider'), {target: {value: '100'}});
+      await waitFor(() => expect(container.querySelectorAll('audio[src]')).toHaveLength(2));
+      fireEvent.change(screen.getByRole('slider'), {target: {value: '0'}});
+      expect(screen.getAllByRole('slider')).toHaveLength(1);
+      expect(screen.getByText('0:00 / 0:50')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', {name: '0:45 · Not transcribed'}));
+      expect(screen.queryByRole('button', {name: 'Retry transcription'})).toBeNull();
+      fireEvent.change(screen.getByRole('slider'), {target: {value: '46000'}});
+      fireEvent.click(screen.getByRole('button', {name: 'Play'}));
+      expect(play.mock.instances[play.mock.instances.length - 1]).toBe(container.querySelectorAll('audio')[1]);
+      expect(container.querySelectorAll('audio')[1].currentTime).toBe(1);
+      expect(JSON.stringify(island)).toBe(before);
+    } finally {
+      act(() => handle?.unmount()); container.remove(); play.mockRestore(); pause.mockRestore();
+    }
   });
 
   it('mount() renders into a bare container and unmount() releases it', () => {

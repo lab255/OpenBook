@@ -83,12 +83,12 @@ const app = () => createApp(store, undefined, new PageHub(), {identity: new Iden
 const claim = () => store.updateInstanceConfig({trustedIssuers: [{issuer: ISS, jwks}], ownerSubject: `${ISS}#owner`});
 
 const get = (a: ReturnType<typeof app>, path: string, jws?: string) =>
-  a.request(path, {headers: jws ? {[IDENTITY_HEADER]: jws} : {}});
+  a.request(path, {headers: {'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {})}});
 
 const put = (a: ReturnType<typeof app>, path: string, body: string, jws?: string) =>
   a.request(path, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json', ...(jws ? {[IDENTITY_HEADER]: jws} : {})},
+    headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {})},
     body,
   });
 
@@ -198,11 +198,12 @@ describe('per-page visibility route + youRole (OB-203)', () => {
     const a = app();
     const read = await get(a, `/api/pages/${mem}/visibility`, await idFor('owner'));
     expect(read.status).toBe(200);
-    expect(((await read.json()) as {visibility: string}).visibility).toBe('members');
+    expect(await read.json()).toEqual({visibility: 'members', listed: true});
 
     const set = await put(a, `/api/pages/${mem}/visibility`, JSON.stringify({visibility: 'restricted'}), await idFor('owner'));
     expect(set.status).toBe(200);
-    expect(await store.getPageVisibility(mem)).toBe('restricted');
+    expect(await set.json()).toEqual({visibility: 'restricted', listed: true});
+    expect(await store.getPageVisibility(mem)).toEqual({visibility: 'restricted', listed: true});
 
     // Now restricted: the viewer can't even read the scope (404 hides existence).
     expect(
@@ -214,6 +215,24 @@ describe('per-page visibility route + youRole (OB-203)', () => {
     const a = app();
     const res = await put(a, `/api/pages/${mem}/visibility`, JSON.stringify({visibility: 'everyone'}), await idFor('owner'));
     expect(res.status).toBe(400);
+    expect((await put(a, `/api/pages/${mem}/visibility`, '{}', await idFor('owner'))).status).toBe(400);
+    expect((await put(a, `/api/pages/${mem}/visibility`, JSON.stringify({listed: 'no'}), await idFor('owner'))).status).toBe(400);
+  });
+
+  it('round-trips a listed-only flip and records its delta under page.visibility', async () => {
+    const a = app();
+    const set = await put(a, `/api/pages/${mem}/visibility`, JSON.stringify({listed: false}), await idFor('owner'));
+    expect(set.status).toBe(200);
+    expect(await set.json()).toEqual({visibility: 'members', listed: false});
+
+    const read = await get(a, `/api/pages/${mem}/visibility`, await idFor('owner'));
+    expect(await read.json()).toEqual({visibility: 'members', listed: false});
+    await new Promise((resolve) => setTimeout(resolve, 10)); // edit-log write is fire-after-commit
+    expect((await store.listEdits(mem))[0]).toMatchObject({
+      kind: 'page.visibility',
+      summary: '{"listed":false}',
+      authorSubject: `${ISS}#owner`,
+    });
   });
 
   it('GET /api/instance carries the effective youRole for the manage/viewer gate (P1-8)', async () => {
@@ -306,7 +325,7 @@ describe('unclaimed-instance back-compat (rule 0)', () => {
     expect(list.map((x) => x.id)).toContain(p);
     const created = await legacy.request('/api/pages', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: pageBody(`legacy-new-${seq}`),
     });
     expect(created.status).toBe(201);

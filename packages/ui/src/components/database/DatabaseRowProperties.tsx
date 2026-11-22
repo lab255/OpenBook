@@ -1,10 +1,13 @@
 import React, {useState} from 'react';
+import {EmptyState} from '@/components/ui/empty-state';
 import {Select} from '@/components/ui/select';
 import {ChevronRight, Eye, EyeOff, FolderPlus, Settings2, Trash2} from 'lucide-react';
 import type {DatabaseProperty, PropertyGroup} from '@book.dev/sdk';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {IconButton} from '@/components/ui/icon-button';
 import {readPageIcon} from '@/lib/pageIcon';
 import {cn} from '@/lib/utils';
+import {useTranslation} from '@/providers';
 import {useDatabase, type UseDatabase} from './useDatabase';
 import {cellValue, PropertyValueCell} from './databaseCells';
 
@@ -15,10 +18,9 @@ const FieldRow: React.FC<{
   property: DatabaseProperty;
   db: UseDatabase;
   pageId: string;
-  schema: DatabaseProperty[];
   rowOptions: {id: string; label: string; icon?: string}[];
   dim?: boolean;
-}> = ({property, db, pageId, schema, rowOptions, dim}) => {
+}> = ({property, db, pageId, rowOptions, dim}) => {
   const row = db.rows.find((r) => r.id === pageId);
   if (!row) return null;
   return (
@@ -31,7 +33,9 @@ const FieldRow: React.FC<{
       <div className="min-w-0 flex-1">
         <PropertyValueCell
           property={property}
-          value={cellValue(row, property, schema, db.rows)}
+          // A cross-database rollup is unknowable until its foreign rows load —
+          // render the empty placeholder instead of flashing a wrong 0.
+          value={db.pendingRollups.has(property.id) ? undefined : cellValue(row, property, db.rollupProperties, db.rollupRows)}
           exprValue={row.exports[property.cellName ?? property.name]}
           onChange={(value) => void db.setRowProperty(pageId, property.id, value)}
           onAddOption={(label) => db.addSelectOption(property.id, label)}
@@ -47,20 +51,22 @@ const ConfigMenu: React.FC<{db: UseDatabase; properties: DatabaseProperty[]; gro
   db,
   properties,
   groups,
-}) => (
-  <Popover>
+}) => {
+  const {t} = useTranslation();
+  return <Popover>
     <PopoverTrigger asChild>
-      <button
-        className="rounded p-1 text-muted-foreground/50 opacity-0 transition hover:bg-hover hover:text-foreground group-hover/props:opacity-100"
+      <IconButton
+        size="sm"
+        className="text-muted-foreground/50 opacity-0 transition-[opacity,background-color,color] group-hover/props:opacity-100"
         aria-label="Configure properties"
         title="Show, hide & group properties"
       >
         <Settings2 className="h-3.5 w-3.5" />
-      </button>
+      </IconButton>
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 space-y-3 p-3">
       <div>
-        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Properties</div>
+        <div className="mb-1 text-[11px] font-semibold text-muted-foreground">Properties</div>
         <div className="max-h-56 space-y-0.5 overflow-y-auto">
           {properties.map((p) => (
             <div key={p.id} className="flex items-center gap-1.5 rounded px-1 py-0.5 text-sm hover:bg-hover">
@@ -93,7 +99,7 @@ const ConfigMenu: React.FC<{db: UseDatabase; properties: DatabaseProperty[]; gro
 
       <div className="border-t border-border pt-2">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Groups</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">Groups</span>
           <button
             onClick={() => void db.addPropertyGroup()}
             className="flex items-center gap-1 rounded px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
@@ -101,7 +107,9 @@ const ConfigMenu: React.FC<{db: UseDatabase; properties: DatabaseProperty[]; gro
             <FolderPlus className="h-3.5 w-3.5" /> Add
           </button>
         </div>
-        {groups.length === 0 && <div className="px-1 text-xs text-muted-foreground/60">No groups yet.</div>}
+        {groups.length === 0 && (
+          <EmptyState variant="overlay" className="px-1 py-1" title={t('database.empty.noGroups')} />
+        )}
         <div className="space-y-1">
           {groups.map((g) => (
             <div key={g.id} className="flex items-center gap-1">
@@ -131,8 +139,8 @@ const ConfigMenu: React.FC<{db: UseDatabase; properties: DatabaseProperty[]; gro
         </div>
       </div>
     </PopoverContent>
-  </Popover>
-);
+  </Popover>;
+};
 
 /**
  * The database-row half of the page-view properties panel. When a page is a
@@ -169,13 +177,13 @@ export const DatabaseRowProperties: React.FC<{pageId: string; databaseId: string
     });
 
   const field = (p: DatabaseProperty, dim?: boolean) => (
-    <FieldRow key={p.id} property={p} db={db} pageId={pageId} schema={schema} rowOptions={rowOptions} dim={dim} />
+    <FieldRow key={p.id} property={p} db={db} pageId={pageId} rowOptions={rowOptions} dim={dim} />
   );
 
   return (
     <div className="group/props mb-2 flex flex-col gap-0.5">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/60">Properties</span>
+        <span className="text-[11px] font-semibold text-muted-foreground">Properties</span>
         <ConfigMenu db={db} properties={schema} groups={groups} />
       </div>
 

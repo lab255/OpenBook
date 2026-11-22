@@ -2,6 +2,7 @@ import {test, expect, takeSnapshot} from './fixtures';
 import {readFileSync} from 'fs';
 import type {APIRequestContext, Page} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
+import type {LibraryBackup} from '@book.dev/sdk';
 import {newPage as seedPage, SERVER} from './seed';
 
 async function newPage(request: APIRequestContext, name: string, blocks: unknown[], values: unknown[] = [], names: unknown[] = []): Promise<string> {
@@ -49,27 +50,50 @@ test('backup: export downloads a bundle and restore brings pages back', {tag: ['
   await newPage(request, 'Backup Spec Page', [{type: 'paragraph', data: {text: 'content'}}]);
   await page.goto('/');
   await page.getByRole('button', {name: 'Settings'}).first().click();
-  // Backup & restore now lives under the Workspace → Admin settings tab.
+  // Backup & restore now lives under the Advanced → Backups & data settings tab.
   await page.getByRole('button', {name: 'Backups & data'}).click();
 
   const [bundle] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name: 'Export backup'}).click()]);
   expect(bundle.suggestedFilename()).toContain('.openbook.json');
 
-  await page.setInputFiles('input[type=file]', await bundle.path());
-  const dialog = page.getByRole('dialog');
+  // Carry a scheduled writer's recorded inconsistency through the REAL restore
+  // dialog. The selected page references bytes omitted from the asset manifest;
+  // server preflight accepts that only when the component forwards `skipped[]`.
+  const skipCarrying = JSON.parse(await readFile((await bundle.path())!, 'utf8')) as LibraryBackup;
+  const skippedPage = skipCarrying.pages.find((p) => p.name === 'Backup Spec Page')!;
+  const missingAsset = 'a'.repeat(64);
+  skippedPage.data = {
+    ...skippedPage.data,
+    blockdoc: {v: 1, update: '', blocks: [{id: 'missing-image', type: 'image', props: {assetId: missingAsset}}]},
+  };
+  skipCarrying.skipped = [{id: missingAsset, refs: [skippedPage.id], reason: 'missing-bytes'}];
+  await page.setInputFiles('input[type=file]', {
+    name: 'skip-carrying.openbook.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(skipCarrying)),
+  });
+  // The Settings panel is itself a role=dialog (and carries a "Restore backup…"
+  // button), so scope to the restore dialog by its unique summary copy.
+  const dialog = page.getByRole('dialog').filter({hasText: 'Pick what to restore'});
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('Restore backup')).toBeVisible();
   await takeSnapshot(page, testInfo); // visual: restore dialog
 
   const beforePages = (await (await request.get(`${SERVER}/api/pages`)).json()) as {id: string}[];
   await dialog.getByRole('button', {name: /^Restore/}).click();
-  await expect
-    .poll(async () => ((await (await request.get(`${SERVER}/api/pages`)).json()) as unknown[]).length)
-    .toBeGreaterThan(beforePages.length);
-  // Copy mode suffixes the clashing name.
-  await expect
-    .poll(async () => ((await (await request.get(`${SERVER}/api/pages`)).json()) as {name: string}[]).some((p) => /\(imported\)/.test(p.name)))
-    .toBe(true);
+  // Deterministic completion signal: the restore dialog only closes and the
+  // settings status line only renders "Restored N pages…" once importLibrary
+  // has fully resolved server-side. Gate on that instead of a timed poll (the
+  // old flake was a race between a fixed poll window and a slow long-lived dev
+  // server).
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/^Restored \d+ pages/)).toBeVisible();
+  await expect(page.getByText(/Warning: partial restore from scheduled backup/)).toBeVisible();
+  // With restore provably applied, the copies now exist: the clashing page came
+  // back as a name-suffixed twin (copy mode) and the page count grew.
+  const afterRestore = (await (await request.get(`${SERVER}/api/pages`)).json()) as {name: string}[];
+  expect(afterRestore.some((p) => /Backup Spec Page \(imported\)/.test(p.name))).toBe(true);
+  expect(afterRestore.length).toBeGreaterThan(beforePages.length);
 
   // The restore just copied the WHOLE workspace. Against a long-lived dev
   // server that doubles the page count every run (and the "X (imported)"

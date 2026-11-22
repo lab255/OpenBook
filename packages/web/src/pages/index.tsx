@@ -1,14 +1,15 @@
 import {useEffect, useMemo, useState} from 'react';
-import type {GetServerSideProps, InferGetServerSidePropsType} from 'next';
+import type {GetServerSideProps} from 'next';
 import Head from 'next/head';
-import {HttpDataClient, getServerUrlOverride, getServerTokenOverride, getIdentityCredential, type DataClient} from '@book.dev/sdk';
+import {HttpDataClient, getServerUrlOverride, getServerTokenOverride, getIdentityCredential, onIdentityChange, onServerOverrideChange, type DataClient} from '@book.dev/sdk';
 import {
   DataProvider,
   DefaultLayout,
   DocumentArea,
   NavigationProvider,
-  PlatformLibraryProvider,
-  type PlatformLibrary,
+  PlatformCapabilitiesProvider,
+  PublicDatabaseForm,
+  type PlatformCapabilities,
 } from '@book.dev/ui';
 import SettingsDeepLink from '@/components/SettingsDeepLink';
 
@@ -18,6 +19,14 @@ import SettingsDeepLink from '@/components/SettingsDeepLink';
 // settings override (`openbook.serverUrl`, also how e2e points at its fixture
 // server) or a build-time `NEXT_PUBLIC_OPENBOOK_SERVER`.
 const REMOTE_SERVER_URL = process.env.NEXT_PUBLIC_OPENBOOK_SERVER;
+
+// STAB-7 (LAN-hosted web UI): when the app is built as the sidecar-served static
+// export (`NEXT_PUBLIC_OPENBOOK_SAMEORIGIN=1`), the data layer is the sidecar's
+// OWN `/api` at this exact origin — the page was served BY the sidecar. Force the
+// same-origin `HttpDataClient('')` transport (like a forwarded site), overriding
+// the in-browser PGlite default, so a LAN browser reads/writes the shared library
+// rather than a private per-browser store.
+const SAME_ORIGIN_UI = process.env.NEXT_PUBLIC_OPENBOOK_SAMEORIGIN === '1';
 
 // The embedded store is browser-only (PGlite WASM + IndexedDB). Open it lazily,
 // once per tab: a module-level promise means React StrictMode's double-mounted
@@ -32,44 +41,63 @@ function openLocalClient(): Promise<DataClient> {
   return localClientPromise;
 }
 
-function useWebClient(forwardedPrefix: string | null): {client: DataClient | null; browserLocal: boolean} {
+function useWebClient(forwardedPrefix: string | null): {client: DataClient | null; browserLocal: boolean; connKey: string} {
   // `browserLocal` marks the third branch below — the embedded PGlite store that
   // lives only in this browser profile. The sharing surfaces use it to say
   // honestly that nothing outside this browser can reach the workspace (P0-4).
-  const [state, setState] = useState<{client: DataClient | null; browserLocal: boolean}>({
+  // `connKey` identifies the active connection; the caller keys the DataProvider
+  // subtree on it so a no-reload library switch remounts the nav providers fresh.
+  const [state, setState] = useState<{client: DataClient | null; browserLocal: boolean; connKey: string}>({
     client: null,
     browserLocal: false,
+    connKey: 'local',
   });
+  // A no-reload library switch re-points the shared server override; re-run the
+  // builder so the client swaps in place (no `window.location.reload`).
+  const [overrideTick, setOverrideTick] = useState(0);
+  useEffect(() => onServerOverrideChange(() => setOverrideTick((t) => t + 1)), []);
   useEffect(() => {
     // Served as a forwarded `<prefix>.book.pub` site (the edge tagged the app-shell
     // request with the site prefix): the workspace lives on the owner's instance,
     // reachable at *this* origin's /api — the edge routes it through the tunnel.
     // Same-origin (empty base), no token: the edge injects the signed viewer
     // principal. Takes precedence over a local override and the in-browser store.
-    if (forwardedPrefix) {
-      setState({client: new HttpDataClient('', undefined, {getIdentity: getIdentityCredential}), browserLocal: false});
-      return;
+    //
+    // STAB-7: the sidecar-served LAN export takes the SAME same-origin branch —
+    // the sidecar served this page, so its `/api` is right here. No edge injects a
+    // principal on the LAN; the sidecar applies its `guestAccess` policy directly.
+    // STAB-8 note: when guest writes start requiring a custom client header, it
+    // plumbs into THIS `HttpDataClient`'s fetch wrapper (a `fetchImpl` that stamps
+    // e.g. `X-OpenBook-Client`), not the server's static handler.
+    if (forwardedPrefix || SAME_ORIGIN_UI) {
+      const client = new HttpDataClient('', undefined, {getIdentity: getIdentityCredential, subscribeIdentity: onIdentityChange});
+      setState({client, browserLocal: false, connKey: forwardedPrefix ? `fwd:${forwardedPrefix}` : 'same-origin'});
+      return () => client.dispose();
     }
     const override = getServerUrlOverride() ?? REMOTE_SERVER_URL;
     if (override) {
       // A published server requires its access token on every request; pass the
       // configured one (Connection settings) so a token-gated remote works.
-      setState({
-        client: new HttpDataClient(override, getServerTokenOverride() ?? undefined, {getIdentity: getIdentityCredential}),
-        browserLocal: false,
+      // `subscribeIdentity` rebuilds the live nav stream when the account identity
+      // refreshes / lapses, so the streamed list can't out-rank content fetches
+      // (cross-server "titles show, content blank").
+      const client = new HttpDataClient(override, getServerTokenOverride() ?? undefined, {
+        getIdentity: getIdentityCredential,
+        subscribeIdentity: onIdentityChange,
       });
-      return;
+      setState({client, browserLocal: false, connKey: `remote:${override}`});
+      return () => client.dispose();
     }
     let cancelled = false;
     openLocalClient()
       .then((c) => {
-        if (!cancelled) setState({client: c, browserLocal: true});
+        if (!cancelled) setState({client: c, browserLocal: true, connKey: 'local'});
       })
       .catch((e) => console.error('OpenBook: failed to open the local store', e));
     return () => {
       cancelled = true;
     };
-  }, [forwardedPrefix]);
+  }, [forwardedPrefix, overrideTick]);
   return state;
 }
 
@@ -80,7 +108,7 @@ function useWebClient(forwardedPrefix: string | null): {client: DataClient | nul
  * the desktop titlebar (which `inWindowTabs` otherwise hides on the web). Read
  * after mount so the initial render still matches the server-rendered HTML.
  */
-function useDesktopShellPreview(): PlatformLibrary | undefined {
+function useDesktopShellPreview(): PlatformCapabilities | undefined {
   const [desktop, setDesktop] = useState(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('shell') !== 'desktop') return;
@@ -88,12 +116,18 @@ function useDesktopShellPreview(): PlatformLibrary | undefined {
     const root = document.documentElement;
     root.style.setProperty('--ob-titlebar-height', '38px');
     root.style.setProperty('--ob-titlebar-pad-left', '8px');
+    // Mirror the real Tauri shell (App.tsx): on the desktop the titlebar is the
+    // book cover's top edge, so the sheets sit flush beneath it with no top
+    // inset. Without this the preview keeps the web inset and the active tab
+    // floats a gap above the page instead of merging into it.
+    root.style.setProperty('--ob-inset-top', '0px');
     return () => {
       root.style.removeProperty('--ob-titlebar-height');
       root.style.removeProperty('--ob-titlebar-pad-left');
+      root.style.removeProperty('--ob-inset-top');
     };
   }, []);
-  return useMemo<PlatformLibrary | undefined>(
+  return useMemo<PlatformCapabilities | undefined>(
     () =>
       desktop
         ? {tabs: {inWindow: true, openWindow: (id) => void window.open(`?page=${encodeURIComponent(id)}`, '_blank')}}
@@ -108,31 +142,59 @@ function useDesktopShellPreview(): PlatformLibrary | undefined {
  * the section is normally absent here. `?updates=<outcome>` injects a *mock*
  * `updates` capability so the section can be exercised in the browser (Chromatic
  * / e2e): `available` → an update is offered, `security` → a security update,
- * `error` → the check fails, anything else → up to date. Read after mount so the
+ * `major` → the current line is current but a newer major exists, `error` → the
+ * check fails, anything else → up to date. Read after mount so the
  * initial render still matches the server-rendered HTML. Never active without
  * the query flag, so production stays update-free on the web.
  */
-function useUpdatesPreview(): PlatformLibrary['updates'] | undefined {
+function useUpdatesPreview(): PlatformCapabilities['updates'] | undefined {
   const [mode, setMode] = useState<string | null>(null);
   useEffect(() => {
     setMode(new URLSearchParams(window.location.search).get('updates'));
   }, []);
-  return useMemo<PlatformLibrary['updates']>(() => {
+  return useMemo<PlatformCapabilities['updates']>(() => {
     if (!mode) return undefined;
+    // e2e observability: the scheduler's background activity has no DOM of its
+    // own, so the mock counts its calls on `window` for the specs to assert on
+    // (e.g. "cadence never → zero checks"). Harmless outside tests — the seam
+    // only exists behind the explicit `?updates=` flag.
+    const count = (key: string): void => {
+      const w = window as unknown as Record<string, unknown>;
+      w[key] = ((w[key] as number | undefined) ?? 0) + 1;
+    };
     return {
       getAppVersion: async () => '1.69.1',
       checkForUpdate: async () => {
+        count('__updateCheckCalls');
         if (mode === 'available') return {status: 'update-available', latestVersion: '1.72.0', latestForCurrentMajor: '1.72.0'};
         if (mode === 'security')
-          return {status: 'update-available', latestVersion: '1.72.0', security: {updateAvailable: true, fixedIn: '1.72.0'}};
+          return {
+            status: 'update-available',
+            latestVersion: '1.72.0',
+            latestForCurrentMajor: '1.72.0',
+            security: {updateAvailable: true, fixedIn: '1.72.0'},
+          };
+        if (mode === 'major')
+          // How the check API shapes a major-only bump: the current line is
+          // current (→ up-to-date) with the newer major riding along.
+          return {
+            status: 'up-to-date',
+            latestVersion: '1.69.1',
+            latestForCurrentMajor: '1.69.1',
+            latestMajor: '2.3.0',
+          };
         if (mode === 'error') return {status: 'error', error: 'mock'};
         return {status: 'up-to-date'};
       },
       // Install/relaunch are inert in the browser preview — there's no Tauri
-      // updater to drive. The seam exists to exercise the *check* states; the
-      // real download/relaunch only runs in the desktop shell.
-      downloadAndInstall: async () => {},
-      relaunch: async () => {},
+      // updater to drive (the real ones only run in the desktop shell) — but
+      // they count their calls so the scheduler e2e can observe them. Report a
+      // staged update (true) so the scheduler's "ready → relaunch" path runs.
+      downloadAndInstall: async () => {
+        count('__updateInstallCalls');
+        return true;
+      },
+      relaunch: async () => count('__updateRelaunchCalls'),
     };
   }, [mode]);
 }
@@ -144,20 +206,39 @@ function useUpdatesPreview(): PlatformLibrary['updates'] | undefined {
 // in-browser store. Absent on the canonical app.book.pub, so that stays local-first.
 const PREFIX_HEADER = 'x-openbook-prefix';
 
-export const getServerSideProps: GetServerSideProps<{
+type PublicFormRoute = {databaseId: string; viewId: string};
+type HomeProps = {
   forwardedPrefix: string | null;
   forwardedHost: string | null;
-}> = async ({req}) => {
+  publicForm: PublicFormRoute | null;
+};
+
+const forwardedPrefixGssp: GetServerSideProps<HomeProps> = async ({req, query}) => {
   const raw = req.headers[PREFIX_HEADER];
   const forwardedPrefix = (Array.isArray(raw) ? raw[0] : raw) || null;
   // On a forwarded site the request host is the `<prefix>.book.cloud` origin the
   // viewer is on — the label the workspace switcher shows for the connection.
   const forwardedHost = forwardedPrefix ? req.headers.host || null : null;
-  return {props: {forwardedPrefix, forwardedHost}};
+  const databaseId = typeof query.form === 'string' ? query.form.trim() : '';
+  const viewId = typeof query.view === 'string' ? query.view.trim() : '';
+  return {
+    props: {
+      forwardedPrefix,
+      forwardedHost,
+      publicForm: databaseId && viewId ? {databaseId, viewId} : null,
+    },
+  };
 };
 
-export default function Home({forwardedPrefix, forwardedHost}: InferGetServerSidePropsType<typeof getServerSideProps>) {
-  const {client, browserLocal} = useWebClient(forwardedPrefix);
+// STAB-7: a static export (`output: 'export'`) can't run `getServerSideProps`, so
+// it's dropped in the LAN same-origin build — Next treats a non-function export as
+// absent. The forwarded-prefix header only exists behind the *.book.cloud edge,
+// which the LAN never has, so there is nothing to read there anyway. Home defaults
+// both props to null and takes its same-origin path from `SAME_ORIGIN_UI` instead.
+export const getServerSideProps = SAME_ORIGIN_UI ? undefined : forwardedPrefixGssp;
+
+function WorkspaceHome({forwardedPrefix = null, forwardedHost = null}: Partial<HomeProps> = {}) {
+  const {client, browserLocal, connKey} = useWebClient(forwardedPrefix);
   const shellPreview = useDesktopShellPreview();
   const updatesPreview = useUpdatesPreview();
   // Tell the UI when the workspace is the in-browser store (nothing outside this
@@ -166,26 +247,34 @@ export default function Home({forwardedPrefix, forwardedHost}: InferGetServerSid
   // is still browser-local, so the truth flag stays. On a forwarded site pass the
   // host so the workspace switcher names the connection after it (P-fwd), rather
   // than the generic local default.
-  const platform = useMemo<PlatformLibrary | undefined>(() => {
-    const base = browserLocal ? {...shellPreview, browserLocalWorkspace: true} : shellPreview;
+  const platform = useMemo<PlatformCapabilities | undefined>(() => {
+    const base = browserLocal ? {...shellPreview, browserLocalLibrary: true} : shellPreview;
     const withHost = forwardedHost ? {...(base ?? {}), forwardedHost} : base;
-    if (!updatesPreview) return withHost;
-    return {...(withHost ?? {}), updates: updatesPreview};
+    // STAB-9: the sidecar-served LAN build (`NEXT_PUBLIC_OPENBOOK_SAMEORIGIN=1`)
+    // renders for a network guest, not the owner — tell the UI so it hides the
+    // sign-in chrome (unsupported over plain-LAN) and relabels the library. A
+    // build-time constant, so it never changes across renders.
+    const withServed = SAME_ORIGIN_UI ? {...(withHost ?? {}), servedSameOrigin: true} : withHost;
+    if (!updatesPreview) return withServed;
+    return {...(withServed ?? {}), updates: updatesPreview};
   }, [browserLocal, shellPreview, forwardedHost, updatesPreview]);
 
   return (
     <>
       <Head>
         <title>OpenBook</title>
-        <meta name="description" content="OpenBook — a local-first block workspace" />
+        <meta name="description" content="OpenBook — a local-first block library" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         {/* SVG mark first (modern browsers); .ico stays as the fallback. */}
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <PlatformLibraryProvider value={platform}>
+      <PlatformCapabilitiesProvider value={platform}>
         {client && (
-          <DataProvider client={client}>
+          // Key the data subtree on the active connection so a no-reload library
+          // switch (a re-pointed server override) remounts the nav providers fresh
+          // against the new client — its one-shot init re-lists the new library.
+          <DataProvider key={connKey} client={client}>
             <NavigationProvider>
               <SettingsDeepLink />
               <DefaultLayout>
@@ -194,7 +283,108 @@ export default function Home({forwardedPrefix, forwardedHost}: InferGetServerSid
             </NavigationProvider>
           </DataProvider>
         )}
-      </PlatformLibraryProvider>
+      </PlatformCapabilitiesProvider>
     </>
   );
+}
+
+function routeFromLocation(): PublicFormRoute | null {
+  const params = new URLSearchParams(window.location.search);
+  const databaseId = params.get('form')?.trim() ?? '';
+  const viewId = params.get('view')?.trim() ?? '';
+  return databaseId && viewId ? {databaseId, viewId} : null;
+}
+
+function PublicFormPage({route, forwardedPrefix}: {
+  route: PublicFormRoute;
+  forwardedPrefix: string | null;
+}) {
+  const [client, setClient] = useState<HttpDataClient | null>(null);
+  const [publicLocation, setPublicLocation] = useState<{capability: string | null; revision: number}>({
+    capability: null,
+    revision: 0,
+  });
+  useEffect(() => {
+    // Public fill deliberately omits account identity and the instance-wide LAN
+    // bearer. These routes are authorized only by the fragment capability.
+    const baseUrl = forwardedPrefix || SAME_ORIGIN_UI
+      ? ''
+      : getServerUrlOverride() ?? REMOTE_SERVER_URL ?? '';
+    const next = new HttpDataClient(baseUrl);
+    setClient(next);
+    return () => next.dispose();
+  }, [forwardedPrefix]);
+  useEffect(() => {
+    const syncPublicLocation = (rawUrl: string, revisit: boolean): void => {
+      const destination = new URL(rawUrl, window.location.href);
+      if (destination.origin !== window.location.origin || destination.pathname !== window.location.pathname) return;
+      if (
+        destination.searchParams.get('form')?.trim() !== route.databaseId
+        || destination.searchParams.get('view')?.trim() !== route.viewId
+      ) {
+        return;
+      }
+      const fragment = new URLSearchParams(destination.hash.replace(/^#/, ''));
+      const capability = fragment.get('capability') ?? '';
+      setPublicLocation((current) => {
+        if (current.capability === null) return {capability, revision: current.revision};
+        if (!revisit && current.capability === capability) return current;
+        return {capability, revision: current.revision + 1};
+      });
+    };
+    const onHashChange = (event: HashChangeEvent): void => syncPublicLocation(event.newURL, false);
+    const onNavigate = (event: NavigateEvent): void => syncPublicLocation(event.destination.url, true);
+    const onPageShow = (event: PageTransitionEvent): void => {
+      if (event.persisted) syncPublicLocation(window.location.href, true);
+    };
+
+    syncPublicLocation(window.location.href, false);
+    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('pageshow', onPageShow);
+    // A second visit to the exact same fragment URL is a same-document
+    // navigation in Chromium: it does not remount this Next page and emits no
+    // hashchange. The Navigation API observes that revisit so the old capability
+    // is checked again instead of leaving a stale success/form surface mounted.
+    window.navigation?.addEventListener('navigate', onNavigate);
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('pageshow', onPageShow);
+      window.navigation?.removeEventListener('navigate', onNavigate);
+    };
+  }, [route.databaseId, route.viewId]);
+  return (
+    <>
+      <Head>
+        <title>Form</title>
+        <meta name="robots" content="noindex,nofollow" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+      {client && publicLocation.capability !== null && (
+        <PublicDatabaseForm
+          key={`${publicLocation.capability}:${publicLocation.revision}`}
+          client={client}
+          databaseId={route.databaseId}
+          viewId={route.viewId}
+          capability={publicLocation.capability}
+        />
+      )}
+    </>
+  );
+}
+
+export default function Home(props: Partial<HomeProps> = {}) {
+  // A static sidecar build cannot run getServerSideProps. Keep its first render
+  // blank, resolve the query immediately after mount, and only then choose the
+  // public form or workspace tree. That prevents a form link from briefly
+  // initializing navigation/page/database chrome before the query is known.
+  const [clientRoute, setClientRoute] = useState<PublicFormRoute | null | undefined>(props.publicForm);
+  useEffect(() => {
+    if (props.publicForm !== undefined) return;
+    setClientRoute(routeFromLocation());
+  }, [props.publicForm]);
+  if (clientRoute === undefined) return null;
+  if (clientRoute) {
+    return <PublicFormPage route={clientRoute} forwardedPrefix={props.forwardedPrefix ?? null} />;
+  }
+  return <WorkspaceHome {...props} />;
 }

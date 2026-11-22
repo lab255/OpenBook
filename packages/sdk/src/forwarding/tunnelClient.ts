@@ -14,7 +14,7 @@ import {buildRelayAttachMessage} from './challenge';
 import {signWithSiteKey} from './siteKey';
 import {decodeBody, decodeControl, encodeBody, encodeControl, FORWARDED_HEADER, type ControlFrame} from './tunnelProtocol';
 
-export type TunnelStatus = 'connecting' | 'online' | 'reconnecting' | 'offline';
+export type TunnelStatus = 'connecting' | 'online' | 'reconnecting' | 'stalled' | 'offline';
 
 export interface TunnelClientOptions {
   /**
@@ -33,12 +33,22 @@ export interface TunnelClientOptions {
    *  `fetchImpl` resolves paths itself, as the desktop IPC transport does). */
   localOrigin: string;
   onStatus?: (status: TunnelStatus) => void;
+  /** Reports every failed mint/open/attach attempt with its original structured error. */
+  onDialError?: (error: unknown) => void;
   fetchImpl?: FetchLike;
   webSocketImpl?: typeof WebSocket;
   maxBackoffMs?: number;
 }
 
 type ReqFrame = Extract<ControlFrame, {t: 'req'}>;
+
+const HEARTBEAT_INTERVAL_MS = 25_000;
+// The relay does not (yet) pong client pings, so liveness rides on the relay's
+// own heartbeat (HEARTBEAT_MS = 30_000 in open.book.pub packages/relay/src/config.ts,
+// best-effort DO alarm). 95s = 3 intervals + slack. This can drop back toward
+// ~62.5s once the companion relay pong echo change is deployed.
+const LIVENESS_DEADLINE_MS = 95_000;
+const TICKET_MINT_TIMEOUT_MS = 15_000;
 
 interface Inflight {
   controller: AbortController;
@@ -55,6 +65,12 @@ export class TunnelClient {
   private readonly WS: typeof WebSocket;
   /** The ticket for the current connection, minted just before the WS opened. */
   private ticket?: string;
+  private consecutiveDialFailures = 0;
+  private ready = false;
+  private failureReportedForDial = false;
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private livenessTimer?: ReturnType<typeof setTimeout>;
+  private lastFrameAt = 0;
 
   constructor(private readonly opts: TunnelClientOptions) {
     this.fetchImpl = opts.fetchImpl ?? globalFetch;
@@ -68,6 +84,8 @@ export class TunnelClient {
 
   stop(): void {
     this.stopped = true;
+    this.clearHeartbeatTimers();
+    this.consecutiveDialFailures = 0;
     this.setStatus('offline');
     this.ws?.close();
   }
@@ -84,35 +102,53 @@ export class TunnelClient {
   }
 
   private connect(): void {
-    this.setStatus(this.backoff > 500 ? 'reconnecting' : 'connecting');
+    if (this.consecutiveDialFailures < 2) this.setStatus(this.backoff > 500 ? 'reconnecting' : 'connecting');
     void this.dial();
   }
 
   /** Mint a fresh ticket, then open the relay socket with it. Minting per dial is
    *  what keeps reconnects working — a reused ticket expires and attach fails. */
   private async dial(): Promise<void> {
-    let info: {relayWsUrl: string; ticket: string};
+    this.clearHeartbeatTimers();
     try {
-      info = await this.opts.ticketProvider();
-    } catch {
-      // Couldn't mint (account unreachable / token expired) — back off and retry.
+      const info = await this.mintTicket();
+      if (this.stopped) return;
+      this.ticket = info.ticket;
+      this.ready = false;
+      this.failureReportedForDial = false;
+      const ws = new this.WS(info.relayWsUrl);
+      ws.binaryType = 'arraybuffer';
+      this.ws = ws;
+      ws.onmessage = (ev) => void this.onMessage(ev.data);
+      ws.onclose = () => {
+        if (this.ws === ws) this.onClose();
+      };
+      ws.onerror = () => {
+        if (this.ws === ws) ws.close();
+      };
+    } catch (error) {
+      if (this.stopped) return;
+      this.reportDialError(error);
       this.scheduleReconnect();
-      return;
     }
-    if (this.stopped) return;
-    this.ticket = info.ticket;
-    const ws = new this.WS(info.relayWsUrl);
-    ws.binaryType = 'arraybuffer';
-    this.ws = ws;
-    ws.onmessage = (ev) => void this.onMessage(ev.data);
-    ws.onclose = () => this.onClose();
-    ws.onerror = () => ws.close();
   }
 
   private onClose(): void {
+    this.clearHeartbeatTimers();
     for (const f of this.inflight.values()) f.controller.abort();
     this.inflight.clear();
+    if (!this.stopped && !this.ready && !this.failureReportedForDial) {
+      this.reportDialError(new Error('relay connection closed before the attach completed'));
+    }
+    this.ready = false;
     this.scheduleReconnect();
+  }
+
+  private reportDialError(error: unknown): void {
+    this.failureReportedForDial = true;
+    this.consecutiveDialFailures += 1;
+    this.opts.onDialError?.(error);
+    if (this.consecutiveDialFailures >= 2) this.setStatus('stalled');
   }
 
   private scheduleReconnect(): void {
@@ -120,7 +156,7 @@ export class TunnelClient {
       this.setStatus('offline');
       return;
     }
-    this.setStatus('reconnecting');
+    if (this.consecutiveDialFailures < 2) this.setStatus('reconnecting');
     const delay = this.backoff;
     this.backoff = Math.min(this.backoff * 2, this.opts.maxBackoffMs ?? 30_000);
     setTimeout(() => {
@@ -128,8 +164,49 @@ export class TunnelClient {
     }, delay);
   }
 
+  private async mintTicket(): Promise<{relayWsUrl: string; ticket: string}> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        this.opts.ticketProvider(),
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => reject(new Error('relay attach-ticket mint timed out after 15000ms')), TICKET_MINT_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
+  }
+
+  private startHeartbeat(): void {
+    this.clearHeartbeatTimers();
+    this.lastFrameAt = Date.now();
+    this.heartbeatTimer = setInterval(() => this.sendControl({t: 'ping'}), HEARTBEAT_INTERVAL_MS);
+    this.armLivenessDeadline();
+  }
+
+  private armLivenessDeadline(): void {
+    if (this.livenessTimer !== undefined) clearTimeout(this.livenessTimer);
+    const remaining = LIVENESS_DEADLINE_MS - (Date.now() - this.lastFrameAt);
+    this.livenessTimer = setTimeout(() => {
+      if (Date.now() - this.lastFrameAt >= LIVENESS_DEADLINE_MS) {
+        this.ws?.close();
+      } else {
+        this.armLivenessDeadline();
+      }
+    }, Math.max(0, remaining));
+  }
+
+  private clearHeartbeatTimers(): void {
+    if (this.heartbeatTimer !== undefined) clearInterval(this.heartbeatTimer);
+    if (this.livenessTimer !== undefined) clearTimeout(this.livenessTimer);
+    this.heartbeatTimer = undefined;
+    this.livenessTimer = undefined;
+  }
+
   private sendControl(frame: ControlFrame): void {
-    this.ws?.send(encodeControl(frame));
+    if (!this.ws || this.ws.readyState !== this.ws.OPEN) return;
+    this.ws.send(encodeControl(frame));
   }
 
   /** Pause while the socket's send buffer is backed up, so streaming a large
@@ -144,6 +221,8 @@ export class TunnelClient {
   }
 
   private async onMessage(data: string | ArrayBuffer): Promise<void> {
+    if (this.stopped) return;
+    this.lastFrameAt = Date.now();
     if (typeof data === 'string') {
       const frame = decodeControl(data);
       if (frame) await this.onControl(frame);
@@ -166,9 +245,14 @@ export class TunnelClient {
     }
     case 'ready':
       this.backoff = 500;
+      this.consecutiveDialFailures = 0;
+      this.ready = true;
+      this.failureReportedForDial = false;
       this.setStatus('online');
+      this.startHeartbeat();
       break;
     case 'error':
+      this.reportDialError(new Error(frame.message));
       this.ws?.close();
       break;
     case 'ping':

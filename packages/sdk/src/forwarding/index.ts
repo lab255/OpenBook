@@ -7,17 +7,41 @@
 // runs in the Tauri webview; the desktop supplies a keychain-backed KeyStore and
 // the IPC fetch.
 
-export {ForwardingApiError, ForwardingClient, MemoryKeyStore, type KeyStore, type SiteIdentity, type ForwardingClientOptions} from './forwardingClient';
+export {
+  ForwardingApiError,
+  ForwardingClient,
+  MemoryKeyStore,
+  SITE_VISIBILITIES,
+  SiteReattachError,
+  type SiteReattachErrorCode,
+  type KeyStore,
+  type SiteIdentity,
+  type SiteVisibility,
+  type ForwardingClientOptions,
+} from './forwardingClient';
+export {
+  createNamespacedKeyStore,
+  KeychainLockedError,
+  type NamespacedKeyStoreOptions,
+  type RawSecretStore,
+} from './namespacedKeyStore';
 export {TunnelClient, type TunnelStatus, type TunnelClientOptions} from './tunnelClient';
 export {mintSiteKeypair, signWithSiteKey, verifyWithSiteKey, type SiteKeypair} from './siteKey';
 export {
   signRosterAssertion,
   verifyRosterAssertion,
+  isAcceptedRosterVersion,
   ROSTER_ASSERTION_VERSION,
+  ROSTER_ASSERTION_V2,
+  ACCEPTED_ROSTER_VERSIONS,
   ROSTER_ASSERTION_SKEW_MS,
+  type RosterAssertionVersion,
   type RosterAssertionPayload,
+  type RosterAssertionV1Payload,
+  type RosterAssertionV2Payload,
   type SignRosterAssertionInput,
   type VerifyRosterAssertionInput,
+  type VerifiedRosterAssertion,
 } from './rosterAssertion';
 export {
   buildAttachMessage,

@@ -1,0 +1,20 @@
+/* App entry only. Never import from src/index.css: the export viewer shares it. */
+@font-face {
+  font-family: InterVariable;
+  src: url('./InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: InterVariable, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    Inter, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* Select opsz from the text size. Explicit FF weight/opsz pairs override
+     this at the label, without overriding existing font-weight utilities. */
+  font-optical-sizing: auto;
+}

@@ -1,0 +1,19 @@
+{
+  "base": "68d6e990c719e1e1d58acad55d19cd82a27349b5",
+  "mode": "full production build plus graph check",
+  "coordinate": 852,
+  "rawBytes": 1933227,
+  "sha256": "67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198",
+  "mtime": "2026-11-17T04:46:49.986398+00:00",
+  "focusedTests": 272,
+  "ledgerTests": 8,
+  "rasterCases": 216,
+  "slashIntegrationFrames": [
+    55,
+    55
+  ],
+  "remoteCLS": [
+    0,
+    0
+  ]
+}

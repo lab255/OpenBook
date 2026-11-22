@@ -21,13 +21,13 @@ export default function AboutDialog({open, onOpenChange}: {open?: boolean; onOpe
     <Dialog open={open} onOpenChange={onOpenChange}>
       {!controlled && (
         <DialogTrigger asChild>
-          <Button variant="ghost" className="flex grow gap-2">
+          <Button variant="ghost" className="flex grow">
             <InformationCircleIcon className="h-4 w-4"/>
             About
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent size="sm">
         <div className="flex justify-center pt-1">
           {/* Cover follows the user's accent colour and recolours with the scheme. */}
           <OpenBookLogo size={104} />
@@ -43,12 +43,12 @@ export default function AboutDialog({open, onOpenChange}: {open?: boolean; onOpe
         </DialogDescription>
         <DialogFooter>
           <Button variant="ghost" asChild>
-            <a href="https://github.com/eliotlim/openbook" target="_blank" rel="noreferrer noopener">
+            <a href="https://github.com/lab255/OpenBook" target="_blank" rel="noreferrer noopener">
               Learn more
             </a>
           </Button>
           <Button variant="ghost" asChild>
-            <a href="https://github.com/eliotlim/openbook/issues" target="_blank" rel="noreferrer noopener">
+            <a href="https://github.com/lab255/OpenBook/issues" target="_blank" rel="noreferrer noopener">
               Get support
             </a>
           </Button>

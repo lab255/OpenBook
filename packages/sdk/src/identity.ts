@@ -32,9 +32,61 @@ export type VerifiedVia =
   | 'synced'
   /** In-process caller (the embedded `LocalDataClient`) — implicitly the local
    *  owner; there is no request to carry a credential. */
-  | 'local';
+  | 'local'
+  /**
+   * An **agent Personal-Access-Token** (AGENT-6): a `Bearer obat_…` credential an
+   * instance admin minted, bound at mint time to the MINTER's own verified subject
+   * (never client-chosen). It rides the SUBJECT-keyed authorize rungs its bound user
+   * would — owner-content, subject-ACL, authenticated-read — but is deliberately
+   * NOT a roster member (no `admin`/`viewer` rung, see `resolveMemberRole`), carries
+   * no persona email (never matches an email-ACL), and can never mint verified block
+   * authorship (`verifiedSubject` stays jws-only). Its HTTP surface is further
+   * confined by a default-deny scope-gate. */
+  | 'pat';
 
 export type PrincipalKind = 'user' | 'guest';
+
+/** What a minted agent token may do over the API (AGENT-6). `read` is confined to
+ *  the read scope-gate allowlist; `write` additionally admits the unsafe methods on
+ *  content routes. Never grants any privileged/admin route (default-deny). */
+export type AgentTokenScope = 'read' | 'write';
+
+/**
+ * The **redacted** view of a minted agent token (AGENT-6), safe to return from the
+ * management API and render in settings. NEVER carries the secret itself — only an
+ * `obat_…` preview prefix; the plaintext is shown exactly once, in the create
+ * response, and only its SHA-256 hash is stored at rest.
+ */
+export interface AgentTokenMeta {
+  id: string;
+  /** Human label the minter gave the token. */
+  name: string;
+  scope: AgentTokenScope;
+  /** The verified subject the token is bound to (the minter's own subject; a
+   *  hatch/local-owner minter binds the instance `ownerSubject` on a claimed
+   *  instance, else the synthetic `local:owner` on an unclaimed one). */
+  subject: string;
+  /** The issuer that vouched for {@link subject} (the instance authority issuer for
+   *  a claimed-instance hatch mint; `local` for an unclaimed one). */
+  issuer: string;
+  /** Who minted it (a display label). */
+  createdBy: string;
+  /** ISO timestamps. */
+  createdAt: string;
+  /** ISO expiry, or `null` for a no-expiry token. */
+  expiresAt: string | null;
+  /** ISO last-used, or `null` if never presented. */
+  lastUsedAt: string | null;
+  /** A short, non-secret prefix of the token (`obat_xxxx…`) for recognition. */
+  preview: string;
+  /** True once revoked (kept listed briefly for provenance; never resolves). */
+  revoked: boolean;
+  /** True when the token may authenticate a FORWARDED `/api/mcp` request over the
+   *  public edge (AGENT-7 remote MCP, L7). Default false — a local-only token can
+   *  never be replayed remotely. Set at mint only, requires the instance's
+   *  `agentApi.remote` setting to already be on. */
+  remote: boolean;
+}
 
 /** The actor behind a request, resolved by the server and stamped onto changes. */
 export interface Principal {
@@ -87,6 +139,21 @@ export function localPrincipal(name = 'Local'): Principal {
  * claimed instance when no (or a stale) account identity is present.
  */
 export const LOCAL_OWNER_HEADER = 'X-OpenBook-Local';
+
+/**
+ * Header stamped by every FIRST-PARTY OpenBook client (STAB-8). Its sole job is to
+ * make an unauthenticated (guest) mutating request NON-SIMPLE in the CORS sense: a
+ * cross-origin `<form>`/`fetch` from a page the browser happens to be visiting can
+ * issue a *simple* POST to the local sidecar (which serves the library over loopback
+ * while any TCP listener is bound), but it can NOT attach a custom request header
+ * without first passing a CORS preflight — and the app-origin allowlist denies the
+ * preflight for a foreign origin. So the server requires this header on guest writes
+ * and the sdk transport sends it on every request; authenticated principals (JWS
+ * identity, PAT bearer, local-owner secret) already ride a non-simple header of their
+ * own and are exempt. The value is not a secret — it authorizes nothing on its own;
+ * it only proves the request is not a browser simple-request forgery.
+ */
+export const CLIENT_HEADER = 'X-OpenBook-Client';
 
 /** Stable short id for a principal — the value embedded in CRDT edit origins. */
 export function principalId(p: Principal): string {

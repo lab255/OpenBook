@@ -1,0 +1,38 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui
+
+ ❯ src/blockeditor/canvas/core.test.ts (25 tests | 2 failed | 18 skipped) 32ms
+   × Review D3 race: erase versus concurrent same-shape edit, undo and redo (A=10, B=20) 15ms
+   × Review D3 race: erase versus concurrent same-shape edit, undo and redo (A=20, B=10) 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/blockeditor/canvas/core.test.ts > Review D3 race: erase versus concurrent same-shape edit, undo and redo (A=10, B=20)
+ FAIL  src/blockeditor/canvas/core.test.ts > Review D3 race: erase versus concurrent same-shape edit, undo and redo (A=20, B=10)
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/blockeditor/canvas/core.test.ts:286:44
+    284|       expect(typeof shape.get('op:startX')).toBe('string');
+    285|       expect(readCanvas(p.props)).toMatchObject({editable:true, diagno…
+    286|       expect(readPressure(shape).degraded).toBe(false);
+       |                                            ^
+    287|     }
+    288|     expect(a.history.redo().reason).toBe('applied');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 passed | 18 skipped (25)
+   Start at  00:03:33
+   Duration  640ms (transform 272ms, setup 0ms, import 353ms, tests 32ms, environment 171ms)
+
+undefined
+/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6mveyr65s7-1/OpenBook/packages/ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/blockeditor/canvas/core.test.ts -t Review D3|Review token lineage|Review diagnostics|Review order ties

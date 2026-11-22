@@ -1,3 +1,4 @@
+import {chipBgVar, chipFgVar} from '@/lib/dataColorVars';
 import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {CalendarCheck, ChevronRight, GripVertical} from 'lucide-react';
 import {
@@ -15,8 +16,10 @@ import {PageIcon} from '@/components/PageIcon';
 import {cn} from '@/lib/utils';
 import {Select} from '@/components/ui/select';
 import type {UseDatabase} from './useDatabase';
-import {SWATCH_HEX} from './databaseColors';
-import {groupCollapsed, groupGlyph, groupHeading, RowChips, RowContextMenu, useRelationGroupTitles} from './databaseLayouts';
+import {dotStyle, swatchColor} from './databaseColors';
+import {groupCollapsed, GroupContextMenu, groupGlyph, groupHeading, RowChips, RowContextMenu, setAllGroupsCollapsed, useRelationGroupTitles} from './databaseLayouts';
+import {ViewSetupCard} from './ViewSetupCard';
+import {useTranslation} from '@/providers';
 
 const DAY_MS = 86_400_000;
 const ROW_H = 34;
@@ -28,6 +31,8 @@ const LABEL_W = 200;
 const BAR_PAD = 5;
 /** A bar never renders narrower than this, so it stays visible (and clickable) at coarse zooms. */
 const BAR_MIN = 7;
+/** Short-bar labels move beside the true date span and keep this much readable width. */
+const BAR_LABEL_MIN = 72;
 /** How close (px) to an edge before the range grows for infinite scrolling. */
 const GROW_THRESHOLD = 280;
 
@@ -40,10 +45,6 @@ const startOfToday = (): Date => {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate());
 };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-const Hint: React.FC<{children: React.ReactNode}> = ({children}) => (
-  <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">{children}</div>
-);
 
 // ── Zoom scales ──────────────────────────────────────────────────────────────
 
@@ -218,8 +219,8 @@ interface LinkState {
 }
 
 const cnBar = (dragging: boolean): string =>
-  `group/bar absolute flex select-none items-center overflow-hidden rounded px-1.5 text-left text-xs font-medium text-white shadow-sm ${
-    dragging ? 'cursor-grabbing ring-2 ring-white/60' : 'cursor-grab hover:opacity-90'
+  `group/bar absolute flex select-none items-center overflow-visible rounded-sm px-1.5 text-left text-xs font-medium shadow-sm focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)] ${
+    dragging ? 'cursor-grabbing ring-2 ring-ring/60' : 'cursor-grab hover:opacity-90'
   }`;
 
 /**
@@ -245,7 +246,7 @@ export const TimelineView: React.FC<{
 }> = ({db, view, properties, cardProperties}) => {
   const startProp = view.datePropertyId ? properties.find((p) => p.id === view.datePropertyId) : undefined;
   if (!startProp) {
-    return <Hint>Choose a start date property in the view options to lay rows out on a timeline.</Hint>;
+    return <ViewSetupCard kind="timeline" db={db} view={view} properties={properties} />;
   }
   return <TimelineCanvas db={db} view={view} properties={properties} startProp={startProp} cardProperties={cardProperties} />;
 };
@@ -257,6 +258,7 @@ const TimelineCanvas: React.FC<{
   startProp: DatabaseProperty;
   cardProperties?: DatabaseProperty[];
 }> = ({db, view, properties, startProp, cardProperties}) => {
+  const {t} = useTranslation();
   // Collapsed swimlane bands persist per view (mirrors the board's lane folds).
   const [collapsedBands, setCollapsedBands] = useState<Set<string>>(() => readBandFolds(view.id));
   const toggleBand = (key: string): void =>
@@ -402,12 +404,12 @@ const TimelineCanvas: React.FC<{
   const topH = axis.top.length ? 22 : 0;
   const gridTicks = axis.top.length ? axis.top : axis.bottom;
 
-  const barColor = (row: DatabaseRow): string => {
+  const barToken = (row: DatabaseRow): string => {
     if (selectProp) {
       const opt = selectProp.options?.find((o) => o.id === row.properties[selectProp.id]);
-      if (opt?.color) return SWATCH_HEX[opt.color] ?? SWATCH_HEX.blue;
+      if (opt?.color && swatchColor(opt.color)) return opt.color;
     }
-    return SWATCH_HEX.blue;
+    return 'blue';
   };
 
   // ── Scroll: centre today, and extend the range near the edges ───────────────
@@ -631,13 +633,13 @@ const TimelineCanvas: React.FC<{
         </Select>
         <button
           onClick={centreToday}
-          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+          className="inline-flex h-control-sm items-center gap-1 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
         >
           <CalendarCheck className="h-3.5 w-3.5" /> Today
         </button>
       </div>
 
-      <div className="flex overflow-hidden rounded-md border border-border">
+      <div className="flex overflow-hidden rounded-lg border border-border">
         {/* Fixed label column: band headers (when grouped) interleaved with row labels. */}
         <div className="shrink-0 border-r border-border" style={{width: LABEL_W}}>
           <div className="border-b border-border bg-muted/30" style={{height: HEADER_H}} />
@@ -659,54 +661,65 @@ const TimelineCanvas: React.FC<{
                 className={cn(overRowBand === g.key && 'bg-accent/40 ring-1 ring-inset ring-brand/40')}
               >
                 {grouped && (
-                  <div
-                    data-band-key={g.key}
-                    onDragOver={(e) => {
-                      if (dragBand && isBandOption(g.key)) {
-                        e.preventDefault();
-                        setOverBand(g.key);
-                      }
-                    }}
-                    onDrop={() => dragBand && reorderBand(dragBand, g.key)}
-                    className={cn(
-                      'flex w-full items-center border-b border-border/60 bg-muted/20 text-xs font-medium text-muted-foreground transition-colors',
-                      dragBand === g.key && 'opacity-40',
-                      overBand === g.key && 'ring-1 ring-inset ring-brand/40',
-                    )}
-                    style={{height: BAND_H}}
+                  <GroupContextMenu
+                    db={db}
+                    group={g}
+                    prop={groupProp}
+                    groupByParent={groupByParent}
+                    collapsed={collapsed}
+                    onToggle={() => toggleBand(g.key)}
+                    onCollapseAll={() => setCollapsedBands(setAllGroupsCollapsed(groups, true, collapseEmpty))}
+                    onExpandAll={() => setCollapsedBands(setAllGroupsCollapsed(groups, false, collapseEmpty))}
                   >
-                    {isBandOption(g.key) && (
-                      <span
-                        draggable
-                        onDragStart={(e) => {
-                          e.stopPropagation();
-                          setDragBand(g.key);
-                        }}
-                        onDragEnd={() => {
-                          setDragBand(null);
-                          setOverBand(null);
-                        }}
-                        aria-label={`Reorder ${heading} band`}
-                        className="flex h-full cursor-grab items-center pl-1 text-muted-foreground/30 transition-colors hover:text-muted-foreground active:cursor-grabbing"
-                      >
-                        <GripVertical className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                    <button
-                      onClick={() => toggleBand(g.key)}
-                      aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${heading} band`}
+                    <div
+                      data-band-key={g.key}
+                      onDragOver={(e) => {
+                        if (dragBand && isBandOption(g.key)) {
+                          e.preventDefault();
+                          setOverBand(g.key);
+                        }
+                      }}
+                      onDrop={() => dragBand && reorderBand(dragBand, g.key)}
                       className={cn(
-                        'flex h-full flex-1 items-center gap-1 px-2 text-left transition-colors hover:bg-hover hover:text-foreground',
-                        isBandOption(g.key) && 'pl-1',
+                        'group/band flex w-full items-center border-b border-border/60 bg-muted/20 text-xs font-medium text-muted-foreground transition-colors',
+                        dragBand === g.key && 'opacity-40',
+                        overBand === g.key && 'ring-1 ring-inset ring-brand/40',
                       )}
+                      style={{height: BAND_H}}
                     >
-                      <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', !collapsed && 'rotate-90')} />
-                      {g.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor: SWATCH_HEX[g.color] ?? '#9ca3af'}} />}
-                      {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
-                      <span className="truncate">{heading}</span>
-                      <span className="ml-auto shrink-0 text-muted-foreground/60">{g.rows.length}</span>
-                    </button>
-                  </div>
+                      {isBandOption(g.key) && (
+                        <span
+                          draggable
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            setDragBand(g.key);
+                          }}
+                          onDragEnd={() => {
+                            setDragBand(null);
+                            setOverBand(null);
+                          }}
+                          aria-label={`Reorder ${heading} band`}
+                          className="flex h-full cursor-grab items-center pl-1 text-muted-foreground/80 opacity-0 transition-opacity group-hover/band:opacity-100 focus-visible:opacity-100 hover:text-muted-foreground active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </span>
+                      )}
+                      <button
+                        onClick={() => toggleBand(g.key)}
+                        aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${heading} band`}
+                        className={cn(
+                          'flex h-full flex-1 items-center gap-1 px-2 text-left transition-colors hover:bg-hover hover:text-foreground',
+                          isBandOption(g.key) && 'pl-1',
+                        )}
+                      >
+                        <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 transition-transform', !collapsed && 'rotate-90')} />
+                        {g.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(g.color)} />}
+                        {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
+                        <span className="truncate">{heading}</span>
+                        <span className="ml-auto shrink-0 text-muted-foreground">{g.rows.length}</span>
+                      </button>
+                    </div>
+                  </GroupContextMenu>
                 )}
                 {!collapsed &&
                   g.rows.map((row) => (
@@ -727,7 +740,7 @@ const TimelineCanvas: React.FC<{
                               setOverRowBand(null);
                             }}
                             aria-label={`Drag ${row.name?.trim() || 'Untitled'} to another band`}
-                            className="flex h-full cursor-grab items-center pl-1 text-muted-foreground/30 opacity-0 transition group-hover/row:opacity-100 active:cursor-grabbing"
+                            className="flex h-full cursor-grab items-center pl-1 text-muted-foreground/80 opacity-0 transition group-hover/row:opacity-100 active:cursor-grabbing"
                           >
                             <GripVertical className="h-3.5 w-3.5" />
                           </span>
@@ -745,7 +758,7 @@ const TimelineCanvas: React.FC<{
                           </span>
                           {railProps.length > 0 && (
                             <span className="flex h-[18px] items-center overflow-hidden">
-                              <RowChips row={row} properties={railProps} rows={db.rows} />
+                              <RowChips row={row} properties={railProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />
                             </span>
                           )}
                         </button>
@@ -761,7 +774,7 @@ const TimelineCanvas: React.FC<{
         <div ref={scrollRef} onScroll={onScroll} className="min-w-0 flex-1 overflow-x-auto">
           <div style={{width: bodyW}}>
             {/* Date axis (two tiers). */}
-            <div className="relative border-b border-border bg-muted/30" style={{height: HEADER_H}}>
+            <div className="relative isolate border-b border-border bg-muted/30" style={{height: HEADER_H}}>
               {axis.top.map((t) => (
                 <div
                   key={t.key}
@@ -776,7 +789,7 @@ const TimelineCanvas: React.FC<{
               {axis.bottom.map((t) => (
                 <div
                   key={t.key}
-                  className="absolute flex items-center justify-center border-l border-border/40 text-[11px] text-muted-foreground/80"
+                  className="absolute flex items-center justify-center border-l border-border/40 text-xs text-muted-foreground"
                   style={{left: t.left, top: topH, width: t.width, height: HEADER_H - topH}}
                 >
                   {t.width > 18 ? t.label : ''}
@@ -784,30 +797,31 @@ const TimelineCanvas: React.FC<{
               ))}
               {/* Today marker tag, aligned with the body's vertical bar. */}
               <div
-                className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-b bg-brand px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
+                data-timeline-today
+                className="pointer-events-none absolute z-raised -translate-x-1/2 rounded-b-sm bg-primary px-1.5 py-0.5 text-xs font-medium leading-none text-primary-foreground"
                 style={{left: todayX, top: 0}}
               >
                 Today
               </div>
             </div>
 
-            <div ref={bodyRef} className="relative" style={{height: bodyH}}>
+            <div ref={bodyRef} className="relative isolate" style={{height: bodyH}}>
               {/* Background: clicking empty canvas (no row lane) adds a new row here. */}
-              <div className="absolute inset-0 z-0" onClick={onCreateClick} title="Click to add a new item here" />
+              <div className="absolute inset-0" onClick={onCreateClick} title="Click to add a new item here" />
               {gridTicks.map((t) => (
                 <div key={t.key} className="pointer-events-none absolute top-0 h-full border-l border-border/25" style={{left: t.left}} />
               ))}
               {bands.map((b) => (
                 <div
                   key={b.key}
-                  className="pointer-events-none absolute left-0 z-[1] border-b border-border/60 bg-muted/20"
+                  className="pointer-events-none absolute left-0 z-raised border-b border-border/60 bg-muted/20"
                   style={{top: b.top, width: bodyW, height: BAND_H}}
                 />
               ))}
-              <div className="pointer-events-none absolute top-0 z-10 h-full w-0.5 -translate-x-1/2 bg-brand/70" style={{left: todayX}} title="Today" />
+              <div className="pointer-events-none absolute top-0 z-pane-overlay h-full w-0.5 -translate-x-1/2 bg-primary/70" style={{left: todayX}} title="Today" />
 
               {laid.length === 0 && (
-                <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                <div className="pointer-events-none absolute inset-0 z-raised flex items-center justify-center px-6 text-center text-sm text-muted-foreground">
                   No rows have a date yet — click anywhere on the timeline to add one.
                 </div>
               )}
@@ -827,12 +841,12 @@ const TimelineCanvas: React.FC<{
                         }
                         scheduleRow(l.row.id, e.clientX);
                       }}
-                      aria-label={`Schedule ${name} on the timeline`}
-                      title="Click to place this item on the timeline"
-                      className="group/lane absolute left-0 z-[1] flex cursor-copy items-center"
+                      aria-label={t('database.timeline.scheduleRow', {name})}
+                      title={t('database.timeline.placeItem')}
+                      className="group/lane absolute left-0 z-raised flex cursor-copy items-center"
                       style={{top: l.top + BAR_PAD, height: rowH - BAR_PAD * 2, width: bodyW}}
                     >
-                      <span className="sticky left-2 rounded border border-dashed border-border bg-background/70 px-2 py-0.5 text-xs text-muted-foreground/70 transition-colors group-hover/lane:border-brand group-hover/lane:text-brand">
+                      <span className="sticky left-2 rounded-sm border border-dashed border-border bg-background/70 px-2 py-0.5 text-xs text-muted-foreground transition-colors group-hover/lane:border-brand group-hover/lane:text-brand">
                         Click to schedule
                       </span>
                     </button>
@@ -851,6 +865,7 @@ const TimelineCanvas: React.FC<{
                     width = Math.max(BAR_MIN, width + dpx);
                   }
                 }
+                const labelOutside = width < BAR_LABEL_MIN;
                 return (
                   <div
                     key={l.row.id}
@@ -864,14 +879,16 @@ const TimelineCanvas: React.FC<{
                       }
                       db.openRow(l.row.id);
                     }}
-                    onKeyDown={(e) => e.key === 'Enter' && db.openRow(l.row.id)}
-                    className={cn(cnBar(!!preview), 'z-[2]', link?.targetId === l.row.id && 'ring-2 ring-brand')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); db.openRow(l.row.id); } }}
+                    className={cn(cnBar(!!preview), 'z-control', link?.targetId === l.row.id && 'ring-2 ring-brand')}
                     style={{
                       left,
                       width,
                       top: l.top + BAR_PAD,
                       height: rowH - BAR_PAD * 2,
-                      backgroundColor: barColor(l.row),
+                      backgroundColor: chipBgVar(barToken(l.row)),
+                      color: chipFgVar(barToken(l.row)),
+                      borderLeft: `3px solid ${swatchColor(barToken(l.row))}`,
                       touchAction: 'none',
                     }}
                     title={`${name} — drag to reschedule`}
@@ -879,15 +896,24 @@ const TimelineCanvas: React.FC<{
                     {canResize && (
                       <span
                         onPointerDown={(e) => begin(e, l.row.id, 'start')}
-                        className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize rounded-l bg-black/0 transition-colors group-hover/bar:bg-black/25"
+                        className="absolute left-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-l bg-transparent transition-colors group-hover/bar:bg-current/20"
                         aria-hidden
                       />
                     )}
-                    <span className="pointer-events-none truncate">{name}</span>
+                    <span
+                      data-timeline-bar-label={labelOutside ? 'outside' : 'inside'}
+                      className={cn(
+                        'pointer-events-none min-w-0 truncate',
+                        labelOutside && 'absolute left-full top-1/2 ml-1 -translate-y-1/2 text-foreground',
+                      )}
+                      style={labelOutside ? {minWidth: BAR_LABEL_MIN, maxWidth: 160} : undefined}
+                    >
+                      {name}
+                    </span>
                     {canResize && (
                       <span
                         onPointerDown={(e) => begin(e, l.row.id, 'end')}
-                        className="absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize rounded-r bg-black/0 transition-colors group-hover/bar:bg-black/25"
+                        className="absolute right-0 top-0 z-raised h-full w-1.5 cursor-ew-resize rounded-r bg-transparent transition-colors group-hover/bar:bg-current/20"
                         aria-hidden
                       />
                     )}
@@ -895,11 +921,11 @@ const TimelineCanvas: React.FC<{
                       <span
                         onPointerDown={(e) => beginLink(e, l.row.id)}
                         onClick={(e) => e.stopPropagation()}
-                        // Inside the bar's right edge — the bar is `overflow-hidden`,
-                        // so a handle placed outside would be clipped.
-                        className="absolute right-0.5 top-1/2 z-20 h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-white/30 opacity-0 transition-opacity group-hover/bar:opacity-100"
-                        aria-label="Link dependency"
-                        title="Drag onto another row to add a dependency"
+                        // Inside the bar's right edge so the dependency origin
+                        // stays tied to the actual date-span geometry.
+                        className="absolute right-0.5 top-1/2 z-control h-2.5 w-2.5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-current bg-card opacity-0 transition-opacity group-hover/bar:opacity-100"
+                        aria-label={t('database.timeline.linkDependency')}
+                        title={t('database.timeline.addDependency')}
                       />
                     )}
                   </div>
@@ -909,26 +935,30 @@ const TimelineCanvas: React.FC<{
               {link && (() => {
                 const a = linkAnchor(link.sourceRowId);
                 return a ? (
-                  <svg className="pointer-events-none absolute inset-0 z-30" width={bodyW} height={bodyH}>
+                  <svg className="pointer-events-none absolute inset-0 z-local-overlay" width={bodyW} height={bodyH}>
                     <path d={`M ${a.x} ${a.y} L ${link.toX} ${link.toY}`} className="stroke-brand" strokeWidth={2} strokeDasharray="4 3" fill="none" />
                   </svg>
                 ) : null;
               })()}
 
               {arrows.length > 0 && (
-                <svg className="pointer-events-none absolute inset-0 z-[3]" width={bodyW} height={bodyH}>
+                <svg className="pointer-events-none absolute inset-0 z-drop-indicator" width={bodyW} height={bodyH}>
                   <defs>
                     <marker id="ob-dep-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                      <path d="M0,0 L6,3 L0,6 Z" className="fill-muted-foreground/70" />
+                      <path d="M0,0 L6,3 L0,6 Z" className="fill-muted-foreground/80" />
                     </marker>
                   </defs>
                   {arrows.map((a, i) => {
-                    const midX = Math.max(a.x1 + 8, a.x2 - 8);
+                    // Smooth cubic Bézier with horizontal end tangents: the edge leaves
+                    // the predecessor's end going right and enters the successor's start
+                    // going right. Backward dependencies (x2 < x1) then read as a clean
+                    // loop instead of an orthogonal elbow that doubles back on itself.
+                    const dx = Math.max(16, Math.abs(a.x2 - a.x1) * 0.5);
                     return (
                       <path
                         key={i}
-                        d={`M ${a.x1} ${a.y1} H ${midX} V ${a.y2} H ${a.x2}`}
-                        className="stroke-muted-foreground/60"
+                        d={`M ${a.x1} ${a.y1} C ${a.x1 + dx} ${a.y1}, ${a.x2 - dx} ${a.y2}, ${a.x2} ${a.y2}`}
+                        className="stroke-muted-foreground/80"
                         strokeWidth={1.5}
                         fill="none"
                         markerEnd="url(#ob-dep-arrow)"

@@ -7,6 +7,7 @@ import {
   signIdentity,
   type IdentityClaims,
   type IdentityKeypair,
+  type InstanceInfo,
   type Jwks,
 } from '@book.dev/sdk';
 import {PgliteDb} from './db';
@@ -66,7 +67,7 @@ describe('guest-access gate', () => {
     expect((await app.request('/api/pages')).status).toBe(200);
     const res = await app.request('/api/pages', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: pageBody(`g-write-${seq}`),
     });
     expect(res.status).toBe(201);
@@ -78,7 +79,7 @@ describe('guest-access gate', () => {
     expect((await app.request('/api/pages')).status).toBe(200);
     const res = await app.request('/api/pages', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: pageBody(`g-ro-${seq}`),
     });
     expect(res.status).toBe(403);
@@ -127,6 +128,49 @@ describe('identity verification', () => {
     const asGuest = await (await app.request('/api/instance')).json();
     expect(asGuest.you).toMatchObject({kind: 'guest', verifiedVia: 'guest'});
   });
+
+  it('GATE-7: a guest on a CLAIMED instance gets the identity-infra block nulled; the owner keeps it', async () => {
+    // Claim to `${ISS}#owner` and advertise an audience, so the identity-infra block
+    // (ownerSubject / trustedIssuers / audience) is fully populated for an owner read.
+    await store.updateInstanceConfig({ownerSubject: `${ISS}#owner`, audience: 'https://lib.example'});
+    const app = appWithIdentity();
+
+    const asGuest = (await (await app.request('/api/instance')).json()) as InstanceInfo;
+    // The recon-only identity metadata is withheld from the anonymous surface…
+    expect(asGuest.ownerSubject).toBeNull();
+    expect(asGuest.trustedIssuers).toEqual([]);
+    expect(asGuest.audience).toBeNull();
+    // …but everything the client needs to render still comes through.
+    expect(asGuest.you).toMatchObject({kind: 'guest', verifiedVia: 'guest'});
+    expect(asGuest.guestAccess).toBe('write');
+    expect('instanceId' in asGuest).toBe(true);
+
+    // The authenticated owner keeps the full payload (claim/repair + forwarding flows).
+    const asOwner = (await (
+      await app.request('/api/instance', {headers: {[IDENTITY_HEADER]: await idFor('owner')}})
+    ).json()) as InstanceInfo;
+    expect(asOwner.ownerSubject).toBe(`${ISS}#owner`);
+    expect(asOwner.trustedIssuers).toContain(ISS);
+    expect(asOwner.audience).toBe('https://lib.example');
+  });
+
+  // PUB-1: `claimed` deliberately sits OUTSIDE the GATE-7 fence. `ownerSubject` is
+  // nulled for an anonymous caller on a claimed instance, so it cannot answer "is
+  // this library owned?" — and a client needs that to warn honestly that an
+  // UNCLAIMED library ignores `defaultVisibility` entirely (authorize rule 0).
+  // A bare boolean discloses no identity.
+  it('PUB-1: `claimed` survives the GATE-7 nulling for an anonymous caller', async () => {
+    const unclaimed = (await (await appWithIdentity().request('/api/instance')).json()) as InstanceInfo;
+    expect(unclaimed.claimed).toBe(false);
+    expect(unclaimed.ownerSubject).toBeNull();
+
+    await store.updateInstanceConfig({ownerSubject: `${ISS}#owner`});
+    const asGuest = (await (await appWithIdentity().request('/api/instance')).json()) as InstanceInfo;
+    // The owner's identity stays fenced…
+    expect(asGuest.ownerSubject).toBeNull();
+    // …but the claim STATE is now unambiguous, which `ownerSubject` alone never was.
+    expect(asGuest.claimed).toBe(true);
+  });
 });
 
 describe('change provenance (edit log)', () => {
@@ -135,7 +179,7 @@ describe('change provenance (edit log)', () => {
     const created = await (
       await app.request('/api/pages', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-OpenBook-Guest-Name': 'Caryl'},
+        headers: {'Content-Type': 'application/json', 'X-OpenBook-Guest-Name': 'Caryl', 'X-OpenBook-Client': '1'},
         body: pageBody(`prov-guest-${seq}`),
       })
     ).json();
@@ -172,13 +216,13 @@ describe('change provenance (edit log)', () => {
     const created = await (
       await app.request('/api/pages', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
         body: pageBody(`prov-http-${seq}`),
       })
     ).json();
     await app.request(`/api/pages/${created.id}`, {
       method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({id: created.id, name: `prov-http-${seq}`, data: {editorjs: {blocks: [{type: 'paragraph', data: {text: 'hi'}}]}, values: [], names: []}}),
     });
     await new Promise((r) => setTimeout(r, 25));
@@ -191,7 +235,7 @@ describe('change provenance (edit log)', () => {
 
 describe('review-layer author identity', () => {
   const createPage = async (app: ReturnType<typeof appWithIdentity>, headers: Record<string, string>) =>
-    (await app.request('/api/pages', {method: 'POST', headers: {'Content-Type': 'application/json', ...headers}, body: pageBody(`rev-${seq}`)})).json();
+    (await app.request('/api/pages', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...headers}, body: pageBody(`rev-${seq}`)})).json();
 
   it('stamps the verified principal on a suggestion', async () => {
     const app = appWithIdentity();
@@ -222,7 +266,7 @@ describe('review-layer author identity', () => {
     const com = await (
       await app.request(`/api/pages/${page.id}/comments`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-OpenBook-Guest-Name': 'Caryl'},
+        headers: {'Content-Type': 'application/json', 'X-OpenBook-Guest-Name': 'Caryl', 'X-OpenBook-Client': '1'},
         body: JSON.stringify({pageId: page.id, authorName: 'Caryl', body: [{t: 'hi'}], blockId: 'b1'}),
       })
     ).json();
@@ -254,7 +298,7 @@ describe('instance policy ownership', () => {
     // A guest cannot change policy now.
     const guestPut = await app.request('/api/instance', {
       method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({guestAccess: 'off'}),
     });
     expect(guestPut.status).toBe(403);

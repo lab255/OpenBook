@@ -6,7 +6,7 @@
 
 // ── Share-link origin ───────────────────────────────────────────────────────
 // On the desktop, `window.location` is `tauri://localhost` — a copied link built
-// from it is dead for anyone else. While the workspace is published through the
+// from it is dead for anyone else. While the library is published through the
 // forwarding tunnel, the forwarded `https://<prefix>.book.cloud` host is the only
 // externally reachable address, so `ForwardingProvider` registers it here while
 // the tunnel is live (and clears it when it isn't). A module-level registry, not
@@ -41,19 +41,66 @@ export function getShareLinkOrigin(): string | null {
   return shareLinkOrigin;
 }
 
-/** Build a shareable deep link to a page (`?page=<id>`), no split. Prefers the
- *  registered share-link origin (the published address) over `window.location`. */
-export function pageLinkUrl(pageId: string): string {
+/** Build a shareable deep link to a page, optionally anchored at a database row
+ *  or group (`?page=<pageId>&row=<id>` / `&group=<key>`). Prefers the registered
+ *  share-link origin (the published address) over `window.location`.
+ *
+ *  Any per-window ephemerals — `?split=`, `?view=`, and a *stale* `?row=`/
+ *  `?group=` from the current URL — are dropped so a copied link carries only the
+ *  page (and its own anchor, when given), never the address bar's incidental state. */
+function buildPageLink(pageId: string, anchor?: {row?: string; group?: string}): string {
+  const applyAnchor = (url: URL): void => {
+    url.searchParams.set('page', pageId);
+    // A fresh page/anchor never carries a foreign per-page db view.
+    url.searchParams.delete('split');
+    url.searchParams.delete('view');
+    url.searchParams.delete('row');
+    url.searchParams.delete('group');
+    if (anchor?.row) url.searchParams.set('row', anchor.row);
+    else if (anchor?.group) url.searchParams.set('group', anchor.group);
+  };
   if (shareLinkOrigin) {
     const url = new URL('/', shareLinkOrigin);
-    url.searchParams.set('page', pageId);
+    applyAnchor(url);
     return url.toString();
   }
   if (typeof window === 'undefined') return '';
   const url = new URL(window.location.href);
-  url.searchParams.set('page', pageId);
-  url.searchParams.delete('split');
+  applyAnchor(url);
   return url.toString();
+}
+
+/** Build a shareable deep link to a page (`?page=<id>`), no split. */
+export function pageLinkUrl(pageId: string): string {
+  return buildPageLink(pageId);
+}
+
+/** Build a deep link that reopens the row's HOST database page and scrolls to +
+ *  highlights the row in context (`?page=<hostPageId>&row=<rowId>`) — not the
+ *  row-as-standalone-page (`?page=<rowId>`). */
+export function rowLinkUrl(hostPageId: string, rowId: string): string {
+  return buildPageLink(hostPageId, {row: rowId});
+}
+
+/** Build a deep link that reopens the database and scrolls to + highlights a
+ *  group header (`?page=<hostPageId>&group=<groupKey>`). */
+export function groupLinkUrl(hostPageId: string, groupKey: string): string {
+  return buildPageLink(hostPageId, {group: groupKey});
+}
+
+/** Build an `openbook://page/<id>` internal deep link — the desktop custom
+ *  scheme that opens the page in the app regardless of publishing (a copied
+ *  link that survives even when `window.location` is the dead `tauri://localhost`
+ *  origin). Only meaningful where the `openbook://` scheme is registered (the
+ *  desktop app); the web app routes plain `?page=<id>` URLs instead. */
+export function internalLinkUrl(pageId: string): string {
+  return `openbook://page/${encodeURIComponent(pageId)}`;
+}
+
+/** Copy a page's internal deep link (see {@link internalLinkUrl}). Resolves to
+ *  whether it worked. */
+export async function copyInternalLink(pageId: string): Promise<boolean> {
+  return copyText(internalLinkUrl(pageId));
 }
 
 /** Copy arbitrary text to the clipboard. Resolves to whether it worked. */
@@ -86,6 +133,18 @@ export async function copyText(text: string): Promise<boolean> {
 export async function copyPageLink(pageId: string): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   return copyText(pageLinkUrl(pageId));
+}
+
+/** Copy an in-context row deep link (see {@link rowLinkUrl}). */
+export async function copyRowLink(hostPageId: string, rowId: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  return copyText(rowLinkUrl(hostPageId, rowId));
+}
+
+/** Copy a group-header deep link (see {@link groupLinkUrl}). */
+export async function copyGroupLink(hostPageId: string, groupKey: string): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  return copyText(groupLinkUrl(hostPageId, groupKey));
 }
 
 // ── Rename bridge ───────────────────────────────────────────────────────────

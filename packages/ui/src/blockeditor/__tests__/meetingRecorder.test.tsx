@@ -1,0 +1,765 @@
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
+import * as Y from 'yjs';
+import {setLocale, t} from '@/i18n';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {act, cleanup, fireEvent, render, screen} from '@testing-library/react';
+import {invalidBlockProps, type AiTranscriptionResult} from '@book.dev/sdk';
+import {setAssetBridge} from '@/lib/assetBridge';
+import {registerBlockEditorDoc} from '@/lib/aiBridge';
+import {AssetBridgeHost} from '@/components/AssetBridgeHost';
+import {DataProvider} from '@/data';
+import type {DataClient} from '@book.dev/sdk';
+import {setMeetingSessionClient, MeetingRecorder, meetingRecorder, meetingSegments, chunkKey, type MeetingAudio, type RecordingChunk} from '../meetingSessions';
+import {deleteMeetingTranscript} from '../meetingManagement';
+import {MeetingBlockView} from '../MeetingBlockView';
+import {blockProp, createDoc, decodeSnapshot, docToJSON, encodeSnapshot, rootBlocks, setBlockProp} from '../model';
+import type {BlockEditorController} from '../useBlockEditor';
+import {BlockEditor} from '../BlockEditor';
+import {registerArtifactKit} from '../kit';
+import {blocksToHtml, blocksToMarkdown, projectBlocksForExport} from '../exportBlocks';
+
+class Recorder {
+  static instances: Recorder[] = [];
+  static isTypeSupported = vi.fn((mime: string) => mime === 'audio/webm;codecs=opus');
+  state = 'inactive';
+  mimeType: string;
+  ondataavailable?: (event: {data: Blob}) => void;
+  onstop?: () => void;
+  onerror?: () => void;
+  start = vi.fn(() => { this.state = 'recording'; });
+  stop = vi.fn(() => {
+    this.state = 'inactive';
+    this.ondataavailable?.({data: new Blob(['standalone audio'], {type: this.mimeType})});
+    this.onstop?.();
+  });
+  constructor(_stream: MediaStream, options: MediaRecorderOptions) {
+    this.mimeType = options.mimeType ?? 'audio/webm'; Recorder.instances.push(this);
+  }
+}
+const track = {stop: vi.fn(), enabled: true};
+const stream = {getTracks: () => [track], getAudioTracks: () => [track]} as unknown as MediaStream;
+const getUserMedia = vi.fn(async () => stream);
+const putAsset = vi.fn(async () => ({id: `asset-${Recorder.instances.length}`}));
+const transcribeAsset = vi.fn(async (): Promise<AiTranscriptionResult> => ({text: 'hello', segments: [{start: 0.25, end: 1.5, text: 'hello'}], durationMs: 2000}));
+function harness(props = {}) {
+  const doc = createDoc([{type: 'meeting', props, children: [{id: 'note', type: 'paragraph', text: 'Manual note'}]}]);
+  const block = rootBlocks(doc).get(0);
+  const editor = {doc, readOnly: false} as BlockEditorController;
+  return {doc, block, editor, session: new MeetingRecorder(editor, block, 'page')};
+}
+const flush = async (): Promise<void> => { for (let i = 0; i < 20; i += 1) await Promise.resolve(); };
+beforeEach(() => {
+  vi.useFakeTimers(); vi.setSystemTime(100000);
+  // The DOM test environment's Blob lacks arrayBuffer; the mock recorder's payload is opaque.
+  vi.stubGlobal('Blob', class extends Blob { async arrayBuffer(): Promise<ArrayBuffer> { return new ArrayBuffer(this.size); } }); vi.stubGlobal('MediaRecorder', Recorder);
+  vi.stubGlobal('URL', Object.assign(URL, {createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn()}));
+  Object.defineProperty(navigator, 'mediaDevices', {configurable: true, value: {getUserMedia}});
+  Recorder.instances = []; track.enabled = true;
+  getUserMedia.mockReset().mockResolvedValue(stream);
+  putAsset.mockReset().mockImplementation(async () => ({id: `asset-${Recorder.instances.length}`}));
+  transcribeAsset.mockReset().mockResolvedValue({text: 'hello', segments: [{start: 0.25, end: 1.5, text: 'hello'}], durationMs: 2000});
+  setAssetBridge({putAsset, getAsset: async () => null, transcribeAsset});
+});
+afterEach(() => { cleanup(); setMeetingSessionClient(null); setLocale('en'); setAssetBridge(null); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+describe('meeting recording and recovery', () => {
+  it('restarts recorders into independent files, pauses/resumes, saves ordered durations and transcript offsets', async () => {
+    const {session, block, doc} = harness();
+    await session.start();
+    expect(blockProp(block, 'status')).toBe('recording');
+    await vi.advanceTimersByTimeAsync(45000);
+    expect(Recorder.instances).toHaveLength(2);
+    expect(Recorder.instances[0].start).toHaveBeenCalledWith(); // no timeslice
+    expect(putAsset).toHaveBeenCalledWith(expect.any(Uint8Array), 'audio/webm', 'page');
+    await vi.advanceTimersByTimeAsync(2000);
+    session.pause(); await flush();
+    expect(session.mode).toBe('paused'); expect(track.enabled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    session.resume(); expect(track.enabled).toBe(true);
+    expect(Recorder.instances).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1000);
+    session.stop(); await flush();
+    expect(blockProp(block, 'status')).toBe('done');
+    expect((blockProp<MeetingAudio[]>(block, 'audioChunks') ?? []).map(({durationMs, startedAtMs}) => ({durationMs, startedAtMs}))).toEqual([
+      {durationMs: 45000, startedAtMs: 0}, {durationMs: 2000, startedAtMs: 45000}, {durationMs: 1000, startedAtMs: 47000},
+    ]);
+    expect(blockProp(block, 'transcript')).toEqual([
+      {startMs: 250, endMs: 1500, text: 'hello'}, {startMs: 45250, endMs: 46500, text: 'hello'}, {startMs: 47250, endMs: 48500, text: 'hello'},
+    ]);
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual(['0:asset-2', '45000:asset-2', '47000:asset-3']);
+    expect(invalidBlockProps('meeting', {transcriptionCompleted: blockProp(block, 'transcriptionCompleted')})).toBeNull();
+    expect(docToJSON(decodeSnapshot(encodeSnapshot(doc)))).toEqual(docToJSON(doc));
+    expect(track.stop).toHaveBeenCalled();
+  });
+
+  it.each([1.5, 1e-7, 1e21])('persists schema-valid completion keys when retrying a chunk starting at %s ms', async (startedAtMs) => {
+    const audio = {assetId: 'saved-audio', durationMs: 1000, startedAtMs};
+    const {session, block} = harness({status: 'done', audioChunks: [audio]});
+    session.retry(audio); await flush();
+    const completed = blockProp(block, 'transcriptionCompleted');
+    expect(completed).toEqual([chunkKey(audio)]);
+    expect(invalidBlockProps('meeting', {transcriptionCompleted: completed})).toBeNull();
+  });
+
+  it('keeps audio on upload failure, retries with exponential backoff, then permits manual recovery', async () => {
+    putAsset.mockRejectedValue(new Error('offline'));
+    const {session, block} = harness();
+    await session.start(); await vi.advanceTimersByTimeAsync(1500); session.stop(); await flush();
+    expect(putAsset).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1000); expect(putAsset).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(2000); expect(putAsset).toHaveBeenCalledTimes(3);
+    expect(session.chunks[0].phase).toBe('uploadFailed'); expect(session.unsaved).toBe(true);
+    expect(blockProp(block, 'status')).toBe('done'); expect(transcribeAsset).not.toHaveBeenCalled();
+    putAsset.mockResolvedValue({id: 'recovered'});
+    await session.upload(session.chunks[0]); await flush();
+    expect(session.unsaved).toBe(false); expect(blockProp(block, 'status')).toBe('done');
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')?.[0].assetId).toBe('recovered');
+  });
+
+  it('retains failed transcription, allows retry without duplicate segments, and sorts late results', async () => {
+    let finishFirst!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+      .mockRejectedValueOnce(new Error('OpenBook request failed (400 Bad Request)'));
+    const {session, block} = harness(); await session.start();
+    await vi.advanceTimersByTimeAsync(45000);
+    await vi.advanceTimersByTimeAsync(2000); session.stop(); await flush();
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(2);
+    expect(session.chunks[1].error).toContain('Settings → AI');
+    expect(session.chunks[1].phase).toBe('untranscribed');
+    await session.transcribe(session.chunks[1]);
+    finishFirst({text: 'first', segments: [{start: 0, end: 1, text: 'first'}], durationMs: 1000}); await flush();
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 0, endMs: 1000, text: 'first'}, {startMs: 45250, endMs: 46500, text: 'hello'}]);
+    await session.transcribe(session.chunks[1]);
+    expect(transcribeAsset).toHaveBeenCalledTimes(3);
+    expect(blockProp(block, 'status')).toBe('done');
+  });
+
+  it('handles permission denial and cancels a late permission grant after stop', async () => {
+    const {session, block} = harness();
+    getUserMedia.mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'));
+    await session.start(); expect(session.mode).toBe('idle'); expect(session.error).toContain('Microphone');
+    expect(blockProp(block, 'status')).toBeUndefined(); expect(Recorder.instances).toHaveLength(0);
+    let grant!: (stream: MediaStream) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
+    const pending = session.start(); session.stop(); grant(stream); await pending;
+    expect(Recorder.instances).toHaveLength(0); expect(session.active).toBe(false);
+    expect(session.mode).toBe('idle'); expect(blockProp(block, 'status')).toBe('idle');
+  });
+
+  it('uses Safari mp4 when opus is unavailable and falls back to plain transcript duration', async () => {
+    Recorder.isTypeSupported.mockImplementationOnce(() => false).mockImplementationOnce(() => false).mockImplementationOnce(() => true);
+    const {session} = harness(); await session.start();
+    expect(Recorder.instances[0].mimeType).toBe('audio/mp4'); session.stop(); await flush();
+    expect(meetingSegments({text: 'plain', durationMs: 1234}, {assetId: 'a', durationMs: 999, startedAtMs: 45000}))
+      .toEqual([{startMs: 45000, endMs: 46234, text: 'plain'}]);
+  });
+});
+
+describe('meeting UI and exports', () => {
+  it('renders editable note children and freezes both notes and recording on read-only pages and locked groups', () => {
+    registerArtifactKit();
+    const {doc} = harness();
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
+    expect(view.container.querySelector('[data-block-text="note"]')?.getAttribute('contenteditable')).toBe('true');
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(false);
+    view.rerender(<ConfirmProvider><BlockEditor doc={doc} readOnly /></ConfirmProvider>);
+    expect(view.container.querySelector('[data-block-text="note"]')?.getAttribute('contenteditable')).toBe('false');
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
+    view.unmount();
+    const locked = createDoc([{type: 'group', props: {locked: true}, children: docToJSON(doc)}]);
+    const group = render(<ConfirmProvider><BlockEditor doc={locked} /></ConfirmProvider>);
+    expect(group.container.querySelector('[data-block-text="note"]')?.getAttribute('contenteditable')).toBe('false');
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('wires no-AI client capability through the bridge and disables transcription without disabling recording', async () => {
+    const {editor, block, doc} = harness({audioChunks: [{assetId: 'saved', durationMs: 2000}]});
+    const unregister = registerBlockEditorDoc('page', doc);
+    const client = {supportsTranscription: false, putAsset, getAsset: async () => null, transcribeAsset} as unknown as DataClient;
+    render(<DataProvider client={client}><AssetBridgeHost /><ConfirmProvider><MeetingBlockView editor={editor} block={block} pageReadOnly={false} /></ConfirmProvider></DataProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.getByText(/Transcription requires a connected/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+    fireEvent.click(screen.getByRole('button', {name: '0:00 · Not transcribed'}));
+    expect((screen.getByRole('button', {name: 'Retry transcription'}) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
+    expect(putAsset).toHaveBeenCalled(); expect(transcribeAsset).not.toHaveBeenCalled(); unregister();
+  });
+
+  it('exports title, timestamped transcript, summary and nested notes without raw status in all three projections', () => {
+    const {doc} = harness({title: 'Planning <team>', status: 'done', summary: 'Next steps', transcript: [{startMs: 61500, endMs: 62000, text: 'Discussion <safe>'}]});
+    const blocks = docToJSON(doc);
+    const html = blocksToHtml(blocks); const markdown = blocksToMarkdown(blocks); const standalone = JSON.stringify(projectBlocksForExport(blocks));
+    for (const output of [html, markdown, standalone]) {
+      expect(output).toContain('Planning'); expect(output).not.toContain('done'); expect(output).not.toContain('Transcript incomplete'); expect(output).toContain('1:01');
+      expect(output).toContain('Discussion'); expect(output).toContain('Next steps'); expect(output).toContain('Manual note');
+    }
+    expect(html).toContain('&lt;safe&gt;'); expect(standalone).toContain('&lt;safe&gt;');
+  });
+});
+
+describe('meeting asynchronous boundaries', () => {
+  it('commits audio in capture order when uploads complete in reverse order', async () => {
+    let first!: (asset: {id: string}) => void;
+    putAsset.mockImplementationOnce(() => new Promise((resolve) => { first = resolve; }))
+      .mockResolvedValueOnce({id: 'second'});
+    const {session, block} = harness(); await session.start();
+    await vi.advanceTimersByTimeAsync(45000);
+    await vi.advanceTimersByTimeAsync(1000); session.stop(); await flush();
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')?.[0].assetId).toBe('second');
+    first({id: 'first'}); await flush();
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')?.map((audio) => audio.assetId)).toEqual(['first', 'second']);
+    expect(blockProp(block, 'status')).toBe('done');
+  });
+
+  it('ignores a stale permission rejection after a new recording has started', async () => {
+    let deny!: (error: Error) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((_resolve, reject) => { deny = reject; }));
+    const {session} = harness(); const oldRequest = session.start(); session.stop();
+    await session.start(); expect(session.mode).toBe('recording');
+    deny(new Error('old permission denied')); await oldRequest;
+    expect(session.mode).toBe('recording'); expect(session.error).toBe('');
+    session.stop(); await flush();
+  });
+
+  it('waits for the final asynchronous data event before declaring done', async () => {
+    const {session, block} = harness(); await session.start();
+    const recorder = Recorder.instances[0];
+    recorder.stop.mockImplementation(() => {
+      recorder.state = 'inactive';
+      setTimeout(() => { recorder.ondataavailable?.({data: new Blob(['last'])}); recorder.onstop?.(); }, 100);
+    });
+    session.stop(); expect(blockProp(block, 'status')).toBe('processing');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(block, 'status')).toBe('done');
+  });
+
+  it.each([403, 404, 502])('keeps audio and a retryable chunk after transcription HTTP %s', async (status) => {
+    transcribeAsset.mockRejectedValue(new Error(`OpenBook request failed (${status})`));
+    const {session, block} = harness(); await session.start(); session.stop(); await flush();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(session.chunks[0].phase).toBe('untranscribed');
+    expect(session.chunks[0].error).toBeTruthy(); expect(session.unsaved).toBe(false);
+    expect(blockProp(block, 'status')).toBe('done');
+  });
+
+  it('shows permission errors and actionable configuration errors with working retry buttons', async () => {
+    const {block, editor, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    getUserMedia.mockRejectedValueOnce(new Error('denied'));
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
+    expect(screen.getByRole('alert').textContent).toContain('Allow microphone access');
+    transcribeAsset.mockRejectedValueOnce(new Error('400'));
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
+    expect(document.querySelector('.obe-meeting-attention')!.textContent).toContain('Settings → AI');
+    expect(screen.getByRole('button', {name: /· Not transcribed$/})).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Retry transcription'})); await flush(); });
+    fireEvent.click(screen.getByRole('tab', {name: 'Transcript'}));
+    expect(screen.getByRole('button', {name: /· Transcribed$/})).toBeTruthy(); expect(screen.getByText('hello')).toBeTruthy();
+    unregister();
+  });
+});
+
+describe('MEET-5 review regressions', () => {
+  it('counts only recorded time across pauses, async finalization, later sessions and reopened blocks', async () => {
+    const {session, block, doc} = harness();
+    await session.start(); await vi.advanceTimersByTimeAsync(2000);
+    expect(session.elapsedMs).toBe(2000);
+    const first = Recorder.instances[0];
+    first.stop.mockImplementation(() => {
+      first.state = 'inactive';
+      setTimeout(() => { first.ondataavailable?.({data: new Blob(['first'])}); first.onstop?.(); }, 100);
+    });
+    session.pause(); expect(session.elapsedMs).toBe(2000);
+    await vi.advanceTimersByTimeAsync(3000); expect(session.elapsedMs).toBe(2000);
+    session.resume(); await vi.advanceTimersByTimeAsync(1000);
+    expect(session.elapsedMs).toBe(3000); session.stop(); await flush();
+    await vi.advanceTimersByTimeAsync(60000); expect(session.elapsedMs).toBe(3000);
+    await session.start(); await vi.advanceTimersByTimeAsync(1000); session.stop(); await flush();
+    expect(session.elapsedMs).toBe(4000);
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')?.map((audio) => audio.startedAtMs)).toEqual([0, 2000, 3000]);
+    const reopened = decodeSnapshot(encodeSnapshot(doc)); const reopenedBlock = rootBlocks(reopened).get(0);
+    const next = new MeetingRecorder({doc: reopened, readOnly: false} as BlockEditorController, reopenedBlock, 'page');
+    await vi.advanceTimersByTimeAsync(60000); await next.start(); await vi.advanceTimersByTimeAsync(1000); next.stop(); await flush();
+    expect(next.elapsedMs).toBe(5000);
+    expect(blockProp<MeetingAudio[]>(reopenedBlock, 'audioChunks')?.slice(-1)[0]?.startedAtMs).toBe(4000);
+  });
+
+  it('keeps oversized audio recoverable without bricking Record or adding idle gaps', async () => {
+    const {editor, block, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    const session = meetingRecorder(editor, block, 'page');
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
+    const recorder = Recorder.instances[0];
+    recorder.stop.mockImplementation(() => {
+      recorder.state = 'inactive';
+      recorder.ondataavailable?.({data: new Blob([new Uint8Array(10 * 1024 * 1024 + 1)])}); recorder.onstop?.();
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
+    expect(session.mode).toBe('done'); expect(session.unsaved).toBe(true); expect(putAsset).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('link', {name: 'Save audio copy'})).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Retry upload'})); await flush(); });
+    expect(session.unsaved).toBe(true); expect(session.mode).toBe('done');
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')?.[0].startedAtMs).toBe(2000);
+    expect(session.elapsedMs).toBe(3000); unregister();
+    // Dispose the recovery guard after checking the retained blob.
+    session.chunks[0].blob = undefined;
+    await act(async () => { await session.start(); session.stop(); await flush(); });
+  });
+
+  it('keeps one focused toggle and announces only status, with no idle timer', async () => {
+    const {editor, block, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
+    const interval = vi.spyOn(globalThis, 'setInterval');
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    expect(interval).not.toHaveBeenCalled();
+    const toggle = screen.getByRole('button', {name: 'Record'}); toggle.focus();
+    await act(async () => { fireEvent.click(toggle); await flush(); });
+    expect(screen.getByRole('button', {name: 'Pause'})).toBe(toggle); expect(document.activeElement).toBe(toggle);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    const status = view.container.querySelector('header [role="status"]')!;
+    expect(status.textContent).toBe('Recording');
+    const timer = status.nextElementSibling!;
+    expect(timer.getAttribute('aria-hidden')).toBe('true'); expect(timer.textContent).toBe('0:02');
+    await act(async () => { fireEvent.click(toggle); await flush(); });
+    expect(screen.getByRole('button', {name: 'Resume'})).toBe(toggle); expect(document.activeElement).toBe(toggle);
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(timer.textContent).toBe('0:02'); expect(status.textContent).toBe('Paused');
+    await act(async () => { fireEvent.click(toggle); await flush(); });
+    expect(screen.getByRole('button', {name: 'Pause'})).toBe(toggle); expect(document.activeElement).toBe(toggle);
+    const stop = screen.getByRole('button', {name: 'Stop'}); stop.focus();
+    await act(async () => { fireEvent.click(stop); await flush(); });
+    expect(document.activeElement).toBe(stop);
+    expect(vi.getTimerCount()).toBe(0); interval.mockRestore(); unregister();
+  });
+
+  it('edits the durable title through KitFrame and distinguishes page read-only from section locks', () => {
+    registerArtifactKit(); const {doc, block} = harness({title: 'Planning'});
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
+    expect(view.container.querySelector('.obe-kit-meeting')).toBeTruthy();
+    fireEvent.change(screen.getByRole('textbox', {name: 'Display name'}), {target: {value: 'Weekly planning'}});
+    expect(blockProp(block, 'title')).toBe('Weekly planning'); expect(blockProp(block, 'label')).toBeUndefined();
+    view.rerender(<ConfirmProvider><BlockEditor doc={doc} readOnly /></ConfirmProvider>);
+    expect(screen.queryByRole('textbox', {name: 'Display name'})).toBeNull();
+    expect(screen.getByText('Read-only meeting')).toBeTruthy(); view.unmount();
+    const locked = createDoc([{type: 'group', props: {locked: true}, children: docToJSON(doc)}]);
+    const group = render(<ConfirmProvider><BlockEditor doc={locked} /></ConfirmProvider>);
+    expect(group.container.querySelector('.obe-kit-meeting input')).toBeNull();
+    expect(screen.getByText('Meeting locked by its section')).toBeTruthy();
+  });
+
+  it('does not append a second transcript when a remote completion arrives during the await', async () => {
+    const audio = {assetId: 'shared', durationMs: 1000, startedAtMs: 0};
+    const {editor, block, doc, session} = harness({status: 'done', audioChunks: [audio]});
+    const remoteDoc = decodeSnapshot(encodeSnapshot(doc)); const remoteBlock = rootBlocks(remoteDoc).get(0);
+    const remote = new MeetingRecorder({...editor, doc: remoteDoc}, remoteBlock, 'page');
+    let complete!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const chunk: RecordingChunk = {id: 'local', audio, phase: 'untranscribed'};
+    const pending = session.transcribe(chunk);
+    await remote.transcribe({id: 'remote', audio, phase: 'untranscribed'});
+    Y.applyUpdate(doc, Y.encodeStateAsUpdate(remoteDoc));
+    complete({text: 'duplicate', durationMs: 1000}); await pending;
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual([chunkKey(audio)]);
+    expect(chunk.phase).toBe('done'); expect(chunk.busy).toBe(false);
+  });
+
+  it.each(['recording', 'processing'])('blocks a new local recording when the persisted status is %s', async (status) => {
+    const {doc, block, editor, session} = harness({status});
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Recording or processing on another client.')).toBeTruthy();
+    await session.start(); expect(getUserMedia).not.toHaveBeenCalled();
+    expect(blockProp(block, 'status')).toBe(status);
+    // A remote completion is observed by the editor and unblocks recording.
+    cleanup(); registerArtifactKit(); const view = render(<ConfirmProvider><BlockEditor doc={doc} /></ConfirmProvider>);
+    act(() => doc.transact(() => setBlockProp(block, 'status', 'done')));
+    expect((screen.getByRole('button', {name: 'Record'}) as HTMLButtonElement).disabled).toBe(false);
+    view.unmount();
+  });
+
+  it('abandons a permission grant if another client starts recording first', async () => {
+    const {session, doc, block} = harness(); let grant!: (stream: MediaStream) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
+    const pending = session.start(); doc.transact(() => setBlockProp(block, 'status', 'recording'));
+    grant(stream); await pending;
+    expect(Recorder.instances).toHaveLength(0); expect(session.recordingElsewhere).toBe(true);
+    expect(blockProp(block, 'status')).toBe('recording'); expect(blockProp(block, 'startedAt')).toBeUndefined();
+  });
+
+  it('enforces effective read-only inside start, including permission-time changes', async () => {
+    const {block, editor, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
+    render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly /></ConfirmProvider>);
+    const session = meetingRecorder(editor, block, 'page');
+    expect(editor.readOnly).toBe(false); await session.start(); expect(getUserMedia).not.toHaveBeenCalled();
+    cleanup(); session.readOnly = false;
+    let grant!: (stream: MediaStream) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
+    const pending = session.start(); session.readOnly = true; grant(stream); await pending;
+    expect(Recorder.instances).toHaveLength(0); expect(session.mode).toBe('idle'); unregister();
+  });
+
+  it('never persists done when cancelling a permission prompt without audio or startedAt', async () => {
+    const {session, block} = harness(); const statuses: unknown[] = [];
+    block.observeDeep(() => statuses.push(blockProp(block, 'status')));
+    let grant!: (stream: MediaStream) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
+    const pending = session.start(); session.stop(); grant(stream); await pending;
+    expect(statuses).not.toContain('done'); expect(blockProp(block, 'status')).toBe('idle');
+    expect(blockProp(block, 'startedAt')).toBeUndefined(); expect(session.mode).toBe('idle');
+  });
+
+  it('retains the pending audio element identity when an earlier upload leaves the list', async () => {
+    let first!: (asset: {id: string}) => void;
+    putAsset.mockImplementationOnce(() => new Promise((resolve) => { first = resolve; })).mockRejectedValue(new Error('offline'));
+    const {block, editor, doc} = harness(); const unregister = registerBlockEditorDoc('page', doc);
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    await act(async () => { fireEvent.click(screen.getByRole('button', {name: 'Record'})); await flush(); await vi.advanceTimersByTimeAsync(45000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); fireEvent.click(screen.getByRole('button', {name: 'Stop'})); await flush(); });
+    await act(async () => { fireEvent.change(screen.getByRole('slider'), {target: {value: '45000'}}); await flush(); });
+    const second = view.container.querySelectorAll('audio')[1];
+    expect(second.hasAttribute('src')).toBe(true);
+    await act(async () => { first({id: 'first'}); await flush(); });
+    expect(view.container.querySelectorAll('audio')[1]).toBe(second);
+    await act(async () => { putAsset.mockResolvedValue({id: 'second'}); await vi.advanceTimersByTimeAsync(1000); });
+    expect(view.container.querySelectorAll('audio[src]')).toHaveLength(0); // saved assets are unavailable in this mock bridge
+    unregister();
+  });
+
+  it.each(['en', 'de', 'ja', 'zh'] as const)('exports translated incompleteness and hour timestamps in %s', (locale) => {
+    setLocale(locale);
+    for (const status of ['idle', 'recording', 'processing', 'done']) {
+      const {doc} = harness({status, transcript: [{startMs: 5423000, endMs: 5424000, text: 'Long meeting'}]});
+      const blocks = docToJSON(doc);
+      for (const output of [blocksToHtml(blocks), blocksToMarkdown(blocks), JSON.stringify(projectBlocksForExport(blocks))]) {
+        expect(output).toContain('1:30:23'); expect(output).not.toContain(status);
+        if (status === 'done') expect(output).not.toContain(t('meetingBlock.incomplete'));
+        else expect(output).toContain(t('meetingBlock.incomplete'));
+        expect(output).toContain('Manual note');
+      }
+    }
+  });
+});
+
+
+describe('app lifetime meeting sessions', () => {
+  it('uses deltas for off-page chunks while concurrent rename, data, and block edits survive', async () => {
+    const {doc, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc), names: ['before']}};
+    const savePage = vi.fn();
+    const applyPageUpdate = vi.fn(async (_id: string, update: string) => {
+      const latest = decodeSnapshot(stored.data.blockdoc);
+      setBlockProp(rootBlocks(latest).get(0), 'concurrent', 'keep');
+      Y.applyUpdate(latest, Uint8Array.from(atob(update), (c) => c.charCodeAt(0)));
+      stored = {id: 'page', name: 'Renamed', data: {blockdoc: encodeSnapshot(latest), names: ['new']}};
+      latest.destroy(); return true;
+    });
+    setMeetingSessionClient({getPage: async () => stored, savePage, applyPageUpdate} as unknown as DataClient);
+    await session.start(); stored = {...stored, data: {...stored.data, blockdoc: encodeSnapshot(doc)}};
+    session.detach(); await vi.advanceTimersByTimeAsync(2000); session.stop(); await vi.advanceTimersByTimeAsync(0);
+    const latest = decodeSnapshot(stored.data.blockdoc); const block = rootBlocks(latest).get(0);
+    expect(stored.name).toBe('Renamed'); expect(stored.data.names).toEqual(['new']);
+    expect(blockProp(block, 'concurrent')).toBe('keep');
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(applyPageUpdate).toHaveBeenCalled(); expect(savePage).not.toHaveBeenCalled();
+    latest.destroy(); session.discard();
+  });
+
+  it.each([403, 404])('stops and retains attention on a delta HTTP %s without a fallback save', async (status) => {
+    const {doc, session} = harness();
+    const savePage = vi.fn();
+    setMeetingSessionClient({getPage: async () => ({id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}}), savePage,
+      applyPageUpdate: async () => { throw Object.assign(new Error(String(status)), {status}); },
+    } as unknown as DataClient);
+    await session.start(); session.detach(); await vi.advanceTimersByTimeAsync(45000); await flush();
+    expect(session.active).toBe(false); expect(session.error).not.toBe('');
+    expect(savePage).not.toHaveBeenCalled(); session.discard();
+  });
+
+  it('persists final audio and transcript after the view and doc detach', async () => {
+    const {doc, block, editor} = harness();
+    const unregister = registerBlockEditorDoc('away-page', doc);
+    const session = meetingRecorder(editor, block, 'away-page');
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    let stored = {id: 'away-page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => { stored = page; });
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start();
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
+    session.detach(); unregister();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(session.mode).toBe('recording');
+    expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(session.mode).toBe('recording');
+    session.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    const persisted = rootBlocks(decodeSnapshot(stored.data.blockdoc)).get(0);
+    expect(blockProp<MeetingAudio[]>(persisted, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(persisted, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(blockProp(persisted, 'status')).toBe('done');
+    expect(blockProp(block, 'audioChunks')).toBeUndefined();
+    expect(savePage).toHaveBeenCalled();
+    expect(remove).toHaveBeenCalledWith('beforeunload', guard);
+    add.mockRestore(); remove.mockRestore();
+  });
+
+  it('rebinds a recreated document to the same live session and stops only on a lock transition', async () => {
+    const {doc, block, editor} = harness();
+    const unregister = registerBlockEditorDoc('return-page', doc);
+    const view = render(<ConfirmProvider><MeetingBlockView block={block} editor={editor} pageReadOnly={false} /></ConfirmProvider>);
+    const session = meetingRecorder(editor, block, 'return-page');
+    await act(async () => { await session.start(); });
+    view.unmount(); unregister();
+    expect(session.mode).toBe('recording'); expect(session.visible).toBe(false);
+    const reopened = decodeSnapshot(encodeSnapshot(doc));
+    const nextBlock = rootBlocks(reopened).get(0);
+    const nextEditor = {...editor, doc: reopened};
+    const unregisterNext = registerBlockEditorDoc('return-page', reopened);
+    const next = render(<ConfirmProvider><MeetingBlockView block={nextBlock} editor={nextEditor} pageReadOnly={false} /></ConfirmProvider>);
+    expect(meetingRecorder(nextEditor, nextBlock, 'return-page')).toBe(session);
+    expect(session.recordingElsewhere).toBe(false); expect(session.visible).toBe(true);
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(45000); });
+    expect(blockProp<MeetingAudio[]>(nextBlock, 'audioChunks')).toHaveLength(1);
+    next.rerender(<ConfirmProvider><MeetingBlockView block={nextBlock} editor={nextEditor} pageReadOnly /></ConfirmProvider>);
+    await act(async () => { await flush(); });
+    expect(session.active).toBe(false);
+    expect(blockProp(nextBlock, 'status')).toBe('done');
+    unregisterNext();
+  });
+});
+
+
+describe('navigation persistence failure recovery', () => {
+  it.each(['load', 'save', 'delta'] as const)('reconciles a page reopened during the stored-page %s', async (stage) => {
+    const {doc, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const getPage = vi.fn(async () => { if (stage === 'load') await gate; return stored; });
+    const savePage = vi.fn(async (page) => { if (stage === 'save') await gate; stored = page; });
+    const applyPageUpdate = stage === 'delta' ? vi.fn(async (_id: string, update: string) => {
+      await gate;
+      const latest = decodeSnapshot(stored.data.blockdoc);
+      Y.applyUpdate(latest, Uint8Array.from(atob(update), (c) => c.charCodeAt(0)));
+      stored = {...stored, data: {blockdoc: encodeSnapshot(latest)}};
+      latest.destroy(); return true;
+    }) : undefined;
+    setMeetingSessionClient({getPage, savePage, applyPageUpdate} as unknown as DataClient);
+    await session.start(); await flush();
+    stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach(); session.pause(); await flush();
+    expect(getPage).toHaveBeenCalledTimes(stage === 'save' ? 2 : 1);
+    if (stage === 'save') expect(savePage).toHaveBeenCalledOnce();
+    const reopened = decodeSnapshot(stored.data.blockdoc);
+    const block = rootBlocks(reopened).get(0);
+    setBlockProp(block, 'title', 'Edited while reopening');
+    const unregister = registerBlockEditorDoc('page', reopened);
+    release(); await flush();
+    expect(rootBlocks(reopened).length).toBe(1);
+    expect(blockProp(block, 'title')).toBe('Edited while reopening');
+    expect(blockProp<MeetingAudio[]>(block, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(block, 'transcript')).toHaveLength(1);
+    expect(session.chunks[0].phase).toBe('done');
+    if (stage !== 'save') expect(savePage).not.toHaveBeenCalled();
+    session.stop(); await flush(); unregister();
+  });
+
+  it('retains a retryable upload when saving its off-page reference fails', async () => {
+    const {doc, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => { stored = page; });
+    savePage.mockRejectedValueOnce(new Error('offline'));
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start(); await flush();
+    stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach();
+    session.pause();
+    await flush();
+    const chunk = session.chunks[0];
+    expect(chunk.phase).toBe('uploadFailed');
+    expect(chunk.blob).toBeDefined();
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    await session.upload(chunk);
+    await flush();
+    expect(chunk.phase).toBe('done');
+    expect(chunk.blob).toBeUndefined();
+    const persisted = rootBlocks(decodeSnapshot(stored.data.blockdoc)).get(0);
+    expect(blockProp<MeetingAudio[]>(persisted, 'audioChunks')).toHaveLength(1);
+    expect(blockProp(persisted, 'transcript')).toHaveLength(1);
+    session.stop(); await flush();
+  });
+
+  it('still releases the microphone when the live meeting block was deleted', async () => {
+    const {doc, session} = harness();
+    await session.start();
+    track.stop.mockClear();
+    rootBlocks(doc).delete(0);
+    expect(() => session.stop()).not.toThrow();
+    await flush();
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(session.active).toBe(false);
+    expect(session.chunks[0].phase).toBe('uploadFailed');
+    expect(session.unsaved).toBe(true);
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    // Release the test's intentionally retained recovery guard.
+    session.chunks[0].blob = undefined;
+    session.setReadOnly(true);
+  });
+
+  it('protects pending transcription after stopping until the transcript is persisted', async () => {
+    const {session} = harness();
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    let finish!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    await session.start();
+    session.stop(); remove.mockClear(); await flush();
+    expect(session.unsaved).toBe(false);
+    const guard = add.mock.calls.find(([name]) => String(name) === 'beforeunload')![1];
+    expect(remove).not.toHaveBeenCalledWith('beforeunload', guard);
+    finish({text: 'saved', durationMs: 1000}); await flush();
+    expect(remove).toHaveBeenCalledWith('beforeunload', guard);
+    add.mockRestore(); remove.mockRestore();
+  });
+});
+
+describe('MTG-7 fix regressions', () => {
+  it.each(['install', 'switch'])('refreshes an idle session on attach after client %s so saved audio can be retried', async (change) => {
+    if (change === 'switch') setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    setAssetBridge(null);
+    const audio = {assetId: 'saved-audio', durationMs: 1000};
+    const {session, editor, block} = harness({status: 'done', audioChunks: [audio]});
+    setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    setAssetBridge({putAsset, getAsset: async () => null, transcribeAsset});
+    session.attach(editor, block);
+    session.retry(audio); await flush();
+    expect(transcribeAsset).toHaveBeenCalledWith('saved-audio', 'page');
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual([chunkKey(audio)]);
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 250, endMs: 1500, text: 'hello'}]);
+    expect(session.error).toBe('');
+    session.detach();
+  });
+
+  it('does not refresh a stopped session with unsaved audio on attach', async () => {
+    const {session, editor, block} = harness();
+    session.chunks.push({id: 'failed', audio: {assetId: '', durationMs: 1000}, blob: new Blob(['audio']), phase: 'uploadFailed'});
+    setMeetingSessionClient({getPage: vi.fn(), savePage: vi.fn()});
+    session.attach(editor, block);
+    session.retry({assetId: 'saved-audio', durationMs: 1000}); await flush();
+    expect(transcribeAsset).not.toHaveBeenCalled();
+    expect(session.error).not.toBe('');
+    session.discard(); session.detach();
+  });
+
+  it('refuses the new client and asset target after a recording switches stores', async () => {
+    const first = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
+    const next = {getPage: vi.fn(), savePage: vi.fn()} as unknown as DataClient;
+    setMeetingSessionClient(first);
+    const {session, editor, block} = harness(); await session.start();
+    track.stop.mockClear();
+    setMeetingSessionClient(next);
+    session.attach(editor, block);
+    session.pause(); await flush();
+    expect(track.stop).toHaveBeenCalled();
+    expect(next.getPage).not.toHaveBeenCalled(); expect(next.savePage).not.toHaveBeenCalled();
+    expect(putAsset).not.toHaveBeenCalled();
+    session.discard();
+  });
+
+  it('evicts a clean detached session and releases its editor', async () => {
+    const {editor, block} = harness();
+    const session = meetingRecorder(editor, block, 'evict');
+    await session.start(); session.stop(); await flush();
+    session.detach(editor);
+    expect((session as unknown as {editor?: unknown}).editor).toBeUndefined();
+    expect(meetingRecorder(editor, block, 'evict')).not.toBe(session);
+  });
+
+  it('keeps a second attached view visible when the first leaves', () => {
+    const {editor, block} = harness();
+    const session = meetingRecorder(editor, block, 'two-views');
+    const second = {...editor}; session.attach(second, block);
+    session.detach(editor); expect(session.visible).toBe(true);
+    session.detach(second); expect(session.visible).toBe(false);
+  });
+
+  it('uses the page id on the first render before document registration', async () => {
+    registerArtifactKit();
+    const {doc, block, editor} = harness();
+    const session = meetingRecorder(editor, block, 'early-page');
+    await session.start();
+    const view = render(<ConfirmProvider><BlockEditor doc={doc} pageId="early-page" /></ConfirmProvider>);
+    expect(screen.queryByText('Recording or processing on another client.')).toBeNull();
+    expect(screen.getByRole('button', {name: 'Pause'})).toBeTruthy();
+    const unregister = registerBlockEditorDoc('early-page', doc);
+    expect(meetingRecorder(editor, block, 'early-page')).toBe(session);
+    await act(async () => { session.stop(); await flush(); });
+    view.unmount(); unregister(); session.detach(editor);
+  });
+
+  it.each(['403', 'deleted'])('stops capture on a definitive %s write failure', async (failure) => {
+    const {doc, session} = harness();
+    const stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    setMeetingSessionClient({getPage: async () => stored, savePage: async () => { throw Object.assign(new Error('forbidden'), {status: 403}); }} as unknown as DataClient);
+    await session.start(); await flush(); track.stop.mockClear();
+    if (failure === '403') session.detach();
+    else rootBlocks(doc).delete(0);
+    await vi.advanceTimersByTimeAsync(45000); await flush();
+    expect(track.stop).toHaveBeenCalled(); expect(session.active).toBe(false);
+    expect(session.error).not.toBe(''); session.discard();
+  });
+
+  it('retries a failed final status on attach without claiming another client owns it', async () => {
+    const {doc, block, editor, session} = harness();
+    let stored = {id: 'page', name: 'Meeting', data: {blockdoc: encodeSnapshot(doc)}};
+    const savePage = vi.fn(async (page) => {
+      const status = blockProp(rootBlocks(decodeSnapshot(page.data.blockdoc)).get(0), 'status');
+      if (status === 'done') throw new Error('offline');
+      stored = page;
+    });
+    setMeetingSessionClient({getPage: async () => stored, savePage} as unknown as DataClient);
+    await session.start(); await flush(); stored = {...stored, data: {blockdoc: encodeSnapshot(doc)}};
+    session.detach(); session.stop(); await vi.advanceTimersByTimeAsync(0);
+    expect(session.statusDirty).toBe(true); expect(session.recordingElsewhere).toBe(false);
+    session.attach(editor, block); await flush();
+    expect(blockProp(block, 'status')).toBe('done'); expect(session.statusDirty).toBe(false);
+    session.discard(); session.detach();
+  });
+
+  it('counts saved audio once while its upload blob is still pending', () => {
+    const audio = {assetId: 'saved', startedAtMs: 0, durationMs: 2000};
+    const {session} = harness({audioChunks: [audio]});
+    session.chunks.push({id: 'pending', audio, blob: new Blob(['audio']), phase: 'uploading'});
+    expect(session.elapsedMs).toBe(2000);
+    session.discard();
+  });
+});
+
+describe('transcript deletion during transcription', () => {
+  it('keeps only new segments and one new completion key after an in-flight result arrives', async () => {
+    const audio = {assetId: 'new-audio', startedAtMs: 2000, durationMs: 2000};
+    const {doc, block, session} = harness({transcript: [{startMs: 0, endMs: 1000, text: 'Old'}], transcriptionCompleted: ['0:old'], audioChunks: [audio]});
+    let finish!: (result: AiTranscriptionResult) => void;
+    transcribeAsset.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const pending = session.transcribe({id: 'pending', phase: 'untranscribed', audio});
+    await flush();
+    deleteMeetingTranscript(doc, block);
+    finish({text: 'New', segments: [{start: 0, end: 1, text: 'New'}], durationMs: 2000});
+    await pending;
+    expect(blockProp(block, 'transcript')).toEqual([{startMs: 2000, endMs: 3000, text: 'New'}]);
+    expect(blockProp(block, 'transcriptionCompleted')).toEqual([chunkKey(audio)]);
+  });
+});

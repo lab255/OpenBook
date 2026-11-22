@@ -1,7 +1,7 @@
 {
   "build": {
     "beforeDevCommand": "pnpm run dev",
-    "beforeBuildCommand": "pnpm --filter @book.dev/sdk run build && pnpm --filter @book.dev/ui run build && pnpm --filter @book.dev/server run build:sidecar && pnpm run build",
+    "beforeBuildCommand": "pnpm --filter @book.dev/sdk run build && pnpm --filter @book.dev/ui run build && pnpm --filter @book.dev/mcp run build && pnpm --filter @book.dev/server run build:sidecar && pnpm -w run build:web-ui && pnpm run build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
@@ -19,8 +19,20 @@
     "externalBin": [
       "binaries/openbook-server"
     ],
+    "resources": {
+      "resources/web-ui": "web-ui"
+    },
     "macOS": {
       "entitlements": "entitlements.plist"
+    },
+    "windows": {
+      "signCommand": {
+        "cmd": "node",
+        "args": [
+          "../scripts/win-sign.mjs",
+          "%1"
+        ]
+      }
     }
   },
   "productName": "OpenBook",
@@ -44,6 +56,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
+        "backgroundThrottling": "disabled",
         "fullscreen": false,
         "resizable": true,
         "title": "OpenBook",

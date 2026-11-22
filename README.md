@@ -1,97 +1,130 @@
+<div align="center">
+
+<img src="packages/web/public/icon.svg" alt="OpenBook logo" width="96"/>
+
 # OpenBook
 
-OpenBook is a place to write and organize knowledge.
+**Notes, databases, and interactive pages that work offline.**
 
-Store thoughts, notes, and ideas in a simple and intuitive way.
+[![License: MIT](https://img.shields.io/github/license/lab255/OpenBook)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/lab255/OpenBook)](https://github.com/lab255/OpenBook/releases/latest)
+![Platforms: macOS · Linux · Windows](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-555)
 
-## Getting Started
+**[Download](#download) · [open.book.pub](https://open.book.pub) · [Templates](#templates) · [Contributing](#contributing)**
 
-> [!IMPORTANT]
-> OpenBook is currently in active development.
-> Please make regular backups of your data while using it.
+![A page open in tabs in the OpenBook desktop app](docs/media/desktop-tabs.png)
 
-Download OpenBook from the [Releases page](https://github.com/eliotlim/openbook/releases).
+</div>
 
-Alternatively, you can build it from source.
+## Pick your path
 
-### Prerequisites
+🟢 **Just want a notebook that works offline?** → [Download OpenBook](#download)
 
-* [Node.JS 18.x or later](https://nodejs.org/en/download)
-* [pnpm](https://pnpm.io/installation) (pinned via the `packageManager` field — `corepack enable` will install it automatically)
-* [Rust toolchain](https://www.rust-lang.org/tools/install) (for the desktop apps)
+🔵 **Want pages that compute as you edit?** → See it [in action](#in-action) or start from a [template](#templates)
 
-## Setting up development environment
+🟣 **Want the internals—SDK, plugins, and local-first sync?** → Go to [For developers](#for-developers) or [Contributing](#contributing)
 
-1. Download and install the [prerequisites](#prerequisites).
-2. Install dependencies: `pnpm install`.
-3. Build and start developing: `pnpm run build`.
+## In action
 
-## Storage & server
+<table>
+<tr>
+<td width="45%"><img src="docs/media/feature-recipe-scaler.png" alt="A recipe scaler with a servings slider, ingredient table, and chart in the OpenBook desktop app"/></td>
+<td width="55%">
 
-OpenBook stores documents as **pages** (UUID + optional name + JSON payload) in
-Postgres. The server is written in TypeScript and **the desktop app and the
-headless deployment run the exact same code** — the desktop bundles it as a
-self-contained sidecar over an embedded Postgres (PGlite/WASM); a headless
-deployment runs it against an external Postgres. The web shell, desktop, and
-server all share types and the HTTP client through
-[`@book.dev/sdk`](packages/sdk/README.md).
+### 🍳 Scale a recipe live
 
-A page can also host a **database** (a Notion-style collection in its own
-`databases` table). Database rows are themselves ordinary pages — each with its
-own editable document — so a row opens in a split pane for editing. Columns are
-typed properties, or `expr` columns that read a row page's live exported
-reactive value, and every view can filter and sort.
+Move the servings slider and the ingredient table and chart recompute together. **Change one input; every connected block stays in sync.**
 
-**Documents are programmable.** The block editor ships an **artifact kit**:
-named inputs (sliders, number steppers, text fields, radio groups, checklists,
-toggles, locations, action buttons) publish values onto a shared reactive
-scope, and live blocks compute over it — formulas, charts (line, area, bar,
-pie, donut, scatter, funnel), and status lights. Assemble a calculator, a
-picker, or a tiny dashboard out of blocks — collaborative by default, and the
-interactive HTML export keeps the computation alive offline. A **dataflow
-view** (page menu → "Dataflow view") opens the page's reactive wiring as a
-live node graph in the split pane: inputs flowing into code into charts,
-values updating as you edit, nodes clicking through to their blocks.
+</td>
+</tr>
+</table>
 
-**It's extensible.** Plugins — zips of TypeScript source — add custom
-blocks, palette commands, and integrations (see [PLUGINS.md](PLUGINS.md)).
-Registries can sign packages (Ed25519); the app verifies against keys you
-trust and badges provenance.
+<table>
+<tr>
+<td width="55%">
 
-**Pages nest.** A page can be a child of another (a `parent_id` link, cascading
-on delete), so the sidebar is a tree and the breadcrumb shows the full path.
-Inside the editor, a **Page** or **Database** block links a child inline — it
-creates the nested page on the spot and clicking it navigates there.
+### ⌨️ Add blocks without leaving the keyboard
 
-**Deletes are recoverable.** Deleting a page is a soft delete: it (and its
-nested subtree) gets a `deleted_at` stamp and moves to the **Trash**, where it
-can be restored or removed for good. A background cleanup job empties the trash
-after a configurable retention window (`OPENBOOK_TRASH_RETENTION_MS` /
-`OPENBOOK_TRASH_CLEANUP_INTERVAL_MS`, default 30 days / 1 hour).
+Type `/` to insert text, media, databases, controls, charts, and more. **Build structured pages in the same flow as writing.**
 
-**Tabs are native.** Each page lives at its own URL (`?page=<id>`), so opening a
-page elsewhere uses the platform: on the web a new browser tab or window
-(`window.open`), on the desktop a macOS window-tab (Tauri windows grouped by a
-shared `tabbingIdentifier`) or a standalone window. The new-page button and the
-"open in…" menu both let you choose tab or window; a window can also split to
-show two pages side by side. Because several tabs talk to the same origin and
-browsers cap connections per origin, every client multiplexes all live updates
-(page list, page edits, database rows) onto a single `/api/live` stream — one
-connection per tab regardless of what it is watching.
+</td>
+<td width="45%"><img src="docs/media/editor-slash.png" alt="The slash-command block menu open in the OpenBook desktop app"/></td>
+</tr>
+</table>
 
-Packages:
+<table>
+<tr>
+<td width="45%"><img src="docs/media/database-views-board.png" alt="A project database displayed as a board in the OpenBook desktop app"/></td>
+<td width="55%">
 
-- [`packages/sdk`](packages/sdk/README.md) — shared types + `HttpDataClient`.
-- [`packages/server`](packages/server/README.md) — page store + Hono API,
-  backed by PGlite (embedded) or external Postgres. Full architecture and
-  deployment modes documented there.
+### 🗂️ Switch the view, not the data
 
-Run the headless server:
+Show one database as a grid, board, calendar, timeline, or map, with filters and sorting for each view. **Keep one source of truth for different workflows.**
+
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="55%">
+
+### 🎤 Present from the page
+
+Turn a page into a clean audience view while keeping speaker notes and a timer close by. **Write and present from the same document.**
+
+</td>
+<td width="45%"><img src="docs/media/present-mode.png" alt="A presentation with speaker notes and a timer in the OpenBook desktop app"/></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="45%"><img src="docs/media/share-dialog.png" alt="Page sharing and access controls in the OpenBook desktop app"/></td>
+<td width="55%">
+
+### 🛜 Work locally, share when you choose
+
+Edits land in a local database first, so the app keeps working offline; sync and collaboration are optional. **Your notebook does not depend on a connection.**
+
+</td>
+</tr>
+</table>
+
+## Templates
+
+The gallery ships with ready-made interactive templates: **recipe scaler**, grocery price tracker, task board, roadmap, and pitch deck. Use one as-is or open it up to see how its controls, data, and views connect.
+
+## Download
+
+Download the [latest release](https://github.com/lab255/OpenBook/releases/latest). OpenBook makes automatic local backups on every platform; macOS, Windows, and the Linux AppImage also update automatically.
+
+| Platform | Download | Notes |
+| --- | --- | --- |
+| macOS | `OpenBook_<ver>_aarch64.dmg` (Apple Silicon) or `OpenBook_<ver>_x64.dmg` (Intel) | Signed and notarized. |
+| Windows | `OpenBook_<ver>_x64-setup.exe` (recommended) or `.msi` | Windows may show SmartScreen; choose **More info → Run anyway**. Signed builds are planned. |
+| Linux | `.AppImage`, `.deb`, or `.rpm` | 64-bit x86 (x86_64). Choose the package for your distribution. |
+
+## Sharing and sync
+
+OpenBook works offline with no account, and edits are written to its local database first. For sync or collaboration, self-host the server or publish a library to **book.cloud**; book.cloud requires a free account.
+
+## For developers
+
+OpenBook includes an SDK and plugin system, with a local-first desktop client and optional sync server. See [ARCHITECTURE.md](ARCHITECTURE.md), the [`packages`](packages/) directory, and [DEVELOPMENT.md](DEVELOPMENT.md) for the system design, code layout, and setup instructions.
+
+Prerequisites are Node.js `^22.14.0 || >=24.10.0`, pnpm, Bun `1.3.14`, and a Rust toolchain.
 
 ```sh
-OPENBOOK_DATABASE_URL=postgres://user:pass@host:5432/openbook \
-  pnpm --filter @book.dev/server dev
+corepack enable
+pnpm install
+pnpm dev
 ```
 
-`pnpm dev` runs the SDK, server (with embedded Postgres), UI, web, and desktop
-together.
+## Contributing
+
+Issues and contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change, and report security issues privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+OpenBook is released under the [MIT License](LICENSE).

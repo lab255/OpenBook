@@ -1,4 +1,6 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {cn} from '@/lib/utils';
+import {WARN_SURFACE_CLASS, WARN_ICON_CLASS, STATUS_INK_CLASS} from '@/lib/statusStyles';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {AppWindow, Blocks, Check, FileText, Image, Loader2, TriangleAlert, Upload} from 'lucide-react';
 import {notionAssetResolver, urlAssetResolver, type AssetBytes, type ImportedDoc} from '@book.dev/sdk';
 import type {TKey} from '@/i18n';
@@ -26,7 +28,8 @@ import {
   type RunImportAssetOptions,
 } from '@/lib/importContent';
 import {htmlToImportedDoc, parseHtmlImport} from '@/lib/htmlImport';
-import {runIslandImport, type HtmlIsland} from '@/lib/islandImport';
+import {runIslandImport, summarizeIslandLedger, type HtmlIsland, type IslandLedgerOutcome} from '@/lib/islandImport';
+import {useIsSettingsAdmin} from '@/components/settings/adminGate';
 import {artifactChoiceFor, runArtifactImport, type ArtifactImportChoice} from '@/lib/artifactImport';
 import {isImportAbortError, parseImportInWorker, type ImportParseProgress} from '@/lib/importParse';
 
@@ -70,12 +73,12 @@ type Phase =
       artifact?: ArtifactImportChoice;
     }
   | {step: 'importing'; summary: ImportSummary}
-  | {step: 'done'; summary: ImportSummary; jumpTarget: string | null}
+  | {step: 'done'; summary: ImportSummary; jumpTarget: string | null; ledger?: IslandLedgerOutcome}
   | {step: 'error'; message: string};
 
 /**
  * "Bring your content" — import a Notion export (.zip), a Markdown (.md), or an
- * HTML (.html) file into the workspace (OB-301/303). Format is auto-detected from
+ * HTML (.html) file into the library (OB-301/303). Format is auto-detected from
  * the file; the SDK importers (`notionExportToImportedDoc` / `markdownToImportedDoc`)
  * and the UI's `htmlToImportedDoc` parse to the format-agnostic IR, and `importDoc`
  * lands it through the existing data paths, picking the create-vs-bundle strategy
@@ -106,13 +109,22 @@ export default function ImportDialog() {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pasteFormat, setPasteFormat] = useState<PasteFormat>('markdown');
-  // Opt-in: fetch each linked (http) image and store a copy in the workspace
+  // Opt-in: fetch each linked (http) image and store a copy in the library
   // (default off — a linked image is kept as a URL that loads from the web).
   const [downloadUrls, setDownloadUrls] = useState(false);
   // For a foreign `.html` file: land it as a sandboxed interactive artifact
   // (true) or convert it to editable blocks (false). Preselected by the
   // script/canvas heuristic when the preview opens; the user can flip it.
   const [runAsArtifact, setRunAsArtifact] = useState(false);
+  // LX-4: also restore the export's embedded ledger records (offered only when
+  // a space island carries a coherent section; default on — the user asked for
+  // their content back, and a non-empty target refuses server-side anyway).
+  const [restoreLedger, setRestoreLedger] = useState(true);
+  // The restore route is instance-administration gated server-side; a CONFIRMED
+  // non-admin gets a plain note instead of a toggle that could only ever fail.
+  // `null` (probe in flight / inconclusive) keeps the toggle — the server gate
+  // stays authoritative.
+  const isAdmin = useIsSettingsAdmin();
 
   // Reset to a clean picker each time the dialog opens, so a previous import's
   // result or error never greets the next one; abort any parse still running
@@ -125,6 +137,7 @@ export default function ImportDialog() {
       setPasteFormat('markdown');
       setDownloadUrls(false);
       setRunAsArtifact(false);
+      setRestoreLedger(true);
       importingRef.current = false;
     } else {
       parseAbortRef.current?.abort();
@@ -283,6 +296,7 @@ export default function ImportDialog() {
       setPhase({step: 'importing', summary});
       try {
         let result: {pageIds: string[]};
+        let ledger: IslandLedgerOutcome | undefined;
         if (artifact) {
           // Run as interactive artifact: the file lands VERBATIM — a new page
           // holding one sandboxed htmlArtifact block over the stored bytes.
@@ -292,11 +306,20 @@ export default function ImportDialog() {
           // block-doc, structure, and databases land verbatim as a copy), then
           // re-store the asset bytes recovered from the file's own data-URIs
           // (content addressing restores the exact ids the blocks reference).
-          result = await runIslandImport(client, island.found, island.assets);
+          // LX-4: embedded ledger records restore too when the user kept the
+          // toggle on and the section previews as a coherent book — into an
+          // EMPTY ledger only (a non-empty target refuses server-side and is
+          // reported below; the page import always stands on its own).
+          const ledgerOk = summarizeIslandLedger(island.found)?.ok === true;
+          const landed = await runIslandImport(client, island.found, island.assets, {
+            restoreLedger: restoreLedger && ledgerOk && isAdmin !== false,
+          });
+          ledger = landed.ledger;
+          result = landed;
         } else if (doc) {
           // Wire the image-rehydration seam: a Notion export uploads its embedded
           // bytes; a Markdown/HTML import preserves linked images as URLs unless the
-          // user opted to download a copy into the workspace.
+          // user opted to download a copy into the library.
           const assetOpts: RunImportAssetOptions =
             format === 'notion-zip' && zipBytes
               ? {resolveAssetBytes: notionAssetResolver(zipBytes)}
@@ -310,14 +333,22 @@ export default function ImportDialog() {
         // Reload first, then resolve the jump target against the fresh nav list
         // (rows excluded) so "view imported" can only ever land on a real page.
         const pages = await reload();
-        setPhase({step: 'done', summary, jumpTarget: pickImportedJumpTarget(result, pages)});
+        setPhase({step: 'done', summary, jumpTarget: pickImportedJumpTarget(result, pages), ...(ledger ? {ledger} : {})});
       } catch (e) {
         setPhase({step: 'error', message: t('importer.importFailed', {error: (e as Error).message})});
       } finally {
         importingRef.current = false;
       }
     },
-    [client, downloadUrls, reload, t],
+    [client, downloadUrls, isAdmin, reload, restoreLedger, t],
+  );
+
+  // LX-4: what the staged island says about embedded ledger records — `null`
+  // when there are none, a tally when they preview as a coherent book, or the
+  // refusal reason when they don't (the same validator the server runs).
+  const ledgerPreview = useMemo(
+    () => (phase.step === 'preview' && phase.island ? summarizeIslandLedger(phase.island.found) : null),
+    [phase],
   );
 
   const viewImported = useCallback(
@@ -330,7 +361,7 @@ export default function ImportDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>{t('importer.title')}</DialogTitle>
           <DialogDescription>{t('importer.description')}</DialogDescription>
@@ -342,7 +373,7 @@ export default function ImportDialog() {
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
-              className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-sheet-1 px-4 py-8 text-center transition-[background-color,border-color,box-shadow] hover:border-foreground/20 hover:bg-hover focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
+              className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted px-4 py-8 text-center transition-[background-color,border-color,box-shadow] hover:border-foreground/20 hover:bg-hover focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
             >
               <Upload className="h-6 w-6 text-muted-foreground" aria-hidden />
               <span className="text-sm font-medium">{t('importer.chooseFile')}</span>
@@ -443,6 +474,43 @@ export default function ImportDialog() {
             {/* An OpenBook export restores exactly from its embedded source —
                 the conversion notes below don't apply. */}
             {phase.island && <p className="text-xs text-muted-foreground">{t('importer.losslessNote')}</p>}
+            {/* LX-4: the export carries ledger records. A CONFIRMED non-admin
+                gets the plain fact (the restore route is admin-gated) instead
+                of a toggle that could only land in `failed`. */}
+            {ledgerPreview?.ok && isAdmin === false && (
+              <p className="text-xs text-muted-foreground">{t('importer.ledgerAdminOnly')}</p>
+            )}
+            {/* Otherwise: offer the restore (empty-ledger only; the server
+                refuses a non-empty target). */}
+            {ledgerPreview?.ok && isAdmin !== false && (
+              <label className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted p-3">
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-sm font-medium">{t('importer.ledgerToggle')}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('importer.ledgerToggleHint', {
+                      accounts: plural(ledgerPreview.accounts, 'importer.ledgerAccountsOne', 'importer.ledgerAccounts'),
+                      entries: plural(ledgerPreview.entries, 'importer.ledgerEntriesOne', 'importer.ledgerEntries'),
+                    })}
+                  </span>
+                  {ledgerPreview.evidenceDropped > 0 && (
+                    <span className="text-xs text-muted-foreground">{t('importer.ledgerEvidenceNote')}</span>
+                  )}
+                </span>
+                <Switch
+                  checked={restoreLedger}
+                  onCheckedChange={setRestoreLedger}
+                  aria-label={t('importer.ledgerToggle')}
+                  className="mt-0.5"
+                />
+              </label>
+            )}
+            {/* Records present but incoherent: said plainly, never half-landed. */}
+            {ledgerPreview && !ledgerPreview.ok && (
+              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                {t('importer.ledgerUnreadable', {reason: ledgerPreview.reason})}
+              </p>
+            )}
             {/* Foreign .html: run-as-artifact vs convert-to-blocks. Preselected
                 by the script/canvas heuristic; island files never offer this.
                 Native radios inside label cards (the AiSettings provider-picker
@@ -462,7 +530,7 @@ export default function ImportDialog() {
                     <label
                       key={opt.label}
                       className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-[background-color,border-color,box-shadow] ${
-                        selected ? 'border-primary bg-primary/5' : 'border-border bg-sheet-1 hover:bg-hover'
+                        selected ? 'border-primary bg-primary/5' : 'border-border bg-muted hover:bg-hover'
                       }`}
                     >
                       <Icon
@@ -505,7 +573,7 @@ export default function ImportDialog() {
                 always stored (and island imports recover their own bytes), so
                 the toggle is only offered for converted Markdown/HTML. */}
             {phase.summary.images > 0 && phase.format !== 'notion-zip' && !phase.island && !runAsArtifact && (
-              <label className="flex items-start justify-between gap-3 rounded-lg border border-border bg-sheet-1 p-3">
+              <label className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted p-3">
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="text-sm font-medium">{t('importer.downloadImages')}</span>
                   <span className="text-xs text-muted-foreground">{t('importer.downloadImagesHint')}</span>
@@ -557,7 +625,7 @@ export default function ImportDialog() {
         {phase.step === 'done' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3 rounded-lg border border-border bg-card p-3">
-              <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <Check className={cn('mt-0.5 h-5 w-5 shrink-0', STATUS_INK_CLASS.ok)} aria-hidden />
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm font-medium">{t('importer.done')}</span>
                 <span className="text-xs text-muted-foreground">
@@ -571,8 +639,35 @@ export default function ImportDialog() {
                     {plural(phase.summary.images, 'importer.imagesResultOne', 'importer.imagesResult')}
                   </span>
                 )}
+                {/* LX-4: how the ledger half ended, when it ran. */}
+                {phase.ledger?.status === 'restored' && (
+                  <span className="text-xs text-muted-foreground">
+                    {t('importer.ledgerRestored', {
+                      accounts: plural(phase.ledger.result.restored.accounts, 'importer.ledgerAccountsOne', 'importer.ledgerAccounts'),
+                      entries: plural(phase.ledger.result.restored.transactions, 'importer.ledgerEntriesOne', 'importer.ledgerEntries'),
+                    })}
+                  </span>
+                )}
+                {phase.ledger?.status === 'restored' && phase.ledger.result.evidenceDropped > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {plural(phase.ledger.result.evidenceDropped, 'importer.ledgerEvidenceDroppedOne', 'importer.ledgerEvidenceDropped')}
+                  </span>
+                )}
               </div>
             </div>
+            {/* A refused / failed ledger restore never costs the page import —
+                but it must be SAID, with the server's actionable reason. */}
+            {(phase.ledger?.status === 'refused' || phase.ledger?.status === 'failed') && (
+              <p
+                role="alert"
+                className={cn('flex items-start gap-2 rounded-lg p-3 text-xs', WARN_SURFACE_CLASS)}
+              >
+                <TriangleAlert className={cn('mt-0.5 h-4 w-4 shrink-0', WARN_ICON_CLASS)} aria-hidden />
+                {t(phase.ledger.status === 'refused' ? 'importer.ledgerRefused' : 'importer.ledgerFailed', {
+                  error: phase.ledger.message,
+                })}
+              </p>
+            )}
             <DialogFooter>
               <Button variant="ghost" onClick={() => setOpen(false)}>
                 {t('importer.finish')}

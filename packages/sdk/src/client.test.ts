@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   HttpDataClient,
+  IdentityRejectedError,
   LIVE_OPEN_GRACE_MS,
   LIVE_POLL_AFTER_ERRORS,
   LIVE_POLL_INTERVAL_MS,
@@ -54,9 +55,161 @@ function makeClient() {
   return {client, paths, getSource: (): FakeSource => source as FakeSource};
 }
 
+describe('LiveStream unlisted-page fallback (UP-2 security round)', () => {
+  it('patches list subscribers when a page frame arrives without a following list frame', () => {
+    const {client, getSource} = makeClient();
+    const lists: Array<Array<{id: string; name: string | null}>> = [];
+    const unsub = client.subscribePages((pages) => lists.push(pages));
+    getSource().emit('list', JSON.stringify({type: 'list', pages: [{id: 'p1', name: 'Before'}]}));
+    getSource().emit('page', JSON.stringify({type: 'page', page: {id: 'p1', name: 'After'}}));
+    expect(lists[lists.length - 1]?.[0]?.name).toBe('After');
+    unsub();
+  });
+
+  it('does not add an unlisted page to list subscribers from a page frame', () => {
+    const {client, getSource} = makeClient();
+    const lists: Array<Array<{id: string}>> = [];
+    const unsub = client.subscribePages((pages) => lists.push(pages));
+    getSource().emit('list', JSON.stringify({type: 'list', pages: [{id: 'p1', name: 'Listed'}]}));
+
+    getSource().emit('page', JSON.stringify({type: 'page', page: {id: 'p2', name: 'Private'}}));
+
+    expect(lists).toHaveLength(1);
+    expect(lists[0]).toEqual([{id: 'p1', name: 'Listed'}]);
+    expect(lists[0]?.some((meta) => meta.id === 'p2')).toBe(false);
+    unsub();
+  });
+
+  it('does not notify list subscribers when projected page metadata is unchanged', () => {
+    const {client, getSource} = makeClient();
+    const lists: Array<Array<{id: string}>> = [];
+    const unsub = client.subscribePages((pages) => lists.push(pages));
+    const meta = {
+      id: 'p1', name: 'Same', hostedDatabaseId: null, parentId: null, deletedAt: null,
+      updatedAt: '2026-01-01T00:00:00.000Z', icon: null,
+    };
+    getSource().emit('list', JSON.stringify({type: 'list', pages: [meta]}));
+
+    getSource().emit('page', JSON.stringify({
+      type: 'page',
+      page: {
+        ...meta,
+        updatedAt: '2026-01-01T00:00:01.000Z',
+        properties: {},
+        data: {editorjs: {blocks: [{id: 'autosaved'}]}, values: [], names: []},
+      },
+    }));
+
+    expect(lists).toHaveLength(1);
+    unsub();
+  });
+
+  it('patches the fresh list base established by resync', async () => {
+    const resynced = {
+      id: 'p1', name: 'Resynced', hostedDatabaseId: null, parentId: null, deletedAt: null,
+      updatedAt: '2026-01-01T00:00:01.000Z', icon: null,
+    };
+    let source: FakeSource | null = null;
+    const client = new HttpDataClient('', undefined, {
+      fetchImpl: () => Promise.resolve(new Response(JSON.stringify([resynced]), {
+        status: 200, headers: {'content-type': 'application/json'},
+      })),
+      createLiveSource: () => (source = new FakeSource()),
+    });
+    const lists: Array<Array<{id: string; name: string | null}>> = [];
+    const unsub = client.subscribePages((pages) => lists.push(pages));
+    source!.emit('list', JSON.stringify({type: 'list', pages: [{...resynced, name: 'Stale'}]}));
+    source!.emit('error');
+    source!.emit('open');
+    await vi.waitFor(() => expect(lists[lists.length - 1]?.[0]?.name).toBe('Resynced'));
+
+    source!.emit('page', JSON.stringify({
+      type: 'page',
+      page: {...resynced, name: 'Patched', updatedAt: '2026-01-01T00:00:02.000Z', properties: {}},
+    }));
+
+    expect(lists[lists.length - 1]?.[0]?.name).toBe('Patched');
+    unsub();
+  });
+
+  it('uses the read-gated per-page SSE only while an open page is absent from the firehose list', () => {
+    const sources: Array<{url: string; source: FakeSource}> = [];
+    const client = new HttpDataClient('https://remote.example', 'instance-token', {
+      fetchImpl: () => Promise.resolve(new Response('[]', {status: 200})),
+      getIdentity: () => ({jws: 'visitor-jws'}),
+      createLiveSource: (url) => {
+        const source = new FakeSource();
+        sources.push({url, source});
+        return source;
+      },
+    });
+    const pages: string[] = [];
+    const deleted: string[] = [];
+    const unsubscribe = client.subscribePage('hidden/page', {
+      onPage: (page) => pages.push(page.name ?? ''),
+      onDeleted: (id) => deleted.push(id),
+    });
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0].url).toBe(
+      'https://remote.example/api/live?token=instance-token&identity=visitor-jws',
+    );
+
+    // The filtered firehose list omits this deliberately-opened unlisted page,
+    // which starts exactly one direct page stream with the same credentials.
+    sources[0].source.emit('list', JSON.stringify({type: 'list', pages: []}));
+    expect(sources).toHaveLength(2);
+    expect(sources[1].url).toBe(
+      'https://remote.example/api/pages/hidden%2Fpage/stream?token=instance-token&identity=visitor-jws',
+    );
+
+    sources[1].source.emit('page', JSON.stringify({id: 'hidden/page', name: 'updated'}));
+    sources[1].source.emit('deleted', JSON.stringify({id: 'hidden/page'}));
+    expect(pages).toEqual(['updated']);
+    expect(deleted).toEqual(['hidden/page']);
+
+    // If the page later becomes discoverable, the multiplexed firehose owns it
+    // again and the exceptional extra connection is closed.
+    sources[0].source.emit(
+      'list',
+      JSON.stringify({type: 'list', pages: [{id: 'hidden/page', name: 'updated'}]}),
+    );
+    expect(sources[1].source.closed).toBe(true);
+
+    unsubscribe();
+    expect(sources[0].source.closed).toBe(true);
+  });
+});
+
 describe('LiveStream poll fallback', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('delivers a server rename to an open page listener within one poll interval', async () => {
+    vi.useFakeTimers();
+    let name = 'Before';
+    const page = () => ({
+      id: 'p1', name, data: {editorjs: {blocks: []}, values: [], names: []},
+      hostedDatabaseId: null, databaseId: null, parentId: null, properties: {}, deletedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z', updatedAt: name === 'Before' ? '2026-01-01T00:00:00.000Z' : '2026-01-01T00:00:01.000Z',
+    });
+    const client = new HttpDataClient('', undefined, {
+      fetchImpl: (input: string) => Promise.resolve(new Response(
+        JSON.stringify(input === '/api/pages' ? [] : page()),
+        {status: 200, headers: {'content-type': 'application/json'}},
+      )),
+      createLiveSource: () => new FakeSource(),
+    });
+    const seen: string[] = [];
+    const unsub = client.subscribePage('p1', {onPage: (value) => seen.push(value.name ?? '')});
+
+    await vi.advanceTimersByTimeAsync(LIVE_OPEN_GRACE_MS);
+    expect(seen).toEqual(['Before']);
+    name = 'After';
+    await vi.advanceTimersByTimeAsync(LIVE_POLL_INTERVAL_MS);
+    expect(seen).toEqual(['Before', 'After']);
+    unsub();
   });
 
   it('falls back to polling when the SSE stream never opens', async () => {
@@ -337,4 +490,311 @@ describe('HttpDataClient assets (base64-JSON is byte-exact on the http path)', (
     expect(got!.bytes.length).toBe(bytes.length);
     expect(Array.from(got!.bytes)).toEqual(Array.from(bytes)); // byte-exact end to end
   });
+});
+
+describe('HttpDataClient form submissions', () => {
+  it('stages form files as byte-exact base64 JSON and returns an opaque token', async () => {
+    let captured: {url: string; init?: RequestInit} | null = null;
+    const result = {token: 'upload-token', name: 'résumé.pdf', size: 4};
+    const client = new HttpDataClient('https://x', undefined, {
+      fetchImpl: (url, init) => {
+        captured = {url, init};
+        return Promise.resolve(
+          new Response(JSON.stringify(result), {status: 201, headers: {'content-type': 'application/json'}}),
+        );
+      },
+    });
+
+    await expect(client.uploadFormFile('page/id', 'form id', {
+      key: 'capability',
+      fieldId: 'documents',
+      name: 'résumé.pdf',
+      mime: 'application/pdf',
+      bytes: new Uint8Array([0, 1, 2, 255]),
+    })).resolves.toEqual(result);
+
+    expect(captured!.url).toBe('https://x/api/pages/page%2Fid/forms/form%20id/uploads');
+    expect(captured!.init!.headers).toMatchObject({
+      'Content-Type': 'application/json',
+      'X-OpenBook-Client': '1',
+    });
+    expect(JSON.parse(String(captured!.init!.body))).toEqual({
+      key: 'capability',
+      fieldId: 'documents',
+      name: 'résumé.pdf',
+      mime: 'application/pdf',
+      data: 'AAEC/w==',
+    });
+  });
+
+  it('throws a typed status for rejected staged uploads', async () => {
+    const client = new HttpDataClient('https://x', undefined, {
+      fetchImpl: () => Promise.resolve(new Response(null, {status: 507})),
+    });
+
+    await expect(client.uploadFormFile('page', 'form', {
+      key: 'capability',
+      fieldId: 'documents',
+      name: 'full.bin',
+      mime: 'application/octet-stream',
+      bytes: new Uint8Array([1]),
+    })).rejects.toMatchObject({name: 'FormUploadError', status: 507});
+  });
+
+  it('POSTs the capability request to the page-scoped form route', async () => {
+    let captured: {url: string; init?: RequestInit} | null = null;
+    const result = {rowId: 'row-1', submittedAt: '2026-08-12T00:00:00.000Z'};
+    const client = new HttpDataClient('https://x', undefined, {
+      fetchImpl: (url, init) => {
+        captured = {url, init};
+        return Promise.resolve(
+          new Response(JSON.stringify(result), {status: 201, headers: {'content-type': 'application/json'}}),
+        );
+      },
+    });
+    const input = {key: 'capability', values: {email: 'reader@example.com'}, idempotencyKey: 'submission-1'};
+
+    await expect(client.submitForm('page/id', 'form id', input)).resolves.toEqual(result);
+    expect(captured!.url).toBe('https://x/api/pages/page%2Fid/forms/form%20id/submissions');
+    expect(captured!.init!.method).toBe('POST');
+    expect(captured!.init!.headers).toMatchObject({
+      'Content-Type': 'application/json',
+      'X-OpenBook-Client': '1',
+    });
+    expect(JSON.parse(String(captured!.init!.body))).toEqual(input);
+  });
+
+  it('throws a typed status and validated inline errors for rejected submissions', async () => {
+    const client = new HttpDataClient('https://x', undefined, {
+      fetchImpl: () => Promise.resolve(new Response(JSON.stringify({
+        errors: [
+          {fieldId: 'email', code: 'email_format'},
+          {fieldId: 'ignored', code: 'not-a-real-code'},
+        ],
+      }), {status: 400, statusText: 'Bad Request', headers: {'content-type': 'application/json'}})),
+    });
+
+    await expect(client.submitForm('page', 'form', {
+      key: 'capability',
+      values: {email: 'bad'},
+      idempotencyKey: 'submission-1',
+    })).rejects.toMatchObject({
+      name: 'FormSubmissionError',
+      status: 400,
+      errors: [{fieldId: 'email', code: 'email_format'}],
+    });
+  });
+});
+
+/**
+ * The live nav stream bakes the identity into its EventSource URL when it opens
+ * (an EventSource can't send headers, so the JWS rides `?identity=`) and can never
+ * refresh it afterwards, while one-shot content fetches read the identity fresh
+ * per request. So a stale/stronger streamed identity kept the nav list showing
+ * page TITLES whose bodies then 401/404'd — the cross-server blank-content bug.
+ * The client rebuilds the stream when the identity credential ACTUALLY changes.
+ */
+describe('LiveStream identity re-mint (cross-server blank pages)', () => {
+  function makeIdentityClient() {
+    let jws: string | undefined;
+    let onChange: (() => void) | null = null;
+    const sources: Array<{url: string; source: FakeSource}> = [];
+    const client = new HttpDataClient('https://remote.example', undefined, {
+      fetchImpl: () => Promise.resolve(new Response('[]', {status: 200, headers: {'content-type': 'application/json'}})),
+      createLiveSource: (url) => {
+        const source = new FakeSource();
+        sources.push({url, source});
+        return source;
+      },
+      getIdentity: () => ({jws}),
+      subscribeIdentity: (cb) => {
+        onChange = cb;
+        return () => void (onChange = null);
+      },
+    });
+    return {
+      client,
+      sources,
+      setIdentity: (v: string | undefined): void => void (jws = v),
+      fireChange: (): void => onChange?.(),
+    };
+  }
+
+  it('rebuilds the stream with the new identity when the credential changes', () => {
+    const h = makeIdentityClient();
+    h.setIdentity('jws-A');
+    const unsub = h.client.subscribePages(() => {});
+    expect(h.sources).toHaveLength(1);
+    expect(h.sources[0].url).toContain('identity=jws-A');
+    h.sources[0].source.emit('open'); // establish the connection
+
+    // The account refreshes the identity to a new JWS → the stream is rebuilt so it
+    // can't keep asserting the old one after content fetches move to the new one.
+    h.setIdentity('jws-B');
+    h.fireChange();
+    expect(h.sources[0].source.closed).toBe(true); // old source torn down
+    expect(h.sources).toHaveLength(2);
+    expect(h.sources[1].url).toContain('identity=jws-B');
+
+    unsub();
+  });
+
+  it('does not churn the connection when the credential is unchanged', () => {
+    const h = makeIdentityClient();
+    h.setIdentity('jws-A');
+    const unsub = h.client.subscribePages(() => {});
+    h.sources[0].source.emit('open');
+
+    h.fireChange(); // same identity — a no-op set fired the listener
+    expect(h.sources).toHaveLength(1);
+    expect(h.sources[0].source.closed).toBe(false);
+
+    unsub();
+  });
+
+  it('drops the identity from the stream URL when it lapses to guest', () => {
+    const h = makeIdentityClient();
+    h.setIdentity('jws-A');
+    const unsub = h.client.subscribePages(() => {});
+    h.sources[0].source.emit('open');
+
+    // The verified identity lapses (refresh cleared it): the rebuilt stream must
+    // stop asserting it, so the streamed list degrades to guest in lockstep with
+    // the content fetches rather than out-ranking them.
+    h.setIdentity(undefined);
+    h.fireChange();
+    expect(h.sources).toHaveLength(2);
+    expect(h.sources[1].url).not.toContain('identity=');
+
+    unsub();
+  });
+
+  // An open PAGE that is no longer readable under the new identity must be CLEARED,
+  // not left rendered — otherwise account-A's body lingers under account-B until
+  // the user navigates. The identity-scoped resync fires `onDeleted` for it.
+  function makePageClient(pageStatusFor: (jws: string | undefined) => number) {
+    let jws: string | undefined;
+    let onChange: (() => void) | null = null;
+    const sources: FakeSource[] = [];
+    const client = new HttpDataClient('https://remote.example', undefined, {
+      fetchImpl: (input: string): Promise<Response> => {
+        if (input.includes('/api/pages/')) {
+          const status = pageStatusFor(jws);
+          const body = status === 200 ? JSON.stringify({id: 'p1', name: 'x', data: {}, updatedAt: 't'}) : '{}';
+          return Promise.resolve(new Response(body, {status, headers: {'content-type': 'application/json'}}));
+        }
+        return Promise.resolve(new Response('[]', {status: 200, headers: {'content-type': 'application/json'}}));
+      },
+      createLiveSource: () => {
+        const source = new FakeSource();
+        sources.push(source);
+        return source;
+      },
+      getIdentity: () => ({jws}),
+      subscribeIdentity: (cb) => {
+        onChange = cb;
+        return () => void (onChange = null);
+      },
+    });
+    return {
+      client,
+      sources,
+      setIdentity: (v: string | undefined): void => void (jws = v),
+      fireChange: (): void => onChange?.(),
+    };
+  }
+
+  it('clears an open page that is unreadable under the new identity (drops stale content)', async () => {
+    // p1 reads under jws-A, is hidden (404) under jws-B.
+    const h = makePageClient((jws) => (jws === 'jws-A' ? 200 : 404));
+    h.setIdentity('jws-A');
+    const deleted: string[] = [];
+    const unsub = h.client.subscribePage('p1', {onPage: () => {}, onDeleted: (id) => deleted.push(id)});
+    h.sources[0].emit('open');
+
+    // Identity lapses/switches to B → the identity-scoped resync finds p1 now 404 and
+    // clears it (never leaving A's body under B).
+    h.setIdentity('jws-B');
+    h.fireChange();
+    await vi.waitFor(() => expect(deleted).toContain('p1'));
+
+    unsub();
+  });
+
+  it('a transient reconnect resync does NOT clear a briefly-failing page (only a credential change does)', async () => {
+    // The page 200s under the (unchanged) identity, then briefly 404s during a
+    // server restart. A reconnect resync must NOT treat that as a loss of access.
+    let status = 200;
+    const h = makePageClient(() => status);
+    h.setIdentity('jws-A');
+    const deleted: string[] = [];
+    const unsub = h.client.subscribePage('p1', {onPage: () => {}, onDeleted: (id) => deleted.push(id)});
+    h.sources[0].emit('open');
+
+    status = 404; // server momentarily can't serve
+    h.sources[0].emit('error'); // a drop…
+    h.sources[0].emit('open'); // …then reopen → reconnect resync (clearUnreadable=false)
+    await new Promise((r) => setTimeout(r, 20));
+    expect(deleted).toHaveLength(0); // stale content kept; the next event heals it
+
+    unsub();
+  });
+});
+
+/**
+ * `getPage` must tell a REJECTED identity (401) from a page that's genuinely gone
+ * or hidden (404): 404 → an empty document, 401 → an auth error a caller surfaces
+ * as re-auth. Collapsing 401 into "no content" is what rendered a blank page when
+ * a remote-server identity lapsed.
+ */
+describe('HttpDataClient.getPage — 401 vs 404', () => {
+  it('returns null on 404 (gone or hidden from this principal)', async () => {
+    const client = new HttpDataClient('https://x', undefined, {
+      fetchImpl: () => Promise.resolve(new Response('{}', {status: 404, headers: {'content-type': 'application/json'}})),
+    });
+    await expect(client.getPage('p1')).resolves.toBeNull();
+  });
+
+  it('throws IdentityRejectedError on 401 (auth problem, not empty content)', async () => {
+    const client = new HttpDataClient('https://x', undefined, {
+      fetchImpl: () =>
+        Promise.resolve(
+          new Response(JSON.stringify({error: 'identity rejected: expired'}), {
+            status: 401,
+            headers: {'content-type': 'application/json'},
+          }),
+        ),
+    });
+    await expect(client.getPage('p1')).rejects.toBeInstanceOf(IdentityRejectedError);
+    await expect(client.getPage('p1')).rejects.toMatchObject({status: 401});
+  });
+});
+
+describe('stored-page delta support', () => {
+  it('returns unavailable on old servers without attempting a page write', async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      expect(url).toBe('/health');
+      return new Response('ok');
+    });
+    const client = new HttpDataClient('', undefined, {fetchImpl});
+    expect(await client.applyPageUpdate('p', 'AA==', 1)).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][0]).toBe('/health');
+  });
+
+  it.each([403, 404, 500])('propagates HTTP %s after support is advertised', async (status) => {
+    const fetchImpl = vi.fn(async (url: string) => url.endsWith('/health')
+      ? new Response('ok', {headers: {'X-OpenBook-Stored-Updates': '1'}})
+      : new Response(JSON.stringify({error: 'failed'}), {status}));
+    const client = new HttpDataClient('', undefined, {fetchImpl});
+    await expect(client.applyPageUpdate('p', 'AA==', 1)).rejects.toThrow(String(status));
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+});
+
+it('acknowledges a durable 204 without expecting a JSON body', async () => {
+  const client = new HttpDataClient('', undefined, {fetchImpl: async (url) => url.endsWith('/health')
+    ? new Response('ok', {headers: {'X-OpenBook-Stored-Updates': '1'}})
+    : new Response(null, {status: 204})});
+  expect(await client.applyPageUpdate('p', 'AA==', 1)).toBe(true);
 });

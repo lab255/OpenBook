@@ -1,34 +1,61 @@
 import type {DataClient} from './client';
 import type {PageSnapshot, StoredPage} from './types';
 import type {DatabaseSchema} from './database';
+import {TITLE_PROPERTY_ID} from './database';
+import {buildSampleDocument} from './sampleDocument';
+import type {LedgerAccountInput, LedgerDraftInput} from './ledger';
 
 /**
  * The built-in **template gallery**: ready-made pages instantiated client-side
  * through the normal data APIs (no server involvement, same as the sample
  * document). Two shapes:
  *
- *  - **Block-doc artifacts** (the five showcases) ship a native block-editor
+ *  - **Showcase documents** ship a native block-editor
  *    JSON projection in `blockdoc: {blocks}`. They lean on the whole editor:
  *    reactive inputs feeding *collapsed* live-code, status lights, info/link/
  *    tooltip cards, charts, progress bars, multi-column layouts, callouts, and
  *    `divider`/`notes` blocks so every page doubles as a slide deck with
  *    speaker notes (see blockeditor/present.ts).
- *  - **Databases** (roadmap, field map) ship a schema, views, and sample rows;
- *    they back the swimlane and map e2e fixtures.
+ *  - **Databases** (task board, reading list, roadmap, field map) ship a
+ *    schema, views, and sample rows; roadmap and field map back the swimlane
+ *    and map e2e fixtures.
  *
  * Ids are stable so the gallery, its i18n keys, and the e2e suite can reference
  * a template without depending on display strings.
  */
 
+/**
+ * What a template demonstrates, surfaced as gallery chips so the reader knows
+ * what a card is before inserting it:
+ *  - `interactive` — reactive inputs feeding live code, charts, status lights.
+ *  - `slides` — divider-cut slides with speaker notes (present-mode ready).
+ *  - `database` — a schema with views and sample rows.
+ */
+export type TemplateTag = 'interactive' | 'slides' | 'database';
+
 export interface PageTemplate {
   /** Stable identifier (i18n keys + tests hang off this). */
-  id: 'grocery-tracker' | 'task-board' | 'reading-list' | 'project-intake' | 'savings-planner' | 'roadmap' | 'field-map';
+  id: 'recipe-scaler' | 'grocery-tracker' | 'task-board' | 'reading-list' | 'project-intake' | 'savings-planner' | 'roadmap' | 'field-map' | 'pitch-deck' | 'compound-growth' | 'team-status' | 'product-hq' | 'dashboard' | 'simple-budget' | 'startup-books';
   /** Emoji shown on the gallery card and applied to the created page. */
   icon: string;
   /** Canonical (English) page name; suffixed when it collides. */
   pageName: string;
-  /** Creates the page (and database, if any) and returns the stored page. */
-  create: (client: DataClient, name: string) => Promise<StoredPage>;
+  /** What the template shows off — rendered as chips on the gallery card. */
+  tags: TemplateTag[];
+  /**
+   * Canonical (English) text of the leading "how to use this" callout, for
+   * templates that don't already open with strong in-doc guidance (the five
+   * database fixtures). The gallery passes a localized override through
+   * {@link instantiateTemplate}; `create` bakes this English text in by
+   * default. Templates whose documents already guide (grocery, pitch deck,
+   * team status, and the sample-document copy — which opens with its own
+   * intro paragraph) leave it unset.
+   */
+  guidance?: string;
+  /** Creates the page (and database, if any) and returns the stored page.
+   *  `guidance` overrides the template's canonical guidance-callout text
+   *  (ignored by templates that define none). */
+  create: (client: DataClient, name: string, guidance?: string) => Promise<StoredPage>;
 }
 
 const emptySnapshot = (blocks: object[]): PageSnapshot => ({
@@ -36,6 +63,50 @@ const emptySnapshot = (blocks: object[]): PageSnapshot => ({
   values: [],
   names: [],
 });
+
+// ── The standardized "how to use this" guidance callout ─────────────────────
+//
+// The five database fixtures — which don't open with strong in-doc guidance of
+// their own — lead with one consistent `info` callout: what the template
+// demonstrates, then how to try it. The English text below is the canonical
+// default; the gallery passes a localized override at instantiation (the ui
+// package's `templates.<id>.guidance` i18n keys mirror these strings).
+
+const GUIDANCE = {
+  recipeScaler:
+    'Scale this weeknight ramen from one bowl to twelve: drag the servings slider and the ingredient amounts, prep load, pot count, chart and batch status all update together. Tick off each method step as you cook.',
+  taskBoard:
+    'This template shows a task database: the Status property drives the kanban columns, and the same rows back the Table and Calendar views. Try it: drag a card to another column, switch views, or right-click the view to export CSV.',
+  readingList:
+    'Each shelf is a gallery group, and the same books also list in a Table view. Try it: rate a book, move one to another shelf, or add your own.',
+  roadmap:
+    'This template shows swimlanes: the Timeline bands and the Board lanes both split by Area. Try it: drag a bar to reschedule, collapse a lane, or move a card between stages.',
+  fieldMap:
+    'This template shows a map database: rows with a location render as region-coloured pins, and the address-only row waits under Unplaced. Try it: click a pin, geocode the unplaced row, or switch to the Table view.',
+  productHq:
+    'This template shows two linked databases: each initiative relates to tasks on the Tasks sub-page, and the Progress and Task count columns roll those tasks up. Try it: tick a task done on the sub-page and watch the rollup move, or open the Tasks timeline for the dependency arrows.',
+  dashboard:
+    'This dashboard reads a sample sales database: the KPI tiles total the rows, and the bar, pie and trend charts group them — all live. Try it: pick a quarter in the control at the top and every tile and chart re-scopes to it at once — or edit a deal on the “… data” sub-page and watch a tile move.',
+  simpleBudget:
+    'A personal finance budget tracker built on double-entry accounting. The ledger seeds a chart of accounts and a month of sample transactions so you can explore the journal, run reports, and add your own entries.',
+  startupBooks:
+    'Comprehensive double-entry bookkeeping for a tech startup, with all reporting surfaces. The ledger seeds accounts for assets, liabilities, equity, revenue and expenses, plus sample transactions showing typical startup operations.',
+} as const;
+
+/** The guidance callout as a block-doc block (ids are stable per template). */
+const guidanceCallout = (id: string, text: string): object => ({
+  id,
+  type: 'callout',
+  text: [{t: text}],
+  props: {variant: 'info'},
+});
+
+/** A host-page snapshot: empty, or a single leading guidance callout rendered
+ *  (block-doc) above the hosted database view. */
+const guidanceSnapshot = (guide?: {id: string; text: string}): PageSnapshot =>
+  guide
+    ? {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: {blocks: [guidanceCallout(guide.id, guide.text)]}}
+    : emptySnapshot([]);
 
 /** A local `YYYY-MM-DD` day string offset by `days` from today. */
 const day = (days: number): string => {
@@ -145,6 +216,80 @@ const GROCERY_BLOCKS = [
   },
   {id: 'g-call2', type: 'callout', text: [{t: 'Swap one branded staple for the shop’s own label and a £100 basket usually drops to £80–£85.'}], props: {variant: 'success'}},
   {id: 'g-notes-3', type: 'notes', text: [{t: 'Close on the habit, not the app: re-price monthly, shop the cheapest staples, top up fresh locally.'}]},
+];
+
+// ── 🍳 Weeknight ramen recipe scaler ────────────────────────────────────────
+// The supported table block is rich text rather than an expression surface, so
+// its amount column names the live outputs directly beside the collapsed code
+// readouts. Those same named values drive the chart, progress and status blocks.
+const RECIPE_BLOCKS = [
+  // Slide 1 — title and guidance
+  {id: 'r-tag', type: 'paragraph', text: [{t: 'A fast mushroom ramen that scales from a solo supper to a full table — '}, {t: 'live', a: {b: true}}, {t: '.'}]},
+  {id: 'r-call', type: 'callout', text: [{t: GUIDANCE.recipeScaler}], props: {variant: 'info'}},
+  {id: 'r-notes-1', type: 'notes', text: [{t: 'Start at four servings, then drag the slider: every quantity and the batch plan recomputes immediately.'}]},
+  {id: 'r-div-1', type: 'divider'},
+
+  // Slide 2 — scaler and live ingredient engine
+  {id: 'r-h2', type: 'heading', text: [{t: 'Scale the bowls'}], props: {level: 2}},
+  {id: 'r-servings', type: 'slider', props: {name: 'servings', label: 'Servings', value: 4, min: 1, max: 12, step: 1}},
+  {id: 'r-scale', type: 'code', text: [{t: 'servings / 4'}], props: {live: true, name: 'scale', language: 'js', collapsed: true}},
+  {id: 'r-noodles', type: 'code', text: [{t: 'Math.round(400 * scale)'}], props: {live: true, name: 'noodles', language: 'js', collapsed: true}},
+  {id: 'r-broth', type: 'code', text: [{t: 'Math.round(1200 * scale)'}], props: {live: true, name: 'broth', language: 'js', collapsed: true}},
+  {id: 'r-mushrooms', type: 'code', text: [{t: 'Math.round(240 * scale)'}], props: {live: true, name: 'mushrooms', language: 'js', collapsed: true}},
+  {id: 'r-spinach', type: 'code', text: [{t: 'Math.round(160 * scale)'}], props: {live: true, name: 'spinach', language: 'js', collapsed: true}},
+  {id: 'r-soy', type: 'code', text: [{t: 'Math.round(60 * scale)'}], props: {live: true, name: 'soy', language: 'js', collapsed: true}},
+  {id: 'r-eggs', type: 'code', text: [{t: 'Math.ceil(4 * scale)'}], props: {live: true, name: 'eggs', language: 'js', collapsed: true}},
+  {id: 'r-weight', type: 'code', text: [{t: 'noodles + broth + mushrooms + spinach + soy + eggs * 50'}], props: {live: true, name: 'prepWeight', language: 'js', collapsed: true}},
+  {id: 'r-pans', type: 'code', text: [{t: 'Math.ceil(servings / 6)'}], props: {live: true, name: 'panCount', language: 'js', collapsed: true}},
+  {
+    id: 'r-cols',
+    type: 'columns',
+    children: [
+      {
+        id: 'r-col-l',
+        type: 'column',
+        props: {span: 7},
+        children: [
+          {id: 'r-chart', type: 'kitchart', props: {kind: 'bar', title: 'Ingredient quantities', labels: 'Noodles (g), Broth (ml), Mushrooms (g), Spinach (g), Soy (ml)', source: '[noodles, broth, mushrooms, spinach, soy]'}},
+        ],
+      },
+      {
+        id: 'r-col-r',
+        type: 'column',
+        props: {span: 5},
+        children: [
+          {id: 'r-status', type: 'statuslight', props: {label: 'Fits one pot', source: '2 - panCount', okAt: 1, warnAt: 0}},
+          {id: 'r-progress', type: 'progressbar', props: {label: 'Maximum batch size', source: 'servings / 12', max: 1, format: 'percent'}},
+        ],
+      },
+    ],
+  },
+  {
+    id: 'r-table',
+    type: 'table',
+    props: {header: true},
+    children: [
+      {id: 'r-tr0', type: 'row', children: [{id: 'r-c00', type: 'cell', text: [{t: 'Ingredient'}]}, {id: 'r-c01', type: 'cell', text: [{t: 'Base (serves 4)'}]}]},
+      {id: 'r-tr1', type: 'row', children: [{id: 'r-c10', type: 'cell', text: [{t: 'Dried ramen noodles'}]}, {id: 'r-c11', type: 'cell', text: [{t: '400 g'}]}]},
+      {id: 'r-tr2', type: 'row', children: [{id: 'r-c20', type: 'cell', text: [{t: 'Vegetable broth'}]}, {id: 'r-c21', type: 'cell', text: [{t: '1200 ml'}]}]},
+      {id: 'r-tr3', type: 'row', children: [{id: 'r-c30', type: 'cell', text: [{t: 'Mushrooms'}]}, {id: 'r-c31', type: 'cell', text: [{t: '240 g'}]}]},
+      {id: 'r-tr4', type: 'row', children: [{id: 'r-c40', type: 'cell', text: [{t: 'Baby spinach'}]}, {id: 'r-c41', type: 'cell', text: [{t: '160 g'}]}]},
+      {id: 'r-tr5', type: 'row', children: [{id: 'r-c50', type: 'cell', text: [{t: 'Soy sauce'}]}, {id: 'r-c51', type: 'cell', text: [{t: '60 ml'}]}]},
+      {id: 'r-tr6', type: 'row', children: [{id: 'r-c60', type: 'cell', text: [{t: 'Eggs'}]}, {id: 'r-c61', type: 'cell', text: [{t: '4'}]}]},
+    ],
+  },
+  {id: 'r-notes-2', type: 'notes', text: [{t: 'The base recipe serves four. The named code outputs are the ingredient amounts used by the chart and batch indicators.'}]},
+  {id: 'r-div-2', type: 'divider'},
+
+  // Slide 3 — method
+  {id: 'r-h3', type: 'heading', text: [{t: 'Method · 25 minutes'}], props: {level: 2}},
+  {id: 'r-step1', type: 'todo', text: [{t: 'Boil the eggs for 7 minutes, cool, peel and halve.'}], props: {checked: false}},
+  {id: 'r-step2', type: 'todo', text: [{t: 'Slice the mushrooms and wash the spinach.'}], props: {checked: false}},
+  {id: 'r-step3', type: 'todo', text: [{t: 'Bring the broth and soy sauce to a simmer; cook the mushrooms for 5 minutes.'}], props: {checked: false}},
+  {id: 'r-step4', type: 'todo', text: [{t: 'Add the noodles and cook for 3 minutes, then fold in the spinach.'}], props: {checked: false}},
+  {id: 'r-step5', type: 'todo', text: [{t: 'Divide between bowls and top each serving with egg.'}], props: {checked: false}},
+  {id: 'r-call2', type: 'callout', text: [{t: 'Cooking more than six servings? Use the computed pan count and split the broth evenly so the noodles cook at the same pace.'}], props: {variant: 'success'}},
+  {id: 'r-notes-3', type: 'notes', text: [{t: 'For the smoothest service, prep every topping before the broth reaches a simmer.'}]},
 ];
 
 // (🗂️ Project task board and 📚 Reading list are databases — see below.)
@@ -352,6 +497,160 @@ const SAVINGS_BLOCKS = [
   {id: 's-notes-4', type: 'notes', text: [{t: 'One ask to close on: automate the monthly contribution so the plan happens without willpower.'}]},
 ];
 
+// ── 📽️ Pitch deck ────────────────────────────────────────────────────────────
+// A present-first showcase: five slides (title · agenda · a live revenue-mix
+// donut · a quote · the ask), each with a speaker `notes` block, so the ⋯ →
+// Present flow lands on a real deck. The donut slide is the interactive core:
+// three sliders feed the chart and a recurring-revenue status light.
+const PITCH_DECK_BLOCKS = [
+  // Slide 1 — title
+  {id: 'pd-h1', type: 'heading', text: [{t: 'Brightloop'}], props: {level: 1}},
+  {id: 'pd-tag', type: 'paragraph', text: [{t: 'The pitch as a '}, {t: 'live document', a: {b: true}}, {t: ' — the numbers on slide 3 recompute while you talk.'}]},
+  {id: 'pd-call', type: 'callout', text: [{t: 'Open the ⋯ menu → Present to run this as a deck.'}], props: {variant: 'info'}},
+  {id: 'pd-notes-1', type: 'notes', text: [{t: 'Thirty seconds, tops: who you are, what Brightloop is, why the room should care. Land the tagline, then advance — the deck itself makes the “live document” point on slide 3.'}]},
+  {id: 'pd-div-1', type: 'divider'},
+
+  // Slide 2 — agenda
+  {id: 'pd-h2', type: 'heading', text: [{t: 'Agenda'}], props: {level: 2}},
+  {id: 'pd-ag1', type: 'list', text: [{t: 'The problem — decks go stale the moment they’re exported.'}], props: {kind: 'number'}},
+  {id: 'pd-ag2', type: 'list', text: [{t: 'The product — one page that is both the model and the deck.'}], props: {kind: 'number'}},
+  {id: 'pd-ag3', type: 'list', text: [{t: 'Revenue mix — live, draggable, no screenshots.'}], props: {kind: 'number'}},
+  {id: 'pd-ag4', type: 'list', text: [{t: 'What early users say.'}], props: {kind: 'number'}},
+  {id: 'pd-ag5', type: 'list', text: [{t: 'The ask.'}], props: {kind: 'number'}},
+  {id: 'pd-notes-2', type: 'notes', text: [{t: 'Signpost, don’t read: five stops, four minutes. Flag that slide 3 is interactive so nobody mistakes the demo for a rehearsed video.'}]},
+  {id: 'pd-div-2', type: 'divider'},
+
+  // Slide 3 — the live donut
+  {id: 'pd-h3', type: 'heading', text: [{t: 'Revenue mix — live'}], props: {level: 2}},
+  {id: 'pd-recurring', type: 'code', text: [{t: 'Math.round(subs / (subs + services + partners) * 100)'}], props: {live: true, name: 'recurring', language: 'js', collapsed: true}},
+  {
+    id: 'pd-cols',
+    type: 'columns',
+    children: [
+      {
+        id: 'pd-col-l',
+        type: 'column',
+        props: {span: 5},
+        children: [
+          {id: 'pd-subs', type: 'slider', props: {name: 'subs', label: 'Subscriptions (£k/yr)', value: 62, min: 0, max: 200}},
+          {id: 'pd-services', type: 'slider', props: {name: 'services', label: 'Services (£k/yr)', value: 26, min: 0, max: 200}},
+          {id: 'pd-partners', type: 'slider', props: {name: 'partners', label: 'Partnerships (£k/yr)', value: 12, min: 0, max: 200}},
+        ],
+      },
+      {
+        id: 'pd-col-r',
+        type: 'column',
+        props: {span: 7},
+        children: [
+          {id: 'pd-donut', type: 'kitchart', props: {kind: 'donut', title: 'Revenue by stream (£k/yr)', labels: 'Subscriptions, Services, Partnerships', source: '[subs, services, partners]'}},
+          {id: 'pd-status', type: 'statuslight', props: {label: 'Recurring revenue ≥ 60%', source: 'recurring', okAt: 60, warnAt: 45}},
+        ],
+      },
+    ],
+  },
+  {id: 'pd-notes-3', type: 'notes', text: [{t: 'The money moment: drag Services up until the light drops to amber, then pull Subscriptions back up until recurring clears 60% and watch it recover. The maths is a one-line code block above the columns — open it if anyone asks.'}]},
+  {id: 'pd-div-3', type: 'divider'},
+
+  // Slide 4 — the quote
+  {id: 'pd-h4', type: 'heading', text: [{t: 'What early users say'}], props: {level: 2}},
+  {id: 'pd-quote', type: 'quote', text: [{t: 'We pitched with the model itself — when the room asked “what if churn doubles?”, we dragged a slider instead of promising a follow-up.'}]},
+  {id: 'pd-notes-4', type: 'notes', text: [{t: 'Pause after reading the quote — let it sit. If pressed for attribution, it’s a composite of three design-partner calls; offer intros rather than names.'}]},
+  {id: 'pd-div-4', type: 'divider'},
+
+  // Slide 5 — the ask
+  {id: 'pd-h5', type: 'heading', text: [{t: 'The ask'}], props: {level: 2}},
+  {id: 'pd-ask', type: 'paragraph', text: [{t: 'We’re raising '}, {t: '£1.2M', a: {b: true}}, {t: ' to take Brightloop from private beta to launch: two engineers, one designer, and twelve months of runway.'}]},
+  {id: 'pd-call2', type: 'callout', text: [{t: 'Make it yours: duplicate this page, swap in your numbers, and pitch with live charts instead of screenshots.'}], props: {variant: 'success'}},
+  {id: 'pd-notes-5', type: 'notes', text: [{t: 'Close with the concrete next step: a 30-minute working session in the live model this week. Stop talking after the ask.'}]},
+];
+
+// ── 🚦 Team status dashboard ─────────────────────────────────────────────────
+// The kit-breadth showcase, as a single-page dashboard (no slides): a **locked
+// group** whose controls stay live for readers (toggle, dropdown, a kudos
+// counter driven by an action button, a formula and a status light reading it),
+// a **funnel** chart (a kind no other template uses), a **tabs** container, and
+// a cross-page **sync** key — the same Pulse group pasted on another page stays
+// in lockstep under `team-pulse`.
+const TEAM_STATUS_BLOCKS = [
+  {id: 'td-tag', type: 'paragraph', text: [{t: 'One page the whole team reads: a '}, {t: 'locked', a: {b: true}}, {t: ' Pulse panel whose controls stay live, a delivery funnel, and the week’s rituals in tabs.'}]},
+  {id: 'td-call', type: 'callout', text: [{t: 'The Pulse group is locked (the 🔒 in its header): its text and layout are frozen, but readers keep every control. It also syncs across pages under the sync key “team-pulse” — paste the same group on another page and the two stay in lockstep.'}], props: {variant: 'info'}},
+
+  // The locked, synced control panel.
+  {id: 'td-h2', type: 'heading', text: [{t: 'Team pulse'}], props: {level: 2}},
+  {
+    id: 'td-group',
+    type: 'group',
+    props: {name: 'Pulse', locked: true, sync: 'team-pulse'},
+    children: [
+      {id: 'td-g-note', type: 'paragraph', text: [{t: 'This panel is locked — this very sentence can’t be edited in place — yet every control below still works.'}]},
+      {id: 'td-oncall', type: 'toggle', props: {name: 'onCall', label: 'On-call rotation active', value: true}},
+      {id: 'td-focus', type: 'dropdown', props: {name: 'focus', label: 'Focus this week', value: 'shipping', opts: [{label: 'Shipping'}, {label: 'Stability'}, {label: 'Growth'}]}},
+      {id: 'td-kudos', type: 'number', props: {name: 'kudos', label: 'Kudos given', value: 2, min: 0, max: 99, step: 1}},
+      {id: 'td-give', type: 'actionbutton', props: {btnlabel: 'Give kudos', action: 'increment', target: 'kudos', amount: 1}},
+      // Inputs inside a named group publish namespaced — pulse.kudos.value —
+      // which is exactly what this formula (and the light below) read.
+      {id: 'td-score', type: 'formula', props: {name: 'morale', source: 'pulse.kudos.value * 10 + (pulse.onCall.value ? 5 : 0)'}},
+      {id: 'td-light', type: 'statuslight', props: {label: 'Momentum', source: 'pulse.kudos.value', okAt: 3, warnAt: 1}},
+    ],
+  },
+
+  // The delivery funnel: a chart kind no other template exercises.
+  {id: 'td-h3', type: 'heading', text: [{t: 'Delivery pipeline'}], props: {level: 2}},
+  {id: 'td-pipe', type: 'code', text: [{t: '({Ideas: 24, Building: 12, "In review": 7, Shipped: shipped})'}], props: {live: true, name: 'pipeline', language: 'js', collapsed: true}},
+  {
+    id: 'td-cols',
+    type: 'columns',
+    children: [
+      {
+        id: 'td-col-l',
+        type: 'column',
+        props: {span: 5},
+        children: [
+          {id: 'td-shipped', type: 'number', props: {name: 'shipped', label: 'Shipped this quarter', value: 5, min: 0, max: 50, step: 1}},
+          {id: 'td-tip', type: 'tooltipcard', props: {term: 'Funnel', tip: 'Each stage narrows: ideas → building → review → shipped. Step the shipped count and the funnel redraws.'}},
+        ],
+      },
+      {
+        id: 'td-col-r',
+        type: 'column',
+        props: {span: 7},
+        children: [
+          {id: 'td-funnel', type: 'kitchart', props: {kind: 'funnel', title: 'Ideas → Shipped', source: 'pipeline'}},
+        ],
+      },
+    ],
+  },
+
+  // The week's rituals, in a tabs container.
+  {id: 'td-h4', type: 'heading', text: [{t: 'Rituals'}], props: {level: 2}},
+  {
+    id: 'td-tabs',
+    type: 'tabs',
+    props: {name: 'Rituals', active: 0},
+    children: [
+      {
+        id: 'td-tab-week',
+        type: 'tab',
+        props: {label: 'This week'},
+        children: [
+          {id: 'td-t1', type: 'todo', text: [{t: 'Monday kick-off — pick the focus in the Pulse panel'}], props: {checked: true}},
+          {id: 'td-t2', type: 'todo', text: [{t: 'Thursday demo — show, don’t tell'}], props: {checked: false}},
+        ],
+      },
+      {
+        id: 'td-tab-next',
+        type: 'tab',
+        props: {label: 'Next week'},
+        children: [
+          {id: 'td-n1', type: 'list', text: [{t: 'Rotate the on-call — flip the Pulse toggle'}], props: {kind: 'bullet'}},
+          {id: 'td-n2', type: 'list', text: [{t: 'Reset the kudos counter at retro'}], props: {kind: 'bullet'}},
+        ],
+      },
+    ],
+  },
+  {id: 'td-call2', type: 'callout', text: [{t: 'Make it yours: rename the Pulse group, change its sync key, and unlock it (the 🔓 in the group header) to re-arrange the controls.'}], props: {variant: 'success'}},
+];
+
 // ════════════════════════════════════════════════════════════════════════════
 // Databases (the task board, reading list, and the swimlane + map e2e fixtures)
 // ════════════════════════════════════════════════════════════════════════════
@@ -386,9 +685,11 @@ const TASK_BOARD_SCHEMA: DatabaseSchema = {
     {id: 'p_effort', name: 'Effort', type: 'number', numberDisplay: 'bar', numberTarget: 8},
   ],
   views: [
-    // Board first → the page opens as a kanban grouped by status; a table backs it.
+    // Board first → the page opens as a kanban grouped by status; a table backs
+    // it, and a calendar lays the same tasks out on a month grid by due date.
     {id: 'v_board', name: 'Board', type: 'board', filters: [], sorts: [], groupByPropertyId: 'p_status'},
     {id: 'v_table', name: 'Table', type: 'table', filters: [], sorts: []},
+    {id: 'v_calendar', name: 'Calendar', type: 'calendar', filters: [], sorts: [], datePropertyId: 'p_due'},
   ],
 };
 
@@ -404,6 +705,23 @@ const TASK_BOARD_ROWS = [
 
 // ── 📚 Reading list ──────────────────────────────────────────────────────────
 // A shelf-grouped gallery of books, with authors and star ratings; a table backs it.
+//
+// Covers (so the gallery renders real cards, not empty slots): tiny (<300 B) raster
+// PNGs, inlined as `data:` URLs on the `files`-typed `p_cover` cells. Deliberately
+// NOT routed through the content-addressed asset store — the `files` property and
+// the gallery cover render a URL string straight into `<img src>` with no
+// asset-resolution seam, so a store `assetId` wouldn't load there, and this seeds
+// identically on both transports (web PGlite + desktop IPC) with no upload call.
+// PNG, never SVG — honouring the store's image allowlist even though nothing is
+// stored (an `<img src="data:image/png…">` executes no script). One per shelf so
+// each gallery group leads with a cover.
+const COVER_TEAL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAB4CAIAAADqjOKhAAAAsklEQVR42u3ZMQ2AMBRF0YpgR1INoAQPGKidrt2R0KQq2FlJmvJzkmvgjC8vbUd+tV9n4BIwMDAwMDAwMDAwMDAwMDAwMDAwMDAw8BLge/S/BAwMDAwMDAwMDAwMDAwMDAwMDAwMHADseQAGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYG/gIurc4PGBgYGBgYGBgYOADYWgIGBgYGBgYGBgYGBgYO0wNsxNp6TrTOmAAAAABJRU5ErkJggg==';
+const COVER_ORANGE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAB4CAIAAADqjOKhAAAAsklEQVR42u3ZMQ2AMBRF0SpBAlKqBw24wEo1dKkClu5d2VlJmvJzkmvgjC8vnXl7VY89cAkYGBgYGBgYGBgYGBgYGBgYGBgYGBgYeAnwuNtfAgYGBgYGBgYGBgYGBgYGBgYGBgYGDgD2PAADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDfwH3cs0PGBgYGBgYGBgYOADYWgIGBgYGBgYGBgYGBgYO0wM4vRK/kEih/QAAAABJRU5ErkJggg==';
+const COVER_BLUE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAB4CAIAAADqjOKhAAAAsklEQVR42u3ZMQ2AMBRF0WpBAxqqBgEIQkSXGunCVANVwM5K0pSfk1wDZ3x5acvnq/0ogUvAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwEuAWx9/CRgYGBgYGBgYGBgYGBgYGBgYGBgYOADY8wAMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM/AV81Xt+wMDAwMDAwMDAwAHA1hIwMDAwMDAwMDAwMDBwmB4f7fGQa+V+2QAAAABJRU5ErkJggg==';
+
 const READING_SCHEMA: DatabaseSchema = {
   properties: [
     {
@@ -427,11 +745,11 @@ const READING_SCHEMA: DatabaseSchema = {
 };
 
 const READING_ROWS = [
-  {name: 'The Design of Everyday Things', properties: {p_shelf: 'opt_reading', p_author: 'Don Norman', p_rating: 4}},
+  {name: 'The Design of Everyday Things', properties: {p_shelf: 'opt_reading', p_author: 'Don Norman', p_rating: 4, p_cover: [COVER_ORANGE]}},
   {name: 'Project Hail Mary', properties: {p_shelf: 'opt_reading', p_author: 'Andy Weir', p_rating: 5}},
-  {name: 'Thinking, Fast and Slow', properties: {p_shelf: 'opt_toread', p_author: 'Daniel Kahneman'}},
+  {name: 'Thinking, Fast and Slow', properties: {p_shelf: 'opt_toread', p_author: 'Daniel Kahneman', p_cover: [COVER_TEAL]}},
   {name: 'Designing Data-Intensive Applications', properties: {p_shelf: 'opt_toread', p_author: 'Martin Kleppmann'}},
-  {name: 'The Pragmatic Programmer', properties: {p_shelf: 'opt_done', p_author: 'Hunt & Thomas', p_rating: 5}},
+  {name: 'The Pragmatic Programmer', properties: {p_shelf: 'opt_done', p_author: 'Hunt & Thomas', p_rating: 5, p_cover: [COVER_BLUE]}},
   {name: 'Deep Work', properties: {p_shelf: 'opt_done', p_author: 'Cal Newport', p_rating: 4}},
 ];
 
@@ -543,6 +861,466 @@ const FIELD_MAP_ROWS = [
   {name: 'Sydney partner', properties: {p_region: 'opt_apac', p_kind: 'opt_partner', p_headcount: 15, p_address: 'Circular Quay, Sydney', p_place: {lat: -33.8610, lng: 151.2100, label: 'Sydney partner'}}},
 ];
 
+// ── 🎯 Product HQ ────────────────────────────────────────────────────────────
+// Two databases wired together: Initiatives (the page you land on) and Tasks
+// (a sub-page). A 1:n relation links them BOTH ways (forward `Tasks` column +
+// reverse `Initiative` column), two rollups on Initiatives fold the linked
+// tasks (% done + task count), and a `dependency` property chains the tasks —
+// surfaced as arrows on the Tasks page's timeline view.
+
+/** Initiatives: status + the forward 1:n relation to Tasks + two rollups over it. */
+const productHqInitiativesSchema = (tasksDbId: string): DatabaseSchema => ({
+  properties: [
+    {
+      id: 'p_status',
+      name: 'Status',
+      type: 'status',
+      options: [
+        {id: 'opt_next', label: 'Up next', color: 'gray', group: 'todo'},
+        {id: 'opt_track', label: 'On track', color: 'blue', group: 'in_progress'},
+        {id: 'opt_risk', label: 'At risk', color: 'red', group: 'in_progress'},
+        {id: 'opt_shipped', label: 'Shipped', color: 'green', group: 'complete'},
+      ],
+    },
+    // The forward side of the two-way link: one initiative → many tasks.
+    {id: 'p_tasks', name: 'Tasks', type: 'relation', relationDatabaseId: tasksDbId, relationCardinality: '1:n', reversePropertyId: 'p_initiative'},
+    // Rollups fold the linked tasks: how done, and how many.
+    {id: 'p_progress', name: 'Progress', type: 'rollup', rollup: {relationPropertyId: 'p_tasks', targetPropertyId: 'p_done', function: 'percent_checked'}},
+    {id: 'p_count', name: 'Task count', type: 'rollup', rollup: {relationPropertyId: 'p_tasks', targetPropertyId: TITLE_PROPERTY_ID, function: 'count'}},
+  ],
+  views: [
+    // The table leads (relation chips + rollups in one glance); a board backs it.
+    {id: 'v_table', name: 'Table', type: 'table', filters: [], sorts: []},
+    {id: 'v_board', name: 'Board', type: 'board', filters: [], sorts: [], groupByPropertyId: 'p_status'},
+  ],
+});
+
+/** Tasks: the reverse (single) side of the relation, a Done checkbox the
+ *  rollup folds, a date range, and the dependency chain the timeline draws. */
+const productHqTasksSchema = (initiativesDbId: string): DatabaseSchema => ({
+  properties: [
+    {id: 'p_initiative', name: 'Initiative', type: 'relation', relationDatabaseId: initiativesDbId, relationSingle: true, reversePropertyId: 'p_tasks'},
+    {id: 'p_owner', name: 'Owner', type: 'text'},
+    {id: 'p_done', name: 'Done', type: 'checkbox'},
+    {id: 'p_when', name: 'When', type: 'date', dateRange: true},
+    {id: 'p_blockedby', name: 'Blocked by', type: 'dependency'},
+  ],
+  views: [
+    // Timeline first: bars from the `When` range, dependency arrows from
+    // `Blocked by` (predecessor end → dependent start).
+    {id: 'v_timeline', name: 'Timeline', type: 'timeline', filters: [], sorts: [], datePropertyId: 'p_when', dependencyPropertyId: 'p_blockedby'},
+    {id: 'v_table', name: 'Table', type: 'table', filters: [], sorts: []},
+  ],
+});
+
+/** Build the two databases, then seed rows across both so the relation, the
+ *  rollups, and the dependency arrows all render non-empty out of the box. */
+const createProductHq = async (client: DataClient, name: string, guidance: string = GUIDANCE.productHq): Promise<StoredPage> => {
+  // Pre-minted ids let each schema reference the OTHER database with no
+  // second-pass schema update (createDatabase honours a client-supplied id).
+  const initiativesDbId = globalThis.crypto.randomUUID();
+  const tasksDbId = globalThis.crypto.randomUUID();
+  const tasksName = `${name} Tasks`;
+
+  // The guidance callout leads the Initiatives host page; the Tasks sub-page
+  // stays bare (it's reached from the guided page).
+  const page = await client.savePage({name, data: guidanceSnapshot({id: 'hq-guide', text: guidance})});
+  const tasksPage = await client.savePage({name: tasksName, data: emptySnapshot([]), parentId: page.id});
+  await client.createDatabase({id: initiativesDbId, pageId: page.id, name, schema: productHqInitiativesSchema(tasksDbId)});
+  await client.createDatabase({id: tasksDbId, pageId: tasksPage.id, name: tasksName, schema: productHqTasksSchema(initiativesDbId)});
+
+  const seedRow = async (dbId: string, rowName: string, properties: Record<string, unknown>): Promise<string> =>
+    (await client.createRow(dbId, {name: rowName, properties})).id;
+
+  // Initiatives first (the tasks link back to them)…
+  const revamp = await seedRow(initiativesDbId, 'Onboarding revamp', {p_status: 'opt_track'});
+  const perf = await seedRow(initiativesDbId, 'Performance push', {p_status: 'opt_risk'});
+  const billing = await seedRow(initiativesDbId, 'Billing v2', {p_status: 'opt_shipped'});
+
+  // …then the tasks: linked 1:n, dated for the timeline, chained by `Blocked by`.
+  const t1 = await seedRow(tasksDbId, 'Ship onboarding checklist', {p_initiative: [revamp], p_owner: 'Ada', p_done: true, p_when: {start: day(-10), end: day(-3)}});
+  const t2 = await seedRow(tasksDbId, 'Guided first-run tour', {p_initiative: [revamp], p_owner: 'Lin', p_done: false, p_when: {start: day(-2), end: day(6)}, p_blockedby: [t1]});
+  const t3 = await seedRow(tasksDbId, 'Profile the hot paths', {p_initiative: [perf], p_owner: 'Sam', p_done: false, p_when: {start: day(1), end: day(5)}});
+  const t4 = await seedRow(tasksDbId, 'Cache the page list', {p_initiative: [perf], p_owner: 'Sam', p_done: false, p_when: {start: day(6), end: day(12)}, p_blockedby: [t3]});
+  const t5 = await seedRow(tasksDbId, 'Migrate legacy invoices', {p_initiative: [billing], p_owner: 'Lin', p_done: true, p_when: {start: day(-20), end: day(-12)}});
+
+  // Mirror the reverse side of the two-way link. Seeding writes both sides
+  // explicitly — the live mirror only runs on relation-cell edits. updateRow's
+  // per-key merge preserves the statuses seeded above.
+  await client.updateRow(initiativesDbId, revamp, {properties: {p_tasks: [t1, t2]}});
+  await client.updateRow(initiativesDbId, perf, {properties: {p_tasks: [t3, t4]}});
+  await client.updateRow(initiativesDbId, billing, {properties: {p_tasks: [t5]}});
+
+  return page;
+};
+
+// ── 📊 Dashboard ─────────────────────────────────────────────────────────────
+// A composite dashboard: a KPI row + DB-backed bar/pie/trend charts laid out in
+// the 12-col column blocks, all reading LIVE from a sample "sales" database the
+// template also seeds (a sub-page). The charts are ordinary in-doc `kitchart`
+// blocks in DATABASE source mode (DASH-3) — their `dbId` is stamped at
+// instantiation, when the sample database's id is minted. Unlike the database
+// fixtures you land on a composed DOCUMENT, not a table/board.
+
+/** The sample sales database the dashboard charts. One row = one deal, with a
+ *  Region/Channel/Stage/Quarter to group by and Amount/Units to total. */
+const SALES_SCHEMA: DatabaseSchema = {
+  properties: [
+    {
+      id: 'p_region',
+      name: 'Region',
+      type: 'select',
+      options: [
+        {id: 'opt_north', label: 'North', color: 'blue'},
+        {id: 'opt_south', label: 'South', color: 'green'},
+        {id: 'opt_east', label: 'East', color: 'orange'},
+        {id: 'opt_west', label: 'West', color: 'purple'},
+      ],
+    },
+    {
+      id: 'p_channel',
+      name: 'Channel',
+      type: 'select',
+      options: [
+        {id: 'opt_online', label: 'Online', color: 'blue'},
+        {id: 'opt_retail', label: 'Retail', color: 'pink'},
+        {id: 'opt_partner', label: 'Partner', color: 'yellow'},
+      ],
+    },
+    {
+      id: 'p_stage',
+      name: 'Stage',
+      type: 'status',
+      options: [
+        {id: 'opt_pipeline', label: 'Pipeline', color: 'gray', group: 'todo'},
+        {id: 'opt_committed', label: 'Committed', color: 'blue', group: 'in_progress'},
+        {id: 'opt_won', label: 'Won', color: 'green', group: 'complete'},
+      ],
+    },
+    {
+      id: 'p_quarter',
+      name: 'Quarter',
+      type: 'select',
+      options: [
+        {id: 'opt_q1', label: 'Q1', color: 'gray'},
+        {id: 'opt_q2', label: 'Q2', color: 'gray'},
+        {id: 'opt_q3', label: 'Q3', color: 'gray'},
+        {id: 'opt_q4', label: 'Q4', color: 'gray'},
+      ],
+    },
+    {id: 'p_amount', name: 'Amount', type: 'number', numberDisplay: 'number'},
+    {id: 'p_units', name: 'Units', type: 'number'},
+  ],
+  views: [
+    // The data page opens on the table; a bar view backs it (and exercises the
+    // DB chart-view kit engine on the sample data itself).
+    {id: 'v_table', name: 'Table', type: 'table', filters: [], sorts: []},
+    {id: 'v_bar', name: 'By region', type: 'bar', filters: [], sorts: [], groupByPropertyId: 'p_region', aggregate: {type: 'sum', propertyId: 'p_amount'}},
+  ],
+};
+
+const SALES_ROWS = [
+  {name: 'Northwind renewal', properties: {p_region: 'opt_north', p_channel: 'opt_online', p_stage: 'opt_won', p_quarter: 'opt_q1', p_amount: 24000, p_units: 120}},
+  {name: 'Acme retail order', properties: {p_region: 'opt_north', p_channel: 'opt_retail', p_stage: 'opt_committed', p_quarter: 'opt_q2', p_amount: 18000, p_units: 90}},
+  {name: 'Globex expansion', properties: {p_region: 'opt_south', p_channel: 'opt_online', p_stage: 'opt_won', p_quarter: 'opt_q1', p_amount: 31000, p_units: 150}},
+  {name: 'Initech pilot', properties: {p_region: 'opt_south', p_channel: 'opt_partner', p_stage: 'opt_pipeline', p_quarter: 'opt_q3', p_amount: 12000, p_units: 60}},
+  {name: 'Umbrella upsell', properties: {p_region: 'opt_east', p_channel: 'opt_online', p_stage: 'opt_committed', p_quarter: 'opt_q2', p_amount: 27000, p_units: 130}},
+  {name: 'Soylent reorder', properties: {p_region: 'opt_east', p_channel: 'opt_retail', p_stage: 'opt_won', p_quarter: 'opt_q4', p_amount: 22000, p_units: 110}},
+  {name: 'Hooli trial', properties: {p_region: 'opt_west', p_channel: 'opt_partner', p_stage: 'opt_pipeline', p_quarter: 'opt_q3', p_amount: 9000, p_units: 45}},
+  {name: 'Stark contract', properties: {p_region: 'opt_west', p_channel: 'opt_online', p_stage: 'opt_won', p_quarter: 'opt_q4', p_amount: 35000, p_units: 170}},
+  {name: 'Wayne partnership', properties: {p_region: 'opt_north', p_channel: 'opt_partner', p_stage: 'opt_committed', p_quarter: 'opt_q2', p_amount: 15000, p_units: 70}},
+  {name: 'Cyberdyne restock', properties: {p_region: 'opt_south', p_channel: 'opt_retail', p_stage: 'opt_won', p_quarter: 'opt_q1', p_amount: 20000, p_units: 100}},
+  {name: 'Tyrell evaluation', properties: {p_region: 'opt_east', p_channel: 'opt_online', p_stage: 'opt_pipeline', p_quarter: 'opt_q3', p_amount: 14000, p_units: 68}},
+  {name: 'Massive Dynamic order', properties: {p_region: 'opt_west', p_channel: 'opt_retail', p_stage: 'opt_committed', p_quarter: 'opt_q4', p_amount: 17000, p_units: 82}},
+];
+
+/** A database-bound `kitchart` block (DASH-3 source mode). `dbId` is stamped at
+ *  instantiation; `count` needs no numeric property, so `aggProp` is optional. A
+ *  one-line `description` keeps the edit view clean (no ghost "Add a description…"). */
+const dashboardChart = (
+  dbId: string,
+  id: string,
+  kind: string,
+  title: string,
+  description: string,
+  groupBy: string,
+  aggType: 'count' | 'sum',
+  aggProp?: string,
+  /** Cross-filter (DASH-7): bind the chart to a named input + a property so a
+   *  top-of-dashboard control re-scopes it. Omitted → the chart is unfiltered. */
+  filter?: {input: string; prop: string},
+): object => ({
+  id,
+  type: 'kitchart',
+  props: {
+    kind,
+    title,
+    description,
+    sourceMode: 'database',
+    dbId,
+    dbGroupBy: groupBy,
+    dbAggType: aggType,
+    ...(aggProp ? {dbAggProp: aggProp} : {}),
+    ...(filter ? {dbFilterInput: filter.input, dbFilterProp: filter.prop} : {}),
+  },
+});
+
+/** The dashboard document: a leading guidance callout, a KPI row across the top
+ *  (three tiles in a 12-col columns block), then the bar+pie pair and a
+ *  full-width quarterly trend — every chart bound to the seeded sales database. */
+const dashboardBlocks = (dbId: string, guidance: string): object[] => {
+  // The cross-filter (DASH-7): a Quarter control published as `quarter`. Every
+  // chart below (except the quarterly trend, which IS the quarter axis) binds to
+  // it on the Quarter property, so picking a quarter re-scopes the whole board.
+  const QUARTER_FILTER = {input: 'quarter', prop: 'p_quarter'};
+  const chart = (id: string, kind: string, title: string, description: string, groupBy: string, aggType: 'count' | 'sum', aggProp?: string, filter: {input: string; prop: string} | null = QUARTER_FILTER) =>
+    dashboardChart(dbId, id, kind, title, description, groupBy, aggType, aggProp, filter ?? undefined);
+  return [
+    guidanceCallout('db-guide', guidance),
+    // Cross-filter control: a dropdown that publishes `quarter`. "All quarters"
+    // (value `all`) is the default and reads as inactive, so the board opens
+    // showing the whole year; picking Q1–Q4 scopes every bound chart at once.
+    {
+      id: 'db-filter',
+      type: 'dropdown',
+      props: {
+        name: 'quarter',
+        label: 'Quarter',
+        value: 'all',
+        opts: [{label: 'All quarters', value: 'all'}, {label: 'Q1'}, {label: 'Q2'}, {label: 'Q3'}, {label: 'Q4'}],
+      },
+    },
+    {id: 'db-h1', type: 'heading', text: [{t: 'This quarter at a glance'}], props: {level: 2}},
+    // KPI row — three number tiles across the top (the DASH-5 `kpi` kind). Each
+    // folds a grouped DB series to one grand total; the tile's title names it.
+    // All three bind to the Quarter cross-filter (default `chart` filter).
+    {
+      id: 'db-kpis',
+      type: 'columns',
+      children: [
+        {id: 'db-kc1', type: 'column', props: {span: 4}, children: [chart('db-k-rev', 'kpi', 'Total revenue (£)', 'Summed across every region', 'p_region', 'sum', 'p_amount')]},
+        {id: 'db-kc2', type: 'column', props: {span: 4}, children: [chart('db-k-deals', 'kpi', 'Deals', 'Every row, across all stages', 'p_stage', 'count')]},
+        {id: 'db-kc3', type: 'column', props: {span: 4}, children: [chart('db-k-units', 'kpi', 'Units sold', 'Summed across every channel', 'p_channel', 'sum', 'p_units')]},
+      ],
+    },
+    {id: 'db-h2', type: 'heading', text: [{t: 'Breakdown'}], props: {level: 2}},
+    // Bar + pie side by side in a 6/6 split — both scoped by the Quarter filter.
+    {
+      id: 'db-cols',
+      type: 'columns',
+      children: [
+        {id: 'db-cl', type: 'column', props: {span: 6}, children: [chart('db-bar', 'bar', 'Revenue by region (£)', 'Amount summed per sales region', 'p_region', 'sum', 'p_amount')]},
+        {id: 'db-cr', type: 'column', props: {span: 6}, children: [chart('db-pie', 'pie', 'Deals by channel', 'Share of deals won online, retail and via partners', 'p_channel', 'count')]},
+      ],
+    },
+    // A full-width quarterly trend closes the dashboard. It is NOT bound to the
+    // Quarter filter (it is already the quarter axis) — it stays full-year, giving
+    // context while the tiles + breakdowns above slice to the chosen quarter.
+    chart('db-line', 'line', 'Revenue by quarter (£)', 'Amount summed by quarter, Q1 → Q4', 'p_quarter', 'sum', 'p_amount', null),
+    // Trailing pointer: how to ADD a chart (distinct from the lead callout, which
+    // is about editing the data). The slash menu inserts a Chart, then its ⚙
+    // Source toggle switches it to Database — there is no "/chart → Database".
+    {id: 'db-note', type: 'callout', text: [{t: 'Want another cut of the data? Type /chart to insert one, then switch its Source to Database in the chart’s ⚙ settings and pick this database.'}], props: {variant: 'info'}},
+  ];
+};
+
+/** Build the dashboard document, then seed the sample sales database it charts.
+ *  The dashboard host page is saved FIRST (so its charts' `dbId` is the minted
+ *  sample-db id), and the sample database lands on a sub-page. */
+const createDashboard = async (client: DataClient, name: string, guidance: string = GUIDANCE.dashboard): Promise<StoredPage> => {
+  const dataDbId = globalThis.crypto.randomUUID();
+  const dataName = `${name} data`;
+  const page = await client.savePage({
+    name,
+    data: {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: {blocks: dashboardBlocks(dataDbId, guidance)}},
+  });
+  const dataPage = await client.savePage({name: dataName, data: emptySnapshot([]), parentId: page.id});
+  await client.createDatabase({id: dataDbId, pageId: dataPage.id, name: dataName, schema: SALES_SCHEMA});
+  for (const row of SALES_ROWS) {
+    let rowName: string | null = row.name;
+    for (let attempt = 2; ; attempt += 1) {
+      try {
+        await client.createRow(dataDbId, {...row, name: rowName});
+        break;
+      } catch {
+        if (attempt > 5) {
+          await client.createRow(dataDbId, {...row, name: null});
+          break;
+        }
+        rowName = `${row.name} ${attempt}`;
+      }
+    }
+  }
+  return page;
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// Ledger templates
+//
+// These templates use the ledger plugin's double-entry accounting system.
+// Each seeds a chart of accounts, sample transactions, and a block-doc page
+// with the ledger's interactive blocks (journal, reports, operations).
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── 💵 Simple budget ────────────────────────────────────────────────────────
+
+const SIMPLE_BUDGET_CHART: LedgerAccountInput[] = [
+  {name: 'Assets:Bank:Checking', type: 'asset'},
+  {name: 'Assets:Bank:Savings', type: 'asset'},
+  {name: 'Assets:Cash', type: 'asset'},
+  {name: 'Liabilities:CreditCard', type: 'liability'},
+  {name: 'Equity:OpeningBalances', type: 'equity'},
+  {name: 'Income:Salary', type: 'revenue'},
+  {name: 'Income:Freelance', type: 'revenue'},
+  {name: 'Income:OtherIncome', type: 'revenue'},
+  {name: 'Expenses:Rent', type: 'expense'},
+  {name: 'Expenses:Utilities', type: 'expense'},
+  {name: 'Expenses:Groceries', type: 'expense'},
+  {name: 'Expenses:Transport', type: 'expense'},
+  {name: 'Expenses:DiningOut', type: 'expense'},
+  {name: 'Expenses:Entertainment', type: 'expense'},
+  {name: 'Expenses:Subscriptions', type: 'expense'},
+  {name: 'Expenses:Healthcare', type: 'expense'},
+];
+
+const simpleBudgetTransactions = (accounts: Map<string, string>): LedgerDraftInput[] => {
+  const id = (name: string): string => accounts.get(name)!;
+  return [
+    {date: day(-25), description: 'Salary deposit', postings: [{accountId: id('Assets:Bank:Checking'), amountMinor: 500000}, {accountId: id('Income:Salary'), amountMinor: -500000}]},
+    {date: day(-20), description: 'Rent payment', postings: [{accountId: id('Expenses:Rent'), amountMinor: 150000}, {accountId: id('Assets:Bank:Checking'), amountMinor: -150000}]},
+    {date: day(-15), description: 'Grocery run', postings: [{accountId: id('Expenses:Groceries'), amountMinor: 8500}, {accountId: id('Liabilities:CreditCard'), amountMinor: -8500}]},
+    {date: day(-10), description: 'Electric bill', postings: [{accountId: id('Expenses:Utilities'), amountMinor: 12000}, {accountId: id('Assets:Bank:Checking'), amountMinor: -12000}]},
+    {date: day(-5), description: 'Dinner out', postings: [{accountId: id('Expenses:DiningOut'), amountMinor: 4500}, {accountId: id('Liabilities:CreditCard'), amountMinor: -4500}]},
+    {date: day(-2), description: 'Streaming subscription', postings: [{accountId: id('Expenses:Subscriptions'), amountMinor: 1599}, {accountId: id('Liabilities:CreditCard'), amountMinor: -1599}]},
+  ];
+};
+
+const SIMPLE_BUDGET_BLOCKS = (guidance: string): object[] => [
+  {id: 'sb-h1', type: 'heading', text: [{t: 'Simple budget'}], props: {level: 1}},
+  guidanceCallout('sb-guide', guidance),
+  {id: 'sb-h2', type: 'heading', text: [{t: 'Journal'}], props: {level: 2}},
+  {id: 'sb-journal', type: 'openbook.ledger/journal-entry', props: {ledgerRows: ''}},
+  {id: 'sb-div', type: 'divider'},
+  {id: 'sb-h3', type: 'heading', text: [{t: 'Monthly summary'}], props: {level: 2}},
+  {id: 'sb-income', type: 'openbook.ledger/income-statement', props: {ledgerIsFrom: ''}},
+];
+
+const createSimpleBudget = async (client: DataClient, name: string, guidance: string = GUIDANCE.simpleBudget): Promise<StoredPage> => {
+  await client.ledgerInit();
+  const accounts = new Map<string, string>();
+  for (const acct of SIMPLE_BUDGET_CHART) {
+    try {
+      const created = await client.ledgerCreateAccount(acct);
+      accounts.set(acct.name, created.id);
+    } catch { /* skip if already exists */ }
+  }
+  if (accounts.size > 0) {
+    for (const tx of simpleBudgetTransactions(accounts)) {
+      try {
+        const draft = await client.ledgerCreateDraft(tx);
+        await client.ledgerPostTransaction(draft.id);
+      } catch { /* skip on error */ }
+    }
+  }
+  return client.savePage({name, data: {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: {blocks: SIMPLE_BUDGET_BLOCKS(guidance)}}});
+};
+
+// ── 📒 Startup books ────────────────────────────────────────────────────────
+
+/** The Startup Books chart of accounts. Exported (with
+ *  {@link startupBooksTransactions}) so the export renderer's golden tests can
+ *  rebuild the SAME fixture book this template seeds without a live store. */
+export const STARTUP_BOOKS_CHART: LedgerAccountInput[] = [
+  {name: 'Assets:Bank:Checking', type: 'asset'},
+  {name: 'Assets:Bank:Savings', type: 'asset'},
+  {name: 'Assets:AccountsReceivable', type: 'asset'},
+  {name: 'Assets:PrepaidExpenses', type: 'asset'},
+  {name: 'Assets:Equipment', type: 'asset'},
+  {name: 'Liabilities:CreditCard', type: 'liability'},
+  {name: 'Liabilities:AccountsPayable', type: 'liability'},
+  {name: 'Liabilities:AccruedExpenses', type: 'liability'},
+  {name: 'Liabilities:DeferredRevenue', type: 'liability'},
+  {name: 'Equity:OpeningBalances', type: 'equity'},
+  {name: 'Equity:RetainedEarnings', type: 'equity'},
+  {name: 'Equity:OwnersInvestment', type: 'equity'},
+  {name: 'Income:Sales', type: 'revenue'},
+  {name: 'Income:Services', type: 'revenue'},
+  {name: 'Income:InterestIncome', type: 'revenue'},
+  {name: 'Expenses:Payroll', type: 'expense'},
+  {name: 'Expenses:Rent', type: 'expense'},
+  {name: 'Expenses:Utilities', type: 'expense'},
+  {name: 'Expenses:Insurance', type: 'expense'},
+  {name: 'Expenses:ProfessionalFees', type: 'expense'},
+  {name: 'Expenses:Marketing', type: 'expense'},
+  {name: 'Expenses:Travel', type: 'expense'},
+  {name: 'Expenses:Software', type: 'expense'},
+  {name: 'Expenses:Hosting', type: 'expense'},
+  {name: 'Expenses:BankFees', type: 'expense'},
+  {name: 'Expenses:Office', type: 'expense'},
+];
+
+/** The Startup Books sample entries, keyed by the caller's `name → account id`
+ *  map (dates are relative to today). Exported for the golden export tests. */
+export const startupBooksTransactions = (accounts: Map<string, string>): LedgerDraftInput[] => {
+  const id = (name: string): string => accounts.get(name)!;
+  return [
+    {date: day(-30), description: 'Owner investment', postings: [{accountId: id('Assets:Bank:Checking'), amountMinor: 5000000}, {accountId: id('Equity:OwnersInvestment'), amountMinor: -5000000}]},
+    {date: day(-25), description: 'Office rent', postings: [{accountId: id('Expenses:Rent'), amountMinor: 250000}, {accountId: id('Assets:Bank:Checking'), amountMinor: -250000}]},
+    {date: day(-20), description: 'AWS hosting', postings: [{accountId: id('Expenses:Hosting'), amountMinor: 15000}, {accountId: id('Liabilities:CreditCard'), amountMinor: -15000}]},
+    {date: day(-15), description: 'Contractor invoice', postings: [{accountId: id('Expenses:ProfessionalFees'), amountMinor: 300000}, {accountId: id('Liabilities:AccountsPayable'), amountMinor: -300000}]},
+    {date: day(-10), description: 'Customer payment', postings: [{accountId: id('Assets:AccountsReceivable'), amountMinor: 1000000}, {accountId: id('Income:Sales'), amountMinor: -1000000}]},
+    {date: day(-5), description: 'Equipment purchase', postings: [{accountId: id('Assets:Equipment'), amountMinor: 200000}, {accountId: id('Assets:Bank:Checking'), amountMinor: -200000}]},
+    {date: day(-2), description: 'Software license', postings: [{accountId: id('Expenses:Software'), amountMinor: 4999}, {accountId: id('Liabilities:CreditCard'), amountMinor: -4999}]},
+  ];
+};
+
+const STARTUP_BOOKS_BLOCKS = (guidance: string): object[] => [
+  {id: 'stb-h1', type: 'heading', text: [{t: 'Startup books'}], props: {level: 1}},
+  guidanceCallout('stb-guide', guidance),
+  {id: 'stb-h2', type: 'heading', text: [{t: 'Journal entries'}], props: {level: 2}},
+  {id: 'stb-journal', type: 'openbook.ledger/journal-entry', props: {ledgerRows: ''}},
+  {id: 'stb-div1', type: 'divider'},
+  {id: 'stb-h3', type: 'heading', text: [{t: 'Reports'}], props: {level: 2}},
+  {id: 'stb-h3a', type: 'heading', text: [{t: 'Trial balance'}], props: {level: 3}},
+  {id: 'stb-tb', type: 'openbook.ledger/trial-balance', props: {ledgerTbShowZero: false}},
+  {id: 'stb-h3b', type: 'heading', text: [{t: 'Balance sheet'}], props: {level: 3}},
+  {id: 'stb-bs', type: 'openbook.ledger/balance-sheet', props: {ledgerBsAsOf: ''}},
+  {id: 'stb-h3c', type: 'heading', text: [{t: 'Income statement'}], props: {level: 3}},
+  {id: 'stb-is', type: 'openbook.ledger/income-statement', props: {ledgerIsFrom: ''}},
+  {id: 'stb-h3d', type: 'heading', text: [{t: 'Account register'}], props: {level: 3}},
+  {id: 'stb-reg', type: 'openbook.ledger/account-register', props: {ledgerRegAccount: ''}},
+  {id: 'stb-div2', type: 'divider'},
+  {id: 'stb-h4', type: 'heading', text: [{t: 'Operations'}], props: {level: 2}},
+  {id: 'stb-h4a', type: 'heading', text: [{t: 'Bank import'}], props: {level: 3}},
+  {id: 'stb-import', type: 'openbook.ledger/bank-import', props: {ledgerImport: '1'}},
+  {id: 'stb-h4b', type: 'heading', text: [{t: 'Reconcile'}], props: {level: 3}},
+  {id: 'stb-rec', type: 'openbook.ledger/reconcile', props: {ledgerRecId: ''}},
+  {id: 'stb-h4c', type: 'heading', text: [{t: 'Period close'}], props: {level: 3}},
+  {id: 'stb-close', type: 'openbook.ledger/period-close', props: {ledgerPeriodStart: ''}},
+  {id: 'stb-h4d', type: 'heading', text: [{t: 'Beancount export'}], props: {level: 3}},
+  {id: 'stb-bean', type: 'openbook.ledger/beancount-export', props: {ledgerBeancount: '1'}},
+];
+
+const createStartupBooks = async (client: DataClient, name: string, guidance: string = GUIDANCE.startupBooks): Promise<StoredPage> => {
+  await client.ledgerInit();
+  const accounts = new Map<string, string>();
+  for (const acct of STARTUP_BOOKS_CHART) {
+    try {
+      const created = await client.ledgerCreateAccount(acct);
+      accounts.set(acct.name, created.id);
+    } catch { /* skip if already exists */ }
+  }
+  if (accounts.size > 0) {
+    for (const tx of startupBooksTransactions(accounts)) {
+      try {
+        const draft = await client.ledgerCreateDraft(tx);
+        await client.ledgerPostTransaction(draft.id);
+      } catch { /* skip on error */ }
+    }
+  }
+  return client.savePage({name, data: {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: {blocks: STARTUP_BOOKS_BLOCKS(guidance)}}});
+};
+
 // ── The gallery ──────────────────────────────────────────────────────────────
 
 /** Create a block-editor template page from a JSON block projection. */
@@ -553,11 +1331,13 @@ const createBlockDocPage =
 
 /** Create a database template: host page + database + sample rows. Names are
  *  not unique, so a plain create always lands; the retry ladder below survives
- *  transient failures (untitled as a last resort). */
+ *  transient failures (untitled as a last resort). `guide` (id + canonical
+ *  English text) puts the standardized guidance callout on the host page —
+ *  where a database template's doc surface renders, above the view. */
 const createDatabasePage =
-  (schema: DatabaseSchema, rows: {name: string; properties: Record<string, unknown>}[]) =>
-    async (client: DataClient, name: string): Promise<StoredPage> => {
-      const page = await client.savePage({name, data: emptySnapshot([])});
+  (schema: DatabaseSchema, rows: {name: string; properties: Record<string, unknown>}[], guide?: {id: string; text: string}) =>
+    async (client: DataClient, name: string, guidance?: string): Promise<StoredPage> => {
+      const page = await client.savePage({name, data: guidanceSnapshot(guide && {id: guide.id, text: guidance ?? guide.text})});
       const db = await client.createDatabase({pageId: page.id, name, schema});
       for (const row of rows) {
         let rowName: string | null = row.name;
@@ -577,14 +1357,38 @@ const createDatabasePage =
       return page;
     };
 
+/** A fresh copy of the sample document under its own gallery name. It already
+ *  opens with its own intro paragraph (`sample-intro`), so — unlike the database
+ *  fixtures — it carries no standardized guidance callout of its own (that would
+ *  double-guide, stacking a near-duplicate lead above the intro). */
+const createCompoundGrowth = (client: DataClient, name: string): Promise<StoredPage> => {
+  const input = buildSampleDocument();
+  return client.savePage({...input, name});
+};
+
 export const PAGE_TEMPLATES: PageTemplate[] = [
-  {id: 'grocery-tracker', icon: '🛒', pageName: 'Grocery price tracker', create: createBlockDocPage(GROCERY_BLOCKS)},
-  {id: 'task-board', icon: '🗂️', pageName: 'Project task board', create: createDatabasePage(TASK_BOARD_SCHEMA, TASK_BOARD_ROWS)},
-  {id: 'reading-list', icon: '📚', pageName: 'Reading list', create: createDatabasePage(READING_SCHEMA, READING_ROWS)},
-  {id: 'project-intake', icon: '📋', pageName: 'Project intake', create: createBlockDocPage(PROJECT_INTAKE_BLOCKS)},
-  {id: 'savings-planner', icon: '💰', pageName: 'Savings & investing', create: createBlockDocPage(SAVINGS_BLOCKS)},
-  {id: 'roadmap', icon: '🗺️', pageName: 'Product roadmap', create: createDatabasePage(ROADMAP_SCHEMA, ROADMAP_ROWS)},
-  {id: 'field-map', icon: '📍', pageName: 'Field map', create: createDatabasePage(FIELD_MAP_SCHEMA, FIELD_MAP_ROWS)},
+  {id: 'recipe-scaler', icon: '🍳', pageName: 'Recipe scaler', tags: ['interactive', 'slides'], create: createBlockDocPage(RECIPE_BLOCKS)},
+  {id: 'grocery-tracker', icon: '🛒', pageName: 'Grocery price tracker', tags: ['interactive', 'slides'], create: createBlockDocPage(GROCERY_BLOCKS)},
+  {id: 'task-board', icon: '🗂️', pageName: 'Project task board', tags: ['database'], guidance: GUIDANCE.taskBoard, create: createDatabasePage(TASK_BOARD_SCHEMA, TASK_BOARD_ROWS, {id: 'tb-guide', text: GUIDANCE.taskBoard})},
+  {id: 'reading-list', icon: '📚', pageName: 'Reading list', tags: ['database'], guidance: GUIDANCE.readingList, create: createDatabasePage(READING_SCHEMA, READING_ROWS, {id: 'rl-guide', text: GUIDANCE.readingList})},
+  {id: 'project-intake', icon: '📋', pageName: 'Project intake', tags: ['interactive', 'slides'], create: createBlockDocPage(PROJECT_INTAKE_BLOCKS)},
+  {id: 'roadmap', icon: '🗺️', pageName: 'Product roadmap', tags: ['database'], guidance: GUIDANCE.roadmap, create: createDatabasePage(ROADMAP_SCHEMA, ROADMAP_ROWS, {id: 'rm-guide', text: GUIDANCE.roadmap})},
+  {id: 'field-map', icon: '📍', pageName: 'Field map', tags: ['database'], guidance: GUIDANCE.fieldMap, create: createDatabasePage(FIELD_MAP_SCHEMA, FIELD_MAP_ROWS, {id: 'fm-guide', text: GUIDANCE.fieldMap})},
+  {id: 'pitch-deck', icon: '📽️', pageName: 'Pitch deck', tags: ['interactive', 'slides'], create: createBlockDocPage(PITCH_DECK_BLOCKS)},
+  {id: 'team-status', icon: '🚦', pageName: 'Team status dashboard', tags: ['interactive'], create: createBlockDocPage(TEAM_STATUS_BLOCKS)},
+  {id: 'product-hq', icon: '🎯', pageName: 'Product HQ', tags: ['database'], guidance: GUIDANCE.productHq, create: createProductHq},
+  // A composite dashboard: KPI tiles + DB-backed charts over a seeded sales
+  // database. Tagged `interactive` (you land on a document, not a table), so it
+  // groups under Interactive documents; the description names its data backing.
+  {id: 'dashboard', icon: '📊', pageName: 'Sales dashboard', tags: ['interactive'], guidance: GUIDANCE.dashboard, create: createDashboard},
+  {id: 'startup-books', icon: '📒', pageName: 'Startup books', tags: ['interactive'], guidance: GUIDANCE.startupBooks, create: createStartupBooks},
+  {id: 'savings-planner', icon: '💰', pageName: 'Savings & investing', tags: ['interactive', 'slides'], create: createBlockDocPage(SAVINGS_BLOCKS)},
+  // The classic sample document, folded into the gallery. Unlike the Home
+  // starter's open-or-create (which targets the canonical sample name and never
+  // overwrites), the gallery card always mints a FRESH copy under its own
+  // display name — the two entry points never race or shadow each other.
+  {id: 'compound-growth', icon: '📈', pageName: 'Compound growth', tags: ['interactive'], create: createCompoundGrowth},
+  {id: 'simple-budget', icon: '💵', pageName: 'Simple budget', tags: ['interactive'], guidance: GUIDANCE.simpleBudget, create: createSimpleBudget},
 ];
 
 /** Courtesy numbering (names are not unique): a second instance becomes
@@ -601,13 +1405,15 @@ async function availableName(client: DataClient, base: string): Promise<string> 
 /**
  * Instantiate a template: pick a distinct display name (courtesy numbering —
  * duplicates are allowed but unhelpful for ready-made pages) and build the page
- * through the client, retrying transient failures.
+ * through the client, retrying transient failures. `opts.guidance` localizes
+ * the leading guidance callout of templates that carry one (the gallery passes
+ * the user's locale text; absent, the canonical English default applies).
  */
-export async function instantiateTemplate(client: DataClient, template: PageTemplate): Promise<StoredPage> {
+export async function instantiateTemplate(client: DataClient, template: PageTemplate, opts?: {guidance?: string}): Promise<StoredPage> {
   let name = await availableName(client, template.pageName);
   for (let attempt = 0; ; attempt += 1) {
     try {
-      return await template.create(client, name);
+      return await template.create(client, name, opts?.guidance);
     } catch (err) {
       // A concurrent create can win the name between the check and the save;
       // step the suffix and retry a few times before giving up.

@@ -1,6 +1,8 @@
 import {useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import * as Y from 'yjs';
 import {
+  blockChildren,
+  blockProp,
   blockText,
   blockToJSON,
   blockType,
@@ -8,6 +10,7 @@ import {
   insertBlock,
   makeBlock,
   mergeWithPrevious,
+  nestInToggle,
   moveBlock,
   removeBlock,
   rootBlocks,
@@ -19,6 +22,8 @@ import {
   type BlockType,
   type NewBlock,
 } from './model';
+import {historyExtension, type EditorHistory} from './historyExtension';
+import {ReactiveEvalCache} from './kit/evalCache';
 
 /**
  * The editor's working state around a Y.Doc: one version counter that bumps
@@ -38,8 +43,16 @@ export interface CaretRequest {
 export interface BlockEditorController {
   doc: Y.Doc;
   version: number;
-  /** Undo/redo over local edits (a live wrapper — see useBlockEditor). */
-  undo: {undo(): void; redo(): void};
+  /** Async evaluator + synchronously readable per-version/per-cell snapshots. */
+  evalCache: ReactiveEvalCache;
+  /** Undo/redo over local edits (a live wrapper — see useBlockEditor).
+   *  `stopCapturing` forces the next tracked change to start a fresh undo item
+   *  even inside the capture window — the "[[" wikilink accept uses it so a
+   *  single undo restores the literal typed text rather than reverting the
+   *  typing too. */
+  undo: {undo(): void; redo(): void; stopCapturing(): void; readonly availability?: {undo: string | null; redo: string | null}};
+  /** The same effect-owned page journal; never instantiate a second manager. */
+  history?: () => EditorHistory | null;
   readOnly: boolean;
 
   /** Set by structural ops; consumed by the focused block after render. */
@@ -71,6 +84,7 @@ export interface BlockEditorController {
 export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorController {
   const [, force] = useState(0);
   const versionRef = useRef(0);
+  const evalCache = useMemo(() => new ReactiveEvalCache(doc), [doc]);
 
   const subscribe = useMemo(() => {
     return (cb: () => void) => {
@@ -87,14 +101,20 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
     () => versionRef.current,
     () => versionRef.current,
   );
+  useEffect(() => {
+    evalCache.activate();
+    return () => evalCache.dispose();
+  }, [evalCache]);
 
   // The UndoManager lives in an effect: StrictMode's mount-cycle cleanup
   // would otherwise destroy a useMemo-created instance and leave the editor
   // holding a dead manager (undoStack frozen at 0). The controller exposes a
   // stable wrapper that always talks to the live instance.
-  const undoRef = useRef<Y.UndoManager | null>(null);
+  const undoRef = useRef<EditorHistory | null>(null);
+  const canWriteRef = useRef(!readOnly);
+  canWriteRef.current = !readOnly;
   useEffect(() => {
-    const manager = new Y.UndoManager(rootBlocks(doc), {
+    const manager = historyExtension?.(doc, () => canWriteRef.current) ?? new Y.UndoManager(rootBlocks(doc), {
       trackedOrigins: new Set(['local']),
       captureTimeout: 400,
     });
@@ -108,6 +128,8 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
     () => ({
       undo: () => undoRef.current?.undo(),
       redo: () => undoRef.current?.redo(),
+      stopCapturing: () => undoRef.current?.stopCapturing(),
+      get availability() { return undoRef.current?.availability ?? {undo: null, redo: null}; },
     }),
     [],
   );
@@ -132,16 +154,24 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
 
     const orderedTextIds = (): string[] => {
       const ids: string[] = [];
-      for (const {block} of walkBlocks(rootBlocks(doc))) {
-        if (TEXT_BLOCKS.has(blockType(block)) && blockText(block)) ids.push(block.get('id') as string);
-      }
+      const walk = (blocks: Y.Array<BlockMap>): void => {
+        for (const block of blocks.toArray()) {
+          if (TEXT_BLOCKS.has(blockType(block)) && blockText(block)) ids.push(block.get('id') as string);
+          if (blockType(block) === 'togglelist' && blockProp(block, 'collapsed')) continue;
+          const children = blockChildren(block);
+          if (children) walk(children);
+        }
+      };
+      walk(rootBlocks(doc));
       return ids;
     };
 
     return {
       doc,
       version,
+      evalCache,
       undo,
+      history: () => undoRef.current,
       readOnly,
       pendingCaret,
       requestCaret,
@@ -164,6 +194,10 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
         const type = blockType(found.block);
         if (type !== 'paragraph' && type !== 'cell' && type !== 'code' && TEXT_BLOCKS.has(type)) {
           turnInto(doc, blockId, 'paragraph');
+          requestCaret({blockId, offset: 0});
+          return;
+        }
+        if (found.index === 0 && nestInToggle(doc, blockId, true)) {
           requestCaret({blockId, offset: 0});
           return;
         }
@@ -201,6 +235,7 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
       },
 
       removeSelected() {
+        if (readOnly) return; // defense-in-depth: never mutate a read-only surface
         if (selection.size === 0) return;
         const all = orderedIds();
         const first = all.find((id) => selection.has(id));
@@ -220,6 +255,7 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
       },
 
       duplicateSelected() {
+        if (readOnly) return; // defense-in-depth: never mutate a read-only surface
         if (selection.size === 0) return;
         doc.transact(() => {
           // Duplicate each selected block right below itself (fresh ids).
@@ -234,6 +270,7 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
       },
 
       moveSelected(delta) {
+        if (readOnly) return; // defense-in-depth: never mutate a read-only surface
         if (selection.size !== 1) return;
         const id = [...selection][0];
         const found = findBlock(doc, id);
@@ -246,7 +283,7 @@ export function useBlockEditor(doc: Y.Doc, readOnly = false): BlockEditorControl
 
       textBlockIds: orderedTextIds,
     };
-  }, [doc, version, undo, readOnly, selection, focusedId]);
+  }, [doc, version, evalCache, undo, readOnly, selection, focusedId]);
 }
 
 // Helpers kept module-local (the controller stays a plain object).

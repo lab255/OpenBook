@@ -2,8 +2,11 @@ import {describe, it, expect} from 'vitest';
 import {
   normalizeTab,
   isSettingsTab,
+  isTabParam,
   SETTINGS_TABS,
   SETTINGS_SECTIONS,
+  SETTINGS_ALIAS_SECTIONS,
+  SETTINGS_SECTION_PEOPLE,
   DEFAULT_SETTINGS_TAB,
   loadHudStorage,
   HUD_STORAGE_KEY,
@@ -11,8 +14,25 @@ import {
 
 describe('normalizeTab', () => {
   it('maps renamed legacy ids to their current tabs', () => {
-    expect(normalizeTab('server')).toBe('connection');
+    // `connection`/`server` folded into the Libraries screen (SET2-1).
+    expect(normalizeTab('server')).toBe('libraries');
+    expect(normalizeTab('connection')).toBe('libraries');
     expect(normalizeTab('backup')).toBe('admin');
+  });
+
+  it('folds the retired Connection tab into Libraries (SET2-1)', () => {
+    // No standalone `connection` tab remains in the rail.
+    expect(isSettingsTab('connection')).toBe(false);
+    expect(SETTINGS_TABS).not.toContain('connection');
+    // …but the legacy param still resolves, so old deep-links never dead-end.
+    expect(isTabParam('connection')).toBe(true);
+  });
+
+  it('folds the retired Members tab into Sharing (SHR-5)', () => {
+    expect(normalizeTab('members')).toBe('sharing');
+    // No standalone `members` tab remains in the rail.
+    expect(isSettingsTab('members')).toBe(false);
+    expect(SETTINGS_TABS).not.toContain('members');
   });
 
   it('passes a current tab through unchanged', () => {
@@ -40,10 +60,31 @@ describe('settings sections', () => {
   });
 });
 
+describe('isTabParam', () => {
+  it('accepts real tabs and known legacy aliases, rejects strays', () => {
+    expect(isTabParam('sharing')).toBe(true);
+    expect(isTabParam('members')).toBe(true); // legacy alias → Sharing
+    expect(isTabParam('nope')).toBe(false);
+    expect(isTabParam(undefined)).toBe(false);
+  });
+});
+
+describe('alias sections', () => {
+  it('routes the members deep-link to the Sharing tab People section', () => {
+    expect(SETTINGS_ALIAS_SECTIONS.members).toBe(SETTINGS_SECTION_PEOPLE);
+  });
+});
+
 describe('loadHudStorage', () => {
   it('normalizes a persisted legacy tab on load', () => {
     localStorage.setItem(HUD_STORAGE_KEY, JSON.stringify({settings: {tab: 'server'}}));
-    expect(loadHudStorage().settings.tab).toBe('connection');
+    expect(loadHudStorage().settings.tab).toBe('libraries');
+    localStorage.clear();
+  });
+
+  it('never restores a stale in-tab scroll target', () => {
+    localStorage.setItem(HUD_STORAGE_KEY, JSON.stringify({settings: {tab: 'sharing', section: 'settings-people'}}));
+    expect(loadHudStorage().settings.section).toBeNull();
     localStorage.clear();
   });
 });

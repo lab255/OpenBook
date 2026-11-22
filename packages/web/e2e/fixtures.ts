@@ -2,8 +2,8 @@ import {spawn} from 'node:child_process';
 import {rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {takeSnapshot as chromaticTakeSnapshot, test as chromaticTest} from '@chromatic-com/playwright';
-import {expect, test as playwrightTest} from '@playwright/test';
-import type {Locator, Page} from '@playwright/test';
+import {expect, request as playwrightRequest, test as playwrightTest} from '@playwright/test';
+import type {APIRequestContext, Locator, Page} from '@playwright/test';
 
 /**
  * Decouple Chromatic visual archiving from functional e2e (OB-222).
@@ -34,6 +34,13 @@ const ARCHIVE_VISUALS = process.env.CHROMATIC_ARCHIVE === '1';
 // `.extend` below identically typed on both paths.
 const base = (ARCHIVE_VISUALS ? chromaticTest : playwrightTest) as typeof playwrightTest;
 
+export async function openInfoTip(page: Page, trigger: Locator, text: string | RegExp): Promise<void> {
+  await page.mouse.move(0, 0, {steps: 5});
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  await trigger.hover();
+  await expect(page.getByRole('tooltip').filter({hasText: text})).toBeVisible();
+}
+
 /**
  * Worker isolation for the e2e suite: every Playwright worker runs its own
  * OpenBook data server (own port, own throwaway PGlite data dir), and every
@@ -57,13 +64,19 @@ export const WORKER_BASE_PORT = 4400;
  * which is `/var/folders/…` on macOS) so the path matches across both files.
  */
 export const WORKER_DATA_DIR_PREFIX = '/tmp/openbook-web-e2e-data-w';
+const LOCAL_OWNER_SECRET = 'openbook-web-e2e-local-owner';
 
 type WorkerFixtures = {
   /** This worker's data-server URL; starting it is the fixture's job. */
   dataServer: string;
+  /** API context authenticated as the machine owner for host-sensitive setup. */
+  ownerRequest: APIRequestContext;
 };
 
 type TestFixtures = {
+  /** Opt into deterministic AI through the real server routes. */
+  mockAi: boolean;
+  _mockAiConfig: void;
   /**
    * Opt a spec into structural per-test workspace isolation (OB-223). Set once
    * per file with `test.use({freshWorkspace: true})`: before EACH test the
@@ -74,8 +87,14 @@ type TestFixtures = {
    * unaffected.
    */
   freshWorkspace: boolean;
+  /** Stamp local-owner auth only on host-sensitive API requests made by the browser. */
+  ownerGatedRequests: boolean;
+  /** Browser page whose API traffic uses the desktop host's local-owner transport. */
+  ownerPage: Page;
   /** Auto fixture that performs the reset; never requested directly. */
   _workspaceReset: void;
+  /** Auto fixture that installs the opt-in owner-gated fetch transport. */
+  _ownerGateAuth: void;
 };
 
 /**
@@ -91,7 +110,7 @@ async function resetWorkspace(serverUrl: string): Promise<void> {
   const bundle = (await res.json()) as {pages?: {id: string}[]};
   await Promise.all(
     (bundle.pages ?? []).map((p) =>
-      fetch(`${serverUrl}/api/pages/${p.id}`, {method: 'DELETE'}).catch(() => undefined),
+      fetch(`${serverUrl}/api/pages/${p.id}`, {method: 'DELETE', headers: {'X-OpenBook-Client': '1'}}).catch(() => undefined),
     ),
   );
 }
@@ -111,13 +130,77 @@ async function ensureAnyPage(serverUrl: string): Promise<void> {
   if (pages.length > 0) return;
   await fetch(`${serverUrl}/api/pages`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: {'content-type': 'application/json', 'X-OpenBook-Client': '1'},
     body: JSON.stringify({name: null, data: {editorjs: {blocks: []}, values: [], names: []}}),
   }).catch(() => undefined);
 }
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   freshWorkspace: [false, {option: true}],
+  mockAi: [false, {option: true}],
+  _mockAiConfig: [
+    async ({mockAi, ownerRequest}, use) => {
+      if (!mockAi) { await use(); return; }
+      // The owner admin API writes settings key 'ai'. MockEngine keeps real
+      // upload/transcribe and streamed generation routes deterministic without
+      // a microphone device, model download, or external paid service.
+      const configured = await ownerRequest.put('/api/ai/config', {data: {provider: 'mock'}});
+      expect(configured.ok()).toBeTruthy();
+      try { await use(); }
+      finally {
+        const reset = await ownerRequest.put('/api/ai/config', {data: {provider: 'off'}});
+        expect(reset.ok()).toBeTruthy();
+      }
+    },
+    {auto: true},
+  ],
+  ownerGatedRequests: [false, {option: true}],
+
+  // UI specs that exercise Settings mutations opt into the desktop host's
+  // local-owner transport. Only the owner-gated routes receive the secret;
+  // ordinary page/content requests retain their original principal so access
+  // control assertions (including read-only ledger pages) remain meaningful.
+  _ownerGateAuth: [
+    async ({context, ownerGatedRequests}, use) => {
+      if (ownerGatedRequests) {
+        await context.addInitScript((secret: string) => {
+          const nativeFetch = globalThis.fetch.bind(globalThis);
+          globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+            const request = new Request(input, init);
+            const method = request.method.toUpperCase();
+            const path = new URL(request.url).pathname;
+            const ownerGated =
+              (path === '/api/plugins' && method === 'POST') ||
+              (path.startsWith('/api/plugins/') && (method === 'PATCH' || method === 'DELETE')) ||
+              (path === '/api/ai/config' && method === 'PUT') ||
+              (path === '/api/ai/models/download' && method === 'POST') ||
+              (path === '/api/ai/skills' && method === 'PUT') ||
+              (path.startsWith('/api/ai/skills/') && method === 'DELETE') ||
+              (path === '/api/ai/mcp' && (method === 'GET' || method === 'PUT')) ||
+              (path === '/api/ai/mcp/test' && method === 'POST');
+            if (!ownerGated) return nativeFetch(input, init);
+            const headers = new Headers(request.headers);
+            headers.set('X-OpenBook-Local', secret);
+            return nativeFetch(new Request(request, {headers}));
+          };
+        }, LOCAL_OWNER_SECRET);
+      }
+      await use();
+    },
+    {auto: true},
+  ],
+
+  // Owner-facing content/navigation assertions need the browser itself (including
+  // its EventSource `/api/live` request) to present the desktop host credential.
+  // Keep the secret in Playwright's routing layer, outside the browser JS context,
+  // just as the real Tauri IPC bridge keeps it outside the webview.
+  ownerPage: async ({page, dataServer}, use) => {
+    await page.route(`${dataServer}/api/**`, async (route) => {
+      const headers = {...route.request().headers(), 'x-openbook-local': LOCAL_OWNER_SECRET};
+      await route.continue({headers});
+    });
+    await use(page);
+  },
 
   // Auto: when the spec opted in, start every test from an empty workspace;
   // otherwise make sure at least one page exists (see {@link ensureAnyPage}).
@@ -162,8 +245,22 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       const child = spawn(
         process.execPath,
         ['--import', 'tsx', 'src/bin.ts', '--data-dir', dataDir, '--port', String(port)],
-        {cwd: serverPkg, stdio: 'ignore'},
+        {
+          cwd: serverPkg,
+          env: {...process.env, OPENBOOK_LOCAL_OWNER_SECRET: LOCAL_OWNER_SECRET},
+          stdio: ['ignore', 'ignore', 'pipe'],
+        },
       );
+
+      // Capture the child's stderr into a small bounded tail so a boot/import
+      // failure (e.g. a missing @book.dev/* dist) is visible in the "data
+      // server exited" error below, instead of misleadingly blaming a leaked
+      // port. Cap the retained text so a chatty child can't grow it unbounded.
+      let stderrTail = '';
+      const STDERR_TAIL_MAX = 4000;
+      child.stderr?.on('data', (chunk: Buffer) => {
+        stderrTail = (stderrTail + chunk.toString('utf8')).slice(-STDERR_TAIL_MAX);
+      });
 
       // Wait for OUR server to come up before any test runs in this worker.
       // If the child dies (e.g. the port is held by a leaked server from an
@@ -172,9 +269,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       const deadline = Date.now() + 60_000;
       for (;;) {
         if (child.exitCode !== null) {
+          const tail = stderrTail.trim();
           throw new Error(
             `worker ${workerInfo.workerIndex}: data server exited (code ${child.exitCode}) — ` +
-              `is :${port} held by a leaked server? (lsof -ti:${port} | xargs kill)`,
+              `is :${port} held by a leaked server? (lsof -ti:${port} | xargs kill)` +
+              (tail ? `\n--- data server stderr (last ${STDERR_TAIL_MAX} chars) ---\n${tail}` : ''),
           );
         }
         try {
@@ -196,6 +295,25 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       rmSync(dataDir, {recursive: true, force: true});
     },
     {scope: 'worker', auto: true, timeout: 120_000},
+  ],
+
+  // Host-sensitive setup must not run as the unclaimed guest used by ordinary
+  // content assertions. This context presents the same per-run local-owner
+  // credential as the desktop host's IPC bridge; it is never added to `request`
+  // or browser traffic implicitly.
+  ownerRequest: [
+    async ({dataServer}, use) => {
+      const owner = await playwrightRequest.newContext({
+        baseURL: dataServer,
+        extraHTTPHeaders: {
+          'X-OpenBook-Client': '1',
+          'X-OpenBook-Local': LOCAL_OWNER_SECRET,
+        },
+      });
+      await use(owner);
+      await owner.dispose();
+    },
+    {scope: 'worker'},
   ],
 
   // Point every context's app at this worker's server before any page loads.
@@ -251,19 +369,26 @@ export const takeSnapshot: typeof chromaticTakeSnapshot = ARCHIVE_VISUALS
  * never changes WHICH button sits under the pointer, so skipping the gate is
  * safe — and it makes every Select-driven spec far less flaky.
  */
-async function pickOption(option: Locator): Promise<void> {
+async function pickOption(page: Page, option: Locator): Promise<void> {
   await option.first().waitFor({state: 'visible'});
   await option.first().click({force: true});
+  // Wait for the popover listbox to tear down before returning. The Select
+  // opens side=bottom, directly over whatever sits below the trigger (e.g. the
+  // "Security updates only" toggle in the Updates settings), so a caller that
+  // clicks that control next can otherwise land on the still-mounted listbox
+  // and loop until timeout. The Select closes without an exit animation, so in
+  // the normal case this resolves immediately.
+  await expect(page.locator('[role="option"]')).toHaveCount(0);
 }
 
 export async function chooseValue(page: Page, trigger: Locator | string, value: string): Promise<void> {
   const t = typeof trigger === 'string' ? page.locator(trigger) : trigger;
   await t.click();
-  await pickOption(page.locator(`[role="option"][data-value="${value}"]`));
+  await pickOption(page, page.locator(`[role="option"][data-value="${value}"]`));
 }
 
 export async function chooseLabel(page: Page, trigger: Locator | string, label: string): Promise<void> {
   const t = typeof trigger === 'string' ? page.locator(trigger) : trigger;
   await t.click();
-  await pickOption(page.getByRole('option', {name: label, exact: true}));
+  await pickOption(page, page.getByRole('option', {name: label, exact: true}));
 }

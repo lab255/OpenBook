@@ -107,6 +107,8 @@ const TextFieldBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
 
 const RadioBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const name = blockProp<string>(block, 'name') ?? 'choice';
+  // Match the kit's visible display label while preserving the symbol fallback.
+  const ariaLabel = blockProp<string>(block, 'label')?.trim() || name;
   const options = resolveOptions(block);
   const value = blockProp<string>(block, 'value') ?? null;
   const wide = kitWide(block);
@@ -114,7 +116,7 @@ const RadioBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const control = (
     <div
       role="radiogroup"
-      aria-label={name}
+      aria-label={ariaLabel}
       className="obe-kit-pills"
       onKeyDown={(e) => {
         // Standard radiogroup keyboard: arrows move AND select, wrapping.
@@ -156,6 +158,8 @@ const RadioBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
 
 const ChecklistBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const name = blockProp<string>(block, 'name') ?? 'checks';
+  // Match the kit's visible display label while preserving the symbol fallback.
+  const ariaLabel = blockProp<string>(block, 'label')?.trim() || name;
   const options = resolveOptions(block);
   const selectedRaw = blockProp<string[]>(block, 'selected');
   const selected = new Set(Array.isArray(selectedRaw) ? selectedRaw : []);
@@ -168,7 +172,7 @@ const ChecklistBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   };
 
   const control = (
-    <div className="obe-kit-checks" role="group" aria-label={name}>
+    <div className="obe-kit-checks" role="group" aria-label={ariaLabel}>
       {options.map((opt) => (
         <label key={opt.value} className="obe-kit-check">
           <input type="checkbox" checked={selected.has(opt.value)} disabled={editor.readOnly} onChange={() => toggle(opt.value)} />
@@ -191,10 +195,12 @@ const DropdownBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const options = resolveOptions(block);
   const value = blockProp<string>(block, 'value') ?? '';
   const known = options.some((o) => o.value === value);
+  const wide = kitWide(block);
 
   const control = (
     <Select unstyled
       className="obe-kit-select obe-kit-dropdown-select"
+      wrapperClassName={wide ? 'w-full' : undefined}
       value={known ? value : ''}
       aria-label={`${name} value`}
       disabled={editor.readOnly}
@@ -219,13 +225,15 @@ const DropdownBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
 const ToggleBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
   const name = blockProp<string>(block, 'name') ?? 'on';
   const value = Boolean(blockProp<boolean>(block, 'value') ?? false);
+  // Match the kit's visible display label while preserving the legacy fallback.
+  const ariaLabel = blockProp<string>(block, 'label')?.trim() || `${name} toggle`;
 
   const control = (
     <button
       type="button"
       role="switch"
       aria-checked={value}
-      aria-label={`${name} toggle`}
+      aria-label={ariaLabel}
       className={`obe-kit-switch${value ? ' obe-kit-switch-on' : ''}`}
       disabled={editor.readOnly}
       onClick={() => kitSet(editor, block, 'value', !value)}
@@ -329,7 +337,7 @@ const ButtonBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       </ConfigField>
       <ConfigField label="Action">
         <Select unstyled
-          className="obe-kit-select w-full rounded-md border border-border bg-card px-2 py-1 text-sm"
+          className="cursor-pointer w-full rounded-md border border-border bg-card px-2 py-1 text-sm"
           value={action}
           disabled={editor.readOnly}
           aria-label="Button action"
@@ -348,7 +356,18 @@ const ButtonBlock: React.FC<CustomBlockProps> = ({block, editor}) => {
       ) : (
         <div className="flex gap-2">
           <ConfigField label="Input">
-            <ConfigInput mono value={target} readOnly={editor.readOnly} aria-label="Target input name" placeholder="x" onChange={(e) => kitSet(editor, block, 'target', e.target.value.trim())} />
+            <ConfigInput
+              mono
+              value={target}
+              readOnly={editor.readOnly}
+              aria-label="Target input name"
+              placeholder="x"
+              onChange={(e) => kitSet(editor, block, 'target', e.target.value)}
+              onBlur={(e) => kitSet(editor, block, 'target', e.target.value.trim())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+            />
           </ConfigField>
           {action !== 'toggle' && (
             <ConfigField label={action === 'set' ? 'value' : 'by'}>

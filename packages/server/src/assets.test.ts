@@ -122,7 +122,7 @@ describe('asset routes — open instance', () => {
   const upload = (a: ReturnType<typeof app>, pageId: string, bytes: Uint8Array<ArrayBuffer>, mime = 'image/png') =>
     a.request(`/api/assets?pageId=${encodeURIComponent(pageId)}`, {
       method: 'POST',
-      headers: {'Content-Type': mime},
+      headers: {'Content-Type': mime, 'X-OpenBook-Client': '1'},
       body: bytes,
     });
 
@@ -140,6 +140,65 @@ describe('asset routes — open instance', () => {
     expect(got.headers.get('Content-Type')).toBe('image/png');
     const roundTrip = new Uint8Array(await got.arrayBuffer());
     expect(Array.from(roundTrip)).toEqual(Array.from(bytes));
+  });
+
+  it.each(['audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'audio/wav'])(
+    'round-trips %s through binary and base64-JSON uploads with safe headers and caching',
+    async (mime) => {
+      const a = app();
+      const page = await store.upsertPage({name: `audio-${seq}`, data: snapshot()});
+      for (const json of [false, true]) {
+        const bytes = new Uint8Array([0, 255, 128, 42, json ? 1 : 0]);
+        const inputMime = `${mime.toUpperCase()}; codecs=opus`;
+        const res = json
+          ? await a.request(`/api/assets?pageId=${page.id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+            body: JSON.stringify({data: Buffer.from(bytes).toString('base64'), mime: inputMime}),
+          })
+          : await upload(a, page.id, bytes, inputMime);
+        expect(res.status).toBe(201);
+        const {id} = await res.json() as {id: string};
+        expect(await store.getAsset(id)).toMatchObject({mime, size: bytes.length, bytes});
+        expect(await store.pagesReferencingAsset(id)).toEqual([page.id]);
+
+        const raw = await a.request(`/api/assets/${id}`);
+        expect(raw.status).toBe(200);
+        expect(raw.headers.get('Content-Type')).toBe(mime);
+        expect(raw.headers.get('Content-Disposition')).toBe('attachment');
+        expect(raw.headers.get('X-Content-Type-Options')).toBe('nosniff');
+        expect(new Uint8Array(await raw.arrayBuffer())).toEqual(bytes);
+        const base64 = await a.request(`/api/assets/${id}?encoding=base64`);
+        expect(base64.status).toBe(200);
+        expect(await base64.json()).toEqual({id, mime, size: bytes.length, data: Buffer.from(bytes).toString('base64')});
+        for (const response of [raw, base64]) {
+          expect(response.headers.get('ETag')).toBe(`"${id}"`);
+          expect(response.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable');
+        }
+        for (const suffix of ['', '?encoding=base64']) {
+          const cached = await a.request(`/api/assets/${id}${suffix}`, {headers: {'If-None-Match': `"${id}"`}});
+          expect(cached.status).toBe(304);
+          expect(await cached.text()).toBe('');
+          expect(cached.headers.get('ETag')).toBe(`"${id}"`);
+          expect(cached.headers.get('Cache-Control')).toBe('private, max-age=31536000, immutable');
+        }
+      }
+    },
+  );
+
+  it.each([false, true])('rejects over-cap audio with 413 (base64-JSON: %s)', async (json) => {
+    const a = app();
+    const page = await store.upsertPage({name: `audio-cap-${seq}`, data: snapshot()});
+    const bytes = new Uint8Array(10 * 1024 * 1024 + 1);
+    const res = json
+      ? await a.request(`/api/assets?pageId=${page.id}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
+        body: JSON.stringify({data: Buffer.from(bytes).toString('base64'), mime: 'audio/webm'}),
+      })
+      : await upload(a, page.id, bytes, 'audio/webm');
+    expect(res.status).toBe(413);
+    expect(await store.assetStorageBytes()).toBe(0);
   });
 
   it('the base64 variant is byte-exact with the raw binary', async () => {
@@ -162,7 +221,7 @@ describe('asset routes — open instance', () => {
     const bytes = new Uint8Array([5, 6, 7, 8, 9, 200, 201]);
     const res = await a.request(`/api/assets?pageId=${page.id}`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({data: Buffer.from(bytes).toString('base64'), mime: 'image/webp'}),
     });
     expect(res.status).toBe(201);
@@ -251,7 +310,7 @@ describe('asset routes — open instance', () => {
     bytes[0] = 137; // non-empty
     const res = await a.request(`/api/assets?pageId=${page.id}`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({data: Buffer.from(bytes).toString('base64'), mime: 'image/png'}),
     });
     expect(res.status).toBe(201);
@@ -267,7 +326,7 @@ describe('asset routes — open instance', () => {
     const over = new Uint8Array(10 * 1024 * 1024 + 4096);
     const res = await a.request(`/api/assets?pageId=${page.id}`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({data: Buffer.from(over).toString('base64'), mime: 'image/png'}),
     });
     expect(res.status).toBe(413);
@@ -276,7 +335,7 @@ describe('asset routes — open instance', () => {
   it('400s a missing pageId and an empty body', async () => {
     const a = app();
     const page = await store.upsertPage({name: `p-${seq}`, data: snapshot()});
-    const noPage = await a.request('/api/assets', {method: 'POST', headers: {'Content-Type': 'image/png'}, body: new Uint8Array([1])});
+    const noPage = await a.request('/api/assets', {method: 'POST', headers: {'Content-Type': 'image/png', 'X-OpenBook-Client': '1'}, body: new Uint8Array([1])});
     expect(noPage.status).toBe(400);
     const empty = await upload(a, page.id, new Uint8Array([]));
     expect(empty.status).toBe(400);
@@ -320,7 +379,7 @@ describe('asset routes — open instance', () => {
     const page = await store.upsertPage({name: `p-${seq}`, data: snapshot()});
     const res = await a.request(`/api/assets?pageId=${page.id}`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({data: Buffer.from([1, 2, 3]).toString('base64'), mime: 'image/png\r\nSet-Cookie: x=y'}),
     });
     expect(res.status).toBe(400);
@@ -339,7 +398,7 @@ describe('asset routes — open instance', () => {
 describe('asset routes — claimed instance read-gate (no leak)', () => {
   const app = () => createApp(store, undefined, new PageHub(), {identity: new IdentityService(store)});
   const req = (a: ReturnType<typeof app>, path: string, jws?: string) =>
-    a.request(path, {headers: jws ? {[IDENTITY_HEADER]: jws} : {}});
+    a.request(path, {headers: {'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {})}});
 
   let restr: string; // a restricted page, ACL-granted to `granted` only
   let assetId: string; // an asset referenced ONLY by `restr`
@@ -360,6 +419,29 @@ describe('asset routes — claimed instance read-gate (no leak)', () => {
     });
     expect(res.status).toBe(201);
     assetId = ((await res.json()) as {id: string}).id;
+  });
+
+  it('applies the same read and write gates to audio, including conditional and base64 GETs', async () => {
+    const a = app();
+    const uploadAudio = async (sub: string) => a.request(`/api/assets?pageId=${restr}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'audio/webm', [IDENTITY_HEADER]: await idFor(sub)},
+      body: new Uint8Array([0, 255, 42]),
+    });
+    expect((await uploadAudio('granted')).status).toBe(403);
+    expect((await uploadAudio('stranger')).status).toBe(404);
+    const uploaded = await uploadAudio('owner');
+    expect(uploaded.status).toBe(201);
+    const {id} = await uploaded.json() as {id: string};
+    for (const suffix of ['', '?encoding=base64']) {
+      expect((await req(a, `/api/assets/${id}${suffix}`, await idFor('granted'))).status).toBe(200);
+      const denied = await a.request(`/api/assets/${id}${suffix}`, {
+        headers: {'If-None-Match': `"${id}"`, 'X-OpenBook-Client': '1'},
+      });
+      expect(denied.status).toBe(404);
+      expect(denied.headers.get('ETag')).toBeNull();
+      expect(denied.headers.get('Cache-Control')).toBe('no-store');
+    }
   });
 
   it('serves the bytes to a reader of the referencing page (owner + ACL grantee)', async () => {

@@ -1,3 +1,5 @@
+import * as Y from 'yjs';
+import {encodeServerBlockDoc} from './collabPersist';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import type {DatabaseRow, PageMeta, PageSnapshot, StoredPage} from '@book.dev/sdk';
 import {createLocalDataClient} from './browser';
@@ -49,6 +51,52 @@ describe('LocalDataClient — page lifecycle', () => {
     await expect(client.renamePage(absent, 'x')).rejects.toThrow();
     await expect(client.movePage(absent, {parentId: null, orderedIds: []})).rejects.toThrow();
     expect(await client.deletePage(absent)).toBe(false);
+  });
+
+  it('keeps unlisted pages visible to the implicit local owner', async () => {
+    const page = await client.savePage({name: 'Private shortcut', listed: false, data: snap('owner only')});
+    expect((await client.listPages()).find((meta) => meta.id === page.id)).toMatchObject({listed: false});
+    expect(await client.getPage(page.id)).toMatchObject({id: page.id});
+  });
+});
+
+describe('LocalDataClient — durable deltas', () => {
+  it('merges concurrent content, preserves metadata and publishes the committed delta', async () => {
+    const doc = new Y.Doc();
+    const block = new Y.Map<unknown>();
+    block.set('id', 'a'); block.set('type', 'paragraph'); block.set('text', new Y.Text('base'));
+    doc.getArray('blocks').push([block]);
+    const page = await client.savePage({name: 'before', data: {blockdoc: encodeServerBlockDoc(doc)} as unknown as PageSnapshot});
+    const other = new Y.Doc(); Y.applyUpdate(other, Y.encodeStateAsUpdate(doc));
+    const sv = Y.encodeStateVector(doc);
+    (block.get('text') as Y.Text).insert(0, 'OFFPAGE');
+    const otherText = other.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text;
+    otherText.insert(0, 'CONCURRENT');
+    await client.savePage({id: page.id, name: 'renamed', data: {blockdoc: encodeServerBlockDoc(other), names: [['key', 'keep']] } as unknown as PageSnapshot});
+    const updates: string[] = [];
+    const unsubscribe = client.subscribePageUpdates(page.id, (update) => updates.push(update));
+    const delta = Buffer.from(Y.encodeStateAsUpdate(doc, sv)).toString('base64');
+    expect(await client.applyPageUpdate(page.id, delta, doc.clientID)).toBe(true);
+    const saved = (await client.getPage(page.id))!;
+    expect(saved.name).toBe('renamed'); expect(saved.data.names).toEqual([['key', 'keep']]);
+    const merged = new Y.Doc();
+    Y.applyUpdate(merged, Buffer.from((saved.data.blockdoc as {update: string}).update, 'base64'));
+    const text = (merged.getArray<Y.Map<unknown>>('blocks').get(0).get('text') as Y.Text).toString();
+    expect(text).toContain('OFFPAGE'); expect(text).toContain('CONCURRENT');
+    expect(updates).toEqual([delta]);
+    const sync = await client.syncPageUpdates(page.id, '');
+    expect(sync).not.toBeNull();
+    unsubscribe(); doc.destroy(); other.destroy(); merged.destroy();
+  });
+
+  it('refuses a base-less or deleted page without writing', async () => {
+    const page = await client.savePage({name: 'legacy', data: snap('keep')});
+    const before = await client.getPage(page.id);
+    await expect(client.applyPageUpdate(page.id, 'AAA=', 1)).rejects.toMatchObject({status: 409});
+    expect(await client.getPage(page.id)).toEqual(before);
+    await client.deletePage(page.id);
+    await expect(client.applyPageUpdate(page.id, 'AAA=', 1)).rejects.toMatchObject({status: 404});
+    expect(await client.getPage(page.id)).toBeNull();
   });
 });
 
@@ -104,6 +152,18 @@ describe('LocalDataClient — databases', () => {
 
     unsub();
   });
+
+  it('ignores undefined property values from in-process row patches', async () => {
+    const host = await client.savePage({name: 'Local rows', data: snap('')});
+    const db = await client.createDatabase({pageId: host.id, name: 'Local rows'});
+    const row = await client.createRow(db.id, {properties: {keep: 'yes', change: 'old'}});
+
+    const updated = await client.updateRow(db.id, row.id, {
+      properties: {keep: undefined, change: 'new'},
+    });
+
+    expect(updated.properties).toEqual({keep: 'yes', change: 'new'});
+  });
 });
 
 describe('LocalDataClient — export / import round-trip', () => {
@@ -113,12 +173,14 @@ describe('LocalDataClient — export / import round-trip', () => {
     const db = await client.createDatabase({pageId: host.id, name: 'Board'});
     await client.createRow(db.id, {name: 'Row 1'});
 
-    const dump = await client.exportSpace();
+    const dump = await client.exportLibrary();
     expect(dump.pages.map((p) => p.id)).toContain(a.id);
     expect(dump.databases.map((d) => d.id)).toContain(db.id);
+    expect(dump.instanceId).toBeTruthy();
+    expect((await client.getInstanceInfo()).instanceId).toBe(dump.instanceId);
 
     // Import as a copy into the same space: new ids minted, nothing clobbered.
-    const result = await client.importSpace({pages: dump.pages, databases: dump.databases, mode: 'copy'});
+    const result = await client.importLibrary({pages: dump.pages, databases: dump.databases, mode: 'copy'});
     expect(result.created).toBeGreaterThan(0);
     expect(Object.keys(result.idMap).length).toBeGreaterThan(0);
   });

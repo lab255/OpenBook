@@ -1,0 +1,10 @@
+{
+  "mode": "fresh localhost measurement server, transformed module fetched before browser probe",
+  "source": "packages/ui/src/blockeditor/canvas/CanvasBlock.tsx",
+  "mtime": "2026-11-17T04:36:18.352185+00:00",
+  "sourceSha256": "3b93a92e3c42ed8b66fc7595d68c4cb6ac317931353d463a0270cb0c60a752ee",
+  "staleServedSha256": "6b9e3543b4447486f96a3ba922a132b3d1408cb73bc158120af4017a5095120d",
+  "freshServedSha256": "1ee78fe173569f4634f641a57d8df5623741e0ddbae85e4c20ab7681d122dc3b",
+  "staleIncludesInert": false,
+  "freshIncludesInert": true
+}

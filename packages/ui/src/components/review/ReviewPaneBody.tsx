@@ -116,7 +116,7 @@ export function ReviewPaneBody() {
 
         {open.length > 0 && (
           <section className="mb-4 flex flex-col gap-2">
-            <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <h3 className="px-0.5 text-[11px] font-medium text-muted-foreground">
               Open suggestions · {open.length}
             </h3>
             {open.map((s) => (
@@ -138,7 +138,7 @@ export function ReviewPaneBody() {
 
         {pageId && blockIds.length > 0 && (
           <section className="mb-4 flex flex-col gap-3">
-            <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <h3 className="px-0.5 text-[11px] font-medium text-muted-foreground">
               Block comments · {blockIds.length}
             </h3>
             {blockIds.map((blockId) => (
@@ -163,7 +163,7 @@ export function ReviewPaneBody() {
 
         {resolved.length > 0 && (
           <section className="flex flex-col gap-2">
-            <h3 className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <h3 className="px-0.5 text-[11px] font-medium text-muted-foreground">
               Resolved · {resolved.length}
             </h3>
             {resolved.map((s) => (

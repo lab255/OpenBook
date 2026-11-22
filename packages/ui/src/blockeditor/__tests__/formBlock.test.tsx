@@ -1,0 +1,266 @@
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import type {DataClient, FormSchema} from '@book.dev/sdk';
+import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {DataProvider} from '@/data';
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
+import {getCustomBlock} from '../registry';
+import {FormOriginContext, registerFormBlock} from '../FormBlockView';
+import {
+  enabledFormBlockId,
+  formBlockReadyForSubmissions,
+  insertFormField,
+  makeFormField,
+  moveFormField,
+  reorderFormFields,
+} from '../formBlock';
+import {createDoc, decodeSnapshot, docToJSON, encodeSnapshot, rootBlocks} from '../model';
+import {KitLockContext} from '../kit/lock';
+import type {BlockEditorController} from '../useBlockEditor';
+
+afterEach(() => cleanup());
+
+const populatedSchema = (): FormSchema => ({
+  formId: 'form-contact',
+  submissionKey: 'abcdefghijklmnopqrstuv',
+  enabled: true,
+  databaseId: 'db-contacts',
+  retention: {enabled: true, days: 30, basis: 'created'},
+  fields: [
+    {id: 'name', kind: 'text', label: 'Name', required: true},
+    {id: 'email', kind: 'email', label: 'Email', required: false},
+  ],
+  confirmation: {message: 'Received'},
+});
+
+function formHarness(over: Partial<FormSchema> = {}) {
+  const schema = {...populatedSchema(), ...over};
+  const doc = createDoc([{id: 'form-block', type: 'form', props: {
+    formId: schema.formId,
+    submissionKey: schema.submissionKey,
+    enabled: schema.enabled,
+    databaseId: schema.databaseId,
+    schema,
+  }}]);
+  const editor = {doc, readOnly: false} as unknown as BlockEditorController;
+  registerFormBlock();
+  return {Render: getCustomBlock('form')!.render, block: rootBlocks(doc).get(0), editor};
+}
+
+describe('form block registration and wire shape', () => {
+  it('finds only enabled keyed forms in the authoritative nested blockdoc projection', () => {
+    const key = 'do-not-return-this-submission-capability';
+    const snapshot = {
+      blockdoc: {
+        blocks: [
+          {id: 'disabled', type: 'form', props: {enabled: false, submissionKey: key}},
+          {
+            id: 'columns',
+            type: 'columns',
+            children: [
+              {id: 'keyless', type: 'form', props: {enabled: true, submissionKey: ''}},
+              {id: 'enabled-form', type: 'form', props: {enabled: true, submissionKey: key}},
+            ],
+          },
+        ],
+      },
+    };
+
+    expect(enabledFormBlockId(snapshot)).toBe('enabled-form');
+    expect(enabledFormBlockId({blockdoc: {blocks: snapshot.blockdoc.blocks.slice(0, 1)}})).toBeNull();
+    expect(enabledFormBlockId({blockdoc: null})).toBeNull();
+  });
+
+  it('reports submission readiness separately without returning the capability', () => {
+    const ready = {
+      blockdoc: {
+        blocks: [{
+          id: 'ready-form',
+          type: 'form',
+          props: {
+            enabled: true,
+            submissionKey: 'private-capability',
+            databaseId: 'responses-db',
+            schema: {fields: [{id: 'name', columnId: 'name-column'}]},
+          },
+        }],
+      },
+    };
+    const blockId = enabledFormBlockId(ready);
+
+    expect(blockId).toBe('ready-form');
+    expect(formBlockReadyForSubmissions(ready, blockId)).toBe(true);
+    expect(formBlockReadyForSubmissions({
+      blockdoc: {
+        blocks: [{
+          ...ready.blockdoc.blocks[0],
+          props: {...ready.blockdoc.blocks[0].props, databaseId: undefined},
+        }],
+      },
+    }, blockId)).toBe(false);
+    expect(JSON.stringify(blockId)).not.toContain('private-capability');
+  });
+
+  it('inserts and reorders palette fields without mutating the source array', () => {
+    const first = {...makeFormField('text', 'First'), id: 'first'};
+    const second = {...makeFormField('email', 'Second'), id: 'second'};
+    const third = {...makeFormField('files', 'Files'), id: 'third'};
+    const source = [first, second];
+
+    expect(insertFormField(source, third, 1).map((field) => field.id)).toEqual(['first', 'third', 'second']);
+    expect(reorderFormFields([...source, third], 'third', 0).map((field) => field.id)).toEqual(['third', 'first', 'second']);
+    expect(moveFormField([...source, third], 'first', 1).map((field) => field.id)).toEqual(['second', 'first', 'third']);
+    expect(source.map((field) => field.id)).toEqual(['first', 'second']);
+  });
+
+  it('registers an interactive slash item with fresh cryptographic ids', () => {
+    registerFormBlock();
+    const def = getCustomBlock('form');
+    expect(def?.slash?.label).toBe('Form');
+    expect(def?.slash?.group).toBe('interactive');
+
+    const first = def!.slash!.make();
+    const second = def!.slash!.make();
+    expect(first.type).toBe('form');
+    expect(first.props?.formId).not.toBe(second.props?.formId);
+    expect(first.props?.submissionKey).not.toBe(second.props?.submissionKey);
+    expect(first.props?.submissionKey).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(first.props?.schema).toMatchObject({
+      formId: first.props?.formId,
+      submissionKey: first.props?.submissionKey,
+      enabled: true,
+      fields: [],
+    });
+  });
+
+  it('round-trips every FORM-1 gate prop through the CRDT JSON projection', () => {
+    const schema = populatedSchema();
+    const doc = createDoc([{
+      id: 'form-block',
+      type: 'form',
+      props: {
+        formId: schema.formId,
+        submissionKey: schema.submissionKey,
+        enabled: schema.enabled,
+        databaseId: schema.databaseId,
+        schema,
+      },
+    }]);
+
+    const reopened = decodeSnapshot(encodeSnapshot(doc));
+    const projected = docToJSON(reopened)[0];
+    expect(JSON.parse(JSON.stringify(projected))).toEqual({
+      id: 'form-block',
+      type: 'form',
+      props: {
+        formId: 'form-contact',
+        submissionKey: 'abcdefghijklmnopqrstuv',
+        enabled: true,
+        databaseId: 'db-contacts',
+        schema,
+      },
+    });
+  });
+
+  it('keeps edit and locked/read-only rendering behind separate boundaries', () => {
+    const {Render, block, editor} = formHarness();
+    const view = render(<Render block={block} editor={editor} pageReadOnly={false} />);
+    expect(view.container.querySelector('[data-form-mode="edit"]')).toBeTruthy();
+    expect(view.container.querySelector('[data-form-builder]')).toBeTruthy();
+    expect(view.container.querySelector('[data-form-field-row="name"]')).toBeTruthy();
+    expect(view.container.querySelector('[data-form-field-row="email"]')).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Add Files'})).toBeTruthy();
+
+    view.rerender(
+      <FormOriginContext.Provider value="https://example.test/?page=contact">
+        <Render block={block} editor={editor} pageReadOnly />
+      </FormOriginContext.Provider>,
+    );
+    const preview = view.container.querySelector<HTMLElement>('[data-form-mode="readonly"]')!;
+    expect(preview).toBeTruthy();
+    expect([...preview.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button')].every((el) => el.disabled)).toBe(true);
+    expect(preview.querySelector('a')?.href).toBe('https://example.test/?page=contact');
+
+    view.rerender(
+      <KitLockContext.Provider value={{locked: true}}>
+        <Render block={block} editor={editor} pageReadOnly={false} />
+      </KitLockContext.Provider>,
+    );
+    expect(view.container.querySelector('[data-form-mode="readonly"]')).toBeTruthy();
+  });
+
+  it('renders a live form on an operable read-only page and freezes an interactive opt-out', () => {
+    const {Render, block, editor} = formHarness();
+    const client = {submitForm: vi.fn()} as unknown as DataClient;
+    const view = render(
+      <DataProvider client={client}>
+        <FormOriginContext.Provider value="https://example.test/?page=contact">
+          <Render block={block} editor={editor} pageReadOnly />
+        </FormOriginContext.Provider>
+      </DataProvider>,
+    );
+    expect(view.container.querySelector('[data-form-mode="live"]')).toBeTruthy();
+    expect(screen.getByRole('button', {name: 'Submit'}).hasAttribute('disabled')).toBe(false);
+
+    view.rerender(
+      <DataProvider client={client}>
+        <FormOriginContext.Provider value="https://example.test/?page=contact">
+          <Render block={block} editor={{...editor, readOnly: true}} pageReadOnly />
+        </FormOriginContext.Provider>
+      </DataProvider>,
+    );
+    expect(view.container.querySelector('[data-form-mode="readonly"]')).toBeTruthy();
+    expect(view.container.querySelector('[data-form-mode="live"]')).toBeNull();
+  });
+
+  it('keeps a group-locked form frozen on an editable page when live prerequisites exist', () => {
+    const {Render, block, editor} = formHarness();
+    const client = {submitForm: vi.fn()} as unknown as DataClient;
+    const {container} = render(
+      <DataProvider client={client}>
+        <FormOriginContext.Provider value="https://example.test/?page=contact">
+          <KitLockContext.Provider value={{locked: true}}>
+            <Render block={block} editor={editor} pageReadOnly={false} />
+          </KitLockContext.Provider>
+        </FormOriginContext.Provider>
+      </DataProvider>,
+    );
+
+    expect(container.querySelector('[data-form-mode="readonly"]')).toBeTruthy();
+  });
+
+  it.each([
+    ['disabled', {enabled: false}],
+    ['zero-cap', {maxSubmissions: 0}],
+  ] as const)('renders the closed state for a %s live form', (_name, over) => {
+    const {Render, block, editor} = formHarness(over);
+    const client = {submitForm: vi.fn()} as unknown as DataClient;
+    const {container} = render(
+      <DataProvider client={client}>
+        <FormOriginContext.Provider value="https://example.test/?page=contact">
+          <Render block={block} editor={editor} pageReadOnly />
+        </FormOriginContext.Provider>
+      </DataProvider>,
+    );
+    expect(container.querySelector('[data-form-state="closed"]')?.textContent).toBe('This form is closed.');
+    expect(client.submitForm).not.toHaveBeenCalled();
+  });
+
+  it('resolves the bound database name and row count through the data client', async () => {
+    const {Render, block, editor} = formHarness();
+    const client = {
+      getDatabase: vi.fn().mockResolvedValue({id: 'db-contacts', name: 'Contacts', schema: {properties: [], views: []}}),
+      listRows: vi.fn().mockResolvedValue([{id: 'r1'}, {id: 'r2'}]),
+    } as unknown as DataClient;
+    render(
+      <DataProvider client={client}>
+        <ConfirmProvider>
+          <Render block={block} editor={editor} pageReadOnly={false} />
+        </ConfirmProvider>
+      </DataProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', {name: 'Block settings'}));
+    await waitFor(() => expect(screen.getByText('Contacts · 2 rows')).toBeTruthy());
+    expect(client.getDatabase).toHaveBeenCalledWith('db-contacts');
+    expect(client.listRows).toHaveBeenCalledWith('db-contacts');
+  });
+});

@@ -22,6 +22,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 import {
+  FORWARDED_HEADER,
+  LOCAL_OWNER_HEADER,
   guestPrincipal,
   signIdentity,
   mintIdentityKeypair,
@@ -43,6 +45,9 @@ import {IdentityService} from './instanceConfig';
 import {IDENTITY_HEADER} from './principal';
 
 const ISS = 'https://account.book.pub';
+const LOCAL_OWNER_SECRET = 'ai-gating-local-owner-secret';
+const FORWARDED_HEADERS = {[FORWARDED_HEADER]: '1'};
+const LOCAL_OWNER_HEADERS = {[LOCAL_OWNER_HEADER]: LOCAL_OWNER_SECRET};
 let store: PageStore;
 let db: PgliteDb;
 let dir: string;
@@ -78,39 +83,46 @@ const principal = (sub: string): Principal => ({
 
 const aiService = () => new AiService(db, join(dir, 'models'));
 
-const appWith = (opts: {ai?: AiService; backups?: BackupScheduler} = {}) =>
-  createApp(store, opts.ai, new PageHub(), {identity: new IdentityService(store), backups: opts.backups});
+const appWith = (opts: {ai?: AiService; backups?: BackupScheduler; localOwnerSecret?: string} = {}) =>
+  createApp(store, opts.ai, new PageHub(), {
+    identity: new IdentityService(store),
+    backups: opts.backups,
+    localOwnerSecret: opts.localOwnerSecret,
+  });
 
 /** Trust the dev issuer + claim the instance under `${ISS}#owner` (no claimOwnership
  *  downgrade — guestAccess stays at the default so public pages stay guest-readable). */
 const claim = () => store.updateInstanceConfig({trustedIssuers: [{issuer: ISS, jwks}], ownerSubject: `${ISS}#owner`});
 
-const post = (app: ReturnType<typeof appWith>, path: string, body: unknown, jws?: string) =>
+const post = (app: ReturnType<typeof appWith>, path: string, body: unknown, jws?: string, extraHeaders: Record<string, string> = {}) =>
   app.request(path, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json', ...(jws ? {[IDENTITY_HEADER]: jws} : {})},
+    headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {}), ...extraHeaders},
     body: JSON.stringify(body),
   });
 
 const get = (app: ReturnType<typeof appWith>, path: string, jws?: string) =>
-  app.request(path, {headers: jws ? {[IDENTITY_HEADER]: jws} : {}});
+  app.request(path, {headers: {'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {})}});
 
-const put = (app: ReturnType<typeof appWith>, path: string, body: unknown, jws?: string) =>
+const put = (app: ReturnType<typeof appWith>, path: string, body: unknown, jws?: string, extraHeaders: Record<string, string> = {}) =>
   app.request(path, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json', ...(jws ? {[IDENTITY_HEADER]: jws} : {})},
+    headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {}), ...extraHeaders},
     body: JSON.stringify(body),
   });
 
-const patch = (app: ReturnType<typeof appWith>, path: string, body: unknown, jws?: string) =>
+const patch = (app: ReturnType<typeof appWith>, path: string, body: unknown, jws?: string, extraHeaders: Record<string, string> = {}) =>
   app.request(path, {
     method: 'PATCH',
-    headers: {'Content-Type': 'application/json', ...(jws ? {[IDENTITY_HEADER]: jws} : {})},
+    headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {}), ...extraHeaders},
     body: JSON.stringify(body),
   });
 
-const del = (app: ReturnType<typeof appWith>, path: string, jws?: string) =>
-  app.request(path, {method: 'DELETE', headers: jws ? {[IDENTITY_HEADER]: jws} : {}});
+const del = (app: ReturnType<typeof appWith>, path: string, jws?: string, extraHeaders: Record<string, string> = {}) =>
+  app.request(path, {
+    method: 'DELETE',
+    headers: {'X-OpenBook-Client': '1', ...(jws ? {[IDENTITY_HEADER]: jws} : {}), ...extraHeaders},
+  });
 
 beforeEach(async () => {
   seq += 1;
@@ -300,59 +312,68 @@ describe('POST /api/pages closes the existence oracle (N6)', () => {
   });
 });
 
-// ── AI + plugin mutation routes are instance-writer-gated (audit P0-5) ────────
+// ── AI + plugin host-sensitive mutations are owner-gated (audit P0-5) ────────
 //
 // `PUT /api/ai/config` (provider + API keys), `POST /api/ai/models/download`
-// (caller-supplied URL fetched onto the server's disk), and the workspace-shared
-// skills mutations are instance-wide configuration — write-class operations, so
-// they ride the same `requireCreate` gate as page creation (owner/admin yes;
-// viewer / jws non-member / guest 403). Same for the plugin surface: an
-// installed plugin is executable code run by EVERY client, so install / enable
-// / disable / remove are writer-only, while the LIST stays open (every client —
-// viewers included — syncs it on boot to run the enabled set).
+// (caller-supplied URL fetched onto the server's disk), and workspace-shared
+// skills affect the host or every user's agent. They require the real instance
+// owner, as do plugin mutations (installed plugin source runs in every client).
+// Source-bearing LIST routes retain their separate `requireCreate` read gate.
 
-describe('AI mutation routes are instance-writer-gated (P0-5)', () => {
+describe('AI mutation routes are instance-owner-gated (P0-5)', () => {
   beforeEach(async () => {
     await claim();
     await store.addMember({subject: `${ISS}#admin`, role: 'admin', status: 'active'});
     await store.addMember({subject: `${ISS}#viewer`, role: 'viewer', status: 'active'});
   });
 
-  it('PUT /api/ai/config: owner + admin may write; viewer/non-member/guest 403', async () => {
+  it('PUT /api/ai/config rejects a forwarded guest and non-owner roles; owner may write', async () => {
     const app = appWith({ai: aiService()});
     const body = {provider: 'mock'};
     expect((await put(app, '/api/ai/config', body, await idFor('owner'))).status).toBe(200);
-    expect((await put(app, '/api/ai/config', body, await idFor('admin'))).status).toBe(200);
+    expect((await put(app, '/api/ai/config', body, await idFor('admin'))).status).toBe(403);
     expect((await put(app, '/api/ai/config', body, await idFor('viewer'))).status).toBe(403);
     expect((await put(app, '/api/ai/config', body, await idFor('stranger'))).status).toBe(403);
-    expect((await put(app, '/api/ai/config', body)).status).toBe(403); // guest
+    expect((await put(app, '/api/ai/config', body, undefined, FORWARDED_HEADERS)).status).toBe(403);
   });
 
-  it('POST /api/ai/models/download is writer-only (no guest-driven server-side fetch)', async () => {
+  it('POST /api/ai/models/download rejects a forwarded guest (no untrusted server-side fetch)', async () => {
     const app = appWith({ai: aiService()});
     // A dead-port URL: the route answers immediately with the download state and
     // the background fetch fails harmlessly — no real network in the allowed case.
     const body = {url: 'http://127.0.0.1:9/model.gguf'};
     expect((await post(app, '/api/ai/models/download', body, await idFor('viewer'))).status).toBe(403);
     expect((await post(app, '/api/ai/models/download', body, await idFor('stranger'))).status).toBe(403);
-    expect((await post(app, '/api/ai/models/download', body)).status).toBe(403); // guest
+    expect((await post(app, '/api/ai/models/download', body, undefined, FORWARDED_HEADERS)).status).toBe(403);
     expect((await post(app, '/api/ai/models/download', body, await idFor('owner'))).status).toBe(200);
   });
 
-  it('skills: PUT + DELETE are writer-only; GET stays open to a viewer', async () => {
+  it('PUT /api/ai/skills rejects a forwarded guest; owner may create a skill', async () => {
     const app = appWith({ai: aiService()});
     const skill = {skill: {name: 'test-skill', description: 'd', instructions: 'do the thing'}};
     expect((await put(app, '/api/ai/skills', skill, await idFor('viewer'))).status).toBe(403);
-    expect((await put(app, '/api/ai/skills', skill)).status).toBe(403); // guest
+    expect((await put(app, '/api/ai/skills', skill, undefined, FORWARDED_HEADERS)).status).toBe(403);
+    expect((await put(app, '/api/ai/skills', skill, await idFor('owner'))).status).toBe(200);
+  });
+
+  it('DELETE /api/ai/skills/:name rejects a forwarded guest and leaves the skill intact', async () => {
+    const ai = aiService();
+    const app = appWith({ai});
+    const skill = {skill: {name: 'test-skill', description: 'd', instructions: 'do the thing'}};
     expect((await put(app, '/api/ai/skills', skill, await idFor('owner'))).status).toBe(200);
     expect((await del(app, '/api/ai/skills/test-skill', await idFor('viewer'))).status).toBe(403);
-    expect((await del(app, '/api/ai/skills/test-skill')).status).toBe(403); // guest
-    expect((await get(app, '/api/ai/skills', await idFor('viewer'))).status).toBe(200);
-    // The owner's delete actually removes the skill — a bare 200 would also pass
-    // on a `{removed:false}` miss, the exact failure mode of the old dead route.
+    expect((await del(app, '/api/ai/skills/test-skill', undefined, FORWARDED_HEADERS)).status).toBe(403);
+    expect((await ai.skills.list()).map((entry) => entry.name)).toEqual(['test-skill']);
     const removed = await del(app, '/api/ai/skills/test-skill', await idFor('owner'));
     expect(removed.status).toBe(200);
     expect(await removed.json()).toEqual({removed: true});
+  });
+
+  it('GET /api/ai/skills retains the source-bearing writer gate (GATE-7)', async () => {
+    const app = appWith({ai: aiService()});
+    expect((await get(app, '/api/ai/skills', await idFor('viewer'))).status).toBe(403);
+    expect((await get(app, '/api/ai/skills')).status).toBe(403);
+    expect((await get(app, '/api/ai/skills', await idFor('owner'))).status).toBe(200);
   });
 
   it('skill delete matches a URL-encoded name (the old %3Aname route never did)', async () => {
@@ -368,9 +389,13 @@ describe('AI mutation routes are instance-writer-gated (P0-5)', () => {
   });
 });
 
-describe('GET /api/ai/status redacts provider API keys for non-writers (P0-5)', () => {
+describe('GET /api/ai/status never returns a provider API key to ANY principal (A)', () => {
   const CLAUDE_KEY = 'sk-ant-verysecret';
   const LEGACY_KEY = 'legacy-flat-secret';
+
+  type StatusBody = {
+    config: {provider: string; apiKey?: string; apiKeySet?: boolean; providers?: Record<string, {model?: string; apiKey?: string; apiKeySet?: boolean}>};
+  };
 
   /** An AiService configured with a paid key in `providers` AND the legacy flat field. */
   const keyedAi = async (): Promise<AiService> => {
@@ -383,43 +408,154 @@ describe('GET /api/ai/status redacts provider API keys for non-writers (P0-5)', 
     return ai;
   };
 
-  it('a viewer / jws non-member / guest gets status with NO apiKey anywhere', async () => {
+  /** Assert the response carries no key value anywhere, but keeps the surface + `apiKeySet`. */
+  const assertRedacted = (text: string): void => {
+    expect(text).not.toContain(CLAUDE_KEY);
+    expect(text).not.toContain(LEGACY_KEY);
+    const body = JSON.parse(text) as StatusBody;
+    // No key field survives — not the flat one, not any provider's.
+    expect(body.config.apiKey).toBeUndefined();
+    for (const s of Object.values(body.config.providers ?? {})) expect(s.apiKey).toBeUndefined();
+    // …but the "a key is stored" signal + the rest of the surface do.
+    expect(body.config.provider).toBe('mock');
+    expect(body.config.providers?.claude?.model).toBe('m');
+    expect(body.config.providers?.claude?.apiKeySet).toBe(true);
+    expect(body.config.apiKeySet).toBe(true); // legacy flat key present → flagged
+  };
+
+  it('every AUTHENTICATED principal (viewer, jws non-member, owner) gets status with NO apiKey', async () => {
     await claim();
     await store.addMember({subject: `${ISS}#viewer`, role: 'viewer', status: 'active'});
     const app = appWith({ai: await keyedAi()});
-    for (const jws of [await idFor('viewer'), await idFor('stranger'), undefined]) {
+    // Every verified principal class on a claimed instance still reads status, redacted.
+    for (const jws of [await idFor('viewer'), await idFor('stranger'), await idFor('owner')]) {
       const res = await get(app, '/api/ai/status', jws);
       expect(res.status).toBe(200);
-      const text = await res.text();
-      expect(text).not.toContain(CLAUDE_KEY);
-      expect(text).not.toContain(LEGACY_KEY);
-      expect(text).not.toContain('apiKey');
-      // The rest of the surface still renders: provider + per-provider settings survive.
-      const body = JSON.parse(text) as {config: {provider: string; providers?: Record<string, {model?: string}>}};
-      expect(body.config.provider).toBe('mock');
-      expect(body.config.providers?.claude?.model).toBe('m');
+      assertRedacted(await res.text());
     }
   });
 
-  it('a writer (owner) still reads the full config back (AiSettings seeds its draft from it)', async () => {
+  it('an anonymous guest on a CLAIMED instance is denied status entirely (401, GATE-7)', async () => {
     await claim();
     const app = appWith({ai: await keyedAi()});
-    const res = await get(app, '/api/ai/status', await idFor('owner'));
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {config: {apiKey?: string; providers?: Record<string, {apiKey?: string}>}};
-    expect(body.config.providers?.claude?.apiKey).toBe(CLAUDE_KEY);
-    expect(body.config.apiKey).toBe(LEGACY_KEY);
+    // The engine-config metadata is not for the anonymous surface a published instance
+    // exposes; a guest is refused before any (already-redacted) body is built.
+    expect((await get(app, '/api/ai/status')).status).toBe(401);
   });
 
-  it('legacy single-user (unclaimed) status keeps full readback for the local app', async () => {
-    // No claim() → the guest IS the single-user app; it must still see its own keys.
+  it('the loopback/local single-user (unclaimed) app is redacted too — the key stays server-side', async () => {
+    // No claim() → the guest IS the loopback single-user app; it still never receives the key,
+    // it just gets `apiKeySet` (inference runs server-side; the browser never needs the value).
     const app = appWith({ai: await keyedAi()});
-    const body = (await (await get(app, '/api/ai/status')).json()) as {config: {providers?: Record<string, {apiKey?: string}>}};
-    expect(body.config.providers?.claude?.apiKey).toBe(CLAUDE_KEY);
+    const res = await get(app, '/api/ai/status'); // loopback, no identity
+    expect(res.status).toBe(200);
+    assertRedacted(await res.text());
+  });
+
+  it('PUT /api/ai/config echoes a redacted config (a blank-preserved key is not handed back)', async () => {
+    await claim();
+    const app = appWith({ai: await keyedAi()});
+    // Owner re-saves with the claude key field BLANK (the form never holds the key). The
+    // server preserves the stored key, but the echoed config must not leak it back.
+    const res = await put(app, '/api/ai/config', {provider: 'mock', providers: {claude: {model: 'm'}}}, await idFor('owner'));
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain(CLAUDE_KEY);
+    const body = JSON.parse(text) as {apiKey?: string; providers?: Record<string, {apiKey?: string; apiKeySet?: boolean}>};
+    expect(body.providers?.claude?.apiKey).toBeUndefined();
+    expect(body.providers?.claude?.apiKeySet).toBe(true); // still stored, just not returned
   });
 });
 
-describe('plugin mutation routes are instance-writer-gated (P0-5)', () => {
+describe('PUT /api/ai/config preserves a blank key and clears on explicit null (A)', () => {
+  const KEY = 'sk-ant-preserve-me';
+
+  const keyedAi = async (): Promise<AiService> => {
+    const ai = aiService();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKey: KEY, model: 'm'}}});
+    return ai;
+  };
+
+  it('omitting the key preserves the stored value (engine still constructs with it)', async () => {
+    const ai = await keyedAi();
+    // Re-save with the claude entry present but NO apiKey (the write-only field left blank).
+    await ai.setConfig({provider: 'claude', providers: {claude: {model: 'm2'}}});
+    const cfg = await ai.getConfig();
+    expect(cfg.providers?.claude?.apiKey).toBe(KEY); // preserved
+    expect(cfg.providers?.claude?.model).toBe('m2'); // other edits applied
+  });
+
+  it('an empty-string key is treated as blank (preserve), not a wipe', async () => {
+    const ai = await keyedAi();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKey: '', model: 'm'}}});
+    expect((await ai.getConfig()).providers?.claude?.apiKey).toBe(KEY);
+  });
+
+  it('a whitespace-only key is treated as blank (preserve) — no unclearable ghost key', async () => {
+    const ai = await keyedAi();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKey: '   ', model: 'm'}}});
+    expect((await ai.getConfig()).providers?.claude?.apiKey).toBe(KEY);
+  });
+
+  it('a new key is stored trimmed', async () => {
+    const ai = await keyedAi();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKey: '  sk-ant-new  ', model: 'm'}}});
+    expect((await ai.getConfig()).providers?.claude?.apiKey).toBe('sk-ant-new');
+  });
+
+  it('a partial save that omits a provider preserves that provider’s stored key', async () => {
+    const ai = aiService();
+    await ai.setConfig({
+      provider: 'claude',
+      providers: {claude: {apiKey: KEY, model: 'm'}, openai: {apiKey: 'sk-openai', model: 'o'}},
+    });
+    // Re-save touching ONLY openai — the claude entry is absent from the providers map.
+    await ai.setConfig({provider: 'claude', providers: {openai: {model: 'o2'}}});
+    const cfg = await ai.getConfig();
+    expect(cfg.providers?.claude?.apiKey).toBe(KEY); // omitted provider's key survives the partial PUT
+    expect(cfg.providers?.claude?.model).toBe('m'); // …and its other settings
+    expect(cfg.providers?.openai?.apiKey).toBe('sk-openai'); // the touched provider's own blank preserves
+    expect(cfg.providers?.openai?.model).toBe('o2');
+  });
+
+  it('a malformed `{claude: null}` provider entry is ignored, not a 500 (stored key survives)', async () => {
+    const ai = await keyedAi();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await ai.setConfig({provider: 'claude', providers: {claude: null as any}});
+    expect((await ai.getConfig()).providers?.claude?.apiKey).toBe(KEY);
+  });
+
+  it('a new non-empty key replaces the stored one', async () => {
+    const ai = await keyedAi();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKey: 'sk-ant-new', model: 'm'}}});
+    expect((await ai.getConfig()).providers?.claude?.apiKey).toBe('sk-ant-new');
+  });
+
+  it('an explicit null clears the stored key', async () => {
+    const ai = await keyedAi();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKey: null, model: 'm'}}});
+    expect((await ai.getConfig()).providers?.claude?.apiKey).toBeUndefined();
+  });
+
+  it('the response-only apiKeySet flag is never persisted into the stored config', async () => {
+    const ai = await keyedAi();
+    await ai.setConfig({provider: 'claude', providers: {claude: {apiKeySet: true, model: 'm'}}});
+    const cfg = await ai.getConfig();
+    expect(cfg.providers?.claude?.apiKeySet).toBeUndefined();
+    expect(cfg.providers?.claude?.apiKey).toBe(KEY); // apiKeySet-only save is a blank → preserve
+  });
+
+  it('the legacy flat key follows the same preserve/clear rules', async () => {
+    const ai = aiService();
+    await ai.setConfig({provider: 'claude', apiKey: KEY});
+    await ai.setConfig({provider: 'claude'}); // no flat key → preserve
+    expect((await ai.getConfig()).apiKey).toBe(KEY);
+    await ai.setConfig({provider: 'claude', apiKey: null}); // explicit clear
+    expect((await ai.getConfig()).apiKey).toBeUndefined();
+  });
+});
+
+describe('plugin mutation routes are instance-owner-gated (P0-5)', () => {
   const pkg = () => ({
     manifest: {id: 'test.gate-check', name: 'Gate Check', version: '1.0.0', main: 'index.ts'},
     files: {'index.ts': 'export {};'},
@@ -431,17 +567,17 @@ describe('plugin mutation routes are instance-writer-gated (P0-5)', () => {
     await store.addMember({subject: `${ISS}#viewer`, role: 'viewer', status: 'active'});
   });
 
-  it('POST /api/plugins: a viewer/non-member/guest cannot plant code (403); owner/admin can', async () => {
+  it('POST /api/plugins rejects a forwarded guest and non-owner roles without storing code', async () => {
     const app = appWith();
     expect((await post(app, '/api/plugins', pkg(), await idFor('viewer'))).status).toBe(403);
     expect((await post(app, '/api/plugins', pkg(), await idFor('stranger'))).status).toBe(403);
-    expect((await post(app, '/api/plugins', pkg())).status).toBe(403); // guest
+    expect((await post(app, '/api/plugins', pkg(), undefined, FORWARDED_HEADERS)).status).toBe(403);
+    expect((await post(app, '/api/plugins', pkg(), await idFor('admin'))).status).toBe(403);
     expect(await store.listPlugins()).toEqual([]); // nothing was stored
     expect((await post(app, '/api/plugins', pkg(), await idFor('owner'))).status).toBe(201);
-    expect((await post(app, '/api/plugins', pkg(), await idFor('admin'))).status).toBe(201);
   });
 
-  it('PATCH + DELETE /api/plugins/:id are writer-only; GET stays open (clients sync on boot)', async () => {
+  it('PATCH + DELETE /api/plugins are owner-only; GET retains its source-bearing writer gate', async () => {
     const app = appWith();
     expect((await post(app, '/api/plugins', pkg(), await idFor('owner'))).status).toBe(201);
     const id = 'test.gate-check';
@@ -449,28 +585,40 @@ describe('plugin mutation routes are instance-writer-gated (P0-5)', () => {
     expect((await patch(app, `/api/plugins/${id}`, {enabled: false})).status).toBe(403); // guest
     expect((await del(app, `/api/plugins/${id}`, await idFor('viewer'))).status).toBe(403);
     expect((await del(app, `/api/plugins/${id}`)).status).toBe(403); // guest
-    // Every client (viewers + guests included) lists plugins to run the enabled set.
-    expect((await get(app, '/api/plugins', await idFor('viewer'))).status).toBe(200);
-    expect((await get(app, '/api/plugins')).status).toBe(200); // guest
-    // The writer path still works end-to-end.
-    expect((await patch(app, `/api/plugins/${id}`, {enabled: false}, await idFor('admin'))).status).toBe(200);
+    // The list embeds each package's inline TS `files` → writer-gated (GATE-7): a
+    // viewer / guest on a claimed instance can't pull the plugin source; the writer can.
+    expect((await get(app, '/api/plugins', await idFor('viewer'))).status).toBe(403);
+    expect((await get(app, '/api/plugins')).status).toBe(403); // guest
+    expect((await get(app, '/api/plugins', await idFor('owner'))).status).toBe(200);
+    expect((await patch(app, `/api/plugins/${id}`, {enabled: false}, await idFor('admin'))).status).toBe(403);
+    // The owner path still works end-to-end.
+    expect((await patch(app, `/api/plugins/${id}`, {enabled: false}, await idFor('owner'))).status).toBe(200);
     expect((await del(app, `/api/plugins/${id}`, await idFor('owner'))).status).toBe(204);
   });
 
 });
 
-describe('legacy single-user (unclaimed) plugin + AI config management is unaffected', () => {
-  it('a guest still installs/toggles/removes plugins and writes the AI config', async () => {
-    // No claim() → the guest keeps blanket write, exactly as the single-user app relies on.
-    const app = appWith({ai: aiService()});
+describe('single-user local-owner plugin + AI config management', () => {
+  it('rejects an unclaimed anonymous caller but preserves the host-authenticated desktop flow', async () => {
+    // No claim(): host-sensitive mutations still require the desktop's per-run
+    // local-owner credential; untrusted webview-reachable requests do not inherit
+    // authority merely because ownerSubject is absent.
+    const app = appWith({ai: aiService(), localOwnerSecret: LOCAL_OWNER_SECRET});
     const pkg = {
       manifest: {id: 'test.gate-check', name: 'Gate Check', version: '1.0.0', main: 'index.ts'},
       files: {'index.ts': 'export {};'},
     };
-    expect((await post(app, '/api/plugins', pkg)).status).toBe(201);
-    expect((await patch(app, '/api/plugins/test.gate-check', {enabled: false})).status).toBe(200);
-    expect((await del(app, '/api/plugins/test.gate-check')).status).toBe(204);
-    expect((await put(app, '/api/ai/config', {provider: 'mock'})).status).toBe(200);
+    expect((await post(app, '/api/plugins', pkg)).status).toBe(403);
+    expect((await put(app, '/api/ai/config', {provider: 'mock'})).status).toBe(403);
+    expect((await post(app, '/api/plugins', pkg, undefined, LOCAL_OWNER_HEADERS)).status).toBe(201);
+    // GATE-7 reads stay open on the unclaimed single-user path:
+    // PluginBoot lists to run the enabled set, and the AI surface reads status/skills.
+    expect((await get(app, '/api/plugins')).status).toBe(200);
+    expect((await get(app, '/api/ai/skills')).status).toBe(200);
+    expect((await get(app, '/api/ai/status')).status).toBe(200);
+    expect((await patch(app, '/api/plugins/test.gate-check', {enabled: false}, undefined, LOCAL_OWNER_HEADERS)).status).toBe(200);
+    expect((await del(app, '/api/plugins/test.gate-check', undefined, LOCAL_OWNER_HEADERS)).status).toBe(204);
+    expect((await put(app, '/api/ai/config', {provider: 'mock'}, undefined, LOCAL_OWNER_HEADERS)).status).toBe(200);
   });
 });
 

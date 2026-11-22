@@ -66,7 +66,7 @@ describe('htmlToImportedBlocks — the mapping corpus', () => {
     );
     expect(blocks).toHaveLength(1);
     expect(blocks[0].type).toBe('table');
-    expect(blocks[0].props).toEqual({header: true});
+    expect(blocks[0].props).toMatchObject({header: true}); // + col:* order-key registry (TBL-1)
     const rows = blocks[0].children ?? [];
     expect(rows.map((r) => r.type)).toEqual(['row', 'row']);
     expect(textOf(rows[1].children?.[1])).toBe('2');
@@ -183,7 +183,7 @@ describe('htmlToImportedDoc — title derivation', () => {
 
 /** A fake {@link ImportWriteClient} recording the writer calls (mirrors importContent.test). */
 function fakeClient() {
-  const calls = {savePage: 0, createDatabase: 0, createRow: 0, importSpace: 0, setPageProperties: 0};
+  const calls = {savePage: 0, createDatabase: 0, createRow: 0, importLibrary: 0, setPageProperties: 0};
   const client: ImportWriteClient = {
     savePage: vi.fn(async (input: {name?: string | null; data?: unknown}) => {
       calls.savePage += 1;
@@ -200,8 +200,8 @@ function fakeClient() {
       calls.createRow += 1;
       return {id: `r${calls.createRow}`} as never;
     }) as never,
-    importSpace: vi.fn(async () => {
-      calls.importSpace += 1;
+    importLibrary: vi.fn(async () => {
+      calls.importLibrary += 1;
       return {created: 1, overwritten: 0, renamed: 0, idMap: {imp_1: 'np1'}} as never;
     }),
   };
@@ -216,7 +216,7 @@ describe('importDoc round-trip (HTML → IR → data path)', () => {
 
     expect(result.strategy).toBe('create');
     expect(calls.savePage).toBe(1);
-    expect(calls.importSpace).toBe(0);
+    expect(calls.importLibrary).toBe(0);
     expect(result.pageIds).toEqual(['p1']);
 
     // The saved snapshot carries the imported blocks (paragraph + image placeholder).

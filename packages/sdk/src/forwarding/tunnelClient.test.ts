@@ -232,3 +232,174 @@ describe('TunnelClient request forwarding — identity + forwarded marker', () =
     expect(captured!.headers.get('X-OpenBook-Forwarded')).toBe('1');
   });
 });
+
+describe('TunnelClient stalled attach diagnostics (TUN-3)', () => {
+  it('emits the original 403 error and enters stalled only after two consecutive failures', async () => {
+    vi.useFakeTimers();
+    const forbidden = Object.assign(new Error('/api/sites/attach-ticket → 403 (forbidden)'), {status: 403});
+    const ticketProvider = vi.fn().mockRejectedValue(forbidden);
+    const errors: unknown[] = [];
+    const statuses: string[] = [];
+    const client = new TunnelClient({
+      ticketProvider,
+      privateKey: 'unused',
+      localOrigin: '',
+      webSocketImpl: FakeWS as unknown as typeof WebSocket,
+      onDialError: (error) => errors.push(error),
+      onStatus: (status) => statuses.push(status),
+    });
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(ticketProvider).toHaveBeenCalledTimes(1);
+      expect(statuses).not.toContain('stalled');
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(ticketProvider).toHaveBeenCalledTimes(2);
+      expect(statuses[statuses.length - 1]).toBe('stalled');
+      expect(errors).toEqual([forbidden, forbidden]);
+      expect((errors[errors.length - 1] as {status?: number}).status).toBe(403);
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('TunnelClient heartbeat and dial liveness (TUN-13)', () => {
+  it('sends client-initiated pings every 25 seconds after ready', async () => {
+    vi.useFakeTimers();
+    const {client, ws} = makeClient(() => Promise.resolve(new Response()));
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(0);
+      ws().deliver({t: 'ready', siteId: 's'});
+
+      await vi.advanceTimersByTimeAsync(24_999);
+      expect(ws().controlFrames().filter((frame) => frame.t === 'ping')).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(ws().controlFrames().filter((frame) => frame.t === 'ping')).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(25_000);
+      expect(ws().controlFrames().filter((frame) => frame.t === 'ping')).toHaveLength(2);
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+
+  it('closes a silent socket after 62.5 seconds and uses the reconnect path', async () => {
+    vi.useFakeTimers();
+    const {client, ws} = makeClient(() => Promise.resolve(new Response()));
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const first = ws();
+      first.deliver({t: 'ready', siteId: 's'});
+
+      await vi.advanceTimersByTimeAsync(95_000);
+      expect(first.readyState).toBe(3);
+      expect(client.currentStatus).toBe('reconnecting');
+      await vi.advanceTimersByTimeAsync(500);
+      expect(FakeWS.instances).toHaveLength(2);
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the liveness deadline on every inbound frame', async () => {
+    vi.useFakeTimers();
+    const {client, ws} = makeClient(() => Promise.resolve(new Response()));
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const sock = ws();
+      sock.deliver({t: 'ready', siteId: 's'});
+      await vi.advanceTimersByTimeAsync(50_000);
+      sock.deliver({t: 'pong'});
+
+      await vi.advanceTimersByTimeAsync(94_999);
+      expect(sock.readyState).toBe(FakeWS.OPEN);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sock.readyState).toBe(3);
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears heartbeat timers on stop so no later pings are sent', async () => {
+    vi.useFakeTimers();
+    const {client, ws} = makeClient(() => Promise.resolve(new Response()));
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const sock = ws();
+      sock.deliver({t: 'ready', siteId: 's'});
+      client.stop();
+
+      await vi.advanceTimersByTimeAsync(100_000);
+      expect(sock.controlFrames().filter((frame) => frame.t === 'ping')).toHaveLength(0);
+      expect(FakeWS.instances).toHaveLength(1);
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+
+  it('routes a hung ticket mint through dial failure and reconnect', async () => {
+    vi.useFakeTimers();
+    const ticketProvider = vi.fn(() => new Promise<{relayWsUrl: string; ticket: string}>(() => {}));
+    const errors: unknown[] = [];
+    const client = new TunnelClient({
+      ticketProvider,
+      privateKey: 'unused',
+      localOrigin: '',
+      webSocketImpl: FakeWS as unknown as typeof WebSocket,
+      onDialError: (error) => errors.push(error),
+    });
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toEqual(expect.objectContaining({message: expect.stringContaining('timed out')}));
+      expect(client.currentStatus).toBe('reconnecting');
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(ticketProvider).toHaveBeenCalledTimes(2);
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('TunnelClient relay-initiated heartbeat liveness (TUN-13)', () => {
+  it('stays live and answers pong while relay pings arrive every 30 seconds', async () => {
+    vi.useFakeTimers();
+    const {client, ws} = makeClient(() => Promise.resolve(new Response()));
+
+    try {
+      client.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const sock = ws();
+      sock.deliver({t: 'ready', siteId: 's'});
+
+      for (let i = 1; i <= 4; i += 1) {
+        await vi.advanceTimersByTimeAsync(30_000);
+        sock.deliver({t: 'ping'});
+        expect(sock.readyState).toBe(FakeWS.OPEN);
+        expect(sock.controlFrames().filter((frame) => frame.t === 'pong')).toHaveLength(i);
+      }
+    } finally {
+      client.stop();
+      vi.useRealTimers();
+    }
+  });
+});

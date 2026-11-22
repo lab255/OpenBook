@@ -104,9 +104,12 @@ test.describe('island (single page)', () => {
 
     // ── Locked semantics: no editing affordances anywhere ──────────────────
     await expect(page.locator('[contenteditable="true"]')).toHaveCount(0);
-    for (const chrome of ['.obe-gutter', '.obe-kit-gear', '.obe-cnt-add', '.obe-code-actions']) {
+    for (const chrome of ['.obe-gutter', '.obe-kit-gear', '.obe-cnt-add', '.obe-media-btn[data-chrome=author]']) {
       await expect(page.locator(`${chrome}:visible`), `${chrome} must be hidden`).toHaveCount(0);
     }
+    const code = viewer.locator('.obe-codeblock').first();
+    await code.hover();
+    await expect(code.getByRole('button', {name: 'Copy code'})).toBeVisible();
     // Kit inline labels freeze to plain spans under the page lock.
     await expect(page.locator('input.obe-kit-inline')).toHaveCount(0);
 

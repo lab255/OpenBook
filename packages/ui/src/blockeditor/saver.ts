@@ -1,3 +1,4 @@
+import {isLocalEditOrigin} from './localHistoryOrigin';
 import * as Y from 'yjs';
 import type {Awareness} from 'y-protocols/awareness';
 import {electSaver, isElectedSaver} from '@/lib/presence';
@@ -233,7 +234,7 @@ export function connectPageSaver(doc: Y.Doc, awareness: Awareness | null, opts: 
     if (saver) {
       // The single saver persists the converged doc whoever authored the change.
       scheduleDebounced();
-    } else if (origin === 'local' || origin == null) {
+    } else if (isLocalEditOrigin(doc, origin) || origin == null) {
       // Our own edit while a peer is the saver: the relay carries it to the saver who
       // persists it; we only arm the backstop in case that confirmation never arrives.
       armBackstop();

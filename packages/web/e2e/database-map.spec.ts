@@ -24,6 +24,31 @@ test('map renders Leaflet tiles, group-coloured markers, and a legend', {tag: ['
 
   // The Leaflet map mounts (lazy chunk) with the OSM tile layer + attribution.
   await expect(page.locator('.leaflet-container')).toBeVisible();
+  expect(await page.locator('.ob-leaflet').evaluate((node) => node.getBoundingClientRect().height)).toBe(480);
+  for (const dark of [false, true]) {
+    await page.evaluate((value) => localStorage.setItem('theme', value ? 'dark' : 'light'), dark);
+    await page.reload();
+    await expect(page.locator('.leaflet-bar a').first()).toBeVisible();
+    await expect(page.locator('html')).toHaveClass(new RegExp(dark ? 'dark' : 'light'));
+    const colors = await page.locator('.leaflet-bar a').first().evaluate((node) => {
+      const style = getComputedStyle(node);
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'hsl(var(--card))';
+      probe.style.color = 'hsl(var(--foreground))';
+      node.appendChild(probe);
+      const expected = getComputedStyle(probe);
+      const result = {bg: style.backgroundColor, fg: style.color, expectedBg: expected.backgroundColor, expectedFg: expected.color};
+      probe.remove();
+      return result;
+    });
+    expect(colors.bg).toBe(colors.expectedBg);
+    expect(colors.fg).toBe(colors.expectedFg);
+    if (dark) {
+      const zoomButton = page.locator('.leaflet-bar a').first();
+      await zoomButton.hover();
+      await expect(zoomButton).not.toHaveCSS('background-color', 'rgb(244, 244, 244)');
+    }
+  }
   await expect(page.getByRole('link', {name: 'OpenStreetMap'})).toBeVisible();
 
   // Placed rows render as tinted pins and/or cluster bubbles (both are our

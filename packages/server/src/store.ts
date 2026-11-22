@@ -1,18 +1,32 @@
+import * as Y from 'yjs';
+import {encodeServerBlockDoc} from './collabPersist';
 import {HTTPException} from 'hono/http-exception';
 import {randomUUID} from './uuid';
 import type {
   AccessCtx,
   AclEntry,
   AclLevel,
+  AgentEditsPolicy,
+  AgentTokenMeta,
+  AgentTokenScope,
+  BackupAsset,
   BackupConfig,
+  BackupPageAccess,
+  BackupPageAcl,
+  BackupRestoreDiagnostic,
+  BackupSkippedItem,
   CommentInput,
   CommentRun,
+  DatabaseFormSubmissionMarker,
   DatabaseInput,
   DatabaseRow,
   DatabaseSchema,
   DatabaseUpdate,
   ImportRequest,
   ImportResult,
+  LedgerBackupSection,
+  LedgerRestoreOutcome,
+  LibraryBackup,
   EffectiveRole,
   InstanceConfig,
   Member,
@@ -23,7 +37,11 @@ import type {
   PageInput,
   PageMeta,
   PageSnapshot,
+  PageVersionMeta,
   PageVisibility,
+  PageVisibilitySettings,
+  PageVisibilityUpdate,
+  StoredPageVersion,
   Principal,
   RowInput,
   StoredComment,
@@ -37,9 +55,28 @@ import type {
   SuggestionUpdate,
   VerifiedVia,
 } from '@book.dev/sdk';
-import {authorize, DEFAULT_ACCOUNT_URL, DEFAULT_BACKUP_CONFIG, DEFAULT_INSTANCE_CONFIG, emptyPageSnapshot, extractMentionIds, isEmailAuthoritative, latestSnapshotAuthor, projectExports, propertiesReferencePage, remapBundle, stampSnapshotAuthors, stampSnapshotAuthorsPerBlock, stampSnapshotMtimes, verifiedSubject, type Decision, type EffectiveVisibility, type PluginPackage, type StoredPlugin} from '@book.dev/sdk';
+import {AGENT_EDITS_POLICIES, authorize, BACKUP_VERSION, dateStart, DEFAULT_ACCOUNT_URL, DEFAULT_BACKUP_CONFIG, DEFAULT_INSTANCE_CONFIG, emptyPageSnapshot, extractMentionIds, extractPropertyReferenceIds, FORM_SUBMISSION_PROPERTY_ID, isEmailAuthoritative, latestSnapshotAuthor, PAGE_VISIBILITIES, parseDay, projectExports, propertiesReferencePage, remapBundle, resolveAutoExpiry, stampSnapshotAuthors, stampSnapshotAuthorsPerBlock, stampSnapshotMtimes, verifiedSubject, type Decision, type EffectiveVisibility, type PageGraph, type PageGraphEdge, type PluginPackage, type StoredPlugin} from '@book.dev/sdk';
+import {LedgerError, LEDGER_AUDIT_ACTIONS, ASSET_MIMES, DEFAULT_MAX_ASSET_BYTES, canonicalLedgerJson, ledgerAuditEventHash, ledgerRestorePayloadContent, verifyLedgerAuditChain} from '@book.dev/sdk';
+import {compareSemver, isSemver} from '@book.dev/sdk';
+import {authoredSubject} from './agentWriteGate';
+import {AbleOidcError} from './ableOidcError';
 import type {Db} from './dbCore';
+import type {IndexablePage} from './ai/search';
+import type {AgentTokenRow} from './agentTokens';
 import {runMigrations} from './migrations';
+import {LEDGER_AUDIT_CHAIN_LOCK, LEDGER_DB_SETTING_KEY, LEDGER_ENTRY_SEQ_SETTING_KEY, LEDGER_PERIODS_SETTING_KEY, LedgerStore, type LedgerIds} from './ledger';
+import {verifyLedger, type LedgerVerifyReport} from './ledgerVerify';
+
+/**
+ * The `settings` key holding `{databaseId, hostPageId}` for the server-managed AI
+ * usage DB (C1). Mirrors `USAGE_DB_KEY` in `./ai/usage`, duplicated here on purpose:
+ * `store.ts` is bundled into `@book.dev/server/browser` (which must carry NO Node
+ * imports), and `./ai/usage` transitively pulls in `./ai/providers` → `node:*`. The
+ * import-overwrite guard test keeps the two literals in sync.
+ */
+const USAGE_DB_SETTING_KEY = 'aiUsageDb';
+const DATABASE_FORM_MARKER_VIEW_KEY = 'submittedViaViewId' satisfies keyof DatabaseFormSubmissionMarker;
+const MAX_ABLE_OIDC_STATES = 5000;
 
 /**
  * Thrown by {@link PageStore.putAsset} when storing a NEW asset would push the
@@ -48,6 +85,26 @@ import {runMigrations} from './migrations';
  * bytes (content-addressed dedup). The upload route maps this to a friendly 507
  * (Insufficient Storage). Carries the numbers for a useful message/log.
  */
+/**
+ * Thrown by {@link PageStore.upsertPlugin} when an install would replace a
+ * newer installed version of the same plugin (OB-641). Downgrades roll back
+ * security fixes, so they require an explicit `allowDowngrade`; the plugin
+ * route maps this to a 409.
+ */
+export class PluginDowngradeError extends Error {
+  constructor(
+    readonly pluginId: string,
+    readonly installed: string,
+    readonly incoming: string,
+  ) {
+    super(
+      `refusing to downgrade plugin "${pluginId}" from v${installed} to v${incoming} — ` +
+        're-install with allowDowngrade if this is deliberate',
+    );
+    this.name = 'PluginDowngradeError';
+  }
+}
+
 export class AssetBudgetError extends Error {
   constructor(
     readonly currentBytes: number,
@@ -59,6 +116,40 @@ export class AssetBudgetError extends Error {
         `${budgetBytes}-byte budget (currently ${currentBytes} byte(s) stored)`,
     );
     this.name = 'AssetBudgetError';
+  }
+}
+
+/** A staged upload would exceed the durable 50 MiB budget for one form. */
+export class FormAssetBudgetError extends Error {
+  constructor(
+    readonly currentBytes: number,
+    readonly assetBytes: number,
+    readonly budgetBytes: number,
+  ) {
+    super(
+      `form asset budget exceeded: storing ${assetBytes} more byte(s) would exceed the ` +
+        `${budgetBytes}-byte budget (currently ${currentBytes} byte(s) accounted)`,
+    );
+    this.name = 'FormAssetBudgetError';
+  }
+}
+
+export interface StagedFormUpload {
+  token: string;
+  assetId: string;
+  fieldId: string;
+  name: string;
+  size: number;
+  consumedBy: string | null;
+}
+
+class FormUploadClaimError extends Error {}
+
+/** A malformed, incomplete, or unsupported backup envelope. */
+export class BackupFormatError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BackupFormatError';
   }
 }
 
@@ -76,6 +167,12 @@ interface PageRow {
   hosted_database_id?: string | null;
   // Projected from `properties->>'sys_icon'` by the meta queries (PageMeta only).
   icon?: string | null;
+  // Sibling sort key; selected by full page fetches so exports carry it (LGR-15).
+  position?: number | string | null;
+  // Stored access posture; selected only by the v3 manifest query.
+  visibility?: string | null;
+  listed?: boolean | null;
+  agent_edits?: string | null;
   created_at: Date | string;
   updated_at: Date | string;
   // Set when the page is in the trash (soft-deleted); null for live pages.
@@ -95,6 +192,165 @@ interface DatabaseRowRecord {
 const EMPTY_SNAPSHOT: PageSnapshot = {editorjs: {blocks: []}, values: [], names: []};
 const EMPTY_SCHEMA: DatabaseSchema = {properties: [], views: []};
 
+/**
+ * PVH-1: minimum gap (seconds) between captured page versions. A save that
+ * changes `data` within this window of the page's newest existing version is
+ * COALESCED — it updates the page but writes no new version — so the 600ms
+ * collab saver and typing bursts can't spam one row per keystroke-burst. This
+ * bounds write-amplification on the autovacuum-less embedded store (OB-164).
+ * 45s is a deliberate middle ground: fine-grained enough to keep a useful undo
+ * trail, coarse enough that a burst of edits collapses to a single snapshot.
+ */
+export const PAGE_VERSION_COALESCE_SECONDS = 45;
+
+/**
+ * PVH-2: retention for captured page versions, pruned by the periodic sweep (NOT
+ * on the hot save path — PGlite has no autovacuum, so per-save deletes would only
+ * add write-amp; OB-164). The capture side coalesces to ≤1 version/45s, but a
+ * long-lived page still accumulates unboundedly, so the sweep bounds each page's
+ * history by TWO limits applied together:
+ *   • keep-N ({@link PAGE_VERSION_KEEP}): retain only the newest N versions.
+ *   • max-age ({@link PAGE_VERSION_MAX_AGE_MS}): drop versions older than this.
+ * with a floor ({@link PAGE_VERSION_KEEP_MIN}): the newest few are ALWAYS kept,
+ * even past max-age, so a page that hasn't been touched in a year still offers a
+ * short rollback trail rather than an empty history. A page within both limits is
+ * left untouched.
+ */
+export const PAGE_VERSION_KEEP = 50;
+export const PAGE_VERSION_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+export const PAGE_VERSION_KEEP_MIN = 3;
+
+/**
+ * How {@link PageStore.upsertPage} snapshots the state it replaces (PVH-1):
+ *   • `'coalesced'` (default, every routine save) — skip the capture when a version
+ *     already exists within {@link PAGE_VERSION_COALESCE_SECONDS}, so bursts collapse.
+ *   • `'force'` (the restore route) — always capture the pre-restore state, bypassing
+ *     the coalesce window, so a restore is never destructive even when it lands within
+ *     45s of the last save. The identical-data (`IS DISTINCT FROM`) guard still holds.
+ */
+export type CaptureMode = 'coalesced' | 'force';
+
+/** Options for {@link PageStore.upsertPage}. */
+export interface UpsertPageOptions {
+  /** Version-capture behaviour for the state this save replaces. Default `'coalesced'`. */
+  captureMode?: CaptureMode;
+}
+
+/** Optional atomic replay ledger for {@link PageStore.createRow}. */
+export interface CreateRowOptions {
+  idempotency?: {
+    /** Stable namespace for this row-create capability (stored in `write_keys.author_subject`). */
+    scope: string;
+    /** Client-generated replay key within that scope. */
+    key: string;
+  };
+  /** Atomic F-4 publication binding and per-view response ceiling. */
+  databaseForm?: {
+    viewId: string;
+    capabilityHash: string;
+    maxResponses: number;
+  };
+}
+
+/** Publication changed after the route's capability check but before row create. */
+export class DatabaseFormAccessLostError extends Error {}
+
+/** A fresh create would exceed the durable per-view response ceiling. */
+export class DatabaseFormResponseLimitError extends Error {}
+
+/** Result of a row create that atomically claims an idempotency key. */
+export interface CreateRowResult {
+  page: StoredPage;
+  /** True only when this call won the key claim; false for every replay. */
+  created: boolean;
+}
+
+/** Identity of one request admitted to the general response ledger. */
+export interface IdempotencyRequest {
+  actorScope: string;
+  key: string;
+  fingerprint: string;
+  method: string;
+  normalizedTarget: string;
+}
+
+/** The complete allowlisted response captured for a successful durable write. */
+export interface IdempotencyResponse<T = unknown> {
+  status: number;
+  body: T;
+  headers?: {
+    contentType?: string;
+    location?: string;
+  };
+}
+
+/** A fresh execution or an exact replay of its committed response. */
+export interface IdempotencyOutcome<T = unknown> extends IdempotencyResponse<T> {
+  replayed: boolean;
+  /** Exact JSON text captured with the successful response. */
+  serializedBody?: string;
+}
+
+/** One actor reused a key with a different method/path/media-type/body tuple. */
+export class IdempotencyKeyReuseError extends Error {
+  constructor() {
+    super('idempotency key was already used for a different request');
+    this.name = 'IdempotencyKeyReuseError';
+  }
+}
+
+interface IdempotencyResponseRow {
+  fingerprint: string;
+  status: number | string | null;
+  response_body: string;
+  content_type: string | null;
+  location: string | null;
+}
+
+function capturedIdempotencyOutcome<T>(
+  request: IdempotencyRequest,
+  row: IdempotencyResponseRow,
+): IdempotencyOutcome<T> {
+  if (row.status == null) {
+    throw new Error('idempotency response claim completed without a captured response');
+  }
+  if (row.fingerprint !== request.fingerprint) {
+    throw new IdempotencyKeyReuseError();
+  }
+  const status = Number(row.status);
+  return {
+    status,
+    body: (status === 204 ? null : JSON.parse(row.response_body)) as T,
+    serializedBody: row.response_body,
+    headers: {
+      ...(row.content_type ? {contentType: row.content_type} : {}),
+      ...(row.location ? {location: row.location} : {}),
+    },
+    replayed: true,
+  };
+}
+
+/** Internal control flow: return a non-2xx response after rolling its claim back. */
+class UnretainedIdempotencyResponse<T> extends Error {
+  constructor(readonly response: IdempotencyResponse<T>) {
+    super('non-successful idempotent response');
+  }
+}
+
+/** A conflict was observed but its claimant row was not visible in this snapshot. */
+class IdempotencyClaimNotVisibleError extends Error {
+  constructor() {
+    super('idempotency response claim completed without a captured response');
+    this.name = 'IdempotencyClaimNotVisibleError';
+  }
+}
+
+interface PageStoreSharedState {
+  conflictCopiesMinted: number;
+  accessGeneration: number;
+  ledgerIdsCache: LedgerIds | undefined;
+}
+
 // Timestamps come back as Date (postgres) or ISO string (pglite); normalize.
 const toIso = (value: Date | string): string =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString();
@@ -112,9 +368,42 @@ const parseJson = <T>(value: T | string | null | undefined, fallback: T): T => {
 const parseSnapshot = (value: PageSnapshot | string | null | undefined): PageSnapshot =>
   parseJson<PageSnapshot>(value, EMPTY_SNAPSHOT);
 
+// One row of the `agent_tokens` table, as read for the redacted management view
+// (the `token_hash` column is deliberately never selected into it).
+interface AgentTokenDbRow {
+  id: string;
+  name: string;
+  preview: string;
+  subject: string;
+  issuer: string;
+  scope: string;
+  created_by: string;
+  created_at: Date | string;
+  expires_at: Date | string | null;
+  last_used_at: Date | string | null;
+  revoked_at: Date | string | null;
+  remote_ok: boolean;
+}
+
+const agentTokenMetaFromRow = (row: AgentTokenDbRow): AgentTokenMeta => ({
+  id: row.id,
+  name: row.name,
+  scope: row.scope as AgentTokenScope,
+  subject: row.subject,
+  issuer: row.issuer,
+  createdBy: row.created_by,
+  createdAt: toIso(row.created_at),
+  expiresAt: toIsoOrNull(row.expires_at),
+  lastUsedAt: toIsoOrNull(row.last_used_at),
+  preview: row.preview,
+  revoked: row.revoked_at != null,
+  remote: row.remote_ok === true,
+});
+
 const metaFromRow = (row: PageRow): PageMeta => ({
   id: row.id,
   name: row.name,
+  listed: row.listed ?? undefined,
   icon: row.icon ?? null,
   hostedDatabaseId: row.hosted_database_id ?? null,
   parentId: row.parent_id ?? null,
@@ -132,6 +421,9 @@ const pageFromRow = (row: PageRow): StoredPage => ({
   parentId: row.parent_id ?? null,
   properties: parseJson<Record<string, unknown>>(row.properties, {}),
   deletedAt: toIsoOrNull(row.deleted_at),
+  // Absent on queries that don't select it; carried by exports so a restore
+  // preserves sibling/posting order (LGR-15 — order feeds the ledger hashes).
+  ...(row.position != null ? {position: Number(row.position)} : {}),
   createdAt: toIso(row.created_at),
   updatedAt: toIso(row.updated_at),
 });
@@ -211,14 +503,47 @@ const stripConflictSuffix = (name: string): string => {
 
 // Column list for a full page fetch, including the hosted-database join.
 const PAGE_COLUMNS =
-  'p.id, p.name, p.data, p.database_id, p.parent_id, p.properties, p.deleted_at, p.created_at, p.updated_at, ' +
+  'p.id, p.name, p.data, p.database_id, p.parent_id, p.properties, p.deleted_at, p.position, p.created_at, p.updated_at, ' +
   'd.id AS hosted_database_id';
 const PAGE_FROM = 'pages p LEFT JOIN databases d ON d.page_id = p.id';
 
 /**
+ * Atomically claim one `(scope, key)` and create under its stable page id.
+ * Replays return the stored page; a hard-purged target is recreated under the
+ * recorded id but remains a replay (`created:false`) because this call did not
+ * win the claim.
+ */
+async function claimKeyedCreate(
+  tx: Db,
+  scope: string,
+  key: string,
+  create: (id: string) => Promise<StoredPage>,
+): Promise<CreateRowResult> {
+  const newId = randomUUID();
+  const claim = await tx.query<{page_id: string}>(
+    `INSERT INTO write_keys (author_subject, client_key, page_id)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (author_subject, client_key) DO NOTHING
+     RETURNING page_id`,
+    [scope, key, newId],
+  );
+  const created = claim.length > 0;
+  if (created) return {page: await create(newId), created};
+
+  const keyed = await tx.query<{page_id: string}>(
+    'SELECT page_id FROM write_keys WHERE author_subject = $1 AND client_key = $2',
+    [scope, key],
+  );
+  const keyedId = keyed[0]?.page_id ?? newId;
+  const rows = await tx.query<PageRow>(`SELECT ${PAGE_COLUMNS} FROM ${PAGE_FROM} WHERE p.id = $1`, [keyedId]);
+  if (rows.length > 0) return {page: pageFromRow(rows[0]), created};
+  return {page: await create(keyedId), created};
+}
+
+/**
  * Stable content hash of an import bundle (ER-6). Re-applying a byte-identical
  * bundle yields the same key, so the second apply short-circuits to the recorded
- * result instead of duplicating the whole workspace. Pages/databases are sorted by
+ * result instead of duplicating the whole library. Pages/databases are sorted by
  * id first so a reordered-but-identical bundle still matches; a genuinely distinct
  * bundle hashes differently and imports normally. SHA-256 (no collision-overwrite
  * risk across distinct bundles); runs in Node ≥ 19 and the browser PGlite home via
@@ -227,12 +552,36 @@ const PAGE_FROM = 'pages p LEFT JOIN databases d ON d.page_id = p.id';
 async function bundleKey(req: ImportRequest): Promise<string> {
   const byId = <T extends {id: string}>(a: T, b: T): number => a.id.localeCompare(b.id);
   const canonical = JSON.stringify({
+    version: req.version ?? null,
     mode: req.mode ?? 'copy',
     pages: [...req.pages].sort(byId),
     databases: [...req.databases].sort(byId),
+    // LGR-15: the ledger section is part of the bundle's identity — the same
+    // pages WITH a ledger to restore must never dedupe against a prior apply
+    // WITHOUT one. `null` (not absent) so a v1 key can't collide by accident.
+    ledger: req.ledger ?? null,
+    assets: req.assets ?? null,
+    pageAccess: req.pageAccess ?? null,
+    skipped: req.skipped ?? null,
+    instanceId: req.instanceId ?? null,
+    ownerSubject: req.ownerSubject ?? null,
+    installForeignPageAccess: req.installForeignPageAccess === true,
   });
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Normalize a BYTEA column value to bytes: PGlite and postgres.js hand back a
+ * `Uint8Array`; some drivers hand back the `\x…` hex string (LGR-15 backup
+ * export reads asset bytes on both backends).
+ */
+function byteaToBytes(raw: Uint8Array | string): Uint8Array {
+  if (typeof raw !== 'string') return raw;
+  const hex = raw.startsWith('\\x') ? raw.slice(2) : raw;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i += 1) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
 }
 
 /**
@@ -247,6 +596,355 @@ async function assetHash(bytes: Uint8Array): Promise<string> {
   // `BufferSource` accepts it (a bare `Uint8Array` is `ArrayBufferLike`).
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const ASSET_ID_RE = /^[0-9a-f]{64}$/;
+const ASSET_ID_RUN_RE = /[0-9a-f]{64,}/g;
+const MAX_BACKUP_JSON_DEPTH = 100;
+
+/**
+ * Asset references are document state, not `asset_refs` state: a moved/copied
+ * block can legitimately have no edge row. Match the GC's conservative liveness
+ * rule: any known stored 64-hex id appearing anywhere in serialized page data
+ * or properties is reachable. Scanning every overlapping window also covers
+ * future property names and URL forms such as `/assets/<id>` without coupling
+ * backup completeness to today's block schema. The structural walk retains loud
+ * missing-byte diagnostics for today's `assetId` and evidence `sha256` shapes.
+ */
+function referencedAssets(pages: StoredPage[], knownAssetIds: Iterable<string> = []): Map<string, Set<string>> {
+  const refs = new Map<string, Set<string>>();
+  const known = new Set([...knownAssetIds].filter((id) => ASSET_ID_RE.test(id)));
+  const add = (assetId: string, pageId: string): void => {
+    const pagesForAsset = refs.get(assetId) ?? new Set<string>();
+    pagesForAsset.add(pageId);
+    refs.set(assetId, pagesForAsset);
+  };
+  const scan = (value: unknown, pageId: string): void => {
+    const json = JSON.stringify(value);
+    if (!json) return;
+    for (const match of json.matchAll(ASSET_ID_RUN_RE)) {
+      const run = match[0];
+      for (let offset = 0; offset <= run.length - 64; offset += 1) {
+        const assetId = run.slice(offset, offset + 64);
+        if (known.has(assetId)) add(assetId, pageId);
+      }
+    }
+  };
+  const walk = (value: unknown, pageId: string, depth: number): void => {
+    if (depth > MAX_BACKUP_JSON_DEPTH) {
+      throw new BackupFormatError(
+        `invalid backup: page ${pageId} JSON exceeds the ${MAX_BACKUP_JSON_DEPTH}-level nesting cap`,
+      );
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, pageId, depth + 1);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if ((key === 'assetId' || key === 'sha256') && typeof child === 'string' && ASSET_ID_RE.test(child)) {
+        add(child, pageId);
+      }
+      walk(child, pageId, depth + 1);
+    }
+  };
+  for (const page of pages) {
+    // Validate before JSON.stringify: deeply nested hostile input must fail as a
+    // clean BackupFormatError, not overflow the serializer's call stack.
+    walk(page.data, page.id, 0);
+    walk(page.properties, page.id, 0);
+    scan(page.data, page.id);
+    scan(page.properties, page.id);
+  }
+  return refs;
+}
+
+/** Strict/canonical base64 decoding: Buffer's permissive decoder is unsuitable
+ * for a restore manifest because ignored junk would make the JSON lie. */
+function decodeBackupBase64(value: string, assetId: string): Uint8Array {
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw new BackupFormatError(`invalid backup: asset ${assetId} has malformed base64 bytes`);
+  }
+  const bytes = Uint8Array.from(Buffer.from(value, 'base64'));
+  if (Buffer.from(bytes).toString('base64') !== value) {
+    throw new BackupFormatError(`invalid backup: asset ${assetId} has non-canonical base64 bytes`);
+  }
+  return bytes;
+}
+
+function safeBackupMime(raw: unknown, assetId: string): string {
+  const value = typeof raw === 'string' ? raw : '';
+  // eslint-disable-next-line no-control-regex -- header-injection characters are never legitimate
+  if (/[\u0000-\u001f\u007f]/.test(value)) {
+    throw new BackupFormatError(`invalid backup: asset ${assetId} carries a control character in its mime`);
+  }
+  const base = value.split(';', 1)[0].trim().toLowerCase();
+  return ASSET_MIMES.has(base) ? base : 'application/octet-stream';
+}
+
+function partialRestoreDiagnostic(version: 1 | 2): BackupRestoreDiagnostic {
+  const missing: BackupRestoreDiagnostic['missing'] = ['complete-asset-manifest', 'page-access-state'];
+  if (version === 1) missing.push('ledger-durability-section');
+  return {
+    code: 'partial-restore',
+    version,
+    missing,
+    message: `partial restore from backup v${version}: missing ${missing.join(', ')}`,
+  };
+}
+
+function foreignPageAccessDiagnostic(sourceInstanceId: string | undefined, targetInstanceId: string): BackupRestoreDiagnostic {
+  const origin = sourceInstanceId ? `foreign instance ${sourceInstanceId}` : 'an origin-less v3 backup';
+  return {
+    code: 'partial-restore',
+    version: 3,
+    missing: ['page-access-state'],
+    message:
+      `partial restore from ${origin}: page access state was skipped for target instance ${targetInstanceId}; ` +
+      'pages were restored restricted (pass installForeignPageAccess:true to install it explicitly)',
+  };
+}
+
+function skippedBackupDiagnostic(skipped: BackupSkippedItem[]): BackupRestoreDiagnostic {
+  return {
+    code: 'partial-restore',
+    version: 3,
+    missing: ['scheduled-backup-skips'],
+    message: `partial restore from scheduled backup: ${skipped.length} inconsistent item(s) were skipped and recorded`,
+  };
+}
+
+const MAX_BACKUP_IDENTITY_LENGTH = 2048;
+
+function validBackupIdentity(value: unknown): value is string | null {
+  return value === null || (typeof value === 'string' && value.length > 0 && value.length <= MAX_BACKUP_IDENTITY_LENGTH);
+}
+
+/**
+ * Validate the v3 envelope in full before opening the write transaction. This
+ * makes a malformed/incomplete manifest a loud no-write failure, not a partly
+ * restored library whose broken images are discovered later.
+ */
+async function preflightBackup(
+  req: ImportRequest,
+  targetInstanceId: string,
+): Promise<{
+  diagnostics: BackupRestoreDiagnostic[];
+  installPageAccess: boolean;
+  skippedPageAccessIds: Set<string>;
+}> {
+  if (req.version == null) {
+    if (req.assets != null || req.pageAccess != null || req.skipped != null) {
+      throw new BackupFormatError('invalid import: v3 assets/pageAccess/skipped require an explicit backup format version');
+    }
+    return {diagnostics: [], installPageAccess: false, skippedPageAccessIds: new Set()}; // ordinary content import, not a backup reader
+  }
+  if (!Number.isSafeInteger(req.version) || req.version < 1) {
+    throw new BackupFormatError(`invalid backup format version ${String(req.version)}`);
+  }
+  if (req.version > BACKUP_VERSION) {
+    throw new BackupFormatError(
+      `unsupported backup format version ${req.version}; this build reads through v${BACKUP_VERSION}`,
+    );
+  }
+  if (req.version === 1 || req.version === 2) {
+    if (req.assets != null || req.pageAccess != null || req.skipped != null) {
+      throw new BackupFormatError(`invalid backup v${req.version}: v3 assets/pageAccess/skipped fields are not allowed`);
+    }
+    return {diagnostics: [partialRestoreDiagnostic(req.version)], installPageAccess: false, skippedPageAccessIds: new Set()};
+  }
+  if (!Array.isArray(req.assets) || !Array.isArray(req.pageAccess)) {
+    throw new BackupFormatError('invalid backup v3: assets and pageAccess manifests are required');
+  }
+  if (req.ledger?.assets && req.ledger.assets.length > 0) {
+    throw new BackupFormatError('invalid backup v3: ledger.assets must be deduplicated into the top-level assets manifest');
+  }
+  if (req.instanceId !== undefined && !validBackupIdentity(req.instanceId)) {
+    throw new BackupFormatError('invalid backup v3: instanceId must be a non-empty string of at most 2048 characters');
+  }
+  if (req.ownerSubject !== undefined && !validBackupIdentity(req.ownerSubject)) {
+    throw new BackupFormatError('invalid backup v3: ownerSubject must be a non-empty string of at most 2048 characters');
+  }
+  if (req.installForeignPageAccess !== undefined && typeof req.installForeignPageAccess !== 'boolean') {
+    throw new BackupFormatError('invalid backup v3: installForeignPageAccess must be a boolean');
+  }
+
+  const pageIds = new Set<string>();
+  for (const page of req.pages) {
+    if (!page || typeof page.id !== 'string' || pageIds.has(page.id)) {
+      throw new BackupFormatError(`invalid backup v3: duplicate or malformed page id ${JSON.stringify(page?.id)}`);
+    }
+    pageIds.add(page.id);
+  }
+
+  if (req.skipped != null && !Array.isArray(req.skipped)) {
+    throw new BackupFormatError('invalid backup v3: skipped manifest must be an array');
+  }
+  const skipped = req.skipped ?? [];
+  const skippedAssets = new Map<string, BackupSkippedItem>();
+  const skippedPageAccessIds = new Set<string>();
+  let sawPageAccessSkip = false;
+  for (const item of skipped) {
+    if (!item || typeof item.id !== 'string' || typeof item.reason !== 'string') {
+      throw new BackupFormatError('invalid backup v3: malformed skipped manifest entry');
+    }
+    const hasRefs = Array.isArray(item.refs);
+    const hasPages = Array.isArray(item.pages);
+    if (hasRefs === hasPages) {
+      throw new BackupFormatError(`invalid backup v3: skipped item ${JSON.stringify(item.id)} must carry refs or pages`);
+    }
+    const ids = hasRefs ? item.refs! : item.pages!;
+    if (ids.length === 0 || ids.some((id) => typeof id !== 'string') || new Set(ids).size !== ids.length) {
+      throw new BackupFormatError(`invalid backup v3: skipped item ${JSON.stringify(item.id)} has malformed page ids`);
+    }
+    if (hasPages) {
+      if (item.id !== 'page-access' || item.reason !== 'page-set-changed' || sawPageAccessSkip) {
+        throw new BackupFormatError('invalid backup v3: malformed or duplicate page-access skip');
+      }
+      sawPageAccessSkip = true;
+      for (const id of ids) {
+        if (pageIds.has(id)) skippedPageAccessIds.add(id);
+      }
+      continue;
+    }
+    if (
+      !ASSET_ID_RE.test(item.id) ||
+      (item.reason !== 'missing-bytes' && item.reason !== 'hash-mismatch' && item.reason !== 'size-mismatch') ||
+      skippedAssets.has(item.id) ||
+      ids.some((id) => !pageIds.has(id))
+    ) {
+      throw new BackupFormatError(`invalid backup v3: malformed or duplicate skipped asset ${JSON.stringify(item.id)}`);
+    }
+    skippedAssets.set(item.id, item);
+  }
+
+  const accessIds = new Set<string>();
+  for (const access of req.pageAccess) {
+    if (!access || typeof access.pageId !== 'string' || accessIds.has(access.pageId) || !pageIds.has(access.pageId)) {
+      throw new BackupFormatError(`invalid backup v3: duplicate or foreign pageAccess id ${JSON.stringify(access?.pageId)}`);
+    }
+    accessIds.add(access.pageId);
+    if (!(PAGE_VISIBILITIES as readonly unknown[]).includes(access.visibility)) {
+      throw new BackupFormatError(`invalid backup v3: page ${access.pageId} has unknown visibility ${JSON.stringify(access.visibility)}`);
+    }
+    if (!(AGENT_EDITS_POLICIES as readonly unknown[]).includes(access.agentEdits)) {
+      throw new BackupFormatError(`invalid backup v3: page ${access.pageId} has unknown agentEdits ${JSON.stringify(access.agentEdits)}`);
+    }
+    if (!Array.isArray(access.acl)) {
+      throw new BackupFormatError(`invalid backup v3: page ${access.pageId} ACL is not an array`);
+    }
+    const aclKeys = new Set<string>();
+    for (const acl of access.acl) {
+      if (!acl || !validBackupIdentity(acl.subject)) {
+        throw new BackupFormatError(
+          `invalid backup v3: page ${access.pageId} ACL subject must be null or a non-empty string of at most 2048 characters`,
+        );
+      }
+      if (!validBackupIdentity(acl.issuer)) {
+        throw new BackupFormatError(
+          `invalid backup v3: page ${access.pageId} ACL issuer must be null or a non-empty string of at most 2048 characters`,
+        );
+      }
+      if (!validBackupIdentity(acl.invitedBy)) {
+        throw new BackupFormatError(
+          `invalid backup v3: page ${access.pageId} ACL invitedBy must be null or a non-empty string of at most 2048 characters`,
+        );
+      }
+      const hasSubject = typeof acl?.subject === 'string' && acl.subject.length > 0;
+      const hasEmail = typeof acl?.email === 'string' && acl.email.length > 0;
+      if (hasSubject === hasEmail || (hasEmail && (typeof acl.issuer !== 'string' || acl.issuer.length === 0))) {
+        throw new BackupFormatError(`invalid backup v3: page ${access.pageId} has a malformed ACL grantee`);
+      }
+      if (acl.level !== 'read' && acl.level !== 'write') {
+        throw new BackupFormatError(`invalid backup v3: page ${access.pageId} has unknown ACL level ${JSON.stringify(acl.level)}`);
+      }
+      if (typeof acl.createdAt !== 'string' || !Number.isFinite(Date.parse(acl.createdAt))) {
+        throw new BackupFormatError(`invalid backup v3: page ${access.pageId} has an invalid ACL timestamp`);
+      }
+      const key = hasSubject ? `subject:${acl.subject}` : `email:${acl.email!.toLowerCase()}`;
+      if (aclKeys.has(key)) throw new BackupFormatError(`invalid backup v3: page ${access.pageId} repeats ACL ${key}`);
+      aclKeys.add(key);
+    }
+  }
+  if (accessIds.size !== pageIds.size) {
+    const missing = [...pageIds].filter((id) => !accessIds.has(id));
+    const unrecorded = missing.filter((id) => !skippedPageAccessIds.has(id));
+    if (unrecorded.length > 0) {
+      throw new BackupFormatError(`invalid backup v3: pageAccess is missing page(s): ${unrecorded.join(', ')}`);
+    }
+  }
+
+  const manifestIds = new Set<string>();
+  for (const asset of req.assets) {
+    if (!asset || typeof asset.id !== 'string' || !ASSET_ID_RE.test(asset.id) || manifestIds.has(asset.id)) {
+      throw new BackupFormatError(`invalid backup v3: duplicate or malformed asset id ${JSON.stringify(asset?.id)}`);
+    }
+    manifestIds.add(asset.id);
+  }
+  for (const id of skippedAssets.keys()) {
+    if (manifestIds.has(id)) throw new BackupFormatError(`invalid backup v3: asset ${id} is both present and skipped`);
+  }
+  const expectedRefs = referencedAssets(req.pages, [...manifestIds, ...skippedAssets.keys()]);
+  for (const asset of req.assets) {
+    if (typeof asset.mime !== 'string' || typeof asset.bytesBase64 !== 'string' || !Number.isSafeInteger(asset.size) || asset.size < 0) {
+      throw new BackupFormatError(`invalid backup v3: asset ${asset.id} has malformed bytes metadata`);
+    }
+    const bytes = decodeBackupBase64(asset.bytesBase64, asset.id);
+    if (bytes.byteLength !== asset.size) {
+      throw new BackupFormatError(`invalid backup v3: asset ${asset.id} declares ${asset.size} bytes but contains ${bytes.byteLength}`);
+    }
+    if (bytes.byteLength > DEFAULT_MAX_ASSET_BYTES) {
+      throw new BackupFormatError(`invalid backup v3: asset ${asset.id} exceeds the ${DEFAULT_MAX_ASSET_BYTES}-byte asset cap`);
+    }
+    const actual = await assetHash(bytes);
+    if (actual !== asset.id) {
+      throw new BackupFormatError(`invalid backup v3: asset ${asset.id} bytes hash to ${actual}`);
+    }
+    safeBackupMime(asset.mime, asset.id);
+    if (!Array.isArray(asset.refs) || asset.refs.some((id) => typeof id !== 'string')) {
+      throw new BackupFormatError(`invalid backup v3: asset ${asset.id} refs are malformed`);
+    }
+    const actualRefs = new Set(asset.refs);
+    if (actualRefs.size !== asset.refs.length || [...actualRefs].some((id) => !pageIds.has(id))) {
+      throw new BackupFormatError(`invalid backup v3: asset ${asset.id} has duplicate or foreign page refs`);
+    }
+    const expected = expectedRefs.get(asset.id);
+    if (!expected) throw new BackupFormatError(`invalid backup v3: asset ${asset.id} is not referenced by a selected page`);
+    const missingRefs = [...expected].filter((id) => !actualRefs.has(id));
+    const extraRefs = [...actualRefs].filter((id) => !expected.has(id));
+    if (missingRefs.length > 0 || extraRefs.length > 0) {
+      throw new BackupFormatError(
+        `invalid backup v3: asset ${asset.id} ref manifest differs from page state` +
+          `${missingRefs.length ? `; missing ${missingRefs.join(', ')}` : ''}` +
+          `${extraRefs.length ? `; extra ${extraRefs.join(', ')}` : ''}`,
+      );
+    }
+  }
+  for (const [id, item] of skippedAssets) {
+    const expected = expectedRefs.get(id);
+    if (!expected) throw new BackupFormatError(`invalid backup v3: skipped asset ${id} is not referenced by a selected page`);
+    const actual = new Set(item.refs!);
+    const missingRefs = [...expected].filter((pageId) => !actual.has(pageId));
+    const extraRefs = [...actual].filter((pageId) => !expected.has(pageId));
+    if (missingRefs.length > 0 || extraRefs.length > 0) {
+      throw new BackupFormatError(`invalid backup v3: skipped asset ${id} ref manifest differs from page state`);
+    }
+  }
+  const missingAssets = [...expectedRefs.keys()].filter((id) => !manifestIds.has(id));
+  const unrecordedAssets = missingAssets.filter((id) => !skippedAssets.has(id));
+  if (unrecordedAssets.length > 0) {
+    throw new BackupFormatError(`invalid backup v3: referenced asset bytes are missing: ${unrecordedAssets.join(', ')}`);
+  }
+  const sameOrigin = req.instanceId !== undefined && req.instanceId === targetInstanceId;
+  const installPageAccess = sameOrigin || req.installForeignPageAccess === true;
+  const diagnostics: BackupRestoreDiagnostic[] = [];
+  if (skipped.length > 0) diagnostics.push(skippedBackupDiagnostic(skipped));
+  if (!installPageAccess) diagnostics.push(foreignPageAccessDiagnostic(req.instanceId, targetInstanceId));
+  return {
+    diagnostics,
+    installPageAccess,
+    skippedPageAccessIds,
+  };
 }
 
 /**
@@ -268,7 +966,14 @@ function toBytes(value: Uint8Array | string): Uint8Array {
  * backend passed in.
  */
 export class PageStore {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly sharedState: PageStoreSharedState = {
+      conflictCopiesMinted: 0,
+      accessGeneration: 0,
+      ledgerIdsCache: undefined,
+    },
+  ) {}
 
   /**
    * Count of **brand-new** "(conflicted copy)" pages minted by
@@ -277,9 +982,8 @@ export class PageStore {
    * mirror's per-page-id copy cap (ER-4) can detect a storm regression without
    * being fooled by repeated re-applies of the same content.
    */
-  private conflictCopiesMinted = 0;
   get copiesMinted(): number {
-    return this.conflictCopiesMinted;
+    return this.sharedState.conflictCopiesMinted;
   }
 
   /**
@@ -294,14 +998,259 @@ export class PageStore {
    * mutation invalidates every cached decision — always safe (never stale-allows),
    * at most an occasional needless re-check.
    */
-  private accessGen = 0;
-  /** The current access epoch (see {@link accessGen}). */
+  /** The current access epoch. */
   accessGeneration(): number {
-    return this.accessGen;
+    return this.sharedState.accessGeneration;
   }
   /** Advance the access epoch — call after any read/write-affecting mutation. */
   private bumpAccess(): void {
-    this.accessGen += 1;
+    this.sharedState.accessGeneration += 1;
+  }
+
+  /**
+   * Return a completed matching response without claiming or executing a write.
+   * Used by destroy routes before their target-existence precondition.
+   */
+  async probeIdempotentWrite<T>(request: IdempotencyRequest): Promise<IdempotencyOutcome<T> | null> {
+    const prior = await this.db.query<IdempotencyResponseRow>(
+      `SELECT fingerprint, status, response_body, content_type, location
+       FROM idempotency_responses
+       WHERE actor_scope = $1 AND idempotency_key = $2`,
+      [request.actorScope, request.key],
+    );
+    if (prior.length === 0 || prior[0].status == null) return null;
+    return capturedIdempotencyOutcome<T>(request, prior[0]);
+  }
+
+  /**
+   * Execute one durable HTTP write under the response-capturing ledger.
+   *
+   * The claim, callback mutations, JSON serialization, and response capture all
+   * use one outer transaction. Methods invoked on the callback store are bound
+   * to that transaction, with their nested `begin` calls contained by savepoints,
+   * while cache/access-generation state stays shared with the owning store. A
+   * thrown error or non-2xx callback result rolls the claim and every mutation back.
+   */
+  async idempotentWrite<T>(
+    request: IdempotencyRequest,
+    execute: (transactionStore: PageStore) => Promise<IdempotencyResponse<T>>,
+  ): Promise<IdempotencyOutcome<T>> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.db.begin(async (tx) => {
+          const claimed = await tx.query<{idempotency_key: string}>(
+            `INSERT INTO idempotency_responses
+             (actor_scope, idempotency_key, fingerprint, method, normalized_target)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (actor_scope, idempotency_key) DO NOTHING
+           RETURNING idempotency_key`,
+            [
+              request.actorScope,
+              request.key,
+              request.fingerprint,
+              request.method,
+              request.normalizedTarget,
+            ],
+          );
+
+          if (claimed.length === 0) {
+            // On real Postgres, the unique-key conflict waits for the claimant's
+            // transaction. This statement then reads its committed completion.
+            const prior = await tx.query<IdempotencyResponseRow>(
+              `SELECT fingerprint, status, response_body, content_type, location
+             FROM idempotency_responses
+             WHERE actor_scope = $1 AND idempotency_key = $2`,
+              [request.actorScope, request.key],
+            );
+            if (prior.length === 0) {
+              throw new IdempotencyClaimNotVisibleError();
+            }
+            return capturedIdempotencyOutcome<T>(request, prior[0]);
+          }
+
+          const response = await execute(new PageStore(tx, this.sharedState));
+          if (!Number.isInteger(response.status) || response.status < 200 || response.status > 299) {
+            throw new UnretainedIdempotencyResponse(response);
+          }
+          // Serialization is deliberately inside the transaction: a response that
+          // cannot be completely constructed must not commit its mutation.
+          const serializedBody = response.status === 204 ? '' : JSON.stringify(response.body);
+          if (serializedBody === undefined) throw new Error('idempotent response body is not JSON-serializable');
+          await tx.query(
+            `UPDATE idempotency_responses
+           SET status = $3,
+               response_body = $4,
+               content_type = $5,
+               location = $6,
+               completed_at = now()
+           WHERE actor_scope = $1 AND idempotency_key = $2`,
+            [
+              request.actorScope,
+              request.key,
+              response.status,
+              serializedBody,
+              response.headers?.contentType ?? null,
+              response.headers?.location ?? null,
+            ],
+          );
+          return {...response, serializedBody, replayed: false};
+        }, {isolationLevel: 'read committed'});
+      } catch (err) {
+        if (err instanceof IdempotencyClaimNotVisibleError && attempt === 0) continue;
+        if (err instanceof UnretainedIdempotencyResponse) {
+          return {...err.response, replayed: false};
+        }
+        throw err;
+      }
+    }
+    throw new Error('idempotency response claim retry exhausted');
+  }
+
+  // ── Ledger (LGR-3): the store-level write guards + the one sanctioned writer ──
+
+  /**
+   * The ledger writer for this store — the ONLY code allowed to mutate ledger
+   * rows. Lazily constructed; safe in both server and in-webview (browser-local)
+   * mode, which is exactly why the guards below live HERE and not in the HTTP
+   * routes: `LocalDataClient` bypasses HTTP entirely.
+   */
+  private ledgerStore: LedgerStore | null = null;
+  get ledger(): LedgerStore {
+    if (!this.ledgerStore) this.ledgerStore = new LedgerStore(this, this.db);
+    return this.ledgerStore;
+  }
+
+  /**
+   * Cached ledger ids from `settings` (`undefined` = unknown / not seeded yet —
+   * the "absent" case is deliberately NOT cached, see {@link ledgerIds}).
+   * Invalidated by {@link setSetting} whenever the recording key is written, so
+   * the guards arm on the very write that seeds the ledger.
+   */
+  /** Drop the cached ledger ids (the seed writes the settings row on its own
+   *  transaction, bypassing {@link setSetting}'s invalidation). */
+  invalidateLedgerIds(): void {
+    this.sharedState.ledgerIdsCache = undefined;
+  }
+
+  /**
+   * The recorded ledger ids, or `null` when the ledger has never been seeded.
+   *
+   * Only a POSITIVE result is cached (LGR-3 F8). Caching the negative one was a
+   * multi-process footgun: against external Postgres, a process that booted
+   * before the ledger was seeded would cache `null` forever — same-process
+   * `setSetting` is the only thing that clears it — leaving EVERY store-level
+   * ledger guard disarmed in that process until it restarted, while another
+   * process happily served a seeded ledger. A miss costs one indexed settings
+   * read; once seeded, the ids never change, so the hot path still caches.
+   */
+  async ledgerIds(): Promise<LedgerIds | null> {
+    if (this.sharedState.ledgerIdsCache != null) return this.sharedState.ledgerIdsCache;
+    const ids = await this.getSetting<LedgerIds>(LEDGER_DB_SETTING_KEY);
+    const resolved = ids && ids.hostPageId && ids.hostPages ? ids : null;
+    this.sharedState.ledgerIdsCache = resolved ?? undefined; // never cache "not seeded"
+    return resolved;
+  }
+
+  /**
+   * LGR-7: run the INDEPENDENT invariant verifier against raw storage. Its own
+   * SQL reads — deliberately not the LedgerStore query/validator paths — so an
+   * out-of-band mutation that slipped past enforcement is still caught.
+   * Read-only; `findings: []` = clean.
+   */
+  verifyLedger(): Promise<LedgerVerifyReport> {
+    return verifyLedger(this.db);
+  }
+
+  /** True for one of the four server-managed ledger databases. */
+  async isLedgerDatabase(databaseId: string): Promise<boolean> {
+    const ids = await this.ledgerIds();
+    if (!ids) return false;
+    return (
+      databaseId === ids.accounts ||
+      databaseId === ids.transactions ||
+      databaseId === ids.postings ||
+      databaseId === ids.reconciliations
+    );
+  }
+
+  /** True for an authoritative server-managed database (AI usage or ledger). */
+  async isManagedDatabase(databaseId: string): Promise<boolean> {
+    const usage = await this.getSetting<{databaseId?: string}>(USAGE_DB_SETTING_KEY);
+    return usage?.databaseId === databaseId || this.isLedgerDatabase(databaseId);
+  }
+
+  /**
+   * True for one of the FIVE ledger host pages — the root, or one of the four
+   * per-database hosts. These are the pages whose access decision every ledger
+   * row inherits, so they carry the confidentiality of the whole ledger (see
+   * {@link setPageVisibility}).
+   */
+  async isLedgerHostPage(pageId: string): Promise<boolean> {
+    const ids = await this.ledgerIds();
+    if (!ids) return false;
+    return (
+      pageId === ids.hostPageId ||
+      pageId === ids.hostPages.accounts ||
+      pageId === ids.hostPages.transactions ||
+      pageId === ids.hostPages.postings ||
+      pageId === ids.hostPages.reconciliations
+    );
+  }
+
+  /** True for the ledger root page, a ledger database's host page, or any row of
+   *  a ledger database. Issues its own query — code inside an open transaction
+   *  MUST use {@link isLedgerPageOn} with its `tx` instead. */
+  async isLedgerPage(pageId: string): Promise<boolean> {
+    const ids = await this.ledgerIds();
+    if (!ids) return false;
+    return this.isLedgerPageOn(this.db, ids, pageId);
+  }
+
+  /**
+   * {@link isLedgerPage} on a caller-supplied queryable.
+   *
+   * DEADLOCK SAFETY — this overload exists because getting it wrong wedges the
+   * whole process. On the embedded PGlite backend a top-level `query` and a
+   * `begin` share ONE non-reentrant FIFO mutex (see `dbCore.ts`), so a query
+   * issued against the OUTER `this.db` handle from inside an open transaction
+   * queues behind the very transaction that is awaiting it: the transaction
+   * never settles, and since `Mutex.tail` is then chained to a promise that
+   * never resolves, every subsequent database call in the process hangs too —
+   * recoverable only by restart. `stripManagedLedger` did exactly this, wedging
+   * any import of a bundle that contained a parented page (i.e. essentially
+   * every real backup restore). Inside `begin`, always pass `tx`.
+   */
+  private async isLedgerPageOn(q: Db, ids: LedgerIds, pageId: string): Promise<boolean> {
+    if (
+      pageId === ids.hostPageId ||
+      pageId === ids.hostPages.accounts ||
+      pageId === ids.hostPages.transactions ||
+      pageId === ids.hostPages.postings ||
+      pageId === ids.hostPages.reconciliations
+    ) {
+      return true;
+    }
+    const rows = await q.query<{database_id: string | null}>(
+      'SELECT database_id FROM pages WHERE id = $1',
+      [pageId],
+    );
+    const dbId = rows[0]?.database_id;
+    if (!dbId) return false;
+    return dbId === ids.accounts || dbId === ids.transactions || dbId === ids.postings || dbId === ids.reconciliations;
+  }
+
+  /** Store-level ledger write-gate for the generic DATABASE mutation surface. */
+  private async assertNotLedgerDatabase(databaseId: string): Promise<void> {
+    if (await this.isLedgerDatabase(databaseId)) {
+      throw new LedgerError('managed', 'this database is part of the server-managed ledger and can only be changed through the ledger API');
+    }
+  }
+
+  /** Store-level ledger write-gate for the generic PAGE mutation surface. */
+  private async assertNotLedgerPage(pageId: string): Promise<void> {
+    if (await this.isLedgerPage(pageId)) {
+      throw new LedgerError('managed', 'this page is part of the server-managed ledger and can only be changed through the ledger API');
+    }
   }
 
   /** Apply pending migrations. Idempotent. */
@@ -387,7 +1336,7 @@ export class PageStore {
    */
   async listPages(): Promise<PageMeta[]> {
     const rows = await this.db.query<PageRow>(
-      `SELECT p.id, p.name, p.parent_id, p.deleted_at, p.created_at, p.updated_at, d.id AS hosted_database_id,
+      `SELECT p.id, p.name, p.listed, p.parent_id, p.deleted_at, p.created_at, p.updated_at, d.id AS hosted_database_id,
               (p.properties->>'sys_icon') AS icon
        FROM ${PAGE_FROM}
        WHERE p.database_id IS NULL AND p.deleted_at IS NULL
@@ -396,18 +1345,257 @@ export class PageStore {
     return rows.map(metaFromRow);
   }
 
+  /**
+   * Every live page — including database rows (they're pages too) — as raw
+   * `{id, name, data}` for the search indexer. Mirrors the query the hosted
+   * {@link AiService} runs; the in-webview {@link LocalSearchIndex} calls this so
+   * lexical content search works with no server.
+   */
+  async indexablePages(): Promise<IndexablePage[]> {
+    return this.db.query<IndexablePage>('SELECT id, name, data FROM pages WHERE deleted_at IS NULL');
+  }
+
   // ── Whole-space backup ───────────────────────────────────────────────────────
 
   /** Export every live page (full data, nesting, database membership) + every
-   *  database — the entire workspace as one bundle. */
-  async exportAll(): Promise<{pages: StoredPage[]; databases: StoredDatabase[]}> {
+   *  database — the entire library as one bundle. When a ledger is seeded the
+   *  bundle also carries its durability surface (LGR-15); v3 additionally
+   *  carries every referenced asset and every page's stored access posture. */
+  async exportAll(exportedAt: string = new Date().toISOString()): Promise<LibraryBackup> {
+    const snapshot = await this.captureBackupSnapshot(exportedAt);
+    const assets = await this.exportAssets(snapshot.pages);
+    const pageAccess = await this.exportPageAccess(snapshot.pages.map((page) => page.id));
+    return {
+      ...snapshot.envelope,
+      pages: snapshot.pages,
+      databases: snapshot.databases,
+      assets,
+      pageAccess,
+      ...(snapshot.ledger ? {ledger: snapshot.ledger} : {}),
+    };
+  }
+
+  /**
+   * Write the canonical v3 envelope incrementally. Scheduled backups use this
+   * path so asset bytes, base64, and JSON are retained for one asset at a time,
+   * never for the whole corpus. Every writer call is awaited, providing the
+   * filesystem writer's backpressure boundary.
+   */
+  async exportAllTo(
+    write: (chunk: string) => Promise<unknown>,
+    exportedAt: string = new Date().toISOString(),
+    opts: {skipInconsistent?: boolean} = {},
+  ): Promise<{skipped: BackupSkippedItem[]}> {
+    const snapshot = await this.captureBackupSnapshot(exportedAt);
+    const skipped: BackupSkippedItem[] = [];
+    const skippedManifest = opts.skipInconsistent ? skipped : undefined;
+    const writeArray = async <T>(items: Iterable<T> | AsyncIterable<T>): Promise<void> => {
+      await write('[');
+      let first = true;
+      for await (const item of items) {
+        await write(`${first ? '' : ','}${JSON.stringify(item)}`);
+        first = false;
+      }
+      await write(']');
+    };
+
+    // JSON.stringify preserves insertion order for these string keys. Keeping
+    // the existing field order makes streamed snapshots byte-for-byte identical
+    // to exportAll() for a stable store and timestamp.
+    await write(JSON.stringify(snapshot.envelope).slice(0, -1));
+    await write(',"pages":');
+    await writeArray(snapshot.pages);
+    await write(',"databases":');
+    await writeArray(snapshot.databases);
+    await write(',"assets":');
+    await writeArray(this.exportAssetEntries(snapshot.pages, skippedManifest));
+    const pageAccess = await this.exportPageAccess(snapshot.pages.map((page) => page.id), skippedManifest);
+    await write(',"pageAccess":');
+    await writeArray(pageAccess);
+    if (skipped.length > 0) {
+      await write(',"skipped":');
+      await writeArray(skipped);
+    }
+    if (snapshot.ledger) {
+      await write(`,"ledger":${JSON.stringify(snapshot.ledger)}`);
+    }
+    await write('}');
+    return {skipped};
+  }
+
+  private async captureBackupSnapshot(exportedAt: string): Promise<{
+    envelope: Pick<LibraryBackup, 'version' | 'exportedAt' | 'instanceId' | 'ownerSubject'>;
+    pages: StoredPage[];
+    databases: StoredDatabase[];
+    ledger: LedgerBackupSection | undefined;
+  }> {
+    const instanceId = await this.ensureInstanceId();
+    const {ownerSubject} = await this.getInstanceConfig();
     const pageRows = await this.db.query<PageRow>(
       `SELECT ${PAGE_COLUMNS} FROM ${PAGE_FROM} WHERE p.deleted_at IS NULL ORDER BY p.created_at ASC`,
     );
     const dbRows = await this.db.query<DatabaseRowRecord>(
       'SELECT id, page_id, name, schema, created_at, updated_at FROM databases',
     );
-    return {pages: pageRows.map(pageFromRow), databases: dbRows.map(databaseFromRow)};
+    const pages = pageRows.map(pageFromRow);
+    // Keep reads sequential: the embedded PGlite adapter serializes through a
+    // single mutex, and a failing completeness branch must settle before cleanup
+    // closes the store (no orphaned sibling promise still queued on the mutex).
+    const ledger = await this.exportLedgerSection();
+    return {
+      envelope: {
+        version: BACKUP_VERSION,
+        exportedAt,
+        instanceId,
+        ...(ownerSubject ? {ownerSubject} : {}),
+      },
+      pages,
+      databases: dbRows.map(databaseFromRow),
+      ledger,
+    };
+  }
+
+  /** Build and self-verify the v3 content-addressed asset manifest. */
+  private async exportAssets(pages: StoredPage[]): Promise<BackupAsset[]> {
+    const assets: BackupAsset[] = [];
+    for await (const asset of this.exportAssetEntries(pages)) assets.push(asset);
+    return assets;
+  }
+
+  /** Yield one verified asset at a time so scheduled writers stay bounded. */
+  private async *exportAssetEntries(
+    pages: StoredPage[],
+    skipped?: BackupSkippedItem[],
+  ): AsyncGenerator<BackupAsset> {
+    // Seed the document scanner with every actually stored id. This makes the
+    // backup liveness set a superset of the GC's `position(a.id IN ...::text)`
+    // predicate without treating unrelated 64-hex document hashes as assets.
+    const stored = await this.db.query<{id: string}>('SELECT id FROM assets');
+    const wanted = referencedAssets(pages, stored.map((asset) => asset.id));
+    let captured = 0;
+    for (const id of [...wanted.keys()].sort()) {
+      const refs = [...wanted.get(id)!].sort();
+      const rows = await this.db.query<{id: string; mime: string; size: number | string; bytes: Uint8Array | string}>(
+        'SELECT id, mime, size, bytes FROM assets WHERE id = $1',
+        [id],
+      );
+      if (rows.length === 0) {
+        if (skipped) {
+          skipped.push({id, refs, reason: 'missing-bytes'});
+          continue;
+        }
+        throw new BackupFormatError(
+          `backup incomplete: referenced asset ${id} has no stored bytes (pages: ${refs.join(', ')})`,
+        );
+      }
+      const bytes = byteaToBytes(rows[0].bytes);
+      const actual = await assetHash(bytes);
+      if (actual !== id) {
+        if (skipped) {
+          skipped.push({id, refs, reason: 'hash-mismatch'});
+          continue;
+        }
+        throw new BackupFormatError(`backup incomplete: asset ${id} bytes hash to ${actual}`);
+      }
+      if (Number(rows[0].size) !== bytes.byteLength) {
+        if (skipped) {
+          skipped.push({id, refs, reason: 'size-mismatch'});
+          continue;
+        }
+        throw new BackupFormatError(
+          `backup incomplete: asset ${id} stores size ${String(rows[0].size)} but contains ${bytes.byteLength} bytes`,
+        );
+      }
+      yield {
+        id,
+        mime: rows[0].mime,
+        size: bytes.byteLength,
+        bytesBase64: Buffer.from(bytes).toString('base64'),
+        refs,
+      };
+      captured += 1;
+    }
+    // Deliberately redundant with the missing-row throw: keep the writer's
+    // completeness invariant obvious if the loop is later batched/streamed.
+    const accounted = captured + (skipped?.filter((item) => item.refs).length ?? 0);
+    if (accounted !== wanted.size) {
+      throw new BackupFormatError(`backup incomplete: accounted for ${accounted} of ${wanted.size} referenced assets`);
+    }
+  }
+
+  /** Export exactly one access-state record per live exported page. */
+  private async exportPageAccess(pageIds: string[], skipped?: BackupSkippedItem[]): Promise<BackupPageAccess[]> {
+    const expected = new Set(pageIds);
+    const readRows = () => this.db.query<{id: string; visibility: string; agent_edits: string}>(
+      'SELECT id, visibility, agent_edits FROM pages WHERE deleted_at IS NULL ORDER BY created_at ASC',
+    );
+    let rows = await readRows();
+    const coherent = (): boolean => rows.length === expected.size && rows.every((row) => expected.has(row.id));
+    if (!coherent()) {
+      if (!skipped) {
+        throw new BackupFormatError('backup incomplete: page access state changed while the page snapshot was captured');
+      }
+      // A fast retry handles a page mutation that committed between the two
+      // snapshot queries. If the set is still different, preserve access for
+      // the intersection and record the race instead of failing the backup.
+      rows = await readRows();
+      if (!coherent()) {
+        const current = new Set(rows.map((row) => row.id));
+        const changed = [
+          ...pageIds.filter((id) => !current.has(id)),
+          ...rows.map((row) => row.id).filter((id) => !expected.has(id)),
+        ].sort();
+        skipped.push({id: 'page-access', pages: changed, reason: 'page-set-changed'});
+        rows = rows.filter((row) => expected.has(row.id));
+      }
+    }
+    const aclRows = await this.db.query<AclRow>(
+      `SELECT ${ACL_COLS} FROM page_acl
+       WHERE page_id = ANY($1)
+       ORDER BY page_id ASC, created_at ASC`,
+      [pageIds],
+    );
+    const aclByPage = new Map<string, BackupPageAcl[]>();
+    for (const raw of aclRows) {
+      const acl = aclFromRow(raw);
+      const list = aclByPage.get(acl.pageId) ?? [];
+      list.push({
+        subject: acl.subject,
+        email: acl.email,
+        issuer: acl.issuer,
+        level: acl.level,
+        invitedBy: acl.invitedBy,
+        createdAt: acl.createdAt,
+      });
+      aclByPage.set(acl.pageId, list);
+    }
+    return rows.map((row) => ({
+      pageId: row.id,
+      visibility: row.visibility as PageVisibility,
+      agentEdits: row.agent_edits as AgentEditsPolicy,
+      acl: aclByPage.get(row.id) ?? [],
+    }));
+  }
+
+  /**
+   * The ledger durability surface of a backup (LGR-15), or `undefined` when no
+   * ledger is seeded. The entity rows travel as ordinary pages; this collects
+   * what they cannot express: the settings rows (ids, periods, entry sequence)
+   * and the FULL audit stream (verbatim — the tamper-evidence chain must survive
+   * the round trip). v2 nested evidence bytes here; v3 deduplicates them into
+   * the top-level complete asset manifest.
+   */
+  private async exportLedgerSection(): Promise<LedgerBackupSection | undefined> {
+    const ids = await this.ledgerIds();
+    if (!ids) return undefined;
+    const settings: Record<string, unknown> = {};
+    for (const key of [LEDGER_DB_SETTING_KEY, LEDGER_PERIODS_SETTING_KEY, LEDGER_ENTRY_SEQ_SETTING_KEY]) {
+      const value = await this.getSetting<unknown>(key);
+      if (value != null) settings[key] = value;
+    }
+    const audit = await this.ledger.exportAuditStream();
+
+    return {settings, audit};
   }
 
   /**
@@ -415,20 +1603,27 @@ export class PageStore {
    * databases as fresh copies — new ids (via {@link remapBundle}), names suffixed
    * `" (imported)"` on clash, appended below existing pages. `overwrite` upserts
    * by id, replacing pages in place. Returns counts + the old→new id map.
+   *
+   * `opts.actor` is recorded on the `ledger.restore` provenance event when the
+   * bundle carries a ledger section; `opts.assetBudgetBytes` applies the
+   * instance's asset-storage budget to restored evidence bytes (same cap the
+   * upload door enforces).
    */
-  async importBundle(req: ImportRequest): Promise<ImportResult> {
+  async importBundle(req: ImportRequest, opts: {actor?: Principal; assetBudgetBytes?: number} = {}): Promise<ImportResult> {
+    const targetInstanceId = await this.ensureInstanceId();
+    const {diagnostics, installPageAccess, skippedPageAccessIds} = await preflightBackup(req, targetInstanceId);
     // ER-6: re-applying the SAME bundle must be a no-op. `copy` mode re-IDs +
     // INSERTs the whole bundle as fresh pages on every call and the route appends
     // a `space.import` edit each time, so an idempotent re-apply (a future
     // workspace-sync/restore daemon re-POSTing its bundle — the OB-241 shape one
-    // level up) would otherwise duplicate the entire workspace and grow the edit
+    // level up) would otherwise duplicate the entire library and grow the edit
     // log unbounded.
     //
     // The whole import runs in ONE transaction that CLAIMS the bundle's content
     // hash FIRST. A separate `SELECT … then import` is a check-then-act race: two
     // overlapping imports of the same bundle would both see no prior row and both
     // apply (copy mode re-IDs, so there's no page-level conflict to stop the
-    // second) → the workspace is duplicated. Claiming the key up front closes that:
+    // second) → the library is duplicated. Claiming the key up front closes that:
     //  - winner: its `INSERT … RETURNING` yields the key → it imports, then writes
     //    the real result into the claimed row before commit.
     //  - loser: `ON CONFLICT DO NOTHING` yields no row → it re-reads the committed
@@ -436,8 +1631,22 @@ export class PageStore {
     //    transactions; on real Postgres the unique-index lock on `import_log.key`
     //    makes the loser block on the winner, then dedupe. A genuinely *distinct*
     //    bundle hashes differently and imports normally.
+    // C1: a library restore must never rewrite the server-managed AI usage DB.
+    // A crafted overwrite bundle could otherwise re-home / rewrite its attribution
+    // rows (user/cost/tokens), its restricted host page, or the database itself —
+    // bypassing the `/api/pages` + `/api/databases` managed write-gates (an
+    // audit-integrity tamper, even for an admin). Load the managed ids here so the
+    // dispatch below can strip any bundle entry that targets them. Read from
+    // `settings` BEFORE the transaction (the ids are recorded once on first AI use
+    // and stable thereafter — absent, so a no-op strip, until then); reading inside
+    // would re-enter the PGlite mutex the tx already holds.
+    const managedUsage = await this.getSetting<{databaseId: string; hostPageId: string | null}>(USAGE_DB_SETTING_KEY);
+    // LGR-3: the same restore-tamper hole applies to the ledger — an overwrite
+    // bundle must never rewrite posted transactions/postings, the seeded schemas,
+    // or the restricted host page. Read (cached) ids outside the tx like above.
+    const ledgerIds = await this.ledgerIds();
     const key = await bundleKey(req);
-    return this.db.begin(async (tx) => {
+    const imported = await this.db.begin(async (tx) => {
       const claim = await tx.query<{key: string}>(
         `INSERT INTO import_log (key, result) VALUES ($1, '{}'::jsonb)
          ON CONFLICT (key) DO NOTHING RETURNING key`,
@@ -448,18 +1657,70 @@ export class PageStore {
         const recorded = parseJson<ImportResult>(prior[0]?.result, {created: 0, overwritten: 0, renamed: 0, idMap: {}});
         return {...recorded, deduped: true};
       }
-      const result =
+      // Drop any bundle entry that targets the server-managed AI usage DB before it
+      // reaches the writers — so overwrite mode can't tamper with the audit rows and
+      // recordSyncedAttributionTx never credits a skipped (managed) page.
+      const stripped = await this.stripManagedUsage(tx, req.pages, req.databases, managedUsage);
+      // …and any entry that targets the server-managed LEDGER (LGR-3).
+      const {pages, databases} = await this.stripManagedLedger(tx, stripped.pages, stripped.databases, ledgerIds);
+      let result =
         req.mode === 'overwrite'
-          ? await this.importOverwriteTx(tx, req.pages, req.databases)
-          : await this.importCopyTx(tx, req.pages, req.databases);
+          ? await this.importOverwriteTx(tx, pages, databases)
+          : await this.importCopyTx(tx, pages, databases);
+      if (req.assets) {
+        await this.restoreAssetsTx(
+          tx,
+          req.assets,
+          pages,
+          result.idMap,
+          opts.assetBudgetBytes,
+          'backup v3',
+          req.mode === 'overwrite',
+        );
+      }
+      // LGR-15: the bundle's ledger durability section (audit stream, settings,
+      // evidence assets). Deliberately narrow: overwrite mode only (copy re-ids
+      // every page, severing the audit stream's entity references), and ONLY
+      // into a library with no seeded ledger — an existing ledger keeps its
+      // LGR-3 protections (the strip above already ran) and the section is
+      // skipped, reported, never merged. Runs in the SAME transaction: a
+      // restored book must never commit with half its history.
+      if (req.ledger) {
+        const outcome: LedgerRestoreOutcome =
+          req.mode !== 'overwrite'
+            ? 'skipped-copy-mode'
+            : ledgerIds
+              ? 'skipped-existing-ledger'
+              : await this.restoreLedgerSectionTx(tx, req.ledger, pages, databases, {
+                actor: opts.actor,
+                assetBudgetBytes: opts.assetBudgetBytes,
+                bundleSha: key,
+                assetCount: req.assets?.length ?? req.ledger.assets?.length ?? 0,
+              });
+        result = {...result, ledger: outcome};
+      }
+      // Apply page access LAST: ledger restore defensively re-asserts its host
+      // pages restricted, then SAME-origin (or explicitly opted-in foreign)
+      // source state is installed over it. A foreign/origin-less v3 bundle gets
+      // the safe baseline instead so subject-keyed grants cannot cross instances.
+      if (req.pageAccess) {
+        if (installPageAccess) await this.restorePageAccessTx(tx, req.pageAccess, result.idMap);
+        else await this.restrictRestoredPageAccessTx(tx, req.pageAccess, result.idMap);
+      }
+      if (skippedPageAccessIds.size > 0) {
+        await this.restrictRestoredPageIdsTx(tx, skippedPageAccessIds, result.idMap);
+      }
+      if (diagnostics.length > 0) result = {...result, diagnostics};
       // OB-170: a page may carry verified per-block authorship from the instance it
       // was authored on. Credit that as a `synced` edit-log entry — in the SAME
       // transaction so a crash can't leave the claimed key committed without its
       // attribution (which a later re-apply would then skip as `deduped`, losing it).
-      await this.recordSyncedAttributionTx(tx, req.pages, result.idMap);
+      await this.recordSyncedAttributionTx(tx, pages, result.idMap);
       await tx.query('UPDATE import_log SET result = $2::jsonb WHERE key = $1', [key, JSON.stringify(result)]);
       return result;
     });
+    if (!imported.deduped && ((req.pageAccess?.length ?? 0) > 0 || skippedPageAccessIds.size > 0)) this.bumpAccess();
+    return imported;
   }
 
   /** Credit the carried verified author of each imported page (OB-170), on the
@@ -495,6 +1756,476 @@ export class PageStore {
     }
   }
 
+  /**
+   * Strip every bundle entry that targets the server-managed AI usage DB (C1),
+   * mirroring {@link AiUsageLog.isManagedPage} against the CURRENT store state (not
+   * the bundle's own untrusted claim). Dropped are:
+   *  - the usage DB's restricted host page (by id);
+   *  - any page CLAIMING to belong to the usage DB (`databaseId === usageDbId`) —
+   *    an overwrite bundle could otherwise inject a forged attribution row;
+   *  - any page whose id currently IS an attribution row (its stored `database_id`
+   *    is the usage DB) — even when the bundle re-homes it elsewhere, so a rewrite /
+   *    detach of a real row is blocked;
+   *  - the usage database itself (by id), so its schema (managed marker, retention)
+   *    and host page can't be re-homed.
+   * A normal (non-managed) page/database in the same bundle is untouched, and when
+   * no usage DB is seeded this is a no-op. Server-internal writes (seed, attribution,
+   * the auto-expiry sweep) never flow through import, so they stay unaffected.
+   */
+  private async stripManagedUsage(
+    tx: Db,
+    pages: StoredPage[],
+    databases: StoredDatabase[],
+    managed: {databaseId: string; hostPageId: string | null} | null,
+  ): Promise<{pages: StoredPage[]; databases: StoredDatabase[]}> {
+    if (!managed?.databaseId) return {pages, databases};
+    const kept: StoredPage[] = [];
+    for (const p of pages) {
+      if (p.id === managed.hostPageId) continue;
+      if (p.databaseId === managed.databaseId) continue;
+      const cur = await tx.query<{database_id: string | null}>('SELECT database_id FROM pages WHERE id = $1', [p.id]);
+      if (cur[0]?.database_id === managed.databaseId) continue;
+      kept.push(p);
+    }
+    return {pages: kept, databases: databases.filter((d) => d.id !== managed.databaseId)};
+  }
+
+  /**
+   * LGR-3 twin of {@link stripManagedUsage}: drop every bundle entry that targets
+   * the server-managed ledger. A no-op until the ledger is seeded.
+   *
+   * SECURITY (LGR-3 F1 — the ledger-erasure cascade). `importOverwriteTx` writes
+   * `parent_id`/`database_id` from the bundle verbatim, and BOTH columns are
+   * `ON DELETE CASCADE`. An earlier version skipped only the ledger ROOT page and
+   * pages carrying a ledger `database_id` — but the four per-database HOST pages
+   * have `database_id IS NULL`, so they passed straight through. Re-homing one
+   * (new `parent_id` under an attacker page, or a new `database_id` on an
+   * attacker database) then made a perfectly ordinary delete-and-purge — or a
+   * `DELETE /api/databases/:id` — hard-cascade the host away, taking its database
+   * and EVERY posting row with it: the transaction rows survived reading
+   * `state:'posted'` with `postings: []`, and the audit log recorded nothing. The
+   * books could be silently emptied through a route that never touches the ledger.
+   *
+   * So the skip-set is now ALL FIVE ledger host pages, and a bundle page is also
+   * dropped when it would ATTACH itself to (or re-home onto) any ledger page or
+   * database — an attacker page parented under a ledger page can't be used to
+   * drag ledger rows into a foreign cascade, and no bundle entry can re-point a
+   * ledger row's membership.
+   */
+  private async stripManagedLedger(
+    tx: Db,
+    pages: StoredPage[],
+    databases: StoredDatabase[],
+    ids: LedgerIds | null,
+  ): Promise<{pages: StoredPage[]; databases: StoredDatabase[]}> {
+    if (!ids) return {pages, databases};
+    const dbIds = new Set([ids.accounts, ids.transactions, ids.postings, ids.reconciliations]);
+    // Every ledger page that must never be rewritten: the root + the four
+    // per-database hosts (the ones that carry no `database_id`).
+    const hostIds = new Set<string>([ids.hostPageId, ...Object.values(ids.hostPages)]);
+    const kept: StoredPage[] = [];
+    for (const p of pages) {
+      if (hostIds.has(p.id)) continue;
+      if (p.databaseId && dbIds.has(p.databaseId)) continue;
+      // Attaching a foreign page UNDER a ledger page (or claiming a ledger page
+      // as its parent) is refused too: it would splice attacker-controlled rows
+      // into the ledger subtree. NOTE the `tx` — querying the outer handle from
+      // inside this transaction deadlocks the process (see isLedgerPageOn).
+      if (p.parentId && (await this.isLedgerPageOn(tx, ids, p.parentId))) continue;
+      const cur = await tx.query<{database_id: string | null}>('SELECT database_id FROM pages WHERE id = $1', [p.id]);
+      if (cur[0]?.database_id && dbIds.has(cur[0].database_id)) continue;
+      kept.push(p);
+    }
+    // A ledger database can neither be rewritten nor re-homed onto ANY ledger
+    // page — host or row. (Claiming a ROW as `pageId` has no erasure path today,
+    // since `deleteDatabase` never touches the host page and ledger rows can't
+    // be trashed or purged; refused anyway so the import door and the runtime
+    // guards agree rather than relying on that reasoning staying true.)
+    const keptDatabases: StoredDatabase[] = [];
+    for (const d of databases) {
+      if (dbIds.has(d.id)) continue;
+      if (await this.isLedgerPageOn(tx, ids, d.pageId)) continue;
+      keptDatabases.push(d);
+    }
+    return {pages: kept, databases: keptDatabases};
+  }
+
+  /** Restore a verified asset corpus and rebuild reachability from its manifest. */
+  private async restoreAssetsTx(
+    tx: Db,
+    assets: BackupAsset[],
+    pages: StoredPage[],
+    idMap: Record<string, string>,
+    budget: number | undefined,
+    context: string,
+    replaceRefs: boolean,
+  ): Promise<void> {
+    const bundlePageIds = new Set(pages.map((page) => page.id));
+    if (replaceRefs) {
+      const targetPageIds = [...bundlePageIds]
+        .map((sourcePageId) => idMap[sourcePageId])
+        .filter((pageId): pageId is string => typeof pageId === 'string');
+      if (targetPageIds.length > 0) {
+        // Overwrite restores replace the page documents, so their reachability
+        // edges must be replaced too. Leaving old edges behind makes a removed
+        // restored image permanently block GC even after no document uses it.
+        await tx.query('DELETE FROM asset_refs WHERE page_id = ANY($1)', [targetPageIds]);
+      }
+    }
+    for (const asset of assets) {
+      if (typeof asset.id !== 'string' || !ASSET_ID_RE.test(asset.id) || typeof asset.bytesBase64 !== 'string') {
+        throw new BackupFormatError(`invalid ${context}: malformed asset entry`);
+      }
+      const bytes = decodeBackupBase64(asset.bytesBase64, asset.id);
+      if (bytes.byteLength > DEFAULT_MAX_ASSET_BYTES) {
+        throw new BackupFormatError(
+          `invalid ${context}: asset ${asset.id} is ${bytes.byteLength} bytes — over the ${DEFAULT_MAX_ASSET_BYTES}-byte asset cap`,
+        );
+      }
+      if (Number(asset.size) !== bytes.byteLength) {
+        throw new BackupFormatError(
+          `invalid ${context}: asset ${asset.id} declares ${String(asset.size)} bytes but contains ${bytes.byteLength}`,
+        );
+      }
+      const actual = await assetHash(bytes);
+      if (actual !== asset.id) {
+        throw new BackupFormatError(`invalid ${context}: asset ${asset.id} bytes hash to ${actual}`);
+      }
+      const mime = safeBackupMime(asset.mime, asset.id);
+      if (budget != null && budget >= 0) {
+        const inserted = await tx.query<{id: string}>(
+          `INSERT INTO assets (id, bytes, mime, size)
+           SELECT $1, $2, $3, $4
+           WHERE EXISTS (SELECT 1 FROM assets WHERE id = $1)
+              OR COALESCE((SELECT SUM(size) FROM assets), 0) + $5::bigint <= $6::bigint
+           ON CONFLICT (id) DO NOTHING
+           RETURNING id`,
+          [asset.id, Buffer.from(bytes), mime, bytes.byteLength, bytes.byteLength, budget],
+        );
+        if (inserted.length === 0) {
+          const exists = await tx.query<{one: number}>('SELECT 1 AS one FROM assets WHERE id = $1', [asset.id]);
+          if (exists.length === 0) {
+            throw new BackupFormatError(
+              `invalid ${context} restore: storing asset ${asset.id} (${bytes.byteLength} bytes) would exceed the ${budget}-byte asset storage budget`,
+            );
+          }
+        }
+      } else {
+        await tx.query(
+          `INSERT INTO assets (id, bytes, mime, size) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO NOTHING`,
+          [asset.id, Buffer.from(bytes), mime, bytes.byteLength],
+        );
+      }
+      for (const sourcePageId of asset.refs ?? []) {
+        if (typeof sourcePageId !== 'string' || !bundlePageIds.has(sourcePageId)) continue;
+        const targetPageId = idMap[sourcePageId];
+        if (!targetPageId) continue;
+        await tx.query(
+          `INSERT INTO asset_refs (asset_id, page_id)
+           SELECT $1, id FROM pages WHERE id = $2
+           ON CONFLICT (asset_id, page_id) DO NOTHING`,
+          [asset.id, targetPageId],
+        );
+      }
+    }
+  }
+
+  /** Replace the imported pages' stored visibility, policy, and ACL rows exactly. */
+  private async restorePageAccessTx(
+    tx: Db,
+    manifest: BackupPageAccess[],
+    idMap: Record<string, string>,
+  ): Promise<void> {
+    for (const access of manifest) {
+      const targetPageId = idMap[access.pageId];
+      if (!targetPageId) continue; // a managed target stripped by the import guard
+      await tx.query(
+        'UPDATE pages SET visibility = $2, agent_edits = $3 WHERE id = $1',
+        [targetPageId, access.visibility, access.agentEdits],
+      );
+      await tx.query('DELETE FROM page_acl WHERE page_id = $1', [targetPageId]);
+      for (const acl of access.acl) {
+        await tx.query(
+          `INSERT INTO page_acl (page_id, subject, email, issuer, level, invited_by, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [targetPageId, acl.subject, acl.email, acl.issuer, acl.level, acl.invitedBy, acl.createdAt],
+        );
+      }
+    }
+  }
+
+  /** Safe access baseline for an origin-less/foreign v3 restore. */
+  private async restrictRestoredPageAccessTx(
+    tx: Db,
+    manifest: BackupPageAccess[],
+    idMap: Record<string, string>,
+  ): Promise<void> {
+    for (const access of manifest) {
+      const targetPageId = idMap[access.pageId];
+      if (!targetPageId) continue; // a managed target stripped by the import guard
+      await tx.query(
+        'UPDATE pages SET visibility = \'restricted\', agent_edits = \'suggest\' WHERE id = $1',
+        [targetPageId],
+      );
+      await tx.query('DELETE FROM page_acl WHERE page_id = $1', [targetPageId]);
+    }
+  }
+
+  /** Safe baseline for pages whose access row could not be captured consistently. */
+  private async restrictRestoredPageIdsTx(
+    tx: Db,
+    sourcePageIds: Iterable<string>,
+    idMap: Record<string, string>,
+  ): Promise<void> {
+    for (const sourcePageId of sourcePageIds) {
+      const targetPageId = idMap[sourcePageId];
+      if (!targetPageId) continue; // a managed target stripped by the import guard
+      await tx.query(
+        'UPDATE pages SET visibility = \'restricted\', agent_edits = \'suggest\' WHERE id = $1',
+        [targetPageId],
+      );
+      await tx.query('DELETE FROM page_acl WHERE page_id = $1', [targetPageId]);
+    }
+  }
+
+  /**
+   * Apply a bundle's {@link LedgerBackupSection} inside the import transaction
+   * (LGR-15). Precondition held by the caller: overwrite mode (plus a fast-path
+   * no-existing-ledger check — RE-VERIFIED in here, see below).
+   *
+   * The section is UNTRUSTED input (instance-admin gated, but a crafted file is
+   * still a crafted file), so the door is checked in this order:
+   *
+   *  1. MEMBERSHIP, not mere existence (S2): every id the section claims must
+   *     be a page/database THIS request's post-strip bundle carried — checked
+   *     against the arrays, never against the target's tables, so a section can
+   *     never conscript a victim's existing database into "being the ledger"
+   *     (arming the write guards against its owner). A section without its own
+   *     rows is `skipped-incomplete`, never half-applied.
+   *  2. STREAM SHAPE: non-empty, strictly-ascending unique seqs, every action
+   *     interpretable by this build, and the FIRST event `ledger.init` — a
+   *     history with no genesis is not a history.
+   *  3. CHAIN VERIFICATION (S4): `verifyLedgerAuditChain` over the whole
+   *     stream, REFUSED when broken — the restore door must not install a
+   *     stream the documented tamper check would reject.
+   *  4. CLAIM, in-transaction (S3): the caller's no-existing-ledger check reads
+   *     pre-transaction state (TOCTOU); here the `ledgerDb` settings row is
+   *     CLAIMED (`ON CONFLICT DO NOTHING RETURNING` — the `import_log` shape),
+   *     then the audit-chain advisory lock is taken (same order as `doSeed`:
+   *     settings first, then lock — one order everywhere, no deadlock cycle)
+   *     and `ledger_audit` must be EMPTY. Losing either check is a typed
+   *     `skipped-existing-ledger`, never a unique-index 500.
+   *  5. VISIBILITY (S1): the five ledger host pages are re-asserted
+   *     `restricted`, mirroring `doSeed` — `visibility` is a column, not part
+   *     of `StoredPage`, so without this a restored ledger landed `inherit`
+   *     and any member could read the books the source library denied them.
+   *  6. ASSETS through the upload door's controls (S5): mime sanitized against
+   *     the SAME allowlist as `safeAssetMime`, the per-asset byte cap enforced,
+   *     the storage budget applied via the same guarded insert as `putAsset`,
+   *     bytes re-hashed against the claimed id, and refs attached ONLY to pages
+   *     this bundle carried.
+   *  7. PROVENANCE (S6): a `ledger.restore` event is appended ON TOP of the
+   *     restored tail — chained from it — naming the actor and the bundle's
+   *     content hash, so an installed history is bracketed by an attributable
+   *     event. Its afterHash derives from its own payload (the verifier
+   *     re-derives it, like `ledger.autoExportPath`).
+   *
+   * What it deliberately does NOT do: judge the restored history's TRUTH. The
+   * hashes are internally consistent or the door refuses; whether they match
+   * the restored rows is the LGR-7 verifier's job (`GET /api/ledger/verify` —
+   * the runbook's mandatory last step, and what the restore CI asserts). A
+   * consistent forger with a fabricated-but-well-formed history is undetectable
+   * by construction — restoring a bundle is trusting its author (runbook).
+   */
+  private async restoreLedgerSectionTx(
+    tx: Db,
+    section: LedgerBackupSection,
+    pages: StoredPage[],
+    databases: StoredDatabase[],
+    opts: {actor?: Principal; assetBudgetBytes?: number; bundleSha: string; assetCount: number},
+  ): Promise<LedgerRestoreOutcome> {
+    // 1. Shape + MEMBERSHIP (against this request's post-strip bundle arrays).
+    const rawIds = section.settings?.[LEDGER_DB_SETTING_KEY] as Partial<LedgerIds> | undefined;
+    const hostPages = rawIds?.hostPages;
+    const pageIds = [rawIds?.hostPageId, hostPages?.accounts, hostPages?.transactions, hostPages?.postings, hostPages?.reconciliations];
+    const dbIds = [rawIds?.accounts, rawIds?.transactions, rawIds?.postings, rawIds?.reconciliations];
+    const allStrings = [...pageIds, ...dbIds].every((id): id is string => typeof id === 'string' && id.length > 0);
+    if (!rawIds || !allStrings) return 'skipped-incomplete';
+    const bundlePageIds = new Set(pages.map((p) => p.id));
+    const bundleDbIds = new Set(databases.map((d) => d.id));
+    if (!pageIds.every((id) => bundlePageIds.has(id as string))) return 'skipped-incomplete';
+    if (!dbIds.every((id) => bundleDbIds.has(id as string))) return 'skipped-incomplete';
+
+    // 2. Stream shape. A ledger's history opens with its genesis event.
+    const events = [...section.audit].sort((a, b) => Number(a.seq) - Number(b.seq));
+    if (events.length === 0 || events[0].action !== 'ledger.init') return 'skipped-incomplete';
+    let prevSeq = 0;
+    for (const ev of events) {
+      const seq = Number(ev.seq);
+      if (!Number.isSafeInteger(seq) || seq <= prevSeq) {
+        throw new Error(`invalid ledger backup: audit seq ${String(ev.seq)} is not strictly ascending`);
+      }
+      prevSeq = seq;
+      if (!(LEDGER_AUDIT_ACTIONS as readonly string[]).includes(ev.action)) {
+        throw new Error(`invalid ledger backup: unknown audit action ${JSON.stringify(ev.action)}`);
+      }
+      if (typeof ev.id !== 'string' || ev.id.length === 0) {
+        throw new Error(`invalid ledger backup: audit seq ${seq} has no event id`);
+      }
+    }
+
+    // 3. The tamper-evidence chain must verify BEFORE anything is installed.
+    const chain = await verifyLedgerAuditChain(events);
+    if (!chain.ok) {
+      throw new Error(
+        `invalid ledger backup: audit hash chain broken at seq ${chain.brokenAtSeq ?? '?'} — ${chain.reason ?? 'unverifiable'}; refusing to install a stream the tamper check rejects`,
+      );
+    }
+
+    // 4. CLAIM the ledger in-transaction (settings row first, then the chain
+    // lock — doSeed's order), and require an EMPTY audit table.
+    const claim = await tx.query<{key: string}>(
+      `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+       ON CONFLICT (key) DO NOTHING RETURNING key`,
+      [LEDGER_DB_SETTING_KEY, JSON.stringify(section.settings[LEDGER_DB_SETTING_KEY])],
+    );
+    if (claim.length === 0) return 'skipped-existing-ledger';
+    await tx.query('SELECT pg_advisory_xact_lock($1)', [LEDGER_AUDIT_CHAIN_LOCK]);
+    const existingAudit = await tx.query<{seq: number}>('SELECT seq FROM ledger_audit LIMIT 1');
+    if (existingAudit.length > 0) return 'skipped-existing-ledger';
+
+    for (const key of [LEDGER_PERIODS_SETTING_KEY, LEDGER_ENTRY_SEQ_SETTING_KEY]) {
+      const value = section.settings[key];
+      if (value == null) continue;
+      await tx.query(
+        `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [key, JSON.stringify(value)],
+      );
+    }
+
+    for (const ev of events) {
+      await tx.query(
+        `INSERT INTO ledger_audit (seq, id, actor_subject, actor_name, action, entity_ids, payload, before_hash, after_hash, prev_hash, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)`,
+        [
+          Number(ev.seq),
+          ev.id,
+          typeof ev.actorSubject === 'string' ? ev.actorSubject : '',
+          typeof ev.actorName === 'string' ? ev.actorName : '',
+          ev.action,
+          JSON.stringify(Array.isArray(ev.entityIds) ? ev.entityIds : []),
+          JSON.stringify(ev.payload ?? {}),
+          typeof ev.beforeHash === 'string' ? ev.beforeHash : null,
+          typeof ev.afterHash === 'string' ? ev.afterHash : null,
+          typeof ev.prevHash === 'string' ? ev.prevHash : null,
+          ev.createdAt,
+        ],
+      );
+    }
+    // Advance the BIGSERIAL past the restored tail so the next append never
+    // collides with a restored seq.
+    await tx.query(
+      'SELECT setval(pg_get_serial_sequence(\'ledger_audit\', \'seq\'), (SELECT COALESCE(MAX(seq), 1) FROM ledger_audit))',
+    );
+
+    // 5. Re-assert the seed-time visibility posture (mirrors doSeed): the five
+    // ledger host pages are `restricted`, always — the bundle does not carry
+    // the `visibility` column, and `inherit` would hand the books to `members`.
+    await tx.query('UPDATE pages SET visibility = \'restricted\' WHERE id = ANY($1)', [pageIds]);
+
+    // 6. Evidence assets, through the upload door's controls.
+    for (const asset of section.assets ?? []) {
+      if (typeof asset.id !== 'string' || !/^[0-9a-f]{64}$/.test(asset.id) || typeof asset.bytesBase64 !== 'string') {
+        throw new Error('invalid ledger backup: malformed evidence asset entry');
+      }
+      const bytes = Uint8Array.from(Buffer.from(asset.bytesBase64, 'base64'));
+      if (bytes.byteLength > DEFAULT_MAX_ASSET_BYTES) {
+        throw new Error(`invalid ledger backup: asset ${asset.id} is ${bytes.byteLength} bytes — over the ${DEFAULT_MAX_ASSET_BYTES}-byte asset cap the upload door enforces`);
+      }
+      const actual = await assetHash(bytes);
+      if (actual !== asset.id) {
+        throw new Error(`invalid ledger backup: asset ${asset.id} bytes hash to ${actual} — refusing to store bytes under a hash they do not answer to`);
+      }
+      // The SAME mime discipline as the upload door's `safeAssetMime` (app.ts),
+      // against the same sdk allowlist: control characters refuse the bundle
+      // (header-injection shape — nothing legitimate produces one); anything
+      // not an allowlisted image or audio stores as octet-stream, which nosniff +
+      // attachment disposition can never execute. Without this, a bundle could
+      // plant `text/html` bytes an image block then serves from the app origin.
+      const rawMime = typeof asset.mime === 'string' ? asset.mime : '';
+      // eslint-disable-next-line no-control-regex -- intentionally rejecting control chars (CR/LF/NUL/etc)
+      if (/[\u0000-\u001f\u007f]/.test(rawMime)) {
+        throw new Error(`invalid ledger backup: asset ${asset.id} carries a control character in its mime`);
+      }
+      const base = rawMime.split(';', 1)[0].trim().toLowerCase();
+      const mime = ASSET_MIMES.has(base) ? base : 'application/octet-stream';
+      // The budget-guarded insert `putAsset` uses, on THIS transaction: the row
+      // lands only if the content already exists (dedup) or the running total
+      // plus this asset stays within budget. See putAsset for the $5/$6 note.
+      const budget = opts.assetBudgetBytes;
+      if (budget != null && budget >= 0) {
+        const inserted = await tx.query<{id: string}>(
+          `INSERT INTO assets (id, bytes, mime, size)
+           SELECT $1, $2, $3, $4
+           WHERE EXISTS (SELECT 1 FROM assets WHERE id = $1)
+              OR COALESCE((SELECT SUM(size) FROM assets), 0) + $5::bigint <= $6::bigint
+           ON CONFLICT (id) DO NOTHING
+           RETURNING id`,
+          [asset.id, Buffer.from(bytes), mime, bytes.byteLength, bytes.byteLength, budget],
+        );
+        if (inserted.length === 0) {
+          const exists = await tx.query<{one: number}>('SELECT 1 AS one FROM assets WHERE id = $1', [asset.id]);
+          if (exists.length === 0) {
+            throw new Error(`invalid ledger backup restore: storing evidence asset ${asset.id} (${bytes.byteLength} bytes) would exceed the ${budget}-byte asset storage budget`);
+          }
+        }
+      } else {
+        await tx.query(
+          `INSERT INTO assets (id, bytes, mime, size) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO NOTHING`,
+          [asset.id, Buffer.from(bytes), mime, bytes.byteLength],
+        );
+      }
+      for (const pageId of asset.refs ?? []) {
+        // Refs attach ONLY to pages THIS bundle carried (S5) — a section must
+        // not be able to hang its assets off a victim's existing pages — and
+        // only where the row exists post-import (no dangling FK); ON CONFLICT
+        // keeps re-restores idempotent.
+        if (typeof pageId !== 'string' || !bundlePageIds.has(pageId)) continue;
+        await tx.query(
+          `INSERT INTO asset_refs (asset_id, page_id)
+           SELECT $1, id FROM pages WHERE id = $2
+           ON CONFLICT (asset_id, page_id) DO NOTHING`,
+          [asset.id, pageId],
+        );
+      }
+    }
+
+    // 7. Provenance: bracket the installed history with an attributable event,
+    // chained from the restored tail. afterHash derives from the payload
+    // through the ONE shared shape (`ledgerRestorePayloadContent` — the same
+    // function the verifier re-derives with and the LX-4 section restore
+    // writes with; for this three-field payload the projection is the
+    // identity, so pre-existing events verify unchanged); prev_hash is the
+    // tail event's canonical hash — the same digest `appendAuditTx` computes
+    // from the raw row.
+    const restorePayload = {
+      bundleSha: opts.bundleSha,
+      auditEvents: events.length,
+      assets: opts.assetCount,
+    };
+    const afterHash = await assetHash(new TextEncoder().encode(canonicalLedgerJson(ledgerRestorePayloadContent(restorePayload))));
+    const prevHash = await ledgerAuditEventHash(events[events.length - 1]);
+    await tx.query(
+      `INSERT INTO ledger_audit (id, actor_subject, actor_name, action, entity_ids, payload, before_hash, after_hash, prev_hash)
+       VALUES ($1, $2, $3, 'ledger.restore', '[]'::jsonb, $4::jsonb, NULL, $5, $6)`,
+      [randomUUID(), opts.actor?.subject ?? '', opts.actor?.name ?? '', JSON.stringify(restorePayload), afterHash, prevHash],
+    );
+    return 'restored';
+  }
+
   private async importCopyTx(tx: Db, pages: StoredPage[], databases: StoredDatabase[]): Promise<ImportResult> {
     const {pages: rp, databases: rd, idMap} = remapBundle(pages, databases, randomUUID);
     let renamed = 0;
@@ -511,12 +2242,15 @@ export class PageStore {
       names.set(p.id, free);
     }
     // Insert pages first (parent_id/database_id deferred so the FKs resolve).
+    // Copy mode appends the import BELOW existing pages (1_000_000 + i keeps the
+    // bundle's relative order); a bundle-carried `position` (LGR-15) is offset,
+    // not taken verbatim, so imported copies never interleave existing siblings.
     let i = 0;
     for (const p of rp) {
       await tx.query(
         `INSERT INTO pages (id, name, data, properties, position, created_at, updated_at)
          VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, $6, now())`,
-        [p.id, names.get(p.id) ?? null, JSON.stringify(p.data), JSON.stringify(p.properties ?? {}), 1_000_000 + i, p.createdAt],
+        [p.id, names.get(p.id) ?? null, JSON.stringify(p.data), JSON.stringify(p.properties ?? {}), 1_000_000 + (typeof p.position === 'number' && Number.isFinite(p.position) ? p.position : i), p.createdAt],
       );
       i += 1;
     }
@@ -547,13 +2281,19 @@ export class PageStore {
       // Keep the page's own name; suffix only if a *different* live page holds it.
       const name = p.name ? await freeName(tx, p.name, taken, 'imported', p.id) : null;
       if (name) taken.add(name);
+      // Overwrite restores IN PLACE, so a bundle-carried `position` (LGR-15) is
+      // taken verbatim — for ledger posting rows it is load-bearing (posting
+      // order feeds the audited content hash); COALESCE keeps a v1 bundle's
+      // pages at the column default / their existing spot.
+      const position = typeof p.position === 'number' && Number.isFinite(p.position) ? p.position : null;
       await tx.query(
-        `INSERT INTO pages (id, name, data, properties, created_at, updated_at)
-         VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, now())
+        `INSERT INTO pages (id, name, data, properties, position, created_at, updated_at)
+         VALUES ($1, $2, $3::jsonb, $4::jsonb, COALESCE($6, 0), $5, now())
          ON CONFLICT (id) DO UPDATE SET
            name = EXCLUDED.name, data = EXCLUDED.data, properties = EXCLUDED.properties,
+           position = COALESCE($6, pages.position),
            deleted_at = NULL, updated_at = now()`,
-        [p.id, name, JSON.stringify(p.data), JSON.stringify(p.properties ?? {}), p.createdAt],
+        [p.id, name, JSON.stringify(p.data), JSON.stringify(p.properties ?? {}), p.createdAt, position],
       );
     }
     for (const d of databases) {
@@ -598,6 +2338,14 @@ export class PageStore {
     base: string,
     nowIso: string = new Date().toISOString(),
   ): Promise<{action: 'created' | 'updated' | 'conflict' | 'unchanged'; page: StoredPage}> {
+    // LGR-3: ledger pages are DB-canonical, ALWAYS. A divergent (or crafted)
+    // mirror file must never rewrite one — report it unchanged so the mirror
+    // loop settles by re-rendering the canonical bytes back to disk. Checked
+    // BEFORE the transaction (the PGlite mutex is held inside it).
+    if (await this.isLedgerPage(record.id)) {
+      const canonical = await this.getPage(record.id);
+      if (canonical) return {action: 'unchanged', page: canonical};
+    }
     return this.db.begin(async (tx) => {
       const existingRows = await tx.query<PageRow>(
         `SELECT id, name, data, database_id, parent_id, properties, created_at, updated_at,
@@ -687,7 +2435,7 @@ export class PageStore {
       // divergence ⇒ at most one conflict copy per (page-id, content) — holds, and
       // the mirror's per-page-id cap (ER-4) can spot a storm regression without
       // being fooled by repeated re-applies of the same content.
-      this.conflictCopiesMinted += 1;
+      this.sharedState.conflictCopiesMinted += 1;
       return {action: 'conflict' as const, page: pageFromRow(copy[0])};
     });
   }
@@ -739,39 +2487,24 @@ export class PageStore {
    * unrelated keyless callers collide. (Anonymous guests share one subject and are
    * the write-excluded class under a locked instance, so they're not relied on here.)
    */
-  async upsertPage(input: PageInput, author?: Principal): Promise<StoredPage> {
+  async upsertPage(input: PageInput, author?: Principal, opts?: UpsertPageOptions): Promise<StoredPage> {
+    // LGR-3: an upsert ONTO a ledger page (host or row) is a direct ledger write —
+    // rejected at the store layer so local mode is enforced identically. A keyless
+    // create is unaffected (a fresh id can't be a ledger page).
+    if (input.id) await this.assertNotLedgerPage(input.id);
+    const captureMode = opts?.captureMode ?? 'coalesced';
     const clientKey = input.idempotencyKey?.trim();
     const subject = author?.subject;
     if (!input.id && clientKey && subject) {
       return this.db.begin(async (tx) => {
-        const newId = randomUUID();
-        const claim = await tx.query<{page_id: string}>(
-          `INSERT INTO write_keys (author_subject, client_key, page_id)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (author_subject, client_key) DO NOTHING
-           RETURNING page_id`,
-          [subject, clientKey, newId],
+        const result = await claimKeyedCreate(tx, subject, clientKey, (id) =>
+          this.upsertPageTx(tx, id, input, author, undefined, captureMode),
         );
-        // The key was already claimed by an earlier create from THIS principal →
-        // this is a replay. Return the page that create minted (whatever its
-        // current state), so the replay never produces a second page.
-        if (claim.length === 0) {
-          const keyed = await tx.query<{page_id: string}>(
-            'SELECT page_id FROM write_keys WHERE author_subject = $1 AND client_key = $2',
-            [subject, clientKey],
-          );
-          const keyedId = keyed[0]?.page_id ?? newId;
-          const rows = await tx.query<PageRow>(`SELECT ${PAGE_COLUMNS} FROM ${PAGE_FROM} WHERE p.id = $1`, [keyedId]);
-          if (rows.length > 0) return pageFromRow(rows[0]);
-          // The keyed page was hard-purged — re-create it under its recorded id so
-          // the key stays consistent across any further replays (rare edge).
-          return this.upsertPageTx(tx, keyedId, input, author);
-        }
-        return this.upsertPageTx(tx, newId, input, author);
+        return result.page;
       });
     }
     const id = input.id ?? randomUUID();
-    return this.db.begin((tx) => this.upsertPageTx(tx, id, input, author));
+    return this.db.begin((tx) => this.upsertPageTx(tx, id, input, author, undefined, captureMode));
   }
 
   /**
@@ -791,6 +2524,7 @@ export class PageStore {
     input: PageInput,
     author?: Principal,
     authorsByBlock?: ReadonlyMap<string, string>,
+    captureMode: CaptureMode = 'coalesced',
   ): Promise<StoredPage> {
     // Stamp per-block mtimes relative to the page's prior content so an
     // unchanged block keeps its timestamp and a changed one is restamped — the
@@ -804,7 +2538,52 @@ export class PageStore {
     const stamped = stampSnapshotMtimes(priorData, input.data ?? EMPTY_SNAPSHOT, new Date().toISOString());
     const data = authorsByBlock
       ? stampSnapshotAuthorsPerBlock(priorData, stamped, authorsByBlock)
-      : stampSnapshotAuthors(priorData, stamped, verifiedSubject(author));
+      : stampSnapshotAuthors(priorData, stamped, authoredSubject(author));
+    // PVH-1: snapshot the state being REPLACED (the prior `data`) into
+    // `page_versions` — a row = "what the page was before this save", the state you
+    // can roll back TO. Runs BEFORE the upsert, in the same transaction, reading the
+    // still-current `pages.data`. The guards mirror the no-op skip below:
+    //   • `p.data IS DISTINCT FROM $2::jsonb` — the SAME normalized-jsonb change
+    //     signal, so a no-op save (or a name-only change) writes NO version. ALWAYS
+    //     applied, in both capture modes.
+    //   • the coalesce `NOT EXISTS` — skip when a version was captured within the
+    //     last PAGE_VERSION_COALESCE_SECONDS, so a burst of saves collapses to one.
+    //     Applied only in `'coalesced'` mode (the default, every routine save).
+    // `captureMode: 'force'` (PVH-3, the restore route) OMITS the coalesce clause so
+    // the pre-restore state is ALWAYS snapshotted, even when the user restores within
+    // 45s of the last capture — otherwise the restore would be destructive and not
+    // undoable (contra the non-destructive guarantee). The `IS DISTINCT FROM` guard
+    // still holds, so restoring identical data still writes no version.
+    // A brand-new page matches no `p.id` row, so a create captures nothing (it
+    // replaces no prior state). Author is the verified saving principal (who
+    // superseded the captured state); a server-merged checkpoint has no single save
+    // principal, so its columns are null (per-block authorship lives in the snapshot).
+    const captureParams: unknown[] = [
+      randomUUID(),
+      JSON.stringify(data),
+      id,
+      author?.subject ?? null,
+      author?.issuer ?? null,
+      author?.name ?? null,
+    ];
+    const coalesceClause =
+      captureMode === 'force'
+        ? ''
+        : `AND NOT EXISTS (
+             SELECT 1 FROM page_versions v
+             WHERE v.page_id = p.id
+               AND v.created_at > now() - ($7::int * interval '1 second')
+           )`;
+    if (captureMode !== 'force') captureParams.push(PAGE_VERSION_COALESCE_SECONDS);
+    await tx.query(
+      `INSERT INTO page_versions (id, page_id, data, author_subject, author_issuer, author_name)
+       SELECT $1, p.id, p.data, $4, $5, $6
+       FROM pages p
+       WHERE p.id = $3
+         AND p.data IS DISTINCT FROM $2::jsonb
+         ${coalesceClause}`,
+      captureParams,
+    );
     const rows = await tx.query<PageRow>(
       // A new page is appended to the bottom of its sibling group (one past the
       // current max position). Like `parent_id`, `position` is set only on
@@ -816,10 +2595,10 @@ export class PageStore {
       // FROM` compares the *normalized* jsonb value, so a different key order or
       // whitespace alone doesn't count as a change. A skipped update also leaves
       // `updated_at` untouched, so the mirror/watcher don't see a phantom edit.
-      `INSERT INTO pages (id, name, data, parent_id, position, updated_at)
+      `INSERT INTO pages (id, name, data, parent_id, position, listed, updated_at)
        VALUES ($1, $2, $3::jsonb, $4,
          (SELECT COALESCE(MAX(position), -1) + 1 FROM pages WHERE parent_id IS NOT DISTINCT FROM $4),
-         now())
+         COALESCE($5, true), now())
        ON CONFLICT (id) DO UPDATE
          SET name = EXCLUDED.name,
              data = EXCLUDED.data,
@@ -828,7 +2607,7 @@ export class PageStore {
             OR pages.name IS DISTINCT FROM EXCLUDED.name
        RETURNING id, name, data, database_id, parent_id, properties, created_at, updated_at,
          (SELECT id FROM databases WHERE page_id = pages.id) AS hosted_database_id`,
-      [id, input.name ?? null, JSON.stringify(data), input.parentId ?? null],
+      [id, input.name ?? null, JSON.stringify(data), input.parentId ?? null, input.listed ?? null],
     );
     // Empty result ⇒ the no-op `WHERE` skipped the write; the stored row is
     // already current, so return it unchanged.
@@ -862,6 +2641,7 @@ export class PageStore {
     blockdoc: unknown,
     authorsByBlock: ReadonlyMap<string, string>,
   ): Promise<StoredPage | null> {
+    await this.assertNotLedgerPage(id); // LGR-3: no collab-persist path into ledger rows
     return this.db.begin(async (tx) => {
       const prior = await tx.query<{name: string | null; data: PageSnapshot | string | null}>(
         'SELECT name, data FROM pages WHERE id = $1 AND deleted_at IS NULL',
@@ -873,6 +2653,29 @@ export class PageStore {
       // editorjs/values/names, etc.). upsertPageTx re-reads prior + stamps mtimes.
       const data = {...priorData, editor: 'blocks', blockdoc};
       return this.upsertPageTx(tx, id, {id, name: prior[0].name, data}, undefined, authorsByBlock);
+    });
+  }
+
+  /** Atomically merge a stored-page delta, preserving current metadata and deletion. */
+  async applyPageUpdate(id: string, update: Uint8Array, author: Principal): Promise<StoredPage | 'stale' | null> {
+    await this.assertNotLedgerPage(id);
+    return this.db.begin(async (tx) => {
+      const prior = await tx.query<{name: string | null; data: PageSnapshot | string | null}>(
+        'SELECT name, data FROM pages WHERE id = $1 AND deleted_at IS NULL FOR UPDATE', [id],
+      );
+      if (!prior.length) return null;
+      const data = parseSnapshot(prior[0].data);
+      const base = (data.blockdoc as {update?: string} | undefined)?.update;
+      if (!base) return 'stale' as const;
+      const doc = new Y.Doc();
+      try {
+        if (base) Y.applyUpdate(doc, Buffer.from(base, 'base64'));
+        Y.applyUpdate(doc, update);
+        if (doc.store.pendingStructs || doc.store.pendingDs) return 'stale' as const;
+        return await this.upsertPageTx(tx, id, {
+          id, name: prior[0].name, data: {...data, editor: 'blocks', blockdoc: encodeServerBlockDoc(doc)},
+        }, author);
+      } finally { doc.destroy(); }
     });
   }
 
@@ -889,6 +2692,15 @@ export class PageStore {
     parentId: string | null,
     orderedIds: string[],
   ): Promise<StoredPage | null> {
+    // LGR-3: a ledger page is never the MOVED page, and a ledger page is never
+    // the DESTINATION parent — splicing a foreign page into the ledger subtree
+    // is exactly what `stripManagedLedger` refuses on the import path, so the
+    // two doors must agree. (Neither assert alone is enough: `orderedIds` is a
+    // third write channel, constrained separately below. And none of this is
+    // what keeps a foreign cascade off the ledger — that is the import-bundle
+    // skip-set, which refuses to re-home a ledger host page.)
+    await this.assertNotLedgerPage(id);
+    if (parentId) await this.assertNotLedgerPage(parentId);
     const ok = await this.db.begin(async (tx) => {
       const exists = await tx.query<{id: string}>('SELECT id FROM pages WHERE id = $1 AND deleted_at IS NULL', [id]);
       if (exists.length === 0) return false;
@@ -914,7 +2726,24 @@ export class PageStore {
         // same `IS DISTINCT FROM` guard `upsertPage` uses — so a renumber that leaves
         // most siblings put doesn't churn a dead MVCC tuple per row (PGlite has no
         // autovacuum, OB-164).
-        await tx.query('UPDATE pages SET position = $2 WHERE id = $1 AND position IS DISTINCT FROM $2', [orderedIds[i], i]);
+        //
+        // SECURITY (LGR-3 F1/F2): `orderedIds` is caller-supplied and was
+        // previously unconstrained — ANY page id in the list got its `position`
+        // rewritten, including DATABASE ROWS that are not siblings of anything
+        // being moved. That was a second, unaudited write channel into ledger
+        // rows: reordering a POSTED transaction's postings changes the order
+        // `postingsForTx` returns, hence the canonical `transactionContent`
+        // serialization the audit hashes are taken over. The renumber is now
+        // constrained to what it always meant — real page-tree siblings under
+        // the move's target parent (`database_id IS NULL` excludes every
+        // database row, ledger rows included). A non-sibling id in the list is
+        // simply ignored, exactly as an unknown id already was.
+        await tx.query(
+          `UPDATE pages SET position = $2
+             WHERE id = $1 AND position IS DISTINCT FROM $2
+               AND parent_id IS NOT DISTINCT FROM $3 AND database_id IS NULL`,
+          [orderedIds[i], i, parentId],
+        );
       }
       return true;
     });
@@ -931,6 +2760,7 @@ export class PageStore {
 
   /** Update only a page's name, leaving its data untouched. */
   async renamePage(id: string, name: string | null): Promise<StoredPage | null> {
+    await this.assertNotLedgerPage(id); // LGR-3 (an account rename goes through the ledger API)
     const rows = await this.db.query<PageRow>(
       `UPDATE pages SET name = $2, updated_at = now() WHERE id = $1
        RETURNING id, name, data, database_id, parent_id, properties, created_at, updated_at,
@@ -941,13 +2771,16 @@ export class PageStore {
   }
 
   /**
-   * Shallow-merge structured property values into a page's `properties` (jsonb
-   * `||`), leaving its document content and any unmentioned properties intact.
+   * Shallow-merge structured property values into a page's `properties`,
+   * leaving its document content and any unmentioned properties intact.
+   * Unlike {@link updateRow}, `null` is stored rather than deleting a key;
+   * readers currently treat a stored `null` the same as an absent value.
    * This is how a standalone page's owner/verification are set — database rows
    * still go through {@link updateRow}. Returns the updated page, or `null` if
    * it's missing.
    */
   async setPageProperties(id: string, patch: Record<string, unknown>): Promise<StoredPage | null> {
+    await this.assertNotLedgerPage(id); // LGR-3: ledger values live in properties — no direct writes
     // Read-merge-write in a transaction. We merge in JS and write the whole
     // object with a plain `$2::jsonb` replace (portable across the embedded and
     // wire-protocol PGlite backends, unlike the jsonb `||` merge operator).
@@ -981,7 +2814,7 @@ export class PageStore {
    */
   async listBacklinks(id: string): Promise<PageMeta[]> {
     const rows = await this.db.query<PageRow>(
-      `SELECT p.id, p.name, p.parent_id, p.properties, p.deleted_at, p.created_at, p.updated_at, p.data,
+      `SELECT p.id, p.name, p.listed, p.parent_id, p.properties, p.deleted_at, p.created_at, p.updated_at, p.data,
               d.id AS hosted_database_id, (p.properties->>'sys_icon') AS icon
          FROM pages p LEFT JOIN databases d ON d.page_id = p.id
         WHERE p.deleted_at IS NULL AND p.id <> $1
@@ -999,6 +2832,75 @@ export class PageStore {
   }
 
   /**
+   * The whole-library page-link graph, computed on the fly (no persisted edge
+   * table). One pass over every live page (standalone pages AND database rows —
+   * relations are set on rows): each page's out-edges are its document
+   * `@`-mentions ({@link extractMentionIds}, `kind:'mention'`) plus its property
+   * references ({@link extractPropertyReferenceIds}, `kind:'relation'`). Edges
+   * are kept only when the TARGET is a real live page (drops references to
+   * deleted/missing pages and non-id property strings) and `from !== to`
+   * (self-loops dropped).
+   *
+   * When `canRead` is supplied (the per-principal read gate the route threads in,
+   * mirroring `/api/ai/search`), the graph is filtered default-deny: a node is
+   * dropped unless it is readable, and an edge is dropped unless BOTH endpoints
+   * are readable — so a restricted page can neither appear as a node nor leak via
+   * an edge to/from a page you can see.
+   */
+  async pageGraph(canRead?: (pageId: string) => boolean | Promise<boolean>): Promise<PageGraph> {
+    const rows = await this.db.query<PageRow>(
+      `SELECT p.id, p.name, p.data, p.properties, (p.properties->>'sys_icon') AS icon
+         FROM pages p
+        WHERE p.deleted_at IS NULL`,
+    );
+    // The set of real, live page ids — the only valid edge targets.
+    const liveIds = new Set(rows.map((r) => r.id));
+
+    // Per-principal read filter (default-deny). Resolve the readable id set once
+    // up front so edge filtering is a couple of set lookups, not an await per
+    // endpoint.
+    let readable: Set<string> | null = null;
+    if (canRead) {
+      readable = new Set<string>();
+      for (const id of liveIds) {
+        if (await canRead(id)) readable.add(id);
+      }
+    }
+    const isReadable = (id: string): boolean => (readable ? readable.has(id) : true);
+
+    const edges: PageGraphEdge[] = [];
+    const seenEdge = new Set<string>();
+    const pushEdge = (from: string, to: string, kind: PageGraphEdge['kind']): void => {
+      if (from === to) return; // self-loop
+      if (!liveIds.has(to)) return; // target deleted/missing (or not a page id)
+      if (!isReadable(from) || !isReadable(to)) return; // both endpoints must be readable
+      const key = `${from} ${to} ${kind}`;
+      if (seenEdge.has(key)) return;
+      seenEdge.add(key);
+      edges.push({from, to, kind});
+    };
+
+    for (const row of rows) {
+      for (const to of extractMentionIds(parseSnapshot(row.data))) pushEdge(row.id, to, 'mention');
+      for (const to of extractPropertyReferenceIds(parseJson<Record<string, unknown>>(row.properties, {})))
+        pushEdge(row.id, to, 'relation');
+    }
+
+    const nodes = rows.filter((row) => isReadable(row.id)).map((row) => ({id: row.id, name: row.name, icon: row.icon ?? null}));
+    return {nodes, edges};
+  }
+
+  /** The ids excluded from ordinary discovery among live pages. Used by the
+   * blanket-readable graph fast path so it pays one query instead of a full
+   * `canListPage` authorization round-trip for every node. */
+  async listUnlistedPageIds(): Promise<string[]> {
+    const rows = await this.db.query<{id: string}>(
+      'SELECT id FROM pages WHERE listed = FALSE AND deleted_at IS NULL',
+    );
+    return rows.map((row) => row.id);
+  }
+
+  /**
    * Soft-delete a page: move it (and its whole `parent_id` subtree) to the
    * trash by stamping `deleted_at`, instead of removing the rows. All affected
    * rows get the same timestamp so {@link restorePage} can bring back exactly
@@ -1008,6 +2910,10 @@ export class PageStore {
    * host on restore and are removed by the FK cascade when it's finally purged.
    */
   async deletePage(id: string): Promise<boolean> {
+    // LGR-3: ledger rows (drafts included) and the ledger host never pass through
+    // the generic soft-delete — a trash restore could otherwise resurrect state
+    // behind the ledger's back. Draft deletion goes through `ledger.deleteDraft`.
+    await this.assertNotLedgerPage(id);
     const rows = await this.db.query<{id: string}>(
       `WITH RECURSIVE subtree AS (
          SELECT id FROM pages WHERE id = $1
@@ -1069,7 +2975,7 @@ export class PageStore {
    */
   async listTrash(): Promise<PageMeta[]> {
     const rows = await this.db.query<PageRow>(
-      `SELECT p.id, p.name, p.parent_id, p.deleted_at, p.created_at, p.updated_at, d.id AS hosted_database_id,
+      `SELECT p.id, p.name, p.listed, p.parent_id, p.deleted_at, p.created_at, p.updated_at, d.id AS hosted_database_id,
               (p.properties->>'sys_icon') AS icon
        FROM pages p
        LEFT JOIN databases d ON d.page_id = p.id
@@ -1084,6 +2990,10 @@ export class PageStore {
   /** Permanently delete a single trashed page (and, by cascade, its subtree,
    *  hosted database, and rows). Returns `true` if a trashed row was removed. */
   async purgePage(id: string): Promise<boolean> {
+    // LGR-3 defense-in-depth: ledger pages can never be soft-deleted (see
+    // deletePage), so none should ever sit in the trash — but a purge must still
+    // refuse to hard-delete one under any circumstance.
+    await this.assertNotLedgerPage(id);
     const rows = await this.db.query(
       'DELETE FROM pages WHERE id = $1 AND deleted_at IS NOT NULL RETURNING id',
       [id],
@@ -1091,11 +3001,32 @@ export class PageStore {
     return rows.length > 0;
   }
 
+  /**
+   * SQL fragment excluding ledger pages from a bulk trash purge (LGR-3): the
+   * four ledger databases' rows and the ledger host page are never touched, no
+   * matter how they might have entered the trash. Returns `''` (no ledger) or an
+   * `AND …` clause plus its parameters, starting at placeholder `$«from»`.
+   */
+  private async ledgerPurgeExclusion(from: number): Promise<{clause: string; params: unknown[]}> {
+    const ids = await this.ledgerIds();
+    if (!ids) return {clause: '', params: []};
+    const dbIds = [ids.accounts, ids.transactions, ids.postings, ids.reconciliations];
+    const pageIds = [ids.hostPageId, ids.hostPages.accounts, ids.hostPages.transactions, ids.hostPages.postings, ids.hostPages.reconciliations];
+    const dbPh = dbIds.map((_, i) => `$${from + i}`).join(', ');
+    const pagePh = pageIds.map((_, i) => `$${from + dbIds.length + i}`).join(', ');
+    return {
+      clause: ` AND (database_id IS NULL OR database_id NOT IN (${dbPh})) AND id NOT IN (${pagePh})`,
+      params: [...dbIds, ...pageIds],
+    };
+  }
+
   /** Permanently delete everything currently in the trash. Returns the count of
    *  directly-trashed pages removed (cascaded descendants aren't counted). */
   async emptyTrash(): Promise<number> {
+    const excl = await this.ledgerPurgeExclusion(1);
     const rows = await this.db.query<{id: string}>(
-      'DELETE FROM pages WHERE deleted_at IS NOT NULL RETURNING id',
+      `DELETE FROM pages WHERE deleted_at IS NOT NULL${excl.clause} RETURNING id`,
+      excl.params,
     );
     return rows.length;
   }
@@ -1106,14 +3037,104 @@ export class PageStore {
    * next sweep (no retention). Returns the count of directly-purged pages.
    */
   async purgeExpired(retentionMs: number): Promise<number> {
+    const excl = await this.ledgerPurgeExclusion(2);
     const rows = await this.db.query<{id: string}>(
       `DELETE FROM pages
        WHERE deleted_at IS NOT NULL
-         AND deleted_at <= now() - ($1::bigint * interval '1 millisecond')
+         AND deleted_at <= now() - ($1::bigint * interval '1 millisecond')${excl.clause}
        RETURNING id`,
-      [Math.max(0, Math.trunc(retentionMs))],
+      [Math.max(0, Math.trunc(retentionMs)), ...excl.params],
     );
     return rows.length;
+  }
+
+  /**
+   * Auto-expiry (TTL) sweep: for every database whose
+   * {@link DatabaseSchema.autoExpiry} resolves to an active rule
+   * ({@link resolveAutoExpiry}), soft-delete its rows whose expiry-basis
+   * timestamp is at or before `now − days`. Rows are moved to the trash — the
+   * same restorable soft-delete {@link deletePage} performs (`deleted_at` set),
+   * NEVER hard-deleted here; the later {@link purgeExpired} sweep decides when a
+   * trashed row is finally purged.
+   *
+   * Each database is swept in isolation, scoped strictly to its own
+   * `database_id`, so one database's TTL can never touch another's rows. `now`
+   * is injectable for deterministic tests (defaults to the wall clock). Returns
+   * the number of rows newly trashed across all databases.
+   *
+   * Basis handling:
+   *  - `created` / `lastEdited` → one bounded `UPDATE … WHERE created_at`
+   *    (resp. `updated_at`) `<= cutoff` — no row scan.
+   *  - a `date` property id → a bounded scan of the database's live rows, parsing
+   *    the stored value ({@link dateStart} + {@link parseDay}) and trashing those
+   *    on/before the cutoff day. (A `created_time` property basis collapses to
+   *    `created` in {@link resolveAutoExpiry}, so it never reaches the scan.)
+   */
+  async sweepExpiredRows(opts: {now?: Date} = {}): Promise<number> {
+    const now = opts.now ?? new Date();
+    const dbRows = await this.db.query<DatabaseRowRecord>(
+      'SELECT id, page_id, name, schema, created_at, updated_at FROM databases',
+    );
+    let trashed = 0;
+    for (const raw of dbRows) {
+      // LGR-3 (defence in depth): never TTL-sweep ledger rows. Transitively safe
+      // today — the seeded schemas set no `autoExpiry`, and `updateDatabase`
+      // refuses to add one — but a retention rule reaching posted history would
+      // be silent, unaudited data loss, so the sweep refuses it structurally
+      // rather than relying on two other guards staying correct.
+      if (await this.isLedgerDatabase(raw.id)) continue;
+      const schema = parseJson<DatabaseSchema>(raw.schema, EMPTY_SCHEMA);
+      const rule = resolveAutoExpiry(schema);
+      if (!rule) continue;
+      const cutoffIso = new Date(now.getTime() - rule.days * 86_400_000).toISOString();
+      if (rule.kind === 'created' || rule.kind === 'lastEdited') {
+        // A single bounded UPDATE, scoped to THIS database only.
+        const col = rule.kind === 'created' ? 'created_at' : 'updated_at';
+        const deleted = await this.db.query<{id: string}>(
+          `UPDATE pages SET deleted_at = now()
+             WHERE database_id = $1 AND deleted_at IS NULL AND ${col} <= $2::timestamptz
+           RETURNING id`,
+          [raw.id, cutoffIso],
+        );
+        trashed += deleted.length;
+        continue;
+      }
+      // date-property basis: the date lives in `pages.properties` (JSONB, not a
+      // comparable column), so scan the database's live rows and parse each value.
+      // Bounded to this database's rows.
+      //
+      // NOTE: date-property expiry is DAY-GRANULAR. `parseDay` normalises the
+      // stored value to a local-midnight Date and compares it against a `cutoffMs`
+      // derived from a UTC `now − days`. Because the day is anchored at local
+      // midnight while the cutoff is a UTC instant, the effective boundary can
+      // shift by up to ~a day relative to a naive UTC-day reading. That coarseness
+      // is acceptable for a retention feature (nothing is hard-deleted — rows only
+      // move to the restorable trash); do not treat it as sub-day-precise.
+      const scan = await this.db.query<{id: string; properties?: Record<string, unknown> | string | null}>(
+        'SELECT id, properties FROM pages WHERE database_id = $1 AND deleted_at IS NULL',
+        [raw.id],
+      );
+      const cutoffMs = new Date(cutoffIso).getTime();
+      const expired: string[] = [];
+      for (const r of scan) {
+        const props = parseJson<Record<string, unknown>>(r.properties, {});
+        const day = parseDay(dateStart(props[rule.propertyId]));
+        if (day && day.getTime() <= cutoffMs) expired.push(r.id);
+      }
+      if (expired.length === 0) continue;
+      const placeholders = expired.map((_, i) => `$${i + 2}`).join(', ');
+      const deleted = await this.db.query<{id: string}>(
+        `UPDATE pages SET deleted_at = now()
+           WHERE database_id = $1 AND deleted_at IS NULL AND id IN (${placeholders})
+         RETURNING id`,
+        [raw.id, ...expired],
+      );
+      trashed += deleted.length;
+    }
+    // Trashed rows leave every reader's view — invalidate the live read-gate cache
+    // (Collab T1), matching deletePage's bumpAccess.
+    if (trashed > 0) this.bumpAccess();
+    return trashed;
   }
 
   // ── Databases ──────────────────────────────────────────────────────────────
@@ -1151,26 +3172,133 @@ export class PageStore {
     return rows.length > 0 ? databaseFromRow(rows[0]) : null;
   }
 
+  /** Count non-deleted rows in one database (FORM-1 submission ceiling). */
+  async countActiveRows(databaseId: string): Promise<number> {
+    const rows = await this.db.query<{n: number | string}>(
+      'SELECT count(*) AS n FROM pages WHERE database_id = $1 AND deleted_at IS NULL',
+      [databaseId],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  /** Count active rows attributed to one database form view, excluding legacy markers. */
+  async countDatabaseFormResponses(databaseId: string, viewId: string): Promise<number> {
+    const rows = await this.db.query<{n: number | string}>(
+      `SELECT count(*) AS n FROM pages
+       WHERE database_id = $1
+         AND deleted_at IS NULL
+         AND properties -> $2::text ->> $3::text = $4`,
+      [databaseId, FORM_SUBMISSION_PROPERTY_ID, DATABASE_FORM_MARKER_VIEW_KEY, viewId],
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
   /** Update a database's name and/or schema. Only provided fields change. */
   async updateDatabase(id: string, patch: DatabaseUpdate): Promise<StoredDatabase | null> {
-    const rows = await this.db.query<DatabaseRowRecord>(
-      `UPDATE databases
-         SET name   = COALESCE($2, name),
-             schema = COALESCE($3::jsonb, schema),
-             updated_at = now()
-       WHERE id = $1
-       RETURNING id, page_id, name, schema, created_at, updated_at`,
-      [
-        id,
-        patch.name === undefined ? null : patch.name,
-        patch.schema === undefined ? null : JSON.stringify(patch.schema),
-      ],
+    await this.assertNotLedgerDatabase(id); // LGR-3: the seeded schemas are enforcement-relevant
+    return this.db.begin(async (tx) => {
+      const rows = await tx.query<DatabaseRowRecord>(
+        `UPDATE databases
+           SET name   = COALESCE($2, name),
+               schema = COALESCE($3::jsonb, schema),
+               updated_at = now()
+         WHERE id = $1
+         RETURNING id, page_id, name, schema, created_at, updated_at`,
+        [
+          id,
+          patch.name === undefined ? null : patch.name,
+          patch.schema === undefined ? null : JSON.stringify(patch.schema),
+        ],
+      );
+      if (rows.length === 0) return null;
+
+      // F-4: publication state is separate from the schema, but deleting a form
+      // view (or retyping it away from `form`) revokes that view's capability in
+      // the SAME transaction as the schema write. A duplicated view has a fresh id,
+      // so it never aliases the source view's row here.
+      if (patch.schema !== undefined) {
+        const formViewCounts = new Map<string, number>();
+        if (Array.isArray(patch.schema.views)) {
+          for (const view of patch.schema.views) {
+            if (view && typeof view === 'object' && view.type === 'form' && typeof view.id === 'string') {
+              formViewCounts.set(view.id, (formViewCounts.get(view.id) ?? 0) + 1);
+            }
+          }
+        }
+        // A duplicate id is not a stable publication binding. Revoke it now so
+        // removing one duplicate later cannot silently reactivate the old link.
+        const liveFormViewIds = [...formViewCounts]
+          .filter(([, count]) => count === 1)
+          .map(([viewId]) => viewId);
+        await tx.query(
+          `DELETE FROM database_form_capabilities capabilities
+           WHERE capabilities.database_id = $1
+             AND NOT EXISTS (
+               SELECT 1 FROM jsonb_array_elements_text($2::jsonb) live(view_id)
+               WHERE live.view_id = capabilities.view_id
+             )`,
+          [id, JSON.stringify(liveFormViewIds)],
+        );
+      }
+      return databaseFromRow(rows[0]);
+    });
+  }
+
+  /** Read the at-rest SHA-256 digest for one published database form view. */
+  async getDatabaseFormCapabilityHash(databaseId: string, viewId: string): Promise<string | null> {
+    const rows = await this.db.query<{capability_hash: string}>(
+      `SELECT capability_hash FROM database_form_capabilities
+       WHERE database_id = $1 AND view_id = $2`,
+      [databaseId, viewId],
     );
-    return rows.length > 0 ? databaseFromRow(rows[0]) : null;
+    return rows[0]?.capability_hash ?? null;
+  }
+
+  /** First-publish or rotate one database form capability digest. */
+  async setDatabaseFormCapabilityHash(databaseId: string, viewId: string, capabilityHash: string): Promise<boolean> {
+    return this.db.begin(async (tx) => {
+      // Serialize publication with updateDatabase's schema write. Without this
+      // lock, a concurrent deleteView could revoke and then lose a late INSERT,
+      // leaving a dormant capability that reactivates if the id is ever reused.
+      const rows = await tx.query<DatabaseRowRecord>(
+        `SELECT id, page_id, name, schema, created_at, updated_at
+         FROM databases WHERE id = $1 FOR UPDATE`,
+        [databaseId],
+      );
+      if (rows.length === 0) return false;
+      const database = databaseFromRow(rows[0]);
+      const matching = Array.isArray(database.schema.views)
+        ? database.schema.views.filter((view) =>
+          view && typeof view === 'object' && view.id === viewId && view.type === 'form',
+        )
+        : [];
+      if (matching.length !== 1) return false;
+
+      const stored = await tx.query<{view_id: string}>(
+        `INSERT INTO database_form_capabilities (database_id, view_id, capability_hash)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (database_id, view_id) DO UPDATE
+           SET capability_hash = EXCLUDED.capability_hash, updated_at = now()
+         RETURNING view_id`,
+        [databaseId, viewId, capabilityHash],
+      );
+      return stored.length === 1;
+    });
+  }
+
+  /** Revoke one database form capability. */
+  async revokeDatabaseFormCapability(databaseId: string, viewId: string): Promise<boolean> {
+    const rows = await this.db.query<{view_id: string}>(
+      `DELETE FROM database_form_capabilities
+       WHERE database_id = $1 AND view_id = $2 RETURNING view_id`,
+      [databaseId, viewId],
+    );
+    return rows.length > 0;
   }
 
   /** Delete a database and (by cascade) all of its row pages. */
   async deleteDatabase(id: string): Promise<boolean> {
+    await this.assertNotLedgerDatabase(id); // LGR-3: a cascade here would erase posted history
     const rows = await this.db.query('DELETE FROM databases WHERE id = $1 RETURNING id', [id]);
     return rows.length > 0;
   }
@@ -1198,13 +3326,85 @@ export class PageStore {
    * of the database's manual order. `input.parentId` nests it under another row
    * as a sub-item. Returns the page.
    */
-  async createRow(databaseId: string, input: RowInput = {}, author?: Principal): Promise<StoredPage> {
-    const id = randomUUID();
+  async createRow(
+    databaseId: string,
+    input?: RowInput,
+    author?: Principal,
+  ): Promise<StoredPage>;
+  async createRow(
+    databaseId: string,
+    input: RowInput,
+    author: Principal | undefined,
+    opts: CreateRowOptions & {idempotency: NonNullable<CreateRowOptions['idempotency']>},
+  ): Promise<CreateRowResult>;
+  async createRow(
+    databaseId: string,
+    input: RowInput = {},
+    author?: Principal,
+    opts?: CreateRowOptions,
+  ): Promise<StoredPage | CreateRowResult> {
+    // LGR-3: ledger rows are minted only by `LedgerStore` (which writes inside
+    // its own transaction, never through here) — every other caller is rejected,
+    // in server AND browser-local mode alike.
+    await this.assertNotLedgerDatabase(databaseId);
+    const scope = opts?.idempotency?.scope.trim();
+    const clientKey = opts?.idempotency?.key.trim();
+    if (scope && clientKey) {
+      return this.db.begin(async (tx) => {
+        const databaseForm = opts?.databaseForm;
+        if (databaseForm) {
+          const marker = input.properties?.[FORM_SUBMISSION_PROPERTY_ID] as Partial<DatabaseFormSubmissionMarker> | undefined;
+          if (
+            marker?.submittedViaViewId !== databaseForm.viewId
+            || typeof marker.submittedAt !== 'string'
+          ) {
+            throw new DatabaseFormAccessLostError();
+          }
+          // Serialize fresh submissions with capability rotation/revocation and
+          // every other submission through this view. Re-checking the digest here
+          // closes the route-check/create TOCTOU window.
+          const publication = await tx.query<{view_id: string}>(
+            `SELECT view_id FROM database_form_capabilities
+             WHERE database_id = $1 AND view_id = $2 AND capability_hash = $3
+             FOR UPDATE`,
+            [databaseId, databaseForm.viewId, databaseForm.capabilityHash],
+          );
+          if (publication.length !== 1) throw new DatabaseFormAccessLostError();
+        }
+
+        return claimKeyedCreate(tx, scope, clientKey, async (id) => {
+          if (databaseForm) {
+            const counts = await tx.query<{n: number | string}>(
+              `SELECT count(*) AS n FROM pages
+               WHERE database_id = $1
+                 AND deleted_at IS NULL
+                 AND properties -> $2::text ->> $3::text = $4`,
+              [databaseId, FORM_SUBMISSION_PROPERTY_ID, DATABASE_FORM_MARKER_VIEW_KEY, databaseForm.viewId],
+            );
+            if (Number(counts[0]?.n ?? 0) >= databaseForm.maxResponses) {
+              throw new DatabaseFormResponseLimitError();
+            }
+          }
+          return this.createRowTx(tx, id, databaseId, input, author);
+        });
+      });
+    }
+    return this.db.begin((tx) => this.createRowTx(tx, randomUUID(), databaseId, input, author));
+  }
+
+  /** Row insert body, shared by ordinary creates and atomic idempotent creates. */
+  private async createRowTx(
+    tx: Db,
+    id: string,
+    databaseId: string,
+    input: RowInput,
+    author?: Principal,
+  ): Promise<StoredPage> {
     // A fresh row has no prior content, so every block is stamped "now" and
     // attributed to its (verified) creator (OB-170).
     const stamped = stampSnapshotMtimes(null, input.data ?? emptyPageSnapshot(), new Date().toISOString());
     const data = stampSnapshotAuthors(null, stamped, verifiedSubject(author));
-    const rows = await this.db.query<PageRow>(
+    const rows = await tx.query<PageRow>(
       `INSERT INTO pages (id, name, data, database_id, parent_id, properties, position, updated_at)
        VALUES ($1, $2, $3::jsonb, $4, $6, $5::jsonb,
          (SELECT COALESCE(MAX(position), -1) + 1 FROM pages WHERE database_id = $4), now())
@@ -1228,6 +3428,7 @@ export class PageStore {
    * to the database are ignored. Returns `true` once applied.
    */
   async reorderRows(databaseId: string, orderedIds: string[]): Promise<boolean> {
+    await this.assertNotLedgerDatabase(databaseId); // LGR-3: managed rows aren't user-orderable
     await this.db.begin(async (tx) => {
       for (let i = 0; i < orderedIds.length; i += 1) {
         // No-op-skip (ER-9): the `position IS DISTINCT FROM $3` guard (the pattern
@@ -1246,30 +3447,54 @@ export class PageStore {
 
   /**
    * Update a row's title and/or manual property values without touching its
-   * document content. Returns the projected row, or `null` if it does not
+   * document content. Property patches merge per key: an omitted, `null`, or
+   * empty properties bag is a no-op; `undefined` values are ignored; and a
+   * `null` value deletes that key. This deliberately differs from
+   * {@link setPageProperties}, which stores `null` (readers currently treat
+   * both forms as absent). Returns the projected row, or `null` if it does not
    * belong to the given database.
    */
   async updateRow(
     databaseId: string,
     rowId: string,
-    patch: {name?: string | null; properties?: Record<string, unknown>},
+    patch: {name?: string | null; properties?: Record<string, unknown> | null},
   ): Promise<DatabaseRow | null> {
-    const rows = await this.db.query<PageRow>(
-      `UPDATE pages
-         SET name = CASE WHEN $3 THEN $4 ELSE name END,
-             properties = COALESCE($5::jsonb, properties),
-             updated_at = now()
-       WHERE id = $1 AND database_id = $2 AND deleted_at IS NULL
-       RETURNING id, name, data, properties, created_at, updated_at`,
-      [
-        rowId,
-        databaseId,
-        patch.name !== undefined,
-        patch.name ?? null,
-        patch.properties === undefined ? null : JSON.stringify(patch.properties),
-      ],
-    );
-    return rows.length > 0 ? rowFromPage(rows[0]) : null;
+    // LGR-3: ledger row values (amounts, states, refs) change only through the
+    // ledger API — the generic row-patch path is rejected at the store layer.
+    await this.assertNotLedgerDatabase(databaseId);
+    return this.db.begin(async (tx) => {
+      let properties: string | null = null;
+      if (patch.properties != null) {
+        // Serialize the read-merge-write on real Postgres. PGlite's outer
+        // transaction mutex supplies the same exclusion in embedded mode.
+        const current = await tx.query<Pick<PageRow, 'properties'>>(
+          `SELECT properties FROM pages
+           WHERE id = $1 AND database_id = $2 AND deleted_at IS NULL
+           FOR UPDATE`,
+          [rowId, databaseId],
+        );
+        if (current.length === 0) return null;
+
+        const merged = {...parseJson<Record<string, unknown>>(current[0].properties, {})};
+        for (const [key, value] of Object.entries(patch.properties)) {
+          if (value === undefined) continue;
+          if (value === null) delete merged[key];
+          else merged[key] = value;
+        }
+        properties = JSON.stringify(merged);
+      }
+
+      const rows = await tx.query<PageRow>(
+        `UPDATE pages
+           SET name = CASE WHEN $3 THEN $4 ELSE name END,
+               properties = COALESCE($5::jsonb, properties),
+               updated_at = now()
+         WHERE id = $1 AND database_id = $2 AND deleted_at IS NULL
+         RETURNING id, name, data, properties, created_at, updated_at`,
+        [rowId, databaseId, patch.name !== undefined, patch.name ?? null, properties],
+      );
+      return rows.length > 0 ? rowFromPage(rows[0]) : null;
+    });
   }
 
   // ── Plugins (installed extensions) ───────────────────────────────────────────
@@ -1289,17 +3514,32 @@ export class PageStore {
     return rows.length > 0 ? pluginFromRow(rows[0]) : null;
   }
 
-  /** Install or update a plugin (idempotent on id; updates re-enable). */
-  async upsertPlugin(pkg: PluginPackage): Promise<StoredPlugin> {
+  /**
+   * Install or upgrade a plugin (idempotent on id). A fresh install lands
+   * enabled; an update of an EXISTING plugin preserves the user's enabled
+   * choice and the original `installed_at` (an upgrade is not a re-install,
+   * and it must never force-enable a plugin the user turned off). A DOWNGRADE
+   * — an incoming semver strictly below the installed one — is refused unless
+   * `opts.allowDowngrade` is explicit; equal versions re-install freely (the
+   * repair/re-sign path). Non-semver versions (legacy dev packages) are not
+   * comparable and pass through.
+   */
+  async upsertPlugin(pkg: PluginPackage, opts: {allowDowngrade?: boolean} = {}): Promise<StoredPlugin> {
+    if (!opts.allowDowngrade) {
+      const existing = await this.getPlugin(pkg.manifest.id);
+      const from = existing?.manifest.version;
+      const to = pkg.manifest.version;
+      if (existing && typeof from === 'string' && isSemver(from) && isSemver(to) && compareSemver(to, from) < 0) {
+        throw new PluginDowngradeError(pkg.manifest.id, from, to);
+      }
+    }
     const rows = await this.db.query<PluginRow>(
       `INSERT INTO plugins (id, manifest, files, signature, enabled)
        VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, TRUE)
        ON CONFLICT (id) DO UPDATE
          SET manifest = EXCLUDED.manifest,
              files = EXCLUDED.files,
-             signature = EXCLUDED.signature,
-             enabled = TRUE,
-             installed_at = now()
+             signature = EXCLUDED.signature
        RETURNING id, manifest, files, signature, enabled, installed_at`,
       [pkg.manifest.id, JSON.stringify(pkg.manifest), JSON.stringify(pkg.files), pkg.signature ? JSON.stringify(pkg.signature) : null],
     );
@@ -1493,12 +3733,10 @@ export class PageStore {
   }
 
   /**
-   * Prune the idempotency ledgers (ER-6 `import_log`, ER-7 `write_keys`) older than
-   * `retentionMs` — the same periodic sweep as the edit log, for the same reason
-   * (bound growth on the autovacuum-less embedded store, OB-164). `retentionMs`
-   * doubles as the dedup window: once a key is pruned, re-applying its bundle /
-   * replaying its create is treated as new. `<= 0` keeps the ledgers forever (no-op).
-   * Returns the number of rows pruned across both tables.
+   * Prune the idempotency ledgers (`import_log`, `write_keys`, and the CWD-5
+   * response ledger) older than `retentionMs`. For captured responses the clock
+   * starts at completion and replay never extends it. `<= 0` keeps every ledger
+   * forever. Returns the number of rows pruned across all three tables.
    */
   async purgeOldIdempotencyKeys(retentionMs: number): Promise<number> {
     if (!(retentionMs > 0)) return 0;
@@ -1513,7 +3751,13 @@ export class PageStore {
        WHERE created_at <= now() - ($1::bigint * interval '1 millisecond') RETURNING page_id`,
       [ms],
     );
-    return imports.length + writes.length;
+    const responses = await this.db.query<{idempotency_key: string}>(
+      `DELETE FROM idempotency_responses
+       WHERE completed_at <= now() - ($1::bigint * interval '1 millisecond')
+       RETURNING idempotency_key`,
+      [ms],
+    );
+    return imports.length + writes.length + responses.length;
   }
 
   /** Read the edit log — a single page's history, or the whole instance's,
@@ -1532,6 +3776,365 @@ export class PageStore {
     return rows.map(editFromRow);
   }
 
+  // ── Page version history (PVH-1, OB-26) ──────────────────────────────────────
+  //
+  // Read-side of the snapshot-on-save history captured in `upsertPageTx`. The
+  // capture (schema + coalescing) is the PVH-1 foundation; the routes/SDK (PVH-3),
+  // retention (PVH-2), and restore/UI (PVH-4+) build on these helpers.
+
+  /** List a page's captured versions, newest first (metadata only — no snapshot
+   *  payload, so a history list stays cheap). */
+  async listPageVersions(pageId: string, limit = 100): Promise<PageVersionMeta[]> {
+    const cap = Math.max(1, Math.min(1000, Math.trunc(limit)));
+    const rows = await this.db.query<PageVersionRow>(
+      `SELECT id, page_id, author_subject, author_issuer, author_name, created_at
+       FROM page_versions WHERE page_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [pageId, cap],
+    );
+    return rows.map(pageVersionMetaFromRow);
+  }
+
+  /** Read one captured version WITH its snapshot payload (the state to roll back
+   *  to), or `null` when it doesn't exist / isn't that page's. */
+  async getPageVersion(pageId: string, versionId: string): Promise<StoredPageVersion | null> {
+    const rows = await this.db.query<PageVersionRow>(
+      `SELECT id, page_id, data, author_subject, author_issuer, author_name, created_at
+       FROM page_versions WHERE id = $1 AND page_id = $2`,
+      [versionId, pageId],
+    );
+    return rows.length > 0 ? pageVersionFromRow(rows[0]) : null;
+  }
+
+  /**
+   * PVH-2: bound each page's captured version history, run by the periodic cleanup
+   * sweep (never on the save path — a per-save delete would only add write-amp to
+   * the autovacuum-less embedded store, OB-164). Per page, a version is pruned when
+   * it is BOTH past the keep-min floor AND (beyond the newest {@link PAGE_VERSION_KEEP}
+   * OR older than `maxAgeMs`):
+   *   • keep-N — anything ranked past the newest N is dropped, even if recent.
+   *   • max-age — anything older than `maxAgeMs` is dropped…
+   *   • …EXCEPT the newest {@link PAGE_VERSION_KEEP_MIN} are always retained, so a
+   *     page whose whole history predates the age cutoff keeps a short rollback trail
+   *     instead of losing it entirely.
+   * A page inside both limits is untouched. `maxAgeMs <= 0` disables the age cut
+   * (keep-N still applies); `keep <= 0` is treated as the floor. One set-based
+   * DELETE over a `ROW_NUMBER()` window — no per-row loop. Returns rows pruned.
+   */
+  async prunePageVersions(
+    keep = PAGE_VERSION_KEEP,
+    maxAgeMs = PAGE_VERSION_MAX_AGE_MS,
+  ): Promise<number> {
+    const keepMin = PAGE_VERSION_KEEP_MIN;
+    const keepN = Math.max(keepMin, Math.trunc(keep) > 0 ? Math.trunc(keep) : keepMin);
+    const ageMs = maxAgeMs > 0 ? Math.trunc(maxAgeMs) : 0;
+    const rows = await this.db.query<{id: string}>(
+      // Rank each page's versions newest-first, then delete those beyond the floor
+      // that also breach keep-N or (when enabled) max-age. The floor (`rn > $2`)
+      // guards the age branch so the newest few survive even if all are old; the
+      // keep-N branch (`rn > $1`) drops surplus recent rows regardless of age.
+      `DELETE FROM page_versions
+       WHERE id IN (
+         SELECT id FROM (
+           SELECT id,
+                  created_at,
+                  ROW_NUMBER() OVER (PARTITION BY page_id ORDER BY created_at DESC) AS rn
+           FROM page_versions
+         ) ranked
+         WHERE rn > $2
+           AND (
+             rn > $1
+             OR ($3::bigint > 0
+                 AND created_at <= now() - ($3::bigint * interval '1 millisecond'))
+           )
+       )
+       RETURNING id`,
+      [keepN, keepMin, ageMs],
+    );
+    return rows.length;
+  }
+
+  // ── Generic settings key/value ───────────────────────────────────────────────
+  //
+  // Small JSON blobs keyed by name in the `settings` table (the same table the AI
+  // config, instance policy, and backups config use). Used by subsystems that need
+  // a bit of durable state without their own table — e.g. the AI usage-attribution
+  // log (its managed database id + the admin pricing override).
+
+  /** Read a JSON settings value by key, or `null` when unset. */
+  async getSetting<T>(key: string): Promise<T | null> {
+    const rows = await this.db.query<{value: T | string}>('SELECT value FROM settings WHERE key = $1', [key]);
+    if (rows.length === 0) return null;
+    return parseJson<T | null>(rows[0].value, null);
+  }
+
+  /** Upsert a JSON settings value by key. */
+  async setSetting(key: string, value: unknown): Promise<void> {
+    await this.db.query(
+      `INSERT INTO settings (key, value) VALUES ($1, $2::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [key, JSON.stringify(value)],
+    );
+    // Writing the ledger's id record must arm/refresh the store-level ledger
+    // write-guards immediately (LGR-3) — drop the cached ids so the next guard
+    // check re-reads them.
+    if (key === LEDGER_DB_SETTING_KEY) this.sharedState.ledgerIdsCache = undefined;
+  }
+
+  // ── Agent Personal-Access-Tokens (AGENT-6) ───────────────────────────────────
+
+  /**
+   * Insert a minted agent token. The plaintext is NEVER stored — only its SHA-256
+   * `tokenHash` (UNIQUE) + a non-secret `preview`. `subject`/`issuer` are the
+   * MINTER's own verified identity (bound by the route, never client-chosen). Returns
+   * the redacted {@link AgentTokenMeta} (no secret).
+   */
+  async createAgentToken(input: {
+    name: string;
+    tokenHash: string;
+    preview: string;
+    subject: string;
+    issuer: string;
+    scope: AgentTokenScope;
+    createdBy: string;
+    expiresAt: Date | null;
+    /** L7 remote opt-in (AGENT-7). Default false; a remote token is minted only on a
+     *  remote-enabled instance (the route enforces that). */
+    remoteOk?: boolean;
+  }): Promise<AgentTokenMeta> {
+    const rows = await this.db.query<AgentTokenDbRow>(
+      `INSERT INTO agent_tokens (id, name, token_hash, preview, subject, issuer, scope, created_by, expires_at, remote_ok)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, name, preview, subject, issuer, scope, created_by, created_at, expires_at, last_used_at, revoked_at, remote_ok`,
+      [randomUUID(), input.name, input.tokenHash, input.preview, input.subject, input.issuer, input.scope, input.createdBy, input.expiresAt, input.remoteOk === true],
+    );
+    return agentTokenMetaFromRow(rows[0]);
+  }
+
+  /** Count LIVE (non-revoked, unexpired) tokens — the mint-cap check. */
+  async countActiveAgentTokens(): Promise<number> {
+    const rows = await this.db.query<{n: number | string}>(
+      'SELECT count(*)::int AS n FROM agent_tokens WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())',
+    );
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  /** List every token (redacted), newest first — revoked/expired ones included and
+   *  flagged, for provenance. The secret hash is never selected. */
+  async listAgentTokens(): Promise<AgentTokenMeta[]> {
+    const rows = await this.db.query<AgentTokenDbRow>(
+      `SELECT id, name, preview, subject, issuer, scope, created_by, created_at, expires_at, last_used_at, revoked_at, remote_ok
+       FROM agent_tokens ORDER BY created_at DESC`,
+    );
+    return rows.map(agentTokenMetaFromRow);
+  }
+
+  /**
+   * Resolve a presented token by its hash — returns the row ONLY when it is LIVE
+   * (not revoked, not past `expires_at`). An absent/revoked/expired hash ⇒ `null`,
+   * so the caller HARD-401s rather than downgrading to a guest.
+   */
+  async resolveAgentToken(tokenHash: string): Promise<AgentTokenRow | null> {
+    const rows = await this.db.query<{id: string; name: string; subject: string; issuer: string; scope: string; remote_ok: boolean}>(
+      `SELECT id, name, subject, issuer, scope, remote_ok FROM agent_tokens
+       WHERE token_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
+      [tokenHash],
+    );
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {id: r.id, name: r.name, subject: r.subject, issuer: r.issuer, scope: r.scope as AgentTokenScope, remoteOk: r.remote_ok === true};
+  }
+
+  /** Best-effort debounced `last_used_at` touch (skips a write within ~60s of the
+   *  last so a busy agent doesn't write on every request). */
+  async touchAgentTokenUsed(id: string): Promise<void> {
+    await this.db.query(
+      `UPDATE agent_tokens SET last_used_at = now() WHERE id = $1
+         AND (last_used_at IS NULL OR last_used_at < now() - interval '60 seconds')`,
+      [id],
+    );
+  }
+
+  /** Revoke a token by id (sets `revoked_at`; the row lingers for provenance).
+   *  Returns `true` when a not-yet-revoked row was revoked. */
+  async revokeAgentToken(id: string): Promise<boolean> {
+    const rows = await this.db.query<{id: string}>(
+      'UPDATE agent_tokens SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL RETURNING id',
+      [id],
+    );
+    return rows.length > 0;
+  }
+
+  // ── able OAuth/OIDC relying-party state (ABLE-1) ──────────────────────────
+
+  /** Persist one short-lived authorization request. The caller hashes the
+   * OAuth state and encrypts the PKCE verifier before crossing this boundary. */
+  async createAbleOidcState(input: {
+    stateHash: string;
+    codeVerifierCiphertext: string;
+    codeVerifierIv: string;
+    nonce: string;
+    handoffState: string;
+    redirectUri: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.db.begin(async (tx) => {
+      await tx.query('DELETE FROM able_oidc_states WHERE expires_at <= now()');
+      const [live] = await tx.query<{count: number}>('SELECT COUNT(*)::int AS count FROM able_oidc_states');
+      if (live.count >= MAX_ABLE_OIDC_STATES) {
+        throw new AbleOidcError(429, 'too many pending able sign-in requests');
+      }
+      await tx.query(
+        `INSERT INTO able_oidc_states
+          (state_hash, code_verifier_ciphertext, code_verifier_iv, nonce, handoff_state, redirect_uri, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          input.stateHash,
+          input.codeVerifierCiphertext,
+          input.codeVerifierIv,
+          input.nonce,
+          input.handoffState,
+          input.redirectUri,
+          input.expiresAt,
+        ],
+      );
+    });
+  }
+
+  /** Atomically consume a live state row. A replay, mismatch, or expired row all
+   * collapse to `null`; deletion happens before any token-endpoint request. */
+  async consumeAbleOidcState(stateHash: string, now: Date): Promise<{
+    codeVerifierCiphertext: string;
+    codeVerifierIv: string;
+    nonce: string;
+    handoffState: string;
+    redirectUri: string;
+  } | null> {
+    const rows = await this.db.query<{
+      code_verifier_ciphertext: string;
+      code_verifier_iv: string;
+      nonce: string;
+      handoff_state: string;
+      redirect_uri: string;
+    }>(
+      `DELETE FROM able_oidc_states
+       WHERE state_hash = $1 AND expires_at > $2
+       RETURNING code_verifier_ciphertext, code_verifier_iv, nonce, handoff_state, redirect_uri`,
+      [stateHash, now],
+    );
+    if (rows.length === 0) return null;
+    const row = rows[0];
+    return {
+      codeVerifierCiphertext: row.code_verifier_ciphertext,
+      codeVerifierIv: row.code_verifier_iv,
+      nonce: row.nonce,
+      handoffState: row.handoff_state,
+      redirectUri: row.redirect_uri,
+    };
+  }
+
+  /** Load the encrypted per-instance Ed25519 bridge key. */
+  async getAbleOidcBridgeKey(issuer: string): Promise<{
+    publicJwk: import('@book.dev/sdk').Jwk;
+    privateKeyCiphertext: string;
+    privateKeyIv: string;
+  } | null> {
+    const rows = await this.db.query<{
+      public_jwk: import('@book.dev/sdk').Jwk | string;
+      private_key_ciphertext: string;
+      private_key_iv: string;
+        }>(
+        'SELECT public_jwk, private_key_ciphertext, private_key_iv FROM able_oidc_bridge_keys WHERE issuer = $1',
+        [issuer],
+        );
+    if (rows.length === 0) return null;
+    return {
+      publicJwk: parseJson<import('@book.dev/sdk').Jwk>(rows[0].public_jwk, {} as import('@book.dev/sdk').Jwk),
+      privateKeyCiphertext: rows[0].private_key_ciphertext,
+      privateKeyIv: rows[0].private_key_iv,
+    };
+  }
+
+  /** Insert the encrypted bridge key if none exists. The conflict-safe insert
+   * prevents two simultaneous first logins from minting mutually invalid keys. */
+  async createAbleOidcBridgeKey(input: {
+    issuer: string;
+    publicJwk: import('@book.dev/sdk').Jwk;
+    privateKeyCiphertext: string;
+    privateKeyIv: string;
+  }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO able_oidc_bridge_keys
+        (issuer, public_jwk, private_key_ciphertext, private_key_iv)
+       VALUES ($1, $2::jsonb, $3, $4)
+       ON CONFLICT (issuer) DO NOTHING`,
+      [input.issuer, JSON.stringify(input.publicJwk), input.privateKeyCiphertext, input.privateKeyIv],
+    );
+  }
+
+  /** Rotate a bridge key whose ciphertext can no longer be decrypted (normally
+   * after an operator deliberately changes the able client secret). */
+  async rotateAbleOidcBridgeKey(input: {
+    issuer: string;
+    publicJwk: import('@book.dev/sdk').Jwk;
+    privateKeyCiphertext: string;
+    privateKeyIv: string;
+  }): Promise<void> {
+    await this.db.query(
+      `UPDATE able_oidc_bridge_keys SET
+         public_jwk = $2::jsonb,
+         private_key_ciphertext = $3,
+         private_key_iv = $4,
+         updated_at = now()
+       WHERE issuer = $1`,
+      [input.issuer, JSON.stringify(input.publicJwk), input.privateKeyCiphertext, input.privateKeyIv],
+    );
+  }
+
+  /** Upsert an encrypted refresh token for the upstream subject. */
+  async setAbleOidcRefreshToken(input: {
+    issuer: string;
+    subject: string;
+    tokenCiphertext: string;
+    tokenIv: string;
+    assertionJti: string;
+  }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO able_oidc_refresh_tokens (issuer, subject, token_ciphertext, token_iv, assertion_jti)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (issuer, subject) DO UPDATE SET
+         token_ciphertext = EXCLUDED.token_ciphertext,
+         token_iv = EXCLUDED.token_iv,
+         assertion_jti = EXCLUDED.assertion_jti,
+         updated_at = now()`,
+      [input.issuer, input.subject, input.tokenCiphertext, input.tokenIv, input.assertionJti],
+    );
+  }
+
+  /** Atomically take an encrypted upstream refresh token. Deleting before the
+   * network exchange serializes renewal for a subject and prevents two callers
+   * from replaying a single-use rotating token. */
+  async consumeAbleOidcRefreshToken(issuer: string, subject: string, assertionJti: string): Promise<{
+    tokenCiphertext: string;
+    tokenIv: string;
+  } | null> {
+    const rows = await this.db.query<{token_ciphertext: string; token_iv: string}>(
+      `DELETE FROM able_oidc_refresh_tokens
+       WHERE issuer = $1 AND subject = $2 AND assertion_jti = $3
+       RETURNING token_ciphertext, token_iv`,
+      [issuer, subject, assertionJti],
+    );
+    if (rows.length === 0) return null;
+    return {tokenCiphertext: rows[0].token_ciphertext, tokenIv: rows[0].token_iv};
+  }
+
+  /** Remove any upstream refresh credential for a signed-out able subject. */
+  async deleteAbleOidcRefreshToken(issuer: string, subject: string): Promise<void> {
+    await this.db.query(
+      'DELETE FROM able_oidc_refresh_tokens WHERE issuer = $1 AND subject = $2',
+      [issuer, subject],
+    );
+  }
+
   /** The instance's multi-user policy (guest gate + trusted issuers), with
    *  defaults filled in. Cheap — one settings row. */
   async getInstanceConfig(): Promise<InstanceConfig> {
@@ -1542,35 +4145,62 @@ export class PageStore {
     return {...DEFAULT_INSTANCE_CONFIG, ...stored};
   }
 
-  /** Shallow-merge a patch into the instance policy and persist it. */
+  /**
+   * Ensure the instance has a stable, opaque `instanceId` (STAB-5), minting +
+   * persisting one on first use and returning the existing id otherwise. Called
+   * once at startup so the id is stable across restarts. Idempotent: a concurrent
+   * double-call at most re-persists the same value (last-writer-wins on the single
+   * `instance` row). The id is a non-secret coordinate — it authorizes nothing.
+   */
+  async ensureInstanceId(): Promise<string> {
+    const config = await this.getInstanceConfig();
+    if (config.instanceId) return config.instanceId;
+    const instanceId = randomUUID();
+    await this.updateInstanceConfig({instanceId});
+    return instanceId;
+  }
+
+  /** Atomically shallow-merge a patch into the instance policy and persist it. */
   async updateInstanceConfig(patch: Partial<InstanceConfig>): Promise<InstanceConfig> {
-    const current = await this.getInstanceConfig();
-    const next = {...current, ...patch};
-    // Un-claim guard (OB-190; OB-182 §2.6, B2). A claim is **one-way**: once an
-    // instance has an `ownerSubject`, this writer must NEVER let it be cleared or
-    // re-pointed. The shallow merge above would otherwise honour a patch carrying
-    // `ownerSubject: undefined` (erasing the pin → next read is unclaimed → the
-    // rule-0 anonymous-world-write short-circuit re-opens). Re-setting the same
-    // value is idempotent and allowed; the first claim (from unset) is allowed —
-    // the transactional first-writer-wins CAS for the claim itself is OB-191.
-    if (current.ownerSubject && next.ownerSubject !== current.ownerSubject) {
-      // 409 (not a 500): clearing/re-pointing a claimed owner is a conflicting
-      // request, so `PUT /api/instance {ownerSubject:null}` surfaces as 409.
-      throw new HTTPException(409, {
-        message: 'ownerSubject is claim-once and cannot be cleared or changed (OB-182 §2.6)',
-      });
-    }
-    // Config footgun guard (OB-182 §2.4, Sasha N2): `emailAuthority` MUST be a
-    // trusted issuer. If it names an issuer the instance doesn't trust, no token
-    // from it ever verifies, so every persona / email-ACL grant silently stops
-    // matching (it fails *safe* → deny, but invisibly). Reject the write instead
-    // of letting the policy drift into that dead state.
-    assertEmailAuthorityTrusted(next);
-    await this.db.query(
-      `INSERT INTO settings (key, value) VALUES ('instance', $1::jsonb)
-       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      [JSON.stringify(next)],
-    );
+    const next = await this.db.begin(async (tx) => {
+      // Materialize the singleton before locking it. The INSERT's unique-key
+      // conflict also serializes two first-ever config writes on real Postgres;
+      // afterward every writer locks and re-reads the winner's complete value.
+      await tx.query(
+        'INSERT INTO settings (key, value) VALUES (\'instance\', \'{}\'::jsonb) ON CONFLICT (key) DO NOTHING',
+      );
+      const rows = await tx.query<{value: InstanceConfig | string}>(
+        'SELECT value FROM settings WHERE key = \'instance\' FOR UPDATE',
+      );
+      const current: InstanceConfig = {
+        ...DEFAULT_INSTANCE_CONFIG,
+        ...parseJson<Partial<InstanceConfig>>(rows[0]?.value, {}),
+      };
+      const merged = {...current, ...patch};
+
+      // Un-claim guard (OB-190; OB-182 §2.6, B2). A claim is **one-way**: once an
+      // instance has an `ownerSubject`, this writer must NEVER let it be cleared or
+      // re-pointed. The shallow merge above would otherwise honour a patch carrying
+      // `ownerSubject: undefined` (erasing the pin → next read is unclaimed → the
+      // rule-0 anonymous-world-write short-circuit re-opens). Re-setting the same
+      // value is idempotent and allowed; the first claim (from unset) is allowed —
+      // the transactional first-writer-wins CAS for the claim itself is OB-191.
+      if (current.ownerSubject && merged.ownerSubject !== current.ownerSubject) {
+        // 409 (not a 500): clearing/re-pointing a claimed owner is a conflicting
+        // request, so `PUT /api/instance {ownerSubject:null}` surfaces as 409.
+        throw new HTTPException(409, {
+          message: 'ownerSubject is claim-once and cannot be cleared or changed (OB-182 §2.6)',
+        });
+      }
+      // Config footgun guard (OB-182 §2.4, Sasha N2): `emailAuthority` MUST be a
+      // trusted issuer. If it names an issuer the instance doesn't trust, no token
+      // from it ever verifies, so every persona / email-ACL grant silently stops
+      // matching (it fails *safe* → deny, but invisibly). Reject the write instead
+      // of letting the policy drift into that dead state.
+      assertEmailAuthorityTrusted(merged);
+      await tx.query('UPDATE settings SET value = $1::jsonb WHERE key = \'instance\'', [JSON.stringify(merged)]);
+      return merged;
+    });
     this.bumpAccess(); // guest gate / issuers / owner all change decisions (Collab T1)
     return next;
   }
@@ -1685,14 +4315,25 @@ export class PageStore {
       'SELECT value FROM settings WHERE key = \'backups\'',
     );
     const stored = rows.length > 0 ? parseJson<Partial<BackupConfig>>(rows[0].value, {}) : {};
-    return {
+    const config: BackupConfig = {
       ...DEFAULT_BACKUP_CONFIG,
       ...stored,
       // Nested records merge so a newly-added cadence keeps its default.
       cadences: {...DEFAULT_BACKUP_CONFIG.cadences, ...stored.cadences},
       keep: {...DEFAULT_BACKUP_CONFIG.keep, ...stored.keep},
       lastRun: {...stored.lastRun},
+      lastSkippedCount: {...stored.lastSkippedCount},
+      failures: {...stored.failures},
     };
+    // Default-on (opt-out): backups now default enabled. The `backups` settings row
+    // is written at a single site — `updateBackupConfig` (owner-gated PUT /api/backups
+    // or the scheduler's `lastRun`) — and nothing seeds it on install/import, so "no
+    // row" is exactly "never configured". Apply the default-on override ONLY when no
+    // row exists; once a row is present its stored `enabled` is honoured as-is. This
+    // enables never-configured instances without silently re-enabling anyone who
+    // deliberately toggled backups off (their row carries `enabled:false`).
+    if (rows.length === 0) config.enabled = DEFAULT_BACKUP_CONFIG.enabled;
+    return config;
   }
 
   /** Shallow-merge a patch into the backup policy and persist it. */
@@ -1704,6 +4345,14 @@ export class PageStore {
       cadences: {...current.cadences, ...patch.cadences},
       keep: {...current.keep, ...patch.keep},
       lastRun: {...current.lastRun, ...patch.lastRun},
+      lastSkippedCount: {...current.lastSkippedCount, ...patch.lastSkippedCount},
+      // Internal scheduler writes pass the complete failure map so a successful
+      // cadence can remove its entry instead of a nested merge resurrecting it.
+      failures: patch.failures === undefined ? {...current.failures} : {...patch.failures},
+      // The moment the user sets the master switch, record that so the default-on
+      // migration above never overrides their choice on the next read. Non-switch
+      // patches (e.g. the scheduler recording `lastRun`) don't flip the marker.
+      userSetEnabled: current.userSetEnabled || patch.enabled !== undefined,
     };
     await this.db.query(
       `INSERT INTO settings (key, value) VALUES ('backups', $1::jsonb)
@@ -1775,8 +4424,8 @@ export class PageStore {
   }
 
   /**
-   * Reconcile the bound workspace's roster into the local `members` table (OB-199)
-   * — the durable side of "instance ↔ workspace". The desired set (already
+   * Reconcile the bound library's roster into the local `members` table (OB-199)
+   * — the durable side of "instance ↔ library". The desired set (already
    * owner-reconciled + deduped + site-owner-filtered by the caller) is projected
    * onto `source='managed'` rows ONLY; `source='local'` rows (the OB-191 invite
    * path) are never read-for-write nor deleted, so a local invite and a managed
@@ -1786,7 +4435,7 @@ export class PageStore {
    *    existing managed row only the `role` is reconciled — `subject`/`status` are
    *    owned by the claim flow and never downgraded by a later sync);
    *  - **remove** managed rows no longer in the desired set (dropped from the
-   *    workspace) — never a local row;
+   *    library) — never a local row;
    *  - **skip** a desired entry whose identity a LOCAL row already covers (don't
    *    clobber the local invite, and don't collide on the unique index — coexist).
    *
@@ -1868,7 +4517,7 @@ export class PageStore {
         }
       }
 
-      // Remove managed rows the workspace dropped — local rows are untouched.
+      // Remove managed rows the library dropped — local rows are untouched.
       let removed = 0;
       for (const row of rows) {
         if (row.source !== 'managed' || kept.has(row.id)) continue;
@@ -1950,25 +4599,87 @@ export class PageStore {
     return this.resolveMemberRole(principal, config); // rule 4 (roster) → admin | viewer | null
   }
 
-  /** A page's stored visibility scope (raw — `inherit` not yet resolved), or
+  /** A page's stored audience scope plus its independent discovery posture, or
    *  `null` when the page doesn't exist. */
-  async getPageVisibility(pageId: string): Promise<PageVisibility | null> {
-    const rows = await this.db.query<{visibility: string}>(
-      'SELECT visibility FROM pages WHERE id = $1',
+  async getPageVisibility(pageId: string): Promise<PageVisibilitySettings | null> {
+    const rows = await this.db.query<{visibility: string; listed: boolean}>(
+      'SELECT visibility, listed FROM pages WHERE id = $1',
       [pageId],
     );
-    return rows.length > 0 ? (rows[0].visibility as PageVisibility) : null;
+    return rows.length > 0 ? {visibility: rows[0].visibility as PageVisibility, listed: rows[0].listed} : null;
   }
 
-  /** Set a page's visibility scope. Returns `false` when the page is missing.
-   *  Deliberately does NOT touch `updated_at`: visibility is an access attribute,
-   *  not document content, so it must not look like an edit to the mirror/mtimes. */
-  async setPageVisibility(pageId: string, visibility: PageVisibility): Promise<boolean> {
-    const rows = await this.db.query(
-      'UPDATE pages SET visibility = $2 WHERE id = $1 RETURNING id',
-      [pageId, visibility],
+  /**
+   * Update a page's audience scope and/or independent discovery posture. Returns
+   * `false` when the page is missing. Deliberately does NOT touch `updated_at`:
+   * neither setting is document content, so they must not look like an edit to
+   * the mirror/mtimes.
+   *
+   * SECURITY (LGR-3 F3 — "flipping the books public"). The ledger's five host
+   * pages MUST stay `restricted`: every ledger ROW is `inherit`, so its read
+   * decision resolves through its database's host page — one `public` flip on a
+   * host exposes every account, transaction, and posting to the whole internet,
+   * and it is reachable by anyone with mere page-WRITE (i.e. any bookkeeper),
+   * with no audit trail. Any non-`restricted` value on a ledger host is
+   * therefore refused at the STORE layer (so browser-local mode is covered too).
+   * Per-page ACL grants remain the sanctioned way to share the ledger.
+   *
+   * `internal: true` is the seed's own path ({@link LedgerStore.ensureSetup}),
+   * which sets `restricted` on pages that are only becoming ledger hosts moments
+   * later — it bypasses the guard, and nothing outside the store passes it.
+   */
+  async setPageVisibility(
+    pageId: string,
+    value: PageVisibility | PageVisibilityUpdate,
+    opts: {internal?: boolean} = {},
+  ): Promise<boolean> {
+    const update: PageVisibilityUpdate = typeof value === 'string' ? {visibility: value} : value;
+    if (!opts.internal && update.visibility !== undefined && update.visibility !== 'restricted' && (await this.isLedgerHostPage(pageId))) {
+      throw new LedgerError(
+        'managed',
+        'the ledger and its databases must stay restricted — share them with per-page ACL grants instead of changing their visibility scope',
+      );
+    }
+    const changed = await this.db.begin(async (tx) => {
+      const rows = await tx.query<{visibility: string; listed: boolean}>(
+        'SELECT visibility, listed FROM pages WHERE id = $1',
+        [pageId],
+      );
+      if (rows.length === 0) return null;
+      const before = rows[0];
+      await tx.query(
+        `UPDATE pages
+         SET visibility = COALESCE($2, visibility), listed = COALESCE($3, listed)
+         WHERE id = $1`,
+        [pageId, update.visibility ?? null, update.listed ?? null],
+      );
+      return (update.visibility !== undefined && update.visibility !== before.visibility)
+        || (update.listed !== undefined && update.listed !== before.listed);
+    });
+    if (changed) this.bumpAccess(); // audience or discovery flip invalidates stream gates (UP-1 / Collab T1)
+    return changed !== null;
+  }
+
+  /** A page's raw agent-edits policy (AGED-1; `inherit` not yet resolved against the
+   *  instance mode), or `null` when the page doesn't exist. */
+  async getPageAgentEdits(pageId: string): Promise<AgentEditsPolicy | null> {
+    const rows = await this.db.query<{agent_edits: string}>(
+      'SELECT agent_edits FROM pages WHERE id = $1',
+      [pageId],
     );
-    if (rows.length > 0) this.bumpAccess(); // scope change alters who may read (Collab T1)
+    return rows.length > 0 ? (rows[0].agent_edits as AgentEditsPolicy) : null;
+  }
+
+  /** Set a page's agent-edits policy (AGED-1). Returns `false` when the page is
+   *  missing. Like {@link setPageVisibility}, deliberately does NOT touch
+   *  `updated_at`: the policy is an access attribute, not document content, so it
+   *  must not look like an edit to the mirror/mtimes. Enum-validated by the route;
+   *  callers must pass a valid {@link AgentEditsPolicy}. */
+  async setPageAgentEdits(pageId: string, policy: AgentEditsPolicy): Promise<boolean> {
+    const rows = await this.db.query(
+      'UPDATE pages SET agent_edits = $2 WHERE id = $1 RETURNING id',
+      [pageId, policy],
+    );
     return rows.length > 0;
   }
 
@@ -2010,8 +4721,18 @@ export class PageStore {
         [pageId, subject, email, issuer, grant.level, grant.invitedBy ?? null],
       );
       return aclFromRow(rows[0]);
-    }).then((acl) => {
+    }).then(async (acl) => {
       this.bumpAccess(); // a new per-page grant changes read decisions (Collab T1)
+      // LGR-3 F3: sharing the ledger is permitted (ACL grants are the sanctioned
+      // route — unlike a visibility flip, a grant names its grantee) but it is
+      // never silent: who was given what, on which ledger page, is audited.
+      if (await this.isLedgerPage(pageId)) {
+        await this.ledger.recordAclChange('grant', pageId, {
+          subject: acl.subject ?? null,
+          email: acl.email ?? null,
+          level: acl.level,
+        });
+      }
       return acl;
     });
   }
@@ -2030,6 +4751,14 @@ export class PageStore {
           [pageId, normalizeEmail(key.email)],
         );
     if (rows.length > 0) this.bumpAccess(); // a revoked grant removes read access (Collab T1)
+    // LGR-3 F3: a revoked ledger grant is audited exactly like the grant was.
+    if (rows.length > 0 && (await this.isLedgerPage(pageId))) {
+      await this.ledger.recordAclChange('revoke', pageId, {
+        subject: 'subject' in key ? key.subject : null,
+        email: 'email' in key ? normalizeEmail(key.email) : null,
+        level: null,
+      });
+    }
     return rows.length > 0;
   }
 
@@ -2116,15 +4845,24 @@ export class PageStore {
     };
   }
 
-  /** The page's stored scope + database membership (NO `deleted_at` filter, so it
-   *  resolves a trashed page or a database row alike), or `null` if absent. */
-  private async pageAccessRow(pageId: string): Promise<{visibility: PageVisibility; databaseId: string | null} | null> {
-    const rows = await this.db.query<{visibility: string; database_id: string | null}>(
-      'SELECT visibility, database_id FROM pages WHERE id = $1',
+  /** The page's stored scope, discovery posture, and database membership (NO
+   *  `deleted_at` filter, so it resolves a trashed page or a database row alike),
+   *  or `null` if absent. */
+  private async pageAccessRow(pageId: string): Promise<{
+    visibility: PageVisibility;
+    listed: boolean;
+    databaseId: string | null;
+  } | null> {
+    const rows = await this.db.query<{visibility: string; listed: boolean; database_id: string | null}>(
+      'SELECT visibility, listed, database_id FROM pages WHERE id = $1',
       [pageId],
     );
     if (rows.length === 0) return null;
-    return {visibility: rows[0].visibility as PageVisibility, databaseId: rows[0].database_id ?? null};
+    return {
+      visibility: rows[0].visibility as PageVisibility,
+      listed: rows[0].listed,
+      databaseId: rows[0].database_id ?? null,
+    };
   }
 
   /** Resolve `inherit` to an effective scope (§2.2/N9): a database row via its
@@ -2173,9 +4911,11 @@ export class PageStore {
     principal: Principal,
     pageId: string,
     base?: AccessBase,
-  ): Promise<{decision: Decision; exists: boolean}> {
+  ): Promise<{decision: Decision; exists: boolean; listed: boolean}> {
     const row = await this.pageAccessRow(pageId);
-    if (!row) return {decision: {canRead: false, canWrite: false, reason: 'no-page'}, exists: false};
+    if (!row) {
+      return {decision: {canRead: false, canWrite: false, reason: 'no-page'}, exists: false, listed: false};
+    }
     const b = base ?? (await this.accessBase(principal));
     const effectiveVisibility = await this.effectiveVisibility(row, b);
     const acl = await this.aclEntries(pageId);
@@ -2184,7 +4924,7 @@ export class PageStore {
       {visibility: row.visibility, acl},
       {config: b.config, role: b.role, effectiveVisibility, emailIsAuthoritative: b.emailIsAuthoritative},
     );
-    return {decision, exists: true};
+    return {decision, exists: true, listed: row.listed};
   }
 
   /**
@@ -2212,18 +4952,77 @@ export class PageStore {
    */
   private blanketRead(principal: Principal, base: AccessBase): boolean | null {
     const {config} = base;
-    const privileged = principal.verifiedVia === 'jws' || principal.verifiedVia === 'local';
+    // A PAT rides the same page-independent rungs `authorize()` grants it: the
+    // unclaimed rule-0 short-circuit (privileged), and — when bound to the owner
+    // subject — the owner rung. Kept in lock-step with authorize's rule-0
+    // `privileged = isJws || isLocal || isPat` and its owner check
+    // `(isJws || isPat) && subject===ownerSubject`, so this fast-path never diverges
+    // from the per-page decision (e.g. a PAT on an unclaimed `guestAccess='off'`
+    // instance: authorize grants via rule 0, so blanketRead must too).
+    const privileged =
+      principal.verifiedVia === 'jws' ||
+      principal.verifiedVia === 'local' ||
+      principal.verifiedVia === 'pat';
     if (config.ownerSubject === undefined) return config.guestAccess !== 'off' || privileged;
     if (principal.verifiedVia === 'local') return true;
-    if (principal.verifiedVia === 'jws' && principal.subject === config.ownerSubject) return true;
+    if (
+      (principal.verifiedVia === 'jws' || principal.verifiedVia === 'pat') &&
+      principal.subject === config.ownerSubject
+    ) {
+      return true;
+    }
     if (base.role === 'admin') return true;
     return null;
+  }
+
+  /** Whether this principal is exempt from the per-page discovery flag. This is
+   * deliberately narrower than {@link blanketRead}: an unclaimed/blanket guest
+   * can read every page directly but is not an owner or admin and therefore must
+   * still have unlisted pages removed from every enumeration. */
+  private listingPrivileged(principal: Principal, base: AccessBase): boolean {
+    if (principal.verifiedVia === 'local') return true;
+    if (
+      (principal.verifiedVia === 'jws' || principal.verifiedVia === 'pat') &&
+      principal.subject === base.config.ownerSubject
+    ) {
+      return true;
+    }
+    return base.role === 'admin';
+  }
+
+  /** Public batch/route seam for deciding whether an unlisted page may be
+   * enumerated for this principal. */
+  async canListUnlisted(principal: Principal, base?: AccessBase): Promise<boolean> {
+    const b = base ?? (await this.accessBase(principal));
+    return this.listingPrivileged(principal, b);
+  }
+
+  /**
+   * The page-independent read decision for a whole-library read, or `null` when
+   * it must be resolved per page. A thin PUBLIC seam over {@link blanketRead} —
+   * the page-graph route uses it exactly like {@link filterReadablePages}'s fast
+   * path: `true` ⇒ the whole library is readable (owner/admin/blanket-guest) so
+   * the graph builder can skip the per-page predicate; `false` ⇒ nothing is
+   * readable so return an empty graph; `null` ⇒ thread `canReadPage` per node.
+   */
+  async blanketReadDecision(principal: Principal, base?: AccessBase): Promise<boolean | null> {
+    const b = base ?? (await this.accessBase(principal));
+    return this.blanketRead(principal, b);
   }
 
   /** May the principal read this page? (existence-aware: a missing page ⇒ false). */
   async canReadPage(principal: Principal, pageId: string, base?: AccessBase): Promise<boolean> {
     const {decision, exists} = await this.decidePageAccess(principal, pageId, base);
     return exists && decision.canRead;
+  }
+
+  /** May the principal discover this page in an enumeration? Direct reads do not
+   * use this gate: an unlisted page remains openable when its visibility/ACL
+   * authorizes the caller. */
+  async canListPage(principal: Principal, pageId: string, base?: AccessBase): Promise<boolean> {
+    const b = base ?? (await this.accessBase(principal));
+    const {decision, exists, listed} = await this.decidePageAccess(principal, pageId, b);
+    return exists && decision.canRead && (listed || this.listingPrivileged(principal, b));
   }
 
   /** May the principal read this database? Inherits its HOST PAGE's read decision. */
@@ -2233,14 +5032,21 @@ export class PageStore {
     return this.canReadPage(principal, db.pageId, base);
   }
 
-  /** Filter a page-meta list to the readable subset (default-deny). */
+  /** Filter a page-meta list to the readable + discoverable subset
+   * (default-deny). The listed predicate MUST run before the blanket-read fast
+   * path: a blanket guest reads direct URLs but is not allowed to enumerate
+   * unlisted pages. */
   async filterReadablePages(principal: Principal, metas: PageMeta[], base?: AccessBase): Promise<PageMeta[]> {
     if (metas.length === 0) return metas;
     const b = base ?? (await this.accessBase(principal));
+    const discoverable = this.listingPrivileged(principal, b)
+      ? metas
+      : metas.filter((meta) => meta.listed === true);
+    if (discoverable.length === 0) return discoverable;
     const blanket = this.blanketRead(principal, b);
-    if (blanket !== null) return blanket ? metas : [];
+    if (blanket !== null) return blanket ? discoverable : [];
     const out: PageMeta[] = [];
-    for (const meta of metas) {
+    for (const meta of discoverable) {
       if (await this.canReadPage(principal, meta.id, b)) out.push(meta);
     }
     return out;
@@ -2251,8 +5057,9 @@ export class PageStore {
     return this.filterReadablePages(principal, await this.listPages());
   }
 
-  /** Filter a database's rows to the readable subset (default-deny). A row is a
-   *  page, so its own visibility/ACL governs — defaulting to the host page (N9). */
+  /** Filter a database's rows to the readable + discoverable subset
+   * (default-deny). A row is a page, so its own visibility/ACL governs —
+   * defaulting to the host page (N9) — and its own listed flag is independent. */
   async filterReadableRows(
     principal: Principal,
     rows: DatabaseRow[],
@@ -2260,10 +5067,21 @@ export class PageStore {
   ): Promise<DatabaseRow[]> {
     if (rows.length === 0) return rows;
     const b = base ?? (await this.accessBase(principal));
+    let discoverable = rows;
+    if (!this.listingPrivileged(principal, b)) {
+      const ids = rows.map((row) => row.id);
+      const listed = await this.db.query<{id: string}>(
+        'SELECT id FROM pages WHERE id = ANY($1) AND listed = TRUE',
+        [ids],
+      );
+      const listedIds = new Set(listed.map((row) => row.id));
+      discoverable = rows.filter((row) => listedIds.has(row.id));
+    }
+    if (discoverable.length === 0) return discoverable;
     const blanket = this.blanketRead(principal, b);
-    if (blanket !== null) return blanket ? rows : [];
+    if (blanket !== null) return blanket ? discoverable : [];
     const out: DatabaseRow[] = [];
-    for (const row of rows) {
+    for (const row of discoverable) {
       if (await this.canReadPage(principal, row.id, b)) out.push(row);
     }
     return out;
@@ -2286,6 +5104,310 @@ export class PageStore {
   // ── Assets: content-addressed binary store (OB-ASSETS A1) ────────────────────
 
   /**
+   * Stage one capability-gated form upload in the existing asset store. The asset
+   * insert and both storage budgets are one transaction, so a rejected form budget
+   * never leaves an untracked blob behind. The returned token, not the content hash,
+   * is exposed to the anonymous caller.
+   */
+  async stageFormUpload(
+    bytes: Uint8Array,
+    mime: string,
+    input: {
+      token: string;
+      pageId: string;
+      formId: string;
+      fieldId: string;
+      name: string;
+      /** F-4 publication binding; null/absent for legacy block forms. */
+      capabilityHash?: string | null;
+    },
+    budgets: {maxFormBytes: number; maxFormStagedBytes: number; maxTotalBytes?: number},
+  ): Promise<StagedFormUpload> {
+    const assetId = await assetHash(bytes);
+    const buf = Buffer.from(bytes);
+    return this.db.begin(async (tx) => {
+      // Strictly serialize the per-form budget on real Postgres too; unlike the
+      // instance's deliberately soft/bounded budget, 50 MiB is a hard form cap.
+      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        JSON.stringify([input.pageId, input.formId]),
+      ]);
+      let ownsAsset = false;
+      const totalBudget = budgets.maxTotalBytes;
+      if (totalBudget != null && totalBudget >= 0) {
+        const inserted = await tx.query<{id: string}>(
+          `INSERT INTO assets (id, bytes, mime, size)
+           SELECT $1, $2, $3, $4
+           WHERE EXISTS (SELECT 1 FROM assets WHERE id = $1)
+              OR COALESCE((SELECT SUM(size) FROM assets), 0) + $5::bigint <= $6::bigint
+           ON CONFLICT (id) DO NOTHING
+           RETURNING id`,
+          [assetId, buf, mime, bytes.byteLength, bytes.byteLength, totalBudget],
+        );
+        ownsAsset = inserted.length > 0;
+        if (!ownsAsset) {
+          const exists = await tx.query<{one: number}>('SELECT 1 AS one FROM assets WHERE id = $1', [assetId]);
+          if (exists.length === 0) {
+            const [{total}] = await tx.query<{total: string | number}>(
+              'SELECT COALESCE(SUM(size), 0) AS total FROM assets',
+            );
+            throw new AssetBudgetError(Number(total), bytes.byteLength, totalBudget);
+          }
+        }
+      } else {
+        const inserted = await tx.query<{id: string}>(
+          `INSERT INTO assets (id, bytes, mime, size) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (id) DO NOTHING RETURNING id`,
+          [assetId, buf, mime, bytes.byteLength],
+        );
+        ownsAsset = inserted.length > 0;
+      }
+
+      // Count each content-addressed asset once per form, even if a user selects
+      // the same bytes twice. Consumed mappings remain until their row is hard-
+      // purged, so the budget reflects all form-owned bytes still in retention.
+      const staged = await tx.query<{token: string}>(
+        `INSERT INTO form_uploads
+           (token, asset_id, page_id, form_id, field_id, file_name, owns_asset, capability_hash)
+         SELECT $1, $2, $3, $4, $5, $6, $7, $8
+         FROM assets candidate
+         WHERE candidate.id = $2
+           AND (
+             EXISTS (
+               SELECT 1 FROM form_uploads existing
+               WHERE existing.page_id = $3 AND existing.form_id = $4 AND existing.asset_id = $2
+             )
+             OR COALESCE((
+               SELECT SUM(accounted.size) FROM assets accounted
+               WHERE EXISTS (
+                 SELECT 1 FROM form_uploads existing
+                 WHERE existing.page_id = $3
+                   AND existing.form_id = $4
+                   AND existing.asset_id = accounted.id
+               )
+             ), 0) + candidate.size <= $9::bigint
+           )
+           AND (
+             EXISTS (
+               SELECT 1 FROM form_uploads existing
+               WHERE existing.page_id = $3
+                 AND existing.form_id = $4
+                 AND existing.asset_id = $2
+                 AND existing.consumed_by IS NULL
+             )
+             OR COALESCE((
+               SELECT SUM(accounted.size) FROM assets accounted
+               WHERE EXISTS (
+                 SELECT 1 FROM form_uploads existing
+                 WHERE existing.page_id = $3
+                   AND existing.form_id = $4
+                   AND existing.asset_id = accounted.id
+                   AND existing.consumed_by IS NULL
+               )
+             ), 0) + candidate.size <= $10::bigint
+           )
+         RETURNING token`,
+        [
+          input.token,
+          assetId,
+          input.pageId,
+          input.formId,
+          input.fieldId,
+          input.name,
+          ownsAsset,
+          input.capabilityHash ?? null,
+          budgets.maxFormBytes,
+          budgets.maxFormStagedBytes,
+        ],
+      );
+      if (staged.length === 0) {
+        const [{durable_total: durableTotal, staged_total: stagedTotal}] = await tx.query<{
+          durable_total: string | number;
+          staged_total: string | number;
+        }>(
+          `SELECT
+             COALESCE(SUM(accounted.size), 0) AS durable_total,
+             COALESCE(SUM(accounted.size) FILTER (WHERE EXISTS (
+               SELECT 1 FROM form_uploads staged
+               WHERE staged.page_id = $1
+                 AND staged.form_id = $2
+                 AND staged.asset_id = accounted.id
+                 AND staged.consumed_by IS NULL
+             )), 0) AS staged_total
+           FROM assets accounted
+           WHERE EXISTS (
+             SELECT 1 FROM form_uploads existing
+             WHERE existing.page_id = $1
+               AND existing.form_id = $2
+               AND existing.asset_id = accounted.id
+           )`,
+          [input.pageId, input.formId],
+        );
+        const stagedBytes = Number(stagedTotal);
+        if (stagedBytes + bytes.byteLength > budgets.maxFormStagedBytes) {
+          throw new FormAssetBudgetError(stagedBytes, bytes.byteLength, budgets.maxFormStagedBytes);
+        }
+        throw new FormAssetBudgetError(Number(durableTotal), bytes.byteLength, budgets.maxFormBytes);
+      }
+      return {
+        token: input.token,
+        assetId,
+        fieldId: input.fieldId,
+        name: input.name,
+        size: bytes.byteLength,
+        consumedBy: null,
+      };
+    });
+  }
+
+  /**
+   * Atomically claim all upload tokens for one submission idempotency key. A retry
+   * with the same key sees the same records; a different submission cannot spend
+   * them. Field/token mismatches roll the whole claim back and return `null`.
+   */
+  async claimFormUploads(
+    pageId: string,
+    formId: string,
+    entries: Array<{fieldId: string; tokens: string[]}>,
+    idempotencyKey: string,
+    ttlMs: number,
+    /** F-4 publication binding; null for legacy block forms. */
+    capabilityHash: string | null = null,
+  ): Promise<StagedFormUpload[] | null> {
+    const expected = new Map<string, string>();
+    for (const entry of entries) {
+      for (const token of entry.tokens) {
+        if (expected.has(token)) return null;
+        expected.set(token, entry.fieldId);
+      }
+    }
+    const tokens = [...expected.keys()];
+    if (tokens.length === 0) return [];
+    try {
+      return await this.db.begin(async (tx) => {
+        const rows = await tx.query<{
+          token: string;
+          asset_id: string;
+          field_id: string;
+          file_name: string;
+          size: number | string;
+          consumed_by: string | null;
+        }>(
+          `UPDATE form_uploads uploads
+           SET claimed_by = COALESCE(uploads.claimed_by, $4)
+           FROM assets
+           WHERE uploads.token = ANY($1)
+             AND uploads.asset_id = assets.id
+             AND uploads.page_id = $2
+             AND uploads.form_id = $3
+             AND uploads.capability_hash IS NOT DISTINCT FROM $6
+             AND (uploads.claimed_by IS NULL OR uploads.claimed_by = $4)
+             AND (
+               uploads.consumed_by IS NOT NULL
+               OR uploads.created_at > now() - ($5::bigint * interval '1 millisecond')
+             )
+           RETURNING uploads.token, uploads.asset_id, uploads.field_id, uploads.file_name,
+             uploads.consumed_by, assets.size`,
+          [tokens, pageId, formId, idempotencyKey, Math.max(0, Math.trunc(ttlMs)), capabilityHash],
+        );
+        if (
+          rows.length !== tokens.length
+          || rows.some((row) => expected.get(row.token) !== row.field_id)
+        ) {
+          throw new FormUploadClaimError();
+        }
+        return rows.map((row) => ({
+          token: row.token,
+          assetId: row.asset_id,
+          fieldId: row.field_id,
+          name: row.file_name,
+          size: Number(row.size),
+          consumedBy: row.consumed_by,
+        }));
+      });
+    } catch (err) {
+      if (err instanceof FormUploadClaimError) return null;
+      throw err;
+    }
+  }
+
+  /** Bind claimed upload assets to the created row and make them readable there. */
+  async consumeFormUploads(tokens: string[], idempotencyKey: string, rowId: string): Promise<void> {
+    if (tokens.length === 0) return;
+    await this.db.begin(async (tx) => {
+      const consumed = await tx.query<{asset_id: string}>(
+        `UPDATE form_uploads
+         SET consumed_by = COALESCE(consumed_by, $3)
+         WHERE token = ANY($1)
+           AND claimed_by = $2
+           AND (consumed_by IS NULL OR consumed_by = $3)
+         RETURNING asset_id`,
+        [tokens, idempotencyKey, rowId],
+      );
+      if (consumed.length !== tokens.length) {
+        console.warn('OpenBook form upload claim changed before consumption:', {
+          expected: tokens.length,
+          consumed: consumed.length,
+          rowId,
+        });
+      }
+      await tx.query(
+        `INSERT INTO asset_refs (asset_id, page_id)
+         SELECT DISTINCT asset_id, $2::uuid FROM form_uploads WHERE token = ANY($1)
+         ON CONFLICT (asset_id, page_id) DO NOTHING`,
+        [tokens, rowId],
+      );
+    });
+  }
+
+  /** Discard unconsumed tokens (honeypot path) and immediately reap blobs this stage created. */
+  async discardFormUploads(pageId: string, formId: string, tokens: string[]): Promise<void> {
+    if (tokens.length === 0) return;
+    await this.db.begin(async (tx) => {
+      const removed = await tx.query<{asset_id: string; owns_asset: boolean}>(
+        `DELETE FROM form_uploads
+         WHERE token = ANY($1) AND page_id = $2 AND form_id = $3 AND consumed_by IS NULL
+         RETURNING asset_id, owns_asset`,
+        [tokens, pageId, formId],
+      );
+      const ownedIds = [...new Set(removed.filter((row) => row.owns_asset).map((row) => row.asset_id))];
+      await this.deleteUnreferencedAssetIds(tx, ownedIds);
+    });
+  }
+
+  /** Activity-triggered 30-minute orphan sweep used by both public form routes. */
+  async gcExpiredFormUploads(ttlMs: number): Promise<{reaped: number; bytes: number}> {
+    return this.db.begin(async (tx) => {
+      const removed = await tx.query<{asset_id: string; owns_asset: boolean}>(
+        `DELETE FROM form_uploads
+         WHERE consumed_by IS NULL
+           AND created_at <= now() - ($1::bigint * interval '1 millisecond')
+           AND (claimed_by IS NULL OR created_at <= now() - ((2 * $1)::bigint * interval '1 millisecond'))
+         RETURNING asset_id, owns_asset`,
+        [Math.max(0, Math.trunc(ttlMs))],
+      );
+      const ids = [...new Set(removed.filter((row) => row.owns_asset).map((row) => row.asset_id))];
+      const reaped = await this.deleteUnreferencedAssetIds(tx, ids);
+      return {
+        reaped: reaped.length,
+        bytes: reaped.reduce((total, row) => total + Number(row.size), 0),
+      };
+    });
+  }
+
+  /** Delete only assets with no authoritative form-stage or reachability edge. */
+  private async deleteUnreferencedAssetIds(db: Db, ids: string[]): Promise<Array<{id: string; size: number | string}>> {
+    if (ids.length === 0) return [];
+    return db.query<{id: string; size: number | string}>(
+      `DELETE FROM assets asset
+       WHERE asset.id = ANY($1)
+         AND NOT EXISTS (SELECT 1 FROM form_uploads upload WHERE upload.asset_id = asset.id)
+         AND NOT EXISTS (SELECT 1 FROM asset_refs ref WHERE ref.asset_id = asset.id)
+       RETURNING asset.id, asset.size`,
+      [ids],
+    );
+  }
+
+  /**
    * Store binary `bytes` under their SHA-256 content hash (dedup: byte-identical
    * uploads collapse to ONE row). Returns the id. `ON CONFLICT DO NOTHING` keeps
    * the first-seen `mime`/`size` for a given content — mime is metadata *about the
@@ -2294,7 +5416,7 @@ export class PageStore {
    * gates the upload and refs the asset to a page.
    *
    * `mime` MUST already be a sanitized, safe-to-serve type (the route runs
-   * `safeAssetMime` before calling in — an allowlisted image or
+   * `safeAssetMime` before calling in — an allowlisted image or audio or
    * `application/octet-stream`). Because only sanitized mimes are ever stored, the
    * first-seen-mime dedup above can never be poisoned into serving an executable
    * type (the stored-XSS defense; see the upload route).
@@ -2303,7 +5425,7 @@ export class PageStore {
    * storing a NEW asset that would push `SUM(size)` past the budget throws
    * {@link AssetBudgetError} (→ route 507) instead of inserting. A byte-identical
    * re-upload of already-stored content is always allowed — dedup adds no bytes, so
-   * the budget can never wedge a workspace out of re-saving content it already holds.
+   * the budget can never wedge a library out of re-saving content it already holds.
    * The check + insert are ONE statement so no window exists between reading `SUM`
    * and inserting on the embedded store (PGlite serializes every query through its
    * mutex). On real Postgres under READ COMMITTED two concurrent uploads can each
@@ -2312,7 +5434,12 @@ export class PageStore {
    * generous soft budget; the periodic GC reclaims any slack. Absent/negative budget
    * ⇒ unbudgeted (legacy behavior).
    */
-  async putAsset(bytes: Uint8Array, mime: string, opts: {maxTotalBytes?: number} = {}): Promise<{id: string}> {
+  private async putAssetUsing(
+    db: Db,
+    bytes: Uint8Array,
+    mime: string,
+    opts: {maxTotalBytes?: number},
+  ): Promise<{id: string}> {
     const id = await assetHash(bytes);
     // Bind a Buffer. PGlite accepts a bare Uint8Array or a Buffer; the remote
     // postgres.js (porsager) driver serializes a Buffer to BYTEA. Buffer is the
@@ -2329,7 +5456,7 @@ export class PageStore {
       // `$5`/`$6` are a separate bigint copy of the size + the budget so the size
       // parameter ($4, the int4 `size` column) isn't deduced into the bigint SUM
       // arithmetic too (PGlite rejects a parameter with two inferred types).
-      const inserted = await this.db.query<{id: string}>(
+      const inserted = await db.query<{id: string}>(
         `INSERT INTO assets (id, bytes, mime, size)
          SELECT $1, $2, $3, $4
          WHERE EXISTS (SELECT 1 FROM assets WHERE id = $1)
@@ -2341,11 +5468,11 @@ export class PageStore {
       if (inserted.length > 0) return {id}; // freshly stored within budget
       // No fresh insert: either the content was already present (dedup — fine) or
       // it's new and over budget. A present row ⇒ dedup; an absent one ⇒ reject.
-      const exists = await this.db.query<{one: number}>('SELECT 1 AS one FROM assets WHERE id = $1', [id]);
+      const exists = await db.query<{one: number}>('SELECT 1 AS one FROM assets WHERE id = $1', [id]);
       if (exists.length > 0) return {id};
-      throw new AssetBudgetError(await this.assetStorageBytes(), bytes.byteLength, budget);
+      throw new AssetBudgetError(await this.assetStorageBytesUsing(db), bytes.byteLength, budget);
     }
-    await this.db.query(
+    await db.query(
       `INSERT INTO assets (id, bytes, mime, size) VALUES ($1, $2, $3, $4)
        ON CONFLICT (id) DO NOTHING`,
       [id, buf, mime, bytes.byteLength],
@@ -2353,13 +5480,39 @@ export class PageStore {
     return {id};
   }
 
-  /** Total bytes currently held in the asset store (`SUM(size)`, 0 when empty) —
-   *  the figure the A6 storage budget is measured against. */
-  async assetStorageBytes(): Promise<number> {
-    const rows = await this.db.query<{total: string | number | null}>(
+  async putAsset(bytes: Uint8Array, mime: string, opts: {maxTotalBytes?: number} = {}): Promise<{id: string}> {
+    return this.putAssetUsing(this.db, bytes, mime, opts);
+  }
+
+  /** Store an authenticated upload and create its reachability edge atomically. */
+  async putAssetAndRef(
+    bytes: Uint8Array,
+    mime: string,
+    pageId: string,
+    opts: {maxTotalBytes?: number} = {},
+  ): Promise<{id: string}> {
+    return this.db.begin(async (tx) => {
+      const stored = await this.putAssetUsing(tx, bytes, mime, opts);
+      await tx.query(
+        `INSERT INTO asset_refs (asset_id, page_id) VALUES ($1, $2)
+         ON CONFLICT (asset_id, page_id) DO NOTHING`,
+        [stored.id, pageId],
+      );
+      return stored;
+    });
+  }
+
+  private async assetStorageBytesUsing(db: Db): Promise<number> {
+    const rows = await db.query<{total: string | number | null}>(
       'SELECT COALESCE(SUM(size), 0) AS total FROM assets',
     );
     return Number(rows[0]?.total ?? 0);
+  }
+
+  /** Total bytes currently held in the asset store (`SUM(size)`, 0 when empty) —
+   *  the figure the A6 storage budget is measured against. */
+  async assetStorageBytes(): Promise<number> {
+    return this.assetStorageBytesUsing(this.db);
   }
 
   /** Fetch an asset's bytes + mime + size by content-hash id, or `null` if absent.
@@ -2455,6 +5608,10 @@ export class PageStore {
    * (an asset that still has any ref is kept regardless), and the id-in-document scan
    * is the confirming check that makes the GC block-move-safe: 0 refs but present in a
    * page document ⇒ KEPT.
+   *
+   * Backup capture's `referencedAssets` deliberately mirrors this substring
+   * predicate (including future keys and `/assets/<id>` URLs), so anything this
+   * GC preserves from a live page is also included in a v3 backup.
    *
    * **Includes TRASHED pages (data-loss fix).** The scan does NOT filter on
    * `deleted_at` — a soft-deleted page is restorable for the whole trash-retention
@@ -2557,11 +5714,11 @@ export interface ManagedMemberInput {
 
 /** Counts from a {@link PageStore.syncManagedRoster} reconcile (observability). */
 export interface RosterSyncResult {
-  /** Managed rows inserted (new workspace members). */
+  /** Managed rows inserted (new library members). */
   added: number;
   /** Managed rows whose role was reconciled. */
   updated: number;
-  /** Managed rows removed (dropped from the workspace). */
+  /** Managed rows removed (dropped from the library). */
   removed: number;
   /** Desired entries skipped because a local invite already covers them. */
   skipped: number;
@@ -2799,4 +5956,34 @@ function editFromRow(row: EditRow): StoredEdit {
     summary: row.summary ?? '',
     createdAt: toIso(row.created_at),
   };
+}
+
+// ── Page version row mapper (PVH-1) ──────────────────────────────────────────
+//
+// The wire types {@link PageVersionMeta}/{@link StoredPageVersion} are the SDK's
+// (one source of truth shared with the client); this maps a DB row onto them.
+
+interface PageVersionRow {
+  id: string;
+  page_id: string;
+  data?: PageSnapshot | string | null;
+  author_subject: string | null;
+  author_issuer: string | null;
+  author_name: string | null;
+  created_at: Date | string;
+}
+
+function pageVersionMetaFromRow(row: PageVersionRow): PageVersionMeta {
+  return {
+    id: row.id,
+    pageId: row.page_id,
+    authorSubject: row.author_subject ?? null,
+    authorIssuer: row.author_issuer ?? null,
+    authorName: row.author_name ?? null,
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function pageVersionFromRow(row: PageVersionRow): StoredPageVersion {
+  return {...pageVersionMetaFromRow(row), data: parseSnapshot(row.data)};
 }

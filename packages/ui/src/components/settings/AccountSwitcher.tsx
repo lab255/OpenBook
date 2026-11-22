@@ -1,3 +1,4 @@
+import {STATUS_INK_CLASS, STATUS_DOT_CLASS} from '@/lib/statusStyles';
 import {ArrowPathIcon, ArrowTopRightOnSquareIcon, PlusIcon} from '@heroicons/react/24/outline';
 import {CheckIcon} from '@radix-ui/react-icons';
 import {Trash2} from 'lucide-react';
@@ -5,7 +6,7 @@ import {Button} from '@/components/ui/button';
 import {SettingsSection} from '@/components/settings/primitives';
 import {initialsOf, monogramHue} from '@/components/ProfileAvatar';
 import {cn} from '@/lib/utils';
-import {useAccount, useConfirm, usePlatformLibrary, useTranslation, type AccountStatus, type ConnectedAccount} from '@/providers';
+import {useAccount, useConfirm, usePlatformCapabilities, useTranslation, type AccountStatus, type ConnectedAccount} from '@/providers';
 
 /**
  * The multi-account switcher (OB-206): lists every connected account, marks the
@@ -34,7 +35,7 @@ export default function AccountSwitcher() {
     signOut,
     syncNow,
   } = useAccount();
-  const platform = usePlatformLibrary();
+  const platform = usePlatformCapabilities();
   const confirm = useConfirm();
 
   // Removing forgets the account on THIS device only (its token + entry), so it
@@ -58,6 +59,7 @@ export default function AccountSwitcher() {
 
   const lastSynced = lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : t('account.signin.never');
   const multiple = accounts.length > 1;
+  const activeIdentityOnly = accounts.find((account) => account.id === activeAccountId)?.identityOnly === true;
 
   return (
     <>
@@ -93,7 +95,9 @@ export default function AccountSwitcher() {
                   <AccountMonogram seed={acc.name} />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-medium">{acc.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{accountHost(acc.accountUrl)}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {acc.identityOnly ? t('account.switcher.openBookIdentity') : accountHost(acc.accountUrl)}
+                    </span>
                   </span>
                   <StatusPill active={active} status={acc.status} />
                   {active && <CheckIcon className="h-4 w-4 shrink-0 text-brand" />}
@@ -116,7 +120,7 @@ export default function AccountSwitcher() {
           })}
         </ul>
         <Button variant="outline" size="sm" className="self-start" onClick={addAccount}>
-          <PlusIcon className="mr-1.5 h-4 w-4" />
+          <PlusIcon className="h-4 w-4" />
           {t('account.switcher.addAnother')}
         </Button>
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -127,18 +131,26 @@ export default function AccountSwitcher() {
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-muted-foreground">{t('account.signin.connectedAs')}</dt>
             <dd className="truncate font-medium">{deviceName}</dd>
-            <dt className="text-muted-foreground">{t('account.signin.lastSynced')}</dt>
-            <dd className="font-medium">{lastSynced}</dd>
+            {!activeIdentityOnly && (
+              <>
+                <dt className="text-muted-foreground">{t('account.signin.lastSynced')}</dt>
+                <dd className="font-medium">{lastSynced}</dd>
+              </>
+            )}
           </dl>
           <div className="mt-1 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={syncNow} disabled={status === 'syncing'}>
-              <ArrowPathIcon className="mr-1.5 h-4 w-4" />
-              {t('account.signin.syncNow')}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => openExternal(`${accountUrl}/dashboard`)}>
-              <ArrowTopRightOnSquareIcon className="mr-1.5 h-4 w-4" />
-              {t('account.signin.openDashboard')}
-            </Button>
+            {!activeIdentityOnly && (
+              <>
+                <Button variant="outline" size="sm" onClick={syncNow} disabled={status === 'syncing'}>
+                  <ArrowPathIcon className="h-4 w-4" />
+                  {t('account.signin.syncNow')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => openExternal(`${accountUrl}/dashboard`)}>
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                  {t('account.signin.openDashboard')}
+                </Button>
+              </>
+            )}
             <Button variant="ghost" size="sm" onClick={signOut} className="text-destructive hover:text-destructive">
               {t('account.signin.signOut')}
             </Button>
@@ -147,9 +159,15 @@ export default function AccountSwitcher() {
       </SettingsSection>
 
       <SettingsSection>
-        <p className="text-xs text-muted-foreground">{t('account.signin.whatSyncs')}</p>
         <p className="text-xs text-muted-foreground">
-          {multiple ? t('account.switcher.signOutActiveHint') : t('account.signin.signOutHint')}
+          {t(activeIdentityOnly ? 'account.signin.able.whatSyncs' : 'account.signin.whatSyncs')}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {activeIdentityOnly
+            ? t('account.signin.able.signOutHint')
+            : multiple
+              ? t('account.switcher.signOutActiveHint')
+              : t('account.signin.signOutHint')}
         </p>
       </SettingsSection>
     </>
@@ -188,7 +206,7 @@ function StatusPill({active, status}: {active: boolean; status: AccountStatus}) 
     );
   }
   const tone: Record<'syncing' | 'error' | 'live', {dot: string; text: string; label: string}> = {
-    syncing: {dot: 'bg-amber-500 animate-pulse', text: 'text-amber-600 dark:text-amber-400', label: t('account.switcher.syncing')},
+    syncing: {dot: cn(STATUS_DOT_CLASS.warn, 'animate-pulse'), text: STATUS_INK_CLASS.warn, label: t('account.switcher.syncing')},
     error: {dot: 'bg-destructive', text: 'text-destructive', label: t('account.switcher.error')},
     live: {dot: 'bg-brand', text: 'text-brand', label: t('account.switcher.active')},
   };

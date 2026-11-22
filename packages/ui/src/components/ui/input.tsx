@@ -7,13 +7,13 @@ const inputVariants = cva(
   // Focus: the field "lights up" — its border tints to the accent and a soft 3px
   // ring hugs it (no offset, so the glow stays flush to the rounded edge). This
   // is the text-field focus idiom; offset rings are for clickable controls.
-  "w-full rounded-md border border-input bg-transparent text-sm text-foreground transition-[color,border-color,box-shadow] file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:border-ring focus-visible:shadow-[var(--ring-field)] disabled:cursor-not-allowed disabled:opacity-50",
+  "w-full rounded-md border border-input bg-transparent text-sm text-foreground transition-[color,border-color,box-shadow] file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-placeholder-foreground focus-visible:outline-hidden focus-visible:border-ring focus-visible:shadow-[var(--ring-field)] disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       // `inputSize` (not `size`, which is a native numeric input attribute).
       inputSize: {
-        default: "flex h-9 px-3 py-1 shadow-xs",
-        sm: "h-8 px-2.5 py-1", // compact, no shadow — for dense inline controls
+        default: "flex h-control-lg px-3 py-2 shadow-xs",
+        sm: "h-control-sm px-2.5 py-1.5", // compact, no shadow — for dense inline controls
       },
     },
     defaultVariants: {inputSize: "default"},

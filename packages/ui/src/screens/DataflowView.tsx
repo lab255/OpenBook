@@ -1,3 +1,4 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import {createContext, useContext, useEffect, useMemo, useState} from 'react';
 import {
   Background,
@@ -30,10 +31,12 @@ import {
   type DataflowNode,
   type DataflowOutlet,
 } from '@/blockeditor/kit/dataflow';
+import {useDocumentCachedScope} from '@/blockeditor/kit/useCachedEval';
 import {openDoc, subscribeOpenDocs} from '@/lib/openDocs';
 import {HOME_PAGE_ID} from '@/lib/homePage';
 import {useData} from '@/data';
 import {useNavigation, useTheme, useTranslation} from '@/providers';
+import {EmptyState} from '@/components/ui/empty-state';
 import {cn} from '@/lib/utils';
 
 /**
@@ -47,12 +50,12 @@ import {cn} from '@/lib/utils';
  */
 
 const KIND_META: Record<DataflowNode['kind'], {icon: typeof Code2; chip: string}> = {
-  input: {icon: SlidersHorizontal, chip: 'bg-sky-500/15 text-sky-700 dark:text-sky-300'},
-  code: {icon: Code2, chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300'},
-  formula: {icon: Sigma, chip: 'bg-violet-500/15 text-violet-700 dark:text-violet-300'},
-  chart: {icon: ChartLine, chip: 'bg-amber-500/15 text-amber-700 dark:text-amber-300'},
-  light: {icon: CircleDot, chip: 'bg-green-500/15 text-green-700 dark:text-green-300'},
-  button: {icon: MousePointerClick, chip: 'bg-pink-500/15 text-pink-700 dark:text-pink-300'},
+  input: {icon: SlidersHorizontal, chip: DATA_CHIP_CLASS.blue},
+  code: {icon: Code2, chip: DATA_CHIP_CLASS.purple},
+  formula: {icon: Sigma, chip: DATA_CHIP_CLASS.purple},
+  chart: {icon: ChartLine, chip: DATA_CHIP_CLASS.yellow},
+  light: {icon: CircleDot, chip: DATA_CHIP_CLASS.green},
+  button: {icon: MousePointerClick, chip: DATA_CHIP_CLASS.pink},
   outlet: {icon: ArrowUpRight, chip: 'bg-primary/15 text-primary'},
 };
 
@@ -80,7 +83,7 @@ function BlockNode({id, data}: NodeProps<FlowNodeType>) {
       onMouseEnter={() => setHovered(id)}
       onMouseLeave={() => setHovered(null)}
       className={cn(
-        'w-52 rounded-lg border bg-card px-3 py-2 shadow-sm transition-opacity duration-150',
+        'w-52 rounded-lg border bg-card px-3 py-2 shadow-sm transition-opacity duration-(--motion-fast)',
         flow.error ? 'border-destructive/50' : 'border-border',
         flow.kind === 'outlet' && 'border-dashed border-primary/40',
         dimmed && 'opacity-30',
@@ -178,24 +181,11 @@ export default function DataflowView() {
   const {pageId, doc} = usePrimaryDoc();
   const {outlets, parentPageId} = useOutlets(pageId);
 
-  const [graph, setGraph] = useState<DataflowGraph>(EMPTY);
-  useEffect(() => {
-    if (!doc) {
-      setGraph(EMPTY);
-      return;
-    }
-    let raf = 0;
-    const recompute = (): void => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setGraph(dataflowGraph(doc, outlets)));
-    };
-    recompute();
-    doc.on('update', recompute);
-    return () => {
-      doc.off('update', recompute);
-      cancelAnimationFrame(raf);
-    };
-  }, [doc, outlets]);
+  const computed = useDocumentCachedScope(doc);
+  const graph = useMemo(
+    () => doc && computed.value ? dataflowGraph(doc, computed.value, outlets) : EMPTY,
+    [computed.value, doc, outlets],
+  );
 
   // Re-fit when the graph's SHAPE changes (outlets arrive async, blocks come
   // and go) — but never on value ticks, and never fight the user's pan/zoom.
@@ -292,11 +282,13 @@ export default function DataflowView() {
 
   if (graph.nodes.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center" data-dataflow-empty>
-        <GitFork className="h-6 w-6 text-muted-foreground/50" />
-        <p className="text-sm text-muted-foreground">{t('flow.empty')}</p>
-        <p className="max-w-xs text-xs text-muted-foreground/70">{t('flow.emptyHint')}</p>
-      </div>
+      <EmptyState
+        className="h-full justify-center px-8"
+        data-dataflow-empty
+        icon={<GitFork className="h-6 w-6 text-muted-foreground/50" />}
+        title={t('flow.empty')}
+        hint={t('flow.emptyHint')}
+      />
     );
   }
 

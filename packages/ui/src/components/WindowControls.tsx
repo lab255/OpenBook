@@ -1,7 +1,11 @@
 import {useEffect, useState} from 'react';
 import {Copy, Minus, Square, X} from 'lucide-react';
-import {usePlatformLibrary} from '@/providers';
+import {usePlatformCapabilities} from '@/providers';
 import {cn} from '@/lib/utils';
+import {suppressContextMenu} from '@/lib/suppressContextMenu';
+
+// eslint-disable-next-line tailwind/no-palette-color -- Windows caption close-button convention (platform red, not theme destructive)
+const CLOSE_HOVER_CLASS = 'hover:bg-red-600 hover:text-white';
 
 /**
  * Minimize / maximize / close buttons for a frameless window (Windows & Linux,
@@ -9,7 +13,7 @@ import {cn} from '@/lib/utils';
  * strip. Renders nothing on macOS / the web, which keep their native controls.
  */
 export default function WindowControls() {
-  const {windowControls} = usePlatformLibrary();
+  const {windowControls} = usePlatformCapabilities();
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -22,7 +26,7 @@ export default function WindowControls() {
   const button = 'flex h-full w-[46px] items-center justify-center text-muted-foreground transition-colors';
 
   return (
-    <div className="flex h-full shrink-0 items-stretch">
+    <div className="flex h-full shrink-0 items-stretch" onContextMenu={suppressContextMenu}>
       <button
         type="button"
         onClick={windowControls.minimize}
@@ -43,7 +47,7 @@ export default function WindowControls() {
         type="button"
         onClick={windowControls.close}
         aria-label="Close"
-        className={cn(button, 'hover:bg-red-600 hover:text-white')}
+        className={cn(button, CLOSE_HOVER_CLASS)}
       >
         <X className="h-4 w-4" />
       </button>

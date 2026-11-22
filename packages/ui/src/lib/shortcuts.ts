@@ -81,12 +81,15 @@ export function matchShortcut(e: KeyboardEvent, combo: ShortcutCombo): boolean {
 }
 
 /**
- * The canonical shortcut for each app command, keyed by command id. Every combo
- * here uses a modifier, so the global handler can fire it even while a text
- * field or the editor has focus without stealing ordinary typing.
+ * The canonical shortcut for each app or editor command, keyed by command id.
+ * App-level combos use a modifier so the global handler can fire them even
+ * while a text field or the editor has focus without stealing ordinary typing.
  */
 export const SHORTCUTS = {
   commandPalette: {key: 'k', mod: true},
+  // ⌘⇧F opens the same unified palette pre-primed for search — a "find in your
+  // library" mnemonic alongside ⌘K (both land on the one search surface).
+  openSearch: {key: 'f', mod: true, shift: true},
   newPage: {key: 'n', mod: true},
   toggleSidebar: {key: '\\', mod: true},
   openSettings: {key: ',', mod: true},
@@ -95,6 +98,11 @@ export const SHORTCUTS = {
   toggleFullWidth: {key: '.', mod: true},
   toggleTheme: {key: 'l', mod: true, shift: true},
   openTrash: {key: 'delete', mod: true, shift: true},
+  // Editor-scoped combos (deleteBlock is modifier-less) — never attach these to the global command registry.
+  duplicateBlock: {key: 'd', mod: true},
+  moveBlockUp: {key: 'arrowup', mod: true, shift: true},
+  moveBlockDown: {key: 'arrowdown', mod: true, shift: true},
+  deleteBlock: {key: 'backspace'},
 } as const satisfies Record<string, ShortcutCombo>;
 
 export type ShortcutId = keyof typeof SHORTCUTS;

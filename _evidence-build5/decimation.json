@@ -1,0 +1,1075 @@
+{
+  "generation": {
+    "original": "straight: (i/4,i/8), n500; arc: (100 cos(i*pi/600),100 sin(i*pi/600)), n600; handwriting-like: (i/4,8 sin(i/18)+12 sin(i/51)), n800; loops: (i/20+20 sin(i/25),20 cos(i/25)), n1000; corner-stress: (i/4,3*(i mod 2)), n1200. Variable q=round(128+80 sin(i/35)).",
+    "representative": "Geometric proxies, NOT recorded human handwriting. Five sample densities n=160,200,240,280,320 per class; t=i/(n-1). Smooth=(100t,30 sin(pi*t)); handwriting-like=(100t,12 sin(6pi*t)+4 sin(2pi*t)); loop=(60t+20 sin(4pi*t),20 cos(4pi*t)). Variable q=round(128+80 sin(2pi*t)). Both constant and variable modes."
+  },
+  "perClass": [
+    {
+      "population": "original-synthetic",
+      "name": "straight",
+      "arity": 2,
+      "count": 1,
+      "retained": {
+        "median": 5,
+        "worst": 5
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "straight",
+      "arity": 3,
+      "count": 1,
+      "retained": {
+        "median": 112,
+        "worst": 112
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "arc",
+      "arity": 2,
+      "count": 1,
+      "retained": {
+        "median": 21,
+        "worst": 21
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "arc",
+      "arity": 3,
+      "count": 1,
+      "retained": {
+        "median": 136,
+        "worst": 136
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "handwriting-like",
+      "arity": 2,
+      "count": 1,
+      "retained": {
+        "median": 49,
+        "worst": 49
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "handwriting-like",
+      "arity": 3,
+      "count": 1,
+      "retained": {
+        "median": 193,
+        "worst": 193
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "loops",
+      "arity": 2,
+      "count": 1,
+      "retained": {
+        "median": 129,
+        "worst": 129
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "loops",
+      "arity": 3,
+      "count": 1,
+      "retained": {
+        "median": 255,
+        "worst": 255
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "corner-stress",
+      "arity": 2,
+      "count": 1,
+      "retained": {
+        "median": 1200,
+        "worst": 1200
+      }
+    },
+    {
+      "population": "original-synthetic",
+      "name": "corner-stress",
+      "arity": 3,
+      "count": 1,
+      "retained": {
+        "median": 1200,
+        "worst": 1200
+      }
+    },
+    {
+      "population": "representative-geometric-proxies",
+      "name": "smooth-curve",
+      "arity": 2,
+      "count": 5,
+      "retained": {
+        "median": 10,
+        "worst": 11
+      }
+    },
+    {
+      "population": "representative-geometric-proxies",
+      "name": "smooth-curve",
+      "arity": 3,
+      "count": 5,
+      "retained": {
+        "median": 51,
+        "worst": 81
+      }
+    },
+    {
+      "population": "representative-geometric-proxies",
+      "name": "handwriting-like",
+      "arity": 2,
+      "count": 5,
+      "retained": {
+        "median": 29,
+        "worst": 30
+      }
+    },
+    {
+      "population": "representative-geometric-proxies",
+      "name": "handwriting-like",
+      "arity": 3,
+      "count": 5,
+      "retained": {
+        "median": 67,
+        "worst": 95
+      }
+    },
+    {
+      "population": "representative-geometric-proxies",
+      "name": "loop",
+      "arity": 2,
+      "count": 5,
+      "retained": {
+        "median": 40,
+        "worst": 42
+      }
+    },
+    {
+      "population": "representative-geometric-proxies",
+      "name": "loop",
+      "arity": 3,
+      "count": 5,
+      "retained": {
+        "median": 67,
+        "worst": 102
+      }
+    }
+  ],
+  "checks": [
+    {
+      "name": "straight",
+      "arity": 2,
+      "maxGeometry": 1.9860273225978185e-15,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "straight",
+      "arity": 3,
+      "maxGeometry": 4.965068306494546e-16,
+      "maxPressureQ": 1
+    },
+    {
+      "name": "arc",
+      "arity": 2,
+      "maxGeometry": 0.3507140750495751,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "arc",
+      "arity": 3,
+      "maxGeometry": 0.26855227755418476,
+      "maxPressureQ": 0.9999999999999947
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "maxGeometry": 0.49687322086240937,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "maxGeometry": 0.4045247442141136,
+      "maxPressureQ": 0.9511163526284525
+    },
+    {
+      "name": "loops",
+      "arity": 2,
+      "maxGeometry": 0.31913313810411137,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "loops",
+      "arity": 3,
+      "maxGeometry": 0.4774382450441921,
+      "maxPressureQ": 0.9844138413928079
+    },
+    {
+      "name": "corner-stress",
+      "arity": 2,
+      "maxGeometry": 0,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "corner-stress",
+      "arity": 3,
+      "maxGeometry": 0,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 2,
+      "maxGeometry": 0.3229904590815008,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 3,
+      "maxGeometry": 0.323173452094588,
+      "maxPressureQ": 0.9552085279889884
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 2,
+      "maxGeometry": 0.3540489052270795,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 3,
+      "maxGeometry": 0.2358171491174784,
+      "maxPressureQ": 0.9152571782149206
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 2,
+      "maxGeometry": 0.4540402393897646,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 3,
+      "maxGeometry": 0.18641218160979278,
+      "maxPressureQ": 0.9106898996023123
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 2,
+      "maxGeometry": 0.3981048860499974,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 3,
+      "maxGeometry": 0.32075770082480304,
+      "maxPressureQ": 0.9003422928534501
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 2,
+      "maxGeometry": 0.3415226247968595,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "smooth-curve",
+      "arity": 3,
+      "maxGeometry": 0.15008636032496797,
+      "maxPressureQ": 0.8993542804971781
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "maxGeometry": 0.46377578441224276,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "maxGeometry": 0.44357470309586927,
+      "maxPressureQ": 0.971553440552885
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "maxGeometry": 0.4000074079163619,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "maxGeometry": 0.39231875289985385,
+      "maxPressureQ": 0.977345160231434
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "maxGeometry": 0.4686699421713939,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "maxGeometry": 0.3582508163630342,
+      "maxPressureQ": 0.8746207141080564
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "maxGeometry": 0.4564909208857828,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "maxGeometry": 0.3128255462028263,
+      "maxPressureQ": 0.7348342411679099
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "maxGeometry": 0.4657131960206715,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "maxGeometry": 0.41887591692874815,
+      "maxPressureQ": 0.8425697329255808
+    },
+    {
+      "name": "loop",
+      "arity": 2,
+      "maxGeometry": 0.3734900165651011,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "loop",
+      "arity": 3,
+      "maxGeometry": 0.37349001656510067,
+      "maxPressureQ": 0.8036903470042249
+    },
+    {
+      "name": "loop",
+      "arity": 2,
+      "maxGeometry": 0.47630981721239113,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "loop",
+      "arity": 3,
+      "maxGeometry": 0.47630981721239113,
+      "maxPressureQ": 0.7620442386974142
+    },
+    {
+      "name": "loop",
+      "arity": 2,
+      "maxGeometry": 0.4402401106617827,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "loop",
+      "arity": 3,
+      "maxGeometry": 0.44042052771969464,
+      "maxPressureQ": 0.8484302172419511
+    },
+    {
+      "name": "loop",
+      "arity": 2,
+      "maxGeometry": 0.4975654885888501,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "loop",
+      "arity": 3,
+      "maxGeometry": 0.4037716439179835,
+      "maxPressureQ": 0.7868088243521356
+    },
+    {
+      "name": "loop",
+      "arity": 2,
+      "maxGeometry": 0.46370068043715795,
+      "maxPressureQ": 0
+    },
+    {
+      "name": "loop",
+      "arity": 3,
+      "maxGeometry": 0.3095447879127727,
+      "maxPressureQ": 0.8444451349306332
+    }
+  ],
+  "negativeControl": {
+    "maxGeometry": 29.998536026443368,
+    "maxPressureQ": 80
+  },
+  "scope": "Five synthetic geometry families, constant/variable q; five mixed boards at each 100/500 stroke size, random production shape ids; whole pointerup transactions with semantic history, then half erase and fresh reload. UTF-8 bytes, uncompressed. Observed worst is not a hard cap. No prediction or time-flushed streaming implemented.",
+  "strokes": [
+    {
+      "name": "straight",
+      "arity": 2,
+      "original": 500,
+      "retained": 5,
+      "overrun": false
+    },
+    {
+      "name": "straight",
+      "arity": 3,
+      "original": 500,
+      "retained": 112,
+      "overrun": false
+    },
+    {
+      "name": "arc",
+      "arity": 2,
+      "original": 600,
+      "retained": 21,
+      "overrun": false
+    },
+    {
+      "name": "arc",
+      "arity": 3,
+      "original": 600,
+      "retained": 136,
+      "overrun": false
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 2,
+      "original": 800,
+      "retained": 49,
+      "overrun": false
+    },
+    {
+      "name": "handwriting-like",
+      "arity": 3,
+      "original": 800,
+      "retained": 193,
+      "overrun": false
+    },
+    {
+      "name": "loops",
+      "arity": 2,
+      "original": 1000,
+      "retained": 129,
+      "overrun": false
+    },
+    {
+      "name": "loops",
+      "arity": 3,
+      "original": 1000,
+      "retained": 255,
+      "overrun": false
+    },
+    {
+      "name": "corner-stress",
+      "arity": 2,
+      "original": 1200,
+      "retained": 1200,
+      "overrun": true
+    },
+    {
+      "name": "corner-stress",
+      "arity": 3,
+      "original": 1200,
+      "retained": 1200,
+      "overrun": true
+    }
+  ],
+  "retained": {
+    "median": 132.5,
+    "worst": 1200
+  },
+  "summary": [
+    {
+      "count": 100,
+      "simplified": false,
+      "base64": {
+        "median": 1610332,
+        "worst": 1610332
+      },
+      "complete": {
+        "median": 3675895,
+        "worst": 3675895
+      },
+      "retainedUndoBase64": {
+        "median": 1610664,
+        "worst": 1610664
+      },
+      "retainedUndoComplete": {
+        "median": 2718475,
+        "worst": 2718475
+      }
+    },
+    {
+      "count": 100,
+      "simplified": true,
+      "base64": {
+        "median": 538108,
+        "worst": 538148
+      },
+      "complete": {
+        "median": 1106951,
+        "worst": 1106991
+      },
+      "retainedUndoBase64": {
+        "median": 538388,
+        "worst": 538432
+      },
+      "retainedUndoComplete": {
+        "median": 925419,
+        "worst": 925463
+      }
+    },
+    {
+      "count": 500,
+      "simplified": false,
+      "base64": {
+        "median": 8052284,
+        "worst": 8052284
+      },
+      "complete": {
+        "median": 18380001,
+        "worst": 18380001
+      },
+      "retainedUndoBase64": {
+        "median": 8053948,
+        "worst": 8053948
+      },
+      "retainedUndoComplete": {
+        "median": 13592676,
+        "worst": 13592676
+      }
+    },
+    {
+      "count": 500,
+      "simplified": true,
+      "base64": {
+        "median": 2692700,
+        "worst": 2692740
+      },
+      "complete": {
+        "median": 5536817,
+        "worst": 5536857
+      },
+      "retainedUndoBase64": {
+        "median": 2694156,
+        "worst": 2694196
+      },
+      "retainedUndoComplete": {
+        "median": 4628984,
+        "worst": 4629024
+      }
+    }
+  ],
+  "boards": [
+    {
+      "count": 100,
+      "trial": 0,
+      "simplified": false,
+      "updateBytes": 1208489,
+      "before": {
+        "raw": 1207720,
+        "base64": 1610296,
+        "projection": 2065534,
+        "complete": 3675859
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 1207966,
+        "base64": 1610624,
+        "projection": 1107782,
+        "complete": 2718435
+      },
+      "afterReload": {
+        "raw": 664515,
+        "base64": 886020,
+        "projection": 1107782,
+        "complete": 1993831
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 0,
+      "simplified": true,
+      "updateBytes": 404214,
+      "before": {
+        "raw": 403492,
+        "base64": 537992,
+        "projection": 568814,
+        "complete": 1106835
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 403703,
+        "base64": 538272,
+        "projection": 387002,
+        "complete": 925303
+      },
+      "afterReload": {
+        "raw": 266967,
+        "base64": 355956,
+        "projection": 387002,
+        "complete": 742987
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 1,
+      "simplified": false,
+      "updateBytes": 1208520,
+      "before": {
+        "raw": 1207749,
+        "base64": 1610332,
+        "projection": 2065534,
+        "complete": 3675895
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 1207996,
+        "base64": 1610664,
+        "projection": 1107782,
+        "complete": 2718475
+      },
+      "afterReload": {
+        "raw": 664516,
+        "base64": 886024,
+        "projection": 1107782,
+        "complete": 1993835
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 1,
+      "simplified": true,
+      "updateBytes": 404175,
+      "before": {
+        "raw": 403442,
+        "base64": 537924,
+        "projection": 568814,
+        "complete": 1106767
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 403654,
+        "base64": 538208,
+        "projection": 387002,
+        "complete": 925239
+      },
+      "afterReload": {
+        "raw": 266889,
+        "base64": 355852,
+        "projection": 387002,
+        "complete": 742883
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 2,
+      "simplified": false,
+      "updateBytes": 1208520,
+      "before": {
+        "raw": 1207749,
+        "base64": 1610332,
+        "projection": 2065534,
+        "complete": 3675895
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 1207996,
+        "base64": 1610664,
+        "projection": 1107782,
+        "complete": 2718475
+      },
+      "afterReload": {
+        "raw": 664516,
+        "base64": 886024,
+        "projection": 1107782,
+        "complete": 1993835
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 2,
+      "simplified": true,
+      "updateBytes": 404337,
+      "before": {
+        "raw": 403609,
+        "base64": 538148,
+        "projection": 568814,
+        "complete": 1106991
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 403822,
+        "base64": 538432,
+        "projection": 387002,
+        "complete": 925463
+      },
+      "afterReload": {
+        "raw": 267028,
+        "base64": 356040,
+        "projection": 387002,
+        "complete": 743071
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 3,
+      "simplified": false,
+      "updateBytes": 1208520,
+      "before": {
+        "raw": 1207749,
+        "base64": 1610332,
+        "projection": 2065534,
+        "complete": 3675895
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 1207996,
+        "base64": 1610664,
+        "projection": 1107782,
+        "complete": 2718475
+      },
+      "afterReload": {
+        "raw": 664516,
+        "base64": 886024,
+        "projection": 1107782,
+        "complete": 1993835
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 3,
+      "simplified": true,
+      "updateBytes": 404335,
+      "before": {
+        "raw": 403608,
+        "base64": 538144,
+        "projection": 568814,
+        "complete": 1106987
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 403820,
+        "base64": 538428,
+        "projection": 387002,
+        "complete": 925459
+      },
+      "afterReload": {
+        "raw": 267055,
+        "base64": 356076,
+        "projection": 387002,
+        "complete": 743107
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 4,
+      "simplified": false,
+      "updateBytes": 1208489,
+      "before": {
+        "raw": 1207720,
+        "base64": 1610296,
+        "projection": 2065534,
+        "complete": 3675859
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 1207966,
+        "base64": 1610624,
+        "projection": 1107782,
+        "complete": 2718435
+      },
+      "afterReload": {
+        "raw": 664515,
+        "base64": 886020,
+        "projection": 1107782,
+        "complete": 1993831
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 100,
+      "trial": 4,
+      "simplified": true,
+      "updateBytes": 404305,
+      "before": {
+        "raw": 403579,
+        "base64": 538108,
+        "projection": 568814,
+        "complete": 1106951
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 403791,
+        "base64": 538388,
+        "projection": 387002,
+        "complete": 925419
+      },
+      "afterReload": {
+        "raw": 267026,
+        "base64": 356036,
+        "projection": 387002,
+        "complete": 743067
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 0,
+      "simplified": false,
+      "updateBytes": 6043754,
+      "before": {
+        "raw": 6039184,
+        "base64": 8052248,
+        "projection": 10327688,
+        "complete": 18379965
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 6040431,
+        "base64": 8053908,
+        "projection": 5538699,
+        "complete": 13592636
+      },
+      "afterReload": {
+        "raw": 3322428,
+        "base64": 4429904,
+        "projection": 5538699,
+        "complete": 9968632
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 0,
+      "simplified": true,
+      "updateBytes": 2023339,
+      "before": {
+        "raw": 2018928,
+        "base64": 2691904,
+        "projection": 2844088,
+        "complete": 5536021
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 2020020,
+        "base64": 2693360,
+        "projection": 1934799,
+        "complete": 4628188
+      },
+      "afterReload": {
+        "raw": 1335012,
+        "base64": 1780016,
+        "projection": 1934799,
+        "complete": 3714844
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 1,
+      "simplified": false,
+      "updateBytes": 6043785,
+      "before": {
+        "raw": 6039213,
+        "base64": 8052284,
+        "projection": 10327688,
+        "complete": 18380001
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 6040461,
+        "base64": 8053948,
+        "projection": 5538699,
+        "complete": 13592676
+      },
+      "afterReload": {
+        "raw": 3322429,
+        "base64": 4429908,
+        "projection": 5538699,
+        "complete": 9968636
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 1,
+      "simplified": true,
+      "updateBytes": 2023900,
+      "before": {
+        "raw": 2019494,
+        "base64": 2692660,
+        "projection": 2844088,
+        "complete": 5536777
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 2020587,
+        "base64": 2694116,
+        "projection": 1934799,
+        "complete": 4628944
+      },
+      "afterReload": {
+        "raw": 1335550,
+        "base64": 1780736,
+        "projection": 1934799,
+        "complete": 3715564
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 2,
+      "simplified": false,
+      "updateBytes": 6043785,
+      "before": {
+        "raw": 6039213,
+        "base64": 8052284,
+        "projection": 10327688,
+        "complete": 18380001
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 6040461,
+        "base64": 8053948,
+        "projection": 5538699,
+        "complete": 13592676
+      },
+      "afterReload": {
+        "raw": 3322429,
+        "base64": 4429908,
+        "projection": 5538699,
+        "complete": 9968636
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 2,
+      "simplified": true,
+      "updateBytes": 2023962,
+      "before": {
+        "raw": 2019553,
+        "base64": 2692740,
+        "projection": 2844088,
+        "complete": 5536857
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 2020647,
+        "base64": 2694196,
+        "projection": 1934799,
+        "complete": 4629024
+      },
+      "afterReload": {
+        "raw": 1335581,
+        "base64": 1780776,
+        "projection": 1934799,
+        "complete": 3715604
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 3,
+      "simplified": false,
+      "updateBytes": 6043785,
+      "before": {
+        "raw": 6039213,
+        "base64": 8052284,
+        "projection": 10327688,
+        "complete": 18380001
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 6040461,
+        "base64": 8053948,
+        "projection": 5538699,
+        "complete": 13592676
+      },
+      "afterReload": {
+        "raw": 3322429,
+        "base64": 4429908,
+        "projection": 5538699,
+        "complete": 9968636
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 3,
+      "simplified": true,
+      "updateBytes": 2023960,
+      "before": {
+        "raw": 2019552,
+        "base64": 2692736,
+        "projection": 2844088,
+        "complete": 5536853
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 2020645,
+        "base64": 2694196,
+        "projection": 1934799,
+        "complete": 4629024
+      },
+      "afterReload": {
+        "raw": 1335608,
+        "base64": 1780812,
+        "projection": 1934799,
+        "complete": 3715640
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 4,
+      "simplified": false,
+      "updateBytes": 6043754,
+      "before": {
+        "raw": 6039184,
+        "base64": 8052248,
+        "projection": 10327688,
+        "complete": 18379965
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 6040431,
+        "base64": 8053908,
+        "projection": 5538699,
+        "complete": 13592636
+      },
+      "afterReload": {
+        "raw": 3322428,
+        "base64": 4429904,
+        "projection": 5538699,
+        "complete": 9968632
+      },
+      "reloadEqual": true
+    },
+    {
+      "count": 500,
+      "trial": 4,
+      "simplified": true,
+      "updateBytes": 2023930,
+      "before": {
+        "raw": 2019523,
+        "base64": 2692700,
+        "projection": 2844088,
+        "complete": 5536817
+      },
+      "afterHalfEraseRetainedUndo": {
+        "raw": 2020616,
+        "base64": 2694156,
+        "projection": 1934799,
+        "complete": 4628984
+      },
+      "afterReload": {
+        "raw": 1335579,
+        "base64": 1780772,
+        "projection": 1934799,
+        "complete": 3715600
+      },
+      "reloadEqual": true
+    }
+  ]
+}

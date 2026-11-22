@@ -6,6 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+.pnpm-store/
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
@@ -78,6 +79,7 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+.env.able.local
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -132,6 +134,11 @@ dist
 .idea/
 .gstack/
 
+# Local analysis artifacts
+.crystal/
+docs/audits/
+ledger-spec.md
+
 # OpenBook server dev data (embedded PGlite database)
 .dev-data*/
 packages/server/.dev-data*/
@@ -161,3 +168,12 @@ packages/web/e2e-viewer/generated/
 
 # Claude Code local runtime state
 .claude/scheduled_tasks.lock
+
+# Key-ceremony output (gen-registry-key.mjs --out): a PRIVATE signing key —
+# stored as a CI secret and destroyed, never committed.
+registry-key.json
+.claude/skills/pr-visual-captures/
+_captures/
+
+# Generated viewer module graph for motion feature accounting.
+packages/ui/src/export/vendor/motion-graph.json

@@ -1,16 +1,16 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  BACKUP_VERSION,
+  getServerUrlOverride,
   parseBookFolder,
-  spaceToBookFiles,
+  libraryToBookFiles,
   type BackupCadence,
   type BackupConfig,
   type BackupStatus,
-  type SpaceBackup,
+  type ServerInfo,
+  type LibraryBackup,
 } from '@book.dev/sdk';
 import {CalendarClock, Database, Download, FileUp, FolderDown, FolderUp, Upload} from 'lucide-react';
 import {Button} from '@/components/ui/button';
-import {Switch} from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -20,12 +20,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {useData} from '@/data';
-import {useConfirm, useHud, useNavigation, usePlatformLibrary, useTranslation} from '@/providers';
+import {useConfirm, useHud, useNavigation, usePlatformCapabilities, useTranslation} from '@/providers';
+import {SettingsField, SettingsSection, SettingsToggle, SettingsAdvancedSection} from '@/components/settings/primitives';
 import {writePageIcon, DEFAULT_PAGE_ICON} from '@/lib/pageIcon';
 import {ICON_PROPERTY_ID} from '@book.dev/sdk';
 import {downloadText} from '@/lib/download';
 import {exportBookFolderInBrowser, importBookFolderInBrowser} from '@/lib/bookFolderTransfer';
-import {bundleRoots, closure, overwriteCount, parseBackup} from '@/lib/backupBundle';
+import {backupAccessDelta, bundleRoots, closure, overwriteCount, parseBackup} from '@/lib/backupBundle';
 import {t as bareT} from '@/i18n';
 
 const displayName = (name: string | null): string => (name && name.trim() ? name : bareT('common.untitled'));
@@ -40,7 +41,7 @@ const displayName = (name: string | null): string => (name && name.trim() ? name
  * vendor bundle (`build:viewer` runs before the lib build, so a packaged ui
  * always has it). When it can't be resolved (e.g. a dev/test context that never
  * built the viewer), the export gracefully degrades to the plain static files —
- * `spaceToBookFiles` emits no reference without a runtime.
+ * `libraryToBookFiles` emits no reference without a runtime.
  */
 async function loadFolderRuntime(): Promise<string | undefined> {
   try {
@@ -63,25 +64,43 @@ function formatBytes(bytes: number): string {
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 
-/** Backup & restore the whole workspace, from the Settings panel. */
+/** Backup & restore the whole library, from the Settings panel. */
 export default function BackupSettings() {
   const client = useData();
-  const platform = usePlatformLibrary();
+  const platform = usePlatformCapabilities();
   const {reload} = useNavigation();
   const confirm = useConfirm();
   const {t} = useTranslation();
   const {setHud} = useHud();
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const [busy, setBusy] = useState<null | 'export' | 'import' | 'folder' | 'compact'>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [bundle, setBundle] = useState<SpaceBackup | null>(null);
+  // Compaction (VACUUM FULL) only applies to the embedded local store; a remote
+  // server answers 409. Gate up front on the connect override so the control
+  // reads as disabled-with-reason instead of failing after a click.
+  const remote = getServerUrlOverride();
 
-  const onExport = useCallback(async () => {
+  const [busy, setBusy] = useState<null | 'export' | 'import' | 'folder' | 'compact'>(null);
+  // One status line for every data in/out action (export, restore, folder
+  // export/import). The Backup and Folder sections sit adjacent, so a single
+  // shared line reads cleanly and there's no second export action to feed.
+  const [status, setStatus] = useState<string | null>(null);
+  const [bundle, setBundle] = useState<LibraryBackup | null>(null);
+  const [targetInstanceId, setTargetInstanceId] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    setTargetInstanceId(undefined);
+    client.getInstanceInfo()
+      .then((info) => setTargetInstanceId(info.instanceId ?? null))
+      .catch(() => setTargetInstanceId(null));
+  }, [client]);
+
+  const doExport = useCallback(async () => {
     setBusy('export');
     setStatus(null);
     try {
-      const {pages, databases} = await client.exportSpace();
+      const serverBundle = await client.exportLibrary();
+      setTargetInstanceId(serverBundle.instanceId ?? null);
+      const {pages} = serverBundle;
       // Icons travel in `page.properties` now, but keep the legacy `icons` map in
       // the bundle too so older importers still restore them.
       const icons: Record<string, string> = {};
@@ -89,7 +108,9 @@ export default function BackupSettings() {
         const ic = p.properties?.[ICON_PROPERTY_ID];
         if (typeof ic === 'string' && ic) icons[p.id] = ic;
       }
-      const backup: SpaceBackup = {version: BACKUP_VERSION, exportedAt: new Date().toISOString(), pages, databases, icons};
+      // Preserve the server-authored v3 envelope intact: reconstructing only the
+      // old pages/databases/ledger fields here would silently drop assets/access.
+      const backup: LibraryBackup = {...serverBundle, icons};
       downloadText(`openbook-backup-${new Date().toISOString().slice(0, 10)}.openbook.json`, JSON.stringify(backup), 'application/json');
       setStatus(t('backup.exported', {count: pages.length}));
     } catch (e) {
@@ -108,14 +129,14 @@ export default function BackupSettings() {
     }
   }, [t]);
 
-  // Export the workspace as a folder of readable `.html` files (one per page,
+  // Export the library as a folder of readable `.html` files (one per page,
   // OB-134 layout) plus a lossless bundle. The desktop supplies a native dialog;
   // the web falls back to the File System Access API or a zip download.
   const onExportFolder = useCallback(async () => {
     setBusy('folder');
     setStatus(null);
     try {
-      const files = spaceToBookFiles(await client.exportSpace(), {runtime: await loadFolderRuntime()});
+      const files = libraryToBookFiles(await client.exportLibrary(), {runtime: await loadFolderRuntime()});
       const name = `openbook-${new Date().toISOString().slice(0, 10)}`;
       const result = platform.bookFolder?.export
         ? await platform.bookFolder.export(files)
@@ -147,7 +168,9 @@ export default function BackupSettings() {
         const ic = p.properties?.[ICON_PROPERTY_ID];
         if (typeof ic === 'string' && ic) icons[p.id] = ic;
       }
-      setBundle({version: BACKUP_VERSION, exportedAt: '', pages: snapshot.pages, databases: snapshot.databases, icons});
+      // A readable-folder import is intentionally a content import, not a
+      // lossless v3 backup (the folder format does not carry assets/access).
+      setBundle({version: 1, exportedAt: '', pages: snapshot.pages, databases: snapshot.databases, icons});
     } catch (e) {
       setStatus(t('backup.readFailed', {error: (e as Error).message}));
     }
@@ -181,18 +204,31 @@ export default function BackupSettings() {
   }, [client, confirm, t]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-2">
-        <h3 className="text-lg font-semibold">{t('backup.heading')}</h3>
-        <p className="text-sm text-muted-foreground">
-          {t('backup.intro')}
-        </p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <Button onClick={() => void onExport()} disabled={busy !== null} className="gap-2">
+    <div className="flex flex-col gap-7">
+      {/* Onboarding, not a backup: pull pages in from another tool. */}
+      <SettingsSection title={t('backup.importHeading')} description={t('backup.importIntro')}>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setHud((draft) => {
+              draft.importer.open = true;
+              return draft;
+            })}
+            disabled={busy !== null}
+          >
+            <FileUp className="h-4 w-4" />
+            {t('backup.importContent')}
+          </Button>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title={t('backup.heading')} description={t('backup.intro')}>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => void doExport()} disabled={busy !== null}>
             <Download className="h-4 w-4" />
             {busy === 'export' ? t('backup.exporting') : t('backup.export')}
           </Button>
-          <Button variant="secondary" onClick={() => fileInput.current?.click()} disabled={busy !== null} className="gap-2">
+          <Button variant="secondary" onClick={() => fileInput.current?.click()} disabled={busy !== null}>
             <Upload className="h-4 w-4" />
             {t('backup.restore')}
           </Button>
@@ -208,55 +244,42 @@ export default function BackupSettings() {
             }}
           />
         </div>
-        {status && <p className="text-sm text-muted-foreground">{status}</p>}
-      </section>
+      </SettingsSection>
 
-      <section className="flex flex-col gap-2 border-t border-border pt-6">
-        <h3 className="text-lg font-semibold">{t('backup.importHeading')}</h3>
-        <p className="text-sm text-muted-foreground">{t('backup.importIntro')}</p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setHud((draft) => {
-              draft.importer.open = true;
-              return draft;
-            })}
-            disabled={busy !== null}
-            className="gap-2"
-          >
-            <FileUp className="h-4 w-4" />
-            {t('backup.importContent')}
-          </Button>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2 border-t border-border pt-6">
-        <h3 className="text-lg font-semibold">{t('backup.folderHeading')}</h3>
-        <p className="text-sm text-muted-foreground">{t('backup.folderIntro')}</p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void onExportFolder()} disabled={busy !== null} className="gap-2">
+      <SettingsSection title={t('backup.folderHeading')} description={t('backup.folderIntro')}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => void onExportFolder()} disabled={busy !== null}>
             <FolderDown className="h-4 w-4" />
             {busy === 'folder' ? t('backup.folderExporting') : t('backup.folderExport')}
           </Button>
-          <Button variant="secondary" onClick={() => void onImportFolder()} disabled={busy !== null} className="gap-2">
+          <Button variant="secondary" onClick={() => void onImportFolder()} disabled={busy !== null}>
             <FolderUp className="h-4 w-4" />
             {t('backup.folderImport')}
           </Button>
         </div>
-      </section>
+        {/* One shared status line for every data in/out action above. */}
+        {status && <p className="text-sm text-muted-foreground">{status}</p>}
+      </SettingsSection>
 
       <ScheduledBackupsSection />
 
-      <section className="flex flex-col gap-2 border-t border-border pt-6">
-        <h3 className="text-lg font-semibold">{t('storage.heading')}</h3>
-        <p className="text-sm text-muted-foreground">{t('storage.intro')}</p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void onCompact()} disabled={busy !== null} className="gap-2">
-            <Database className="h-4 w-4" />
-            {busy === 'compact' ? t('storage.compacting') : t('storage.compact')}
-          </Button>
-        </div>
-      </section>
+      <SettingsSection title={t('storage.heading')}>
+        <BookFilesFields />
+        {/* Rarely-touched maintenance — collapsed by default (SET2-8). */}
+        <SettingsAdvancedSection title={t('storage.compactHeading')} description={t('storage.intro')}>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => void onCompact()}
+              disabled={busy !== null || !!remote}
+            >
+              <Database className="h-4 w-4" />
+              {busy === 'compact' ? t('storage.compacting') : t('storage.compact')}
+            </Button>
+          </div>
+          {remote && <p className="text-xs text-muted-foreground">{t('storage.remoteUnavailable')}</p>}
+        </SettingsAdvancedSection>
+      </SettingsSection>
 
       {bundle && (
         <RestoreDialog
@@ -268,7 +291,7 @@ export default function BackupSettings() {
             void reload();
           }}
           run={async (req) => {
-            const result = await client.importSpace(req);
+            const result = await client.importLibrary(req);
             // Carry over page icons to the imported ids.
             for (const [oldId, newId] of Object.entries(result.idMap)) {
               const ic = bundle.icons?.[oldId];
@@ -276,12 +299,75 @@ export default function BackupSettings() {
             }
             return result;
           }}
-          existingIds={async () => new Set((await client.exportSpace()).pages.map((p) => p.id))}
+          existingIds={async () => new Set((await client.exportLibrary()).pages.map((p) => p.id))}
           confirm={confirm}
           setBusy={setBusy}
+          targetInstanceId={targetInstanceId}
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The book-files folder (desktop, local managed server only): show where the
+ * durable on-disk book mirror lives and let the user relocate or reveal it.
+ * Hidden on the web and when connected to a remote server — only the always-on
+ * local managed server exposes `chooseBookDir`. Rendered inside the unified
+ * Storage section, so it emits fields only (no section wrapper of its own).
+ */
+function BookFilesFields() {
+  const {serverControls} = usePlatformCapabilities();
+  const {t} = useTranslation();
+  const [info, setInfo] = useState<ServerInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(() => {
+    if (!serverControls) return;
+    serverControls
+      .info()
+      .then(setInfo)
+      .catch(() => {
+        /* the folder row simply stays hidden if info is unavailable */
+      });
+  }, [serverControls]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const runControl = useCallback(async (fn: () => Promise<ServerInfo>) => {
+    setBusy(true);
+    try {
+      setInfo(await fn());
+    } catch {
+      /* a cancelled folder picker (or a transient error) leaves the row as-is */
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  if (!serverControls?.chooseBookDir || !info?.managed) return null;
+
+  return (
+    <>
+      <p className="text-sm text-muted-foreground">{t('connection.bookFilesDescription')}</p>
+      <SettingsField label={t('connection.bookFolder')} className="max-w-lg">
+        <code className="block truncate rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs">
+          {info?.bookDir ?? '—'}
+        </code>
+      </SettingsField>
+      <div className="flex gap-2">
+        <Button variant="outline" disabled={busy} onClick={() => void runControl(() => serverControls.chooseBookDir!())}>
+          {t('connection.changeFolder')}
+        </Button>
+        {serverControls.revealBookDir && (
+          <Button variant="ghost" disabled={busy} onClick={() => void serverControls.revealBookDir!()}>
+            {t('connection.reveal')}
+          </Button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -330,8 +416,12 @@ function ScheduledBackupsSection() {
     setBusy(true);
     setMsg(null);
     try {
-      const {file} = await client.runBackup('daily');
-      setMsg(t('backup.schedule.ranNow', {file}));
+      const {file, skippedCount} = await client.runBackup('daily');
+      setMsg(
+        skippedCount > 0
+          ? t('backup.schedule.ranNowSkipped', {file, count: skippedCount})
+          : t('backup.schedule.ranNow', {file}),
+      );
       refresh();
     } catch (e) {
       setMsg((e as Error).message);
@@ -352,55 +442,64 @@ function ScheduledBackupsSection() {
     [t],
   );
 
+  const cadenceHint = useCallback(
+    (cadence: BackupStatus['cadences'][number]): string =>
+      [
+        cadence.lastRun
+          ? t('backup.schedule.keptLast', {
+            when: new Date(cadence.lastRun).toLocaleString(),
+            count: cadence.count,
+          })
+          : t('backup.schedule.never'),
+        cadence.lastSkippedCount && cadence.lastSkippedCount > 0
+          ? t('backup.schedule.lastSkipped', {count: cadence.lastSkippedCount})
+          : '',
+        cadence.lastError ? t('backup.schedule.lastError', {error: cadence.lastError.message}) : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    [t],
+  );
+
   if (unavailable || !status) return null;
   const webOnly = status.resolvedDir === null;
 
   return (
-    <section className="flex flex-col gap-2 border-t border-border pt-6">
-      <h3 className="text-lg font-semibold">{t('backup.schedule.heading')}</h3>
-      <p className="text-sm text-muted-foreground">{t('backup.schedule.intro')}</p>
-
+    <SettingsSection title={t('backup.schedule.heading')} description={t('backup.schedule.intro')}>
       {webOnly ? (
         <p className="text-sm text-muted-foreground">{t('backup.schedule.webOnly')}</p>
       ) : (
         <>
-          <label className="mt-1 flex items-center justify-between gap-6 rounded-md border border-border px-3.5 py-3">
-            <span className="flex min-w-0 flex-col">
-              <span className="text-sm font-medium">{t('backup.schedule.enable')}</span>
-              <span className="text-xs text-muted-foreground">{t('backup.schedule.enableHint')}</span>
-            </span>
-            <Switch checked={status.config.enabled} disabled={busy} onCheckedChange={(v) => void patch({enabled: v})} />
-          </label>
+          <SettingsToggle
+            label={t('backup.schedule.enable')}
+            hint={t('backup.schedule.enableHint')}
+            checked={status.config.enabled}
+            disabled={busy}
+            onCheckedChange={(v) => void patch({enabled: v})}
+          />
 
           {status.config.enabled && (
             <div className="flex flex-col gap-1.5">
               {status.cadences.map((c) => (
-                <label key={c.cadence} className="flex items-center justify-between gap-4 rounded-md border border-border px-3 py-2">
-                  <span className="flex min-w-0 flex-col">
-                    <span className="text-sm font-medium">{cadenceLabel(c.cadence)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {c.lastRun
-                        ? t('backup.schedule.keptLast', {when: new Date(c.lastRun).toLocaleString(), count: c.count})
-                        : t('backup.schedule.never')}
-                    </span>
-                  </span>
-                  <Switch
-                    checked={c.enabled}
-                    disabled={busy}
-                    onCheckedChange={(v) => void patch({cadences: {...status.config.cadences, [c.cadence]: v}})}
-                  />
-                </label>
+                <SettingsToggle
+                  key={c.cadence}
+                  label={cadenceLabel(c.cadence)}
+                  hint={cadenceHint(c)}
+                  checked={c.enabled}
+                  disabled={busy}
+                  onCheckedChange={(v) => void patch({cadences: {...status.config.cadences, [c.cadence]: v}})}
+                />
               ))}
             </div>
           )}
 
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={() => void backupNow()} disabled={busy} className="gap-2">
+            <Button variant="secondary" onClick={() => void backupNow()} disabled={busy}>
               <CalendarClock className="h-4 w-4" />
               {busy ? t('backup.schedule.backingUp') : t('backup.schedule.backupNow')}
             </Button>
             {status.resolvedDir && (
-              <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/40 px-2 py-1.5 text-xs">
+              <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs">
                 {status.resolvedDir}
               </code>
             )}
@@ -408,7 +507,7 @@ function ScheduledBackupsSection() {
         </>
       )}
       {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -420,19 +519,35 @@ function RestoreDialog({
   existingIds,
   confirm,
   setBusy,
+  targetInstanceId,
 }: {
-  bundle: SpaceBackup;
+  bundle: LibraryBackup;
   onClose: () => void;
   onDone: (summary: string) => void;
-  run: (req: Parameters<ReturnType<typeof useData>['importSpace']>[0]) => ReturnType<ReturnType<typeof useData>['importSpace']>;
+  run: (req: Parameters<ReturnType<typeof useData>['importLibrary']>[0]) => ReturnType<ReturnType<typeof useData>['importLibrary']>;
   existingIds: () => Promise<Set<string>>;
   confirm: ReturnType<typeof useConfirm>;
   setBusy: (b: null | 'import') => void;
+  targetInstanceId: string | null | undefined;
 }) {
   const {t} = useTranslation();
   const roots = useMemo(() => bundleRoots(bundle), [bundle]);
   const [checked, setChecked] = useState<Set<string>>(() => new Set(roots.map((r) => r.id)));
   const [mode, setMode] = useState<'copy' | 'overwrite'>('copy');
+  const [installForeignPageAccess, setInstallForeignPageAccess] = useState(false);
+
+  const selectedPageIds = useMemo(
+    () => new Set(closure(bundle, checked).pages.map((page) => page.id)),
+    [bundle, checked],
+  );
+  const accessDelta = useMemo(
+    () => backupAccessDelta(bundle.pageAccess, selectedPageIds),
+    [bundle.pageAccess, selectedPageIds],
+  );
+  const foreignPageAccess =
+    bundle.version === 3 &&
+    targetInstanceId !== undefined &&
+    (!bundle.instanceId || !targetInstanceId || bundle.instanceId !== targetInstanceId);
 
   const toggle = (id: string) =>
     setChecked((prev) => {
@@ -460,24 +575,69 @@ function RestoreDialog({
     }
     setBusy('import');
     try {
-      const result = await run({pages: sel.pages, databases: sel.databases, mode});
+      // LGR-15: a bundle carrying the ledger's durability section forwards it on
+      // an OVERWRITE restore — the server applies it only into a library with no
+      // seeded ledger (and only when the selection carried the ledger's own
+      // pages), so this is safe to send unconditionally in that mode.
+      const selectedPageIds = new Set(sel.pages.map((page) => page.id));
+      const assets = bundle.assets?.flatMap((asset) => {
+        const refs = asset.refs.filter((pageId) => selectedPageIds.has(pageId));
+        return refs.length > 0 ? [{...asset, refs}] : [];
+      });
+      const pageAccess = bundle.pageAccess?.filter((access) => selectedPageIds.has(access.pageId));
+      const skipped = bundle.skipped?.flatMap((item) => {
+        const ids = (item.pages ?? item.refs)!.filter((id) => selectedPageIds.has(id));
+        if (ids.length === 0) return [];
+        return [item.pages ? {...item, pages: ids} : {...item, refs: ids}];
+      });
+      const result = await run({
+        version: bundle.version,
+        pages: sel.pages,
+        databases: sel.databases,
+        mode,
+        ...(bundle.version === 3 ? {assets: assets ?? [], pageAccess: pageAccess ?? []} : {}),
+        ...(bundle.version === 3 && bundle.instanceId ? {instanceId: bundle.instanceId} : {}),
+        ...(bundle.version === 3 && bundle.ownerSubject ? {ownerSubject: bundle.ownerSubject} : {}),
+        ...(bundle.version === 3 && skipped?.length ? {skipped} : {}),
+        ...(foreignPageAccess && installForeignPageAccess ? {installForeignPageAccess: true} : {}),
+        ...(mode === 'overwrite' && bundle.ledger ? {ledger: bundle.ledger} : {}),
+      });
       const bits = [
         result.created ? t('backup.added', {count: result.created}) : '',
         result.overwritten ? t('backup.overwrittenCount', {count: result.overwritten}) : '',
         result.renamed ? t('backup.renamedCount', {count: result.renamed}) : '',
       ].filter(Boolean);
       const detail = bits.length ? ` (${bits.join(', ')})` : '';
-      onDone(t('backup.restored', {count: sel.pages.length, detail}));
+      // LGR-15: the ledger section's outcome is reported EXPLICITLY — pages
+      // restoring fine while the books' history was skipped must never read as
+      // success (the runbook's verify step hangs off this line).
+      const ledgerLine =
+        result.ledger === 'restored'
+          ? ` ${t('backup.ledgerRestored')}`
+          : result.ledger === 'skipped-existing-ledger'
+            ? ` ${t('backup.ledgerSkippedExisting')}`
+            : result.ledger === 'skipped-copy-mode'
+              ? ` ${t('backup.ledgerSkippedCopy')}`
+              : result.ledger === 'skipped-incomplete'
+                ? ` ${t('backup.ledgerSkippedIncomplete')}`
+                : '';
+      const diagnosticLine = (result.diagnostics ?? [])
+        .filter((diagnostic) => diagnostic.code === 'partial-restore')
+        .map((diagnostic) => t('backup.partialRestoreWarning', {message: diagnostic.message}))
+        .join(' ');
+      onDone(
+        `${t('backup.restored', {count: sel.pages.length, detail})}${ledgerLine}${diagnosticLine ? ` ${diagnosticLine}` : ''}`,
+      );
     } catch (e) {
       onDone(t('backup.restoreFailed', {error: (e as Error).message}));
     } finally {
       setBusy(null);
     }
-  }, [bundle, checked, mode, confirm, existingIds, run, onDone, setBusy, t]);
+  }, [bundle, checked, mode, confirm, existingIds, run, onDone, setBusy, t, foreignPageAccess, installForeignPageAccess]);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>{t('backup.dialog.title')}</DialogTitle>
           <DialogDescription>
@@ -511,6 +671,33 @@ function RestoreDialog({
           ))}
         </ul>
 
+        {bundle.version === 3 && (
+          <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {t('backup.dialog.accessDelta', {
+              publicPages: accessDelta.publicPages,
+              subjectGrants: accessDelta.subjectGrants,
+              agentEditRelaxations: accessDelta.agentEditRelaxations,
+            })}
+          </p>
+        )}
+
+        {foreignPageAccess && (
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 cursor-pointer"
+              checked={installForeignPageAccess}
+              onChange={(e) => setInstallForeignPageAccess(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">{t('backup.dialog.installForeignAccess')}</span>
+              <span className="block text-xs text-muted-foreground">
+                {t('backup.dialog.installForeignAccessHint')}
+              </span>
+            </span>
+          </label>
+        )}
+
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"
@@ -530,7 +717,7 @@ function RestoreDialog({
           <Button variant="ghost" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={() => void onRestore()} disabled={checked.size === 0}>
+          <Button onClick={() => void onRestore()} disabled={checked.size === 0 || (bundle.version === 3 && targetInstanceId === undefined)}>
             {t('backup.dialog.restoreN', {count: checked.size})}
           </Button>
         </DialogFooter>

@@ -1,8 +1,8 @@
 import {describe, it, expect, afterEach, beforeEach} from 'vitest';
-import {render, screen, cleanup, fireEvent} from '@testing-library/react';
+import {render, screen, cleanup, fireEvent, within} from '@testing-library/react';
 import AppearanceSettings from '../AppearanceSettings';
 import {PageAppearanceControls} from '../appearance/PageCustomiseBody';
-import {I18nProvider, ThemeProvider} from '@/providers';
+import {I18nProvider, PreferencesProvider, ThemeProvider} from '@/providers';
 import {readPageTheme} from '@/lib/pageTheme';
 import {readPageFonts} from '@/lib/pageFont';
 import {readPageCover} from '@/lib/pageCover';
@@ -10,7 +10,9 @@ import {readPageCover} from '@/lib/pageCover';
 function renderWithProviders(node: React.ReactNode) {
   return render(
     <I18nProvider>
-      <ThemeProvider defaultColorMode="light">{node}</ThemeProvider>
+      <PreferencesProvider>
+        <ThemeProvider defaultColorMode="light">{node}</ThemeProvider>
+      </PreferencesProvider>
     </I18nProvider>,
   );
 }
@@ -41,12 +43,31 @@ describe('AppearanceSettings', () => {
     expect(JSON.parse(localStorage.getItem('openbook.appearance')!).themeId).toBe('forest');
   });
 
+  it('persists the selected menu density', () => {
+    renderWithProviders(<AppearanceSettings />);
+    fireEvent.click(screen.getByText('Compact'));
+    expect(JSON.parse(localStorage.getItem('openbook.preferences')!).general.menuDensity).toBe('compact');
+  });
+
   it('picking the Slate gray accent retints the surfaces cool', () => {
     renderWithProviders(<AppearanceSettings />);
     fireEvent.click(screen.getByText('Slate'));
     // The gray accent carries the neutral temperature: muted swings warm 40 → cool 220.
     expect(document.documentElement.style.getPropertyValue('--muted').startsWith('220 ')).toBe(true);
     expect(JSON.parse(localStorage.getItem('openbook.appearance')!).themeId).toBe('slate');
+  });
+
+  it('switches the data-colour scheme: persists it and recolours the CSS vars (OB-379)', () => {
+    renderWithProviders(<AppearanceSettings />);
+    // Scope to the Data colours field ("Vivid" also labels a control-intensity level).
+    const field = within(screen.getByText('Data colours').closest('section')!);
+    const blueBefore = document.getElementById('ob-data-colors')!.textContent!;
+    expect(blueBefore).toContain('--data-blue:#a9ccdf'); // pastel default
+    fireEvent.click(field.getByText('Vivid'));
+    expect(JSON.parse(localStorage.getItem('openbook.appearance')!).dataColors).toBe('vivid');
+    const blueAfter = document.getElementById('ob-data-colors')!.textContent!;
+    expect(blueAfter).toContain('--data-blue:#3b82f6'); // vivid
+    expect(blueAfter).not.toContain('--data-blue:#a9ccdf');
   });
 });
 

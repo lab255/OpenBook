@@ -19,11 +19,15 @@ import { ChevronRight, type LucideIcon } from "lucide-react";
 import { PageIcon } from "@/components/PageIcon";
 import type { DropWhere } from "@/lib/treeMove";
 import useResizeObserver from "use-resize-observer";
+import { MENU_WIDTH_MD } from "@/components/ui/menu-components";
+import { SIDEBAR_SELECTED_ROW } from "@/lib/sidebarStyles";
 
 interface TreeDataItem {
   id: string;
   name: string;
   icon?: LucideIcon | string,
+  /** Persistent metadata rendered after the label (for example a status badge). */
+  badge?: React.ReactNode;
   children?: TreeDataItem[];
 }
 
@@ -84,7 +88,7 @@ function WithRowMenu({menu, children}: {menu?: React.ReactNode; children: React.
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-52">{menu}</ContextMenuContent>
+      <ContextMenuContent className={MENU_WIDTH_MD}>{menu}</ContextMenuContent>
     </ContextMenu>
   );
 }
@@ -317,7 +321,7 @@ const TreeRow = React.forwardRef<HTMLDivElement, TreeRowProps & React.HTMLAttrib
 
   return (
     <div className="relative">
-      {where === "before" && <div className="pointer-events-none absolute inset-x-1 top-0 z-10 h-0.5 rounded-full bg-primary" />}
+      {where === "before" && <div className="pointer-events-none absolute inset-x-1 top-0 z-10 h-0.5 rounded-full bg-[hsl(var(--sheet-1-foreground))]" />}
       <div
         ref={setRefs}
         role="treeitem"
@@ -333,9 +337,14 @@ const TreeRow = React.forwardRef<HTMLDivElement, TreeRowProps & React.HTMLAttrib
         onDragEnd={dnd.enabled ? dnd.onDragEnd : undefined}
         style={{ paddingLeft: depth * 12 + 4 }}
         className={cn(
-          "group/row flex items-center mx-1 py-1 pr-1.5 rounded-md cursor-pointer text-sm text-foreground/75 transition-colors hover:bg-hover",
-          isSelected && "bg-hover-strong text-foreground font-medium",
-          where === "inside" && "ring-2 ring-inset ring-primary bg-hover",
+          // Row text/hover read the accent-chrome remap on the sidebar surface
+          // (lib/sidebarStyles + .ob-accent-chrome): full sheet foreground (no
+          // alpha de-emphasis — it fails contrast on the saturated sheet) and a
+          // veil-based hover/active. `--sheet-1-foreground` collapses to the app
+          // foreground at interface levels 0–1, so this stays correct there too.
+          "group/row relative flex items-center mx-1 py-1 pr-1.5 rounded-md cursor-pointer text-sm text-sheet-1-foreground transition-colors hover:bg-hover",
+          isSelected && SIDEBAR_SELECTED_ROW,
+          where === "inside" && "ring-2 ring-inset ring-[hsl(var(--sheet-1-foreground))] bg-hover",
           isDragged && "opacity-50",
         )}
       >
@@ -351,7 +360,7 @@ const TreeRow = React.forwardRef<HTMLDivElement, TreeRowProps & React.HTMLAttrib
           >
             <ChevronRight
               className={cn(
-                "h-4 w-4 shrink-0 text-accent-foreground/50 transition-transform duration-200",
+                "h-4 w-4 shrink-0 text-accent-foreground/75 transition-transform duration-(--motion-base)",
                 isExpanded && "rotate-90",
               )}
             />
@@ -361,6 +370,7 @@ const TreeRow = React.forwardRef<HTMLDivElement, TreeRowProps & React.HTMLAttrib
         )}
         <RowIcon icon={item.icon} Fallback={Icon} />
         <span className="grow truncate text-sm">{item.name}</span>
+        {item.badge}
         {renderRowActions && (
           <span
             // Revealed on hover or when something inside has focus; doesn't shift
@@ -373,7 +383,7 @@ const TreeRow = React.forwardRef<HTMLDivElement, TreeRowProps & React.HTMLAttrib
           </span>
         )}
       </div>
-      {where === "after" && <div className="pointer-events-none absolute inset-x-1 bottom-0 z-10 h-0.5 rounded-full bg-primary" />}
+      {where === "after" && <div className="pointer-events-none absolute inset-x-1 bottom-0 z-10 h-0.5 rounded-full bg-[hsl(var(--sheet-1-foreground))]" />}
     </div>
   );
 });
@@ -385,9 +395,9 @@ function RowIcon({icon, Fallback}: {icon?: LucideIcon | string; Fallback?: Lucid
   }
   if (typeof icon === "function") {
     const Icon = icon;
-    return <Icon className="mr-2 h-4 w-4 shrink-0 text-accent-foreground/50" aria-hidden="true" />;
+    return <Icon className="mr-2 h-4 w-4 shrink-0 text-accent-foreground/75" aria-hidden="true" />;
   }
-  if (Fallback) return <Fallback className="mr-2 h-4 w-4 shrink-0 text-accent-foreground/50" aria-hidden="true" />;
+  if (Fallback) return <Fallback className="mr-2 h-4 w-4 shrink-0 text-accent-foreground/75" aria-hidden="true" />;
   return null;
 }
 

@@ -1,0 +1,809 @@
+{
+  "method": "Native Chromium, DPR1, 1280x800, 800px canvas; hint contrast measured against its bounded backing chip, not the document paper.",
+  "hints": [
+    {
+      "theme": "light",
+      "paper": "#ffffff",
+      "text": "rgb(53, 49, 44)",
+      "backing": "rgb(255, 255, 255)",
+      "contrast": 12.906622248076262,
+      "chip": {
+        "width": 235.515625,
+        "height": 63.1875
+      },
+      "viewport": {
+        "width": 800,
+        "height": 360
+      },
+      "overlay": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "theme": "light",
+      "paper": "#172554",
+      "text": "rgb(53, 49, 44)",
+      "backing": "rgb(255, 255, 255)",
+      "contrast": 12.906622248076262,
+      "chip": {
+        "width": 235.515625,
+        "height": 63.1875
+      },
+      "viewport": {
+        "width": 800,
+        "height": 360
+      },
+      "overlay": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "theme": "dark",
+      "paper": "#ffffff",
+      "text": "rgb(209, 209, 209)",
+      "backing": "rgb(33, 33, 33)",
+      "contrast": 10.544587314696248,
+      "chip": {
+        "width": 235.515625,
+        "height": 63.1875
+      },
+      "viewport": {
+        "width": 800,
+        "height": 360
+      },
+      "overlay": "rgba(0, 0, 0, 0)"
+    },
+    {
+      "theme": "dark",
+      "paper": "#172554",
+      "text": "rgb(209, 209, 209)",
+      "backing": "rgb(33, 33, 33)",
+      "contrast": 10.544587314696248,
+      "chip": {
+        "width": 235.515625,
+        "height": 63.1875
+      },
+      "viewport": {
+        "width": 800,
+        "height": 360
+      },
+      "overlay": "rgba(0, 0, 0, 0)"
+    }
+  ],
+  "themes": [
+    {
+      "theme": "light",
+      "unavailable": {
+        "ariaDisabled": "true",
+        "cursor": "default",
+        "color": "rgb(113, 111, 107)",
+        "background": "rgba(0, 0, 0, 0)",
+        "chrome": "rgb(255, 255, 255)",
+        "outline": "rgb(113, 111, 107)",
+        "outlineWidth": "1px",
+        "boundaryContrast": 5.014056970132651
+      },
+      "swatch": {
+        "mark": "✓",
+        "color": "rgb(53, 49, 44)",
+        "backing": "rgb(255, 255, 255)",
+        "aboveSwatch": true,
+        "contrast": 12.906622248076262
+      },
+      "ring": {
+        "method": "Foreground single-process Chromium DPR1 at native resolution; screenshot buffer sampled in memory only, no image saved/published. Coordinates relative to 36px pressed Pen button crop; unfocused control removes the gap.",
+        "viewportClip": {
+          "x": 284,
+          "y": 88,
+          "width": 36,
+          "height": 36
+        },
+        "style": {
+          "focusVisible": true,
+          "accent": "rgb(28, 121, 196)",
+          "gap": "rgb(255, 255, 255)",
+          "fill": "rgb(28, 121, 196)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 0px 4px inset"
+        },
+        "focused": [
+          {
+            "x": 18,
+            "y": 0,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 1,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 2,
+            "rgba": [
+              255,
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 3,
+            "rgba": [
+              255,
+              255,
+              255,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 4,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 5,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 6,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 7,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          }
+        ],
+        "unfocused": [
+          {
+            "x": 18,
+            "y": 0,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 1,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 2,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 3,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 4,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 5,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 6,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 7,
+            "rgba": [
+              28,
+              121,
+              196,
+              255
+            ]
+          }
+        ],
+        "contrast": 4.583723076908545
+      },
+      "selection": {
+        "strip": {
+          "x": 240,
+          "y": 484,
+          "width": 800,
+          "height": 80,
+          "top": 484,
+          "right": 1040,
+          "bottom": 564,
+          "left": 240
+        },
+        "footer": {
+          "x": 240,
+          "y": 564,
+          "width": 800,
+          "height": 44,
+          "top": 564,
+          "right": 1040,
+          "bottom": 608,
+          "left": 240
+        },
+        "rows": 2,
+        "children": [
+          {
+            "label": "Stroke✓",
+            "rect": {
+              "x": 248,
+              "y": 492,
+              "width": 208.578125,
+              "height": 28,
+              "top": 492,
+              "right": 456.578125,
+              "bottom": 520,
+              "left": 248
+            }
+          },
+          {
+            "label": "Stroke width12358",
+            "rect": {
+              "x": 464.578125,
+              "y": 492,
+              "width": 139,
+              "height": 28,
+              "top": 492,
+              "right": 603.578125,
+              "bottom": 520,
+              "left": 464.578125
+            }
+          },
+          {
+            "label": "Fill∅",
+            "rect": {
+              "x": 611.578125,
+              "y": 492,
+              "width": 219.90625,
+              "height": 28,
+              "top": 492,
+              "right": 831.484375,
+              "bottom": 520,
+              "left": 611.578125
+            }
+          },
+          {
+            "label": "X",
+            "rect": {
+              "x": 839.484375,
+              "y": 492,
+              "width": 76.15625,
+              "height": 28,
+              "top": 492,
+              "right": 915.640625,
+              "bottom": 520,
+              "left": 839.484375
+            }
+          },
+          {
+            "label": "Y",
+            "rect": {
+              "x": 923.640625,
+              "y": 492,
+              "width": 75.875,
+              "height": 28,
+              "top": 492,
+              "right": 999.515625,
+              "bottom": 520,
+              "left": 923.640625
+            }
+          },
+          {
+            "label": "Width",
+            "rect": {
+              "x": 248,
+              "y": 528,
+              "width": 101.375,
+              "height": 28,
+              "top": 528,
+              "right": 349.375,
+              "bottom": 556,
+              "left": 248
+            }
+          },
+          {
+            "label": "Height",
+            "rect": {
+              "x": 357.375,
+              "y": 528,
+              "width": 105.46875,
+              "height": 28,
+              "top": 528,
+              "right": 462.84375,
+              "bottom": 556,
+              "left": 357.375
+            }
+          },
+          {
+            "label": "Keep aspect ratio",
+            "rect": {
+              "x": 470.84375,
+              "y": 533.59375,
+              "width": 119.109375,
+              "height": 16.796875,
+              "top": 533.59375,
+              "right": 589.953125,
+              "bottom": 550.390625,
+              "left": 470.84375
+            }
+          },
+          {
+            "label": "Name",
+            "rect": {
+              "x": 597.953125,
+              "y": 528,
+              "width": 112.828125,
+              "height": 28,
+              "top": 528,
+              "right": 710.78125,
+              "bottom": 556,
+              "left": 597.953125
+            }
+          },
+          {
+            "label": "Duplicate",
+            "rect": {
+              "x": 718.78125,
+              "y": 528,
+              "width": 77.078125,
+              "height": 28,
+              "top": 528,
+              "right": 795.859375,
+              "bottom": 556,
+              "left": 718.78125
+            }
+          },
+          {
+            "label": "Delete selected",
+            "rect": {
+              "x": 803.859375,
+              "y": 528,
+              "width": 116.796875,
+              "height": 28,
+              "top": 528,
+              "right": 920.65625,
+              "bottom": 556,
+              "left": 803.859375
+            }
+          }
+        ]
+      }
+    },
+    {
+      "theme": "dark",
+      "unavailable": {
+        "ariaDisabled": "true",
+        "cursor": "default",
+        "color": "rgb(151, 151, 151)",
+        "background": "rgba(0, 0, 0, 0)",
+        "chrome": "rgb(33, 33, 33)",
+        "outline": "rgb(151, 151, 151)",
+        "outlineWidth": "1px",
+        "boundaryContrast": 5.512607149522789
+      },
+      "swatch": {
+        "mark": "✓",
+        "color": "rgb(209, 209, 209)",
+        "backing": "rgb(33, 33, 33)",
+        "aboveSwatch": true,
+        "contrast": 10.544587314696248
+      },
+      "ring": {
+        "method": "Foreground single-process Chromium DPR1 at native resolution; screenshot buffer sampled in memory only, no image saved/published. Coordinates relative to 36px pressed Pen button crop; unfocused control removes the gap.",
+        "viewportClip": {
+          "x": 284,
+          "y": 88,
+          "width": 36,
+          "height": 36
+        },
+        "style": {
+          "focusVisible": true,
+          "accent": "rgb(83, 166, 234)",
+          "gap": "rgb(15, 32, 46)",
+          "fill": "rgb(83, 166, 234)",
+          "shadow": "rgb(15, 32, 46) 0px 0px 0px 4px inset"
+        },
+        "focused": [
+          {
+            "x": 18,
+            "y": 0,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 1,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 2,
+            "rgba": [
+              15,
+              32,
+              46,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 3,
+            "rgba": [
+              15,
+              32,
+              46,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 4,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 5,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 6,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 7,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          }
+        ],
+        "unfocused": [
+          {
+            "x": 18,
+            "y": 0,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 1,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 2,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 3,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 4,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 5,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 6,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          },
+          {
+            "x": 18,
+            "y": 7,
+            "rgba": [
+              83,
+              166,
+              234,
+              255
+            ]
+          }
+        ],
+        "contrast": 6.32548491423962
+      },
+      "selection": {
+        "strip": {
+          "x": 240,
+          "y": 484,
+          "width": 800,
+          "height": 80,
+          "top": 484,
+          "right": 1040,
+          "bottom": 564,
+          "left": 240
+        },
+        "footer": {
+          "x": 240,
+          "y": 564,
+          "width": 800,
+          "height": 44,
+          "top": 564,
+          "right": 1040,
+          "bottom": 608,
+          "left": 240
+        },
+        "rows": 2,
+        "children": [
+          {
+            "label": "Stroke✓",
+            "rect": {
+              "x": 248,
+              "y": 492,
+              "width": 208.578125,
+              "height": 28,
+              "top": 492,
+              "right": 456.578125,
+              "bottom": 520,
+              "left": 248
+            }
+          },
+          {
+            "label": "Stroke width12358",
+            "rect": {
+              "x": 464.578125,
+              "y": 492,
+              "width": 139,
+              "height": 28,
+              "top": 492,
+              "right": 603.578125,
+              "bottom": 520,
+              "left": 464.578125
+            }
+          },
+          {
+            "label": "Fill∅",
+            "rect": {
+              "x": 611.578125,
+              "y": 492,
+              "width": 219.90625,
+              "height": 28,
+              "top": 492,
+              "right": 831.484375,
+              "bottom": 520,
+              "left": 611.578125
+            }
+          },
+          {
+            "label": "X",
+            "rect": {
+              "x": 839.484375,
+              "y": 492,
+              "width": 76.15625,
+              "height": 28,
+              "top": 492,
+              "right": 915.640625,
+              "bottom": 520,
+              "left": 839.484375
+            }
+          },
+          {
+            "label": "Y",
+            "rect": {
+              "x": 923.640625,
+              "y": 492,
+              "width": 75.875,
+              "height": 28,
+              "top": 492,
+              "right": 999.515625,
+              "bottom": 520,
+              "left": 923.640625
+            }
+          },
+          {
+            "label": "Width",
+            "rect": {
+              "x": 248,
+              "y": 528,
+              "width": 101.375,
+              "height": 28,
+              "top": 528,
+              "right": 349.375,
+              "bottom": 556,
+              "left": 248
+            }
+          },
+          {
+            "label": "Height",
+            "rect": {
+              "x": 357.375,
+              "y": 528,
+              "width": 105.46875,
+              "height": 28,
+              "top": 528,
+              "right": 462.84375,
+              "bottom": 556,
+              "left": 357.375
+            }
+          },
+          {
+            "label": "Keep aspect ratio",
+            "rect": {
+              "x": 470.84375,
+              "y": 533.59375,
+              "width": 119.109375,
+              "height": 16.796875,
+              "top": 533.59375,
+              "right": 589.953125,
+              "bottom": 550.390625,
+              "left": 470.84375
+            }
+          },
+          {
+            "label": "Name",
+            "rect": {
+              "x": 597.953125,
+              "y": 528,
+              "width": 112.828125,
+              "height": 28,
+              "top": 528,
+              "right": 710.78125,
+              "bottom": 556,
+              "left": 597.953125
+            }
+          },
+          {
+            "label": "Duplicate",
+            "rect": {
+              "x": 718.78125,
+              "y": 528,
+              "width": 77.078125,
+              "height": 28,
+              "top": 528,
+              "right": 795.859375,
+              "bottom": 556,
+              "left": 718.78125
+            }
+          },
+          {
+            "label": "Delete selected",
+            "rect": {
+              "x": 803.859375,
+              "y": 528,
+              "width": 116.796875,
+              "height": 28,
+              "top": 528,
+              "right": 920.65625,
+              "bottom": 556,
+              "left": 803.859375
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

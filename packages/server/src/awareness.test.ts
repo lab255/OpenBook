@@ -207,14 +207,14 @@ describe('Collab T4 — awareness transport (legacy single-user)', () => {
 
     const bad = await app.request(`/api/pages/${page.id}/awareness`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({clientId: 1}),
     });
     expect(bad.status).toBe(400);
 
     const missing = await app.request(`/api/pages/${randomUUID()}/awareness`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({update: 'AQ==', clientId: 1}),
     });
     expect(missing.status).toBe(404);
@@ -252,7 +252,7 @@ describe('Collab T4 — awareness transport (legacy single-user)', () => {
     const huge = 'A'.repeat(64 * 1024 + 1024); // > 64 KiB cap
     const res = await app.request(`/api/pages/${page.id}/awareness`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({update: huge, clientId: 1}),
     });
     expect(res.status).toBe(413);
@@ -375,6 +375,12 @@ describe('Collab T4 — identity integrity + read-gating', () => {
       body: JSON.stringify({update: 'AQ==', clientId: doc.clientID}),
     });
     expect(uRes.status).toBe(403);
+    const durable = await app.request(`/api/pages/${page.id}/updates/apply`, {
+      method: 'POST', headers: {'Content-Type': 'application/json', [IDENTITY_HEADER]: viewerJws},
+      body: JSON.stringify({update: 'AQ==', clientId: doc.clientID}),
+    });
+    expect(durable.status).toBe(403);
+
 
     // A non-reader is hidden the page entirely: presence POST + snapshot GET both 404.
     expect(

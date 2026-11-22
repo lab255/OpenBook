@@ -1,0 +1,15 @@
+{
+  "scope": "All UI src and canvas measurement source/config. Bundle stamp vs current disk, before canvas mounts; planted mismatch must block mounting.",
+  "results": [
+    {
+      "control": true,
+      "blocked": true,
+      "message": "Stale canvas measurement source: served 4fe069c58aa28042533e71891bb00eaba20ad5615b947d067088ea3a79e42210, disk planted-stale-stamp. Restart the measurement server."
+    },
+    {
+      "control": false,
+      "stamp": "4fe069c58aa28042533e71891bb00eaba20ad5615b947d067088ea3a79e42210",
+      "matchedDisk": true
+    }
+  ]
+}

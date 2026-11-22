@@ -96,6 +96,10 @@ test('chart + status light + button: the full artifact loop', {tag: ['@editor', 
   await expect(chart.locator('svg rect')).toHaveCount(3);
   await expect(chart.locator('svg text', {hasText: 'ten'})).toBeVisible();
 
+  // Wait for the portaled chart settings to finish closing before hovering
+  // another row: its exit surface can otherwise retain the hover hit target.
+  await expect(page.getByLabel('Chart data expression')).toBeHidden();
+
   // Status thresholds over n.
   const status = page.locator('.obe-kit-status');
   await status.hover();
@@ -262,23 +266,27 @@ test('HTML export keeps a kit artifact computing offline', {tag: ['@editor']}, a
   const file = testInfo.outputPath('kit-export.html');
   await download.saveAs(file);
   await page.goto(`file://${file}`);
-  const exprs = page.locator('.reactive.expr [data-val]');
-  await expect(exprs.nth(0)).toHaveText('70'); // the formula readout
-  // The status light renders as a LIVE dot (its expr is hidden): done*10 = 70 ≥ okAt 50 → ok.
-  await expect(page.locator('.kitlight')).toHaveAttribute('data-status', 'ok');
+  // The export hydrates the island-mounted OpenBookViewer over the static body;
+  // wait for its locked-but-interactive surface (only present post-hydration)
+  // before asserting on the live kit DOM.
+  await expect(page.locator('.obe-present-blocks')).toBeVisible();
+  const formula = page.locator('.obe-formula-out').first();
+  await expect(formula).toHaveText('70'); // the formula readout
+  // The status light renders as a LIVE dot: done*10 = 70 ≥ okAt 50 → ok.
+  await expect(page.locator('.obe-kit-status')).toHaveAttribute('data-status', 'ok');
   // The kit chart exports as a DRAWN, kind-faithful plot over its cell:
   // three bars with their x labels, redrawn when the input moves.
-  const fig = page.locator('[data-chart]'); // the chart's title is a sibling; the plot node carries data-chart
-  await expect(fig.locator('svg rect')).toHaveCount(3);
-  await expect(fig.locator('svg text', {hasText: 'b'})).toBeVisible();
+  const fig = page.locator('.obe-chart-svg'); // the drawn plot svg
+  await expect(fig.locator('rect')).toHaveCount(3);
+  await expect(fig.locator('text', {hasText: 'b'})).toBeVisible();
   // y-axis ticks prove the redraw: data max 21 → a "20" tick…
-  await expect(fig.locator('svg text', {hasText: '20'})).toBeVisible();
-  await page.locator('.reactive.slider input[type=range]').fill('3');
-  await expect(exprs.nth(0)).toHaveText('30');
+  await expect(fig.locator('text', {hasText: '20'})).toBeVisible();
+  await page.locator('.obe-kit-number .obe-kit-stepper input').fill('3');
+  await expect(formula).toHaveText('30');
   // …data max 9 → the axis rescales to a "5" tick.
-  await expect(fig.locator('svg rect')).toHaveCount(3);
-  await expect(fig.locator('svg text', {hasText: '5'})).toBeVisible();
-  await expect(fig.locator('svg text', {hasText: '20'})).toHaveCount(0);
+  await expect(fig.locator('rect')).toHaveCount(3);
+  await expect(fig.locator('text', {hasText: '5'})).toBeVisible();
+  await expect(fig.locator('text', {hasText: '20'})).toHaveCount(0);
 });
 
 test('dropdown publishes its pick; full-width radio renders stacked rows', {tag: ['@editor']}, async ({page}) => {
@@ -305,4 +313,50 @@ test('dropdown publishes its pick; full-width radio renders stacked rows', {tag:
   await radio.getByRole('button', {name: 'Block settings'}).click(); // close the popover
   await radio.getByRole('radio', {name: 'Three'}).click();
   await expect(radio.getByRole('radio', {name: 'Three'})).toHaveAttribute('aria-checked', 'true');
+});
+
+test('code wrap preserves long-line caret, selection and toolbar geometry', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await insert(page, 'code', 'Code');
+  const code = page.locator('.obe-codeblock').last();
+  const text = code.locator('.obe-text');
+  const line = 'const value = ' + 'x'.repeat(286);
+  await text.click();
+  await page.keyboard.insertText(line);
+  await expect(code).toHaveAttribute('data-wrap', 'false');
+  const caret = () => text.evaluate((el) => {
+    const selection = window.getSelection()!;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.setEnd(selection.focusNode!, selection.focusOffset);
+    return range.toString().length;
+  });
+  // Native Home/End movement must also reveal the caret in the text scroller.
+  await page.keyboard.press('Home');
+  await expect.poll(caret).toBe(0);
+  await page.keyboard.press('End');
+  await expect.poll(caret).toBe(300);
+  await expect.poll(() => text.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await page.keyboard.press('Shift+Home');
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(line);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(caret).toBe(300);
+  const before = await code.boundingBox();
+  await code.hover();
+  const barBefore = await code.locator('.obe-media-bar').boundingBox();
+  await code.locator('.obe-kit-gear').click();
+  await page.getByRole('checkbox', {name: 'Wrap code', exact: true}).check();
+  await expect(code).toHaveAttribute('data-wrap', 'true');
+  await expect(text).toHaveText(line);
+  const wrapped = await code.boundingBox();
+  const barWrapped = await code.locator('.obe-media-bar').boundingBox();
+  expect(wrapped!.x).toBeCloseTo(before!.x, 1);
+  expect(wrapped!.y).toBeCloseTo(before!.y, 1);
+  expect(wrapped!.width).toBeCloseTo(before!.width, 1);
+  expect(barWrapped!.x).toBeCloseTo(barBefore!.x, 1);
+  expect(barWrapped!.y).toBeCloseTo(barBefore!.y, 1);
+  // Height may naturally grow with wrapping; toggling back restores its footprint.
+  await page.getByRole('checkbox', {name: 'Wrap code', exact: true}).uncheck();
+  await expect(code).toHaveAttribute('data-wrap', 'false');
+  expect((await code.boundingBox())!.height).toBeCloseTo(before!.height, 1);
 });

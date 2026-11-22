@@ -1,10 +1,10 @@
-import {describe, it, expect, afterEach} from 'vitest';
+import {describe, it, expect, afterEach, vi} from 'vitest';
 import {render, screen, cleanup, fireEvent, waitFor, within} from '@testing-library/react';
 import type {DataClient, InstanceConfig, InstanceInfo, Principal} from '@book.dev/sdk';
 import {guestPrincipal} from '@book.dev/sdk';
 import {DiagnosticsBody} from '../settings/DiagnosticsSettings';
 import {DataProvider} from '@/data/DataProvider';
-import {ConfirmProvider, I18nProvider} from '@/providers';
+import {ConfirmProvider, I18nProvider, PlatformCapabilitiesProvider, type PlatformCapabilities} from '@/providers';
 
 /**
  * The diagnostics screen over the seams it reads: the data client's
@@ -34,20 +34,46 @@ const info = (over: Partial<InstanceInfo> = {}): InstanceInfo => ({
   ...over,
 });
 
-const wrap = (client: Partial<DataClient>) =>
+const wrap = (client: Partial<DataClient>, platform?: PlatformCapabilities) =>
   render(
     <I18nProvider>
-      <ConfirmProvider>
-        <DataProvider client={client as DataClient}>
-          <DiagnosticsBody />
-        </DataProvider>
-      </ConfirmProvider>
+      <PlatformCapabilitiesProvider value={platform}>
+        <ConfirmProvider>
+          <DataProvider client={client as DataClient}>
+            <DiagnosticsBody />
+          </DataProvider>
+        </ConfirmProvider>
+      </PlatformCapabilitiesProvider>
     </I18nProvider>,
   );
 
 afterEach(() => cleanup());
 
 describe('DiagnosticsBody', () => {
+  it('replaces raw transport errors with copyable sidecar diagnostics and Restart', async () => {
+    const restart = vi.fn(async () => undefined);
+    const writeText = vi.fn(async () => undefined);
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    try {
+      Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
+      wrap(
+        {getInstanceInfo: async () => { throw new Error('ipc connect failed: Connection refused'); }},
+        {sidecar: {degraded: true, restart, state: {state: 'dead', attempts: 5, lastExitCode: 61, lastStderrTail: ['panic: socket closed'], socketReady: false}}},
+      );
+      expect(screen.getByText('Local service unavailable')).toBeTruthy();
+      expect(screen.queryByText(/ipc connect failed/)).toBeNull();
+      expect(screen.getByRole('button', {name: 'Copy latest error'}).textContent).toBe('Copy latest error');
+      expect(screen.getByLabelText('Copy latest error', {selector: 'pre'}).tabIndex).toBe(0);
+      fireEvent.click(screen.getByRole('button', {name: /Copy latest error/}));
+      expect(writeText).toHaveBeenCalledWith('panic: socket closed');
+      fireEvent.click(screen.getByRole('button', {name: 'Restart'}));
+      expect(restart).toHaveBeenCalledOnce();
+    } finally {
+      if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard);
+      else Reflect.deleteProperty(navigator, 'clipboard');
+    }
+  });
+
   it('a failed probe IS the diagnostic — shown with a re-run affordance, never blank', async () => {
     const client: Partial<DataClient> = {
       getInstanceInfo: async () => {
@@ -85,7 +111,7 @@ describe('DiagnosticsBody', () => {
       setInstancePolicy: async (patch: Partial<InstanceConfig>) => {
         // Mirrors the server's repair rule: local transport + own verified subject.
         if (patch.ownerSubject === you.subject) stored = you.subject;
-        return {guestAccess: 'read', trustedIssuers: [], ownerSubject: stored} as InstanceConfig;
+        return {guestAccess: 'read', agentEdits: 'suggest', trustedIssuers: [], ownerSubject: stored} as InstanceConfig;
       },
     };
     wrap(client);
@@ -116,7 +142,7 @@ describe('DiagnosticsBody', () => {
     wrap(client);
     expect(await screen.findByText('Ownership mismatch')).toBeTruthy();
     expect(screen.queryByText('Repair ownership')).toBeNull();
-    expect(screen.getByText('Repair is only possible on the workspace’s own device, from this app.')).toBeTruthy();
+    expect(screen.getByText('Repair is only possible on the library’s own device, from this app.')).toBeTruthy();
   });
 
   it('cancelling the confirm leaves ownership untouched', async () => {
@@ -126,7 +152,7 @@ describe('DiagnosticsBody', () => {
       getInstanceInfo: async () => info({ownerSubject: stored, you, localOwner: true}),
       setInstancePolicy: async () => {
         stored = you.subject;
-        return {guestAccess: 'read', trustedIssuers: [], ownerSubject: stored} as InstanceConfig;
+        return {guestAccess: 'read', agentEdits: 'suggest', trustedIssuers: [], ownerSubject: stored} as InstanceConfig;
       },
     };
     wrap(client);

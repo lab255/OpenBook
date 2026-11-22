@@ -6,14 +6,14 @@
  * - {@link IslandPageJson}: the canonical single-page island a `.book.html`
  *   file embeds (`packages/sdk/src/bookfile.ts` — `{version,id,name,icon,
  *   updatedAt,data}` where `data` is a `PageSnapshot` carrying `blockdoc`).
- * - {@link SpaceBundleJson}: the whole-space `openbook.space.json` bundle
+ * - {@link LibraryBundleJson}: the whole-space `openbook.library.json` bundle
  *   (`packages/sdk/src/bookFolder.ts` — `{pages,databases}`), for site
  *   exports; the viewer adds minimal hash-based page navigation over it.
  */
 
 /** The subset of a `PageSnapshot` the viewer reads. Extra keys pass through. */
 export interface ViewerPageData {
-  /** `'blocks'` for native block-docs (the only editor since the EditorJS retirement). */
+  /** `'blocks'` for native block-docs — currently the only editor. */
   editor?: string;
   /** The block-doc snapshot: `{v:1, update: base64-Y-update, blocks: JSON projection}`. */
   blockdoc?: unknown;
@@ -39,9 +39,11 @@ export interface IslandPageJson {
 }
 
 /** A page inside the space bundle (`StoredPage`, read structurally). */
-export interface SpaceBundlePage {
+export interface LibraryBundlePage {
   id: string;
   name?: string | null;
+  /** Discovery posture may be present in foreign/legacy bundles; the viewer does not enforce it. */
+  listed?: boolean;
   parentId?: string | null;
   position?: number;
   properties?: Record<string, unknown>;
@@ -49,14 +51,14 @@ export interface SpaceBundlePage {
   data: ViewerPageData;
 }
 
-/** The whole-space `openbook.space.json` bundle shape. */
-export interface SpaceBundleJson {
-  pages: SpaceBundlePage[];
+/** The whole-space `openbook.library.json` bundle shape. */
+export interface LibraryBundleJson {
+  pages: LibraryBundlePage[];
   /** Databases are carried for losslessness but not rendered by the viewer (yet). */
   databases?: unknown[];
 }
 
-export type ViewerSource = IslandPageJson | SpaceBundleJson;
+export type ViewerSource = IslandPageJson | LibraryBundleJson;
 
 /**
  * One asset's bytes in the mount payload — the same entry shape as the export
@@ -76,6 +78,21 @@ export interface ViewerMountOptions {
   page?: string;
   /** Pre-resolved asset bytes by assetId (see {@link ViewerAssetEntry}). */
   assets?: Record<string, ViewerAssetEntry>;
+  /** Canonical live-page URL by page id for frozen forms in offline exports. */
+  formOrigins?: Record<string, string>;
+  /**
+   * Static block renders the HOST DOCUMENT already produced, by block id
+   * (LX-5). For a block the viewer has no renderer for, the supplied node is
+   * replanted instead of the viewer's missing-plugin card — that is how an
+   * exported ledger report keeps showing its real, server-computed table once
+   * JS runs, instead of degrading to "install the plugin".
+   *
+   * DOM elements, not HTML strings: the export's boot script hands over clones
+   * of nodes the browser already parsed out of its own body, so nothing is
+   * re-parsed here. The viewer stays content-agnostic — it never inspects what
+   * a node contains, and carries no ledger (or other plugin) code to do so.
+   */
+  staticBlocks?: Record<string, Element>;
 }
 
 export interface ViewerHandle {

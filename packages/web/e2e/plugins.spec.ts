@@ -1,3 +1,5 @@
+import {readFileSync} from 'node:fs';
+import {join} from 'node:path';
 import {test, expect} from './fixtures';
 import {SERVER} from './seed';
 import {zipSync, strToU8} from 'fflate';
@@ -33,6 +35,8 @@ const SOURCES: Record<string, string> = {
   `,
   'src/greet.ts': 'export const greet = (): string => \'plugin says hi\';',
 };
+
+test.use({ownerGatedRequests: true});
 
 const zipOf = (withSignature?: object): Buffer => {
   const entries: Record<string, Uint8Array> = {'openbook.json': strToU8(JSON.stringify(MANIFEST))};
@@ -78,7 +82,13 @@ async function openExtensions(page: import('@playwright/test').Page): Promise<vo
 
 test('install an unsigned zip: block, command, badge, disable, remove', {tag: ['@plugins']}, async ({page, request}) => {
   await openExtensions(page);
-  await expect(page.getByText('No extensions installed')).toBeVisible();
+  // THIS plugin is not installed yet — asserted by its absence, not by an empty
+  // list: spec files share a worker (and therefore its data server), and the
+  // ledger specs install their own extension, so "No extensions installed" is
+  // not something this test may assume. Anchored on the panel having rendered,
+  // because `toHaveCount(0)` is trivially true before it paints.
+  await expect(page.locator('[data-extension-file]')).toBeAttached();
+  await expect(page.locator('[data-extension="acme.hello"]')).toHaveCount(0);
 
   await page.locator('[data-extension-file]').setInputFiles({name: 'hello.zip', mimeType: 'application/zip', buffer: zipOf()});
   const card = page.locator('[data-extension="acme.hello"]');
@@ -116,11 +126,12 @@ test('install an unsigned zip: block, command, badge, disable, remove', {tag: ['
   await expect(page.getByRole('option', {name: /Wave from the fixture/})).toHaveCount(0);
   await page.keyboard.press('Escape');
 
-  // Remove → the card is gone.
+  // Remove → the card is gone (again: this plugin's absence, not an empty list —
+  // another spec file on this worker may have its own extension installed).
   await openExtensions(page);
   await page.getByLabel('Remove Hello Test').click();
+  await expect(page.locator('[data-extension-file]')).toBeAttached();
   await expect(page.locator('[data-extension="acme.hello"]')).toHaveCount(0);
-  await expect(page.getByText('No extensions installed')).toBeVisible();
 });
 
 test('a page of named code blocks exports as an installable plugin zip', {tag: ['@plugins']}, async ({page, request}) => {
@@ -177,6 +188,35 @@ test('a page of named code blocks exports as an installable plugin zip', {tag: [
   await openExtensions(page);
   await page.getByLabel('Remove Page Authored').click();
   await expect(card).toHaveCount(0);
+});
+
+test('the bundled first-party extension ships signed; trusting its build key shows Verified', {tag: ['@plugins']}, async ({page}) => {
+  // The bundled Ledger extension auto-installs SIGNED (bundlePlugins.ts). A
+  // dev/test build signs it with the committed TEST-ONLY key, which no build
+  // trusts by default — so it starts Unverified. Trusting that key through
+  // the real registries UI flips the badge to Verified: the same
+  // fresh-install verification path a production build exercises against the
+  // pinned OPENBOOK_REGISTRY key, with only the trust anchor differing.
+  const testKey = JSON.parse(
+    readFileSync(join(__dirname, '..', '..', '..', 'scripts', 'test-registry-key.json'), 'utf8'),
+  ) as {registry: string; publicKey: string};
+
+  await openExtensions(page);
+  // Auto-installed on the first sync of a fresh library — no upload here.
+  const card = page.locator('[data-extension="openbook.ledger"]');
+  await expect(card).toBeVisible();
+  await expect(card).toHaveAttribute('data-extension-state', 'active');
+  await expect(card.locator('[data-extension-unverified]')).toBeVisible();
+
+  await page.locator('[data-registry-name]').fill(testKey.registry);
+  await page.locator('[data-registry-key]').fill(testKey.publicKey);
+  await page.locator('[data-registry-add]').click();
+  await expect(page.locator(`[data-registry="${testKey.registry}"]`)).toBeVisible();
+  await expect(card.locator('[data-extension-verified]')).toBeVisible();
+
+  // Withdraw trust (this context's localStorage only) → demoted again.
+  await page.getByLabel(`Remove registry ${testKey.registry}`).click();
+  await expect(card.locator('[data-extension-unverified]')).toBeVisible();
 });
 
 test('a signed zip from a trusted registry shows Verified; tampering or distrust loses it', {tag: ['@plugins']}, async ({page}) => {

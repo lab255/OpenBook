@@ -1,0 +1,84 @@
+{
+  "trials": 5,
+  "method": "Headless 500 strokes; i/10 coordinates; commit x/y, undo, redo; renderer/network observers excluded. Baseline processes briefly overlapped; after runs were sequential. All raw samples retained.",
+  "rows": [
+    {
+      "shapes": 500,
+      "pairsPerShape": 50,
+      "operation": "Single move",
+      "before": {
+        "medianMs": 2.6807909999999993,
+        "worstMs": 9.997667000000007
+      },
+      "after": {
+        "medianMs": 0.1377500000000964,
+        "worstMs": 1.5281249999999318
+      }
+    },
+    {
+      "shapes": 500,
+      "pairsPerShape": 50,
+      "operation": "Move all 500",
+      "before": {
+        "medianMs": 836.8592089999999,
+        "worstMs": 839.0989999999983
+      },
+      "after": {
+        "medianMs": 7.479208999999855,
+        "worstMs": 24.38708399999996
+      }
+    },
+    {
+      "shapes": 500,
+      "pairsPerShape": 50,
+      "operation": "Undo all 500",
+      "before": {
+        "medianMs": 1709.3082080000004,
+        "worstMs": 1819.2141660000016
+      },
+      "after": {
+        "medianMs": 8.442291000000068,
+        "worstMs": 12.788041999999905
+      }
+    },
+    {
+      "shapes": 500,
+      "pairsPerShape": 1000,
+      "operation": "Single move",
+      "before": {
+        "medianMs": 14.629666000000043,
+        "worstMs": 23.979917
+      },
+      "after": {
+        "medianMs": 0.1939159999999447,
+        "worstMs": 0.32712500000002365
+      }
+    },
+    {
+      "shapes": 500,
+      "pairsPerShape": 1000,
+      "operation": "Move all 500",
+      "before": {
+        "medianMs": 6132.492166999997,
+        "worstMs": 7955.759457999986
+      },
+      "after": {
+        "medianMs": 12.392041999999947,
+        "worstMs": 21.90491700000007
+      }
+    },
+    {
+      "shapes": 500,
+      "pairsPerShape": 1000,
+      "operation": "Undo all 500",
+      "before": {
+        "medianMs": 12621.093416000003,
+        "worstMs": 13609.71829199999
+      },
+      "after": {
+        "medianMs": 5.973291999999901,
+        "worstMs": 34.966042000000016
+      }
+    }
+  ]
+}

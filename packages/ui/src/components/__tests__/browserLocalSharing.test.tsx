@@ -3,10 +3,10 @@ import {render, screen, cleanup, fireEvent} from '@testing-library/react';
 import type {DataClient} from '@book.dev/sdk';
 import {guestPrincipal} from '@book.dev/sdk';
 import ShareDialog from '../ShareDialog';
-import MembersSettings from '../settings/MembersSettings';
+import {PeopleSection} from '../settings/MembersSettings';
 import SharingPublishingSettings from '../settings/SharingPublishingSettings';
 import {DataProvider} from '@/data/DataProvider';
-import {ConfirmProvider, I18nProvider, PlatformLibraryProvider, type PlatformLibrary} from '@/providers';
+import {ConfirmProvider, I18nProvider, PlatformCapabilitiesProvider, type PlatformCapabilities} from '@/providers';
 
 // `ForwardingSection` calls `useAccount()` unconditionally (before its
 // `!supported` early-return), and the real AccountProvider drags in the whole
@@ -19,7 +19,7 @@ vi.mock('@/providers', async (importOriginal) => {
 // P0-4 (sharing audit 2026-07-03): the standalone web app's workspace is an
 // in-browser PGlite store — nothing outside the browser can reach it, yet the
 // sharing surfaces used to render as if fully wired. The host now declares
-// `browserLocalWorkspace` on the platform library and every surface annotates
+// `browserLocalLibrary` on the platform library and every surface annotates
 // itself honestly (kept functional, not hidden-and-broken). These tests pin
 // both sides: the disclosures under the flag, and the unchanged default.
 
@@ -35,19 +35,20 @@ const instanceInfo = {
 
 const client: Partial<DataClient> = {
   getInstanceInfo: async () => instanceInfo,
+  getPage: async () => null,
   getPageVisibility: async () => null,
   listPageAcl: async () => [],
   listMembers: async () => [],
 };
 
-const wrap = (ui: React.ReactElement, platform: PlatformLibrary = {}) =>
+const wrap = (ui: React.ReactElement, platform: PlatformCapabilities = {}) =>
   render(
     <I18nProvider>
-      <PlatformLibraryProvider value={platform}>
+      <PlatformCapabilitiesProvider value={platform}>
         <ConfirmProvider>
           <DataProvider client={client as DataClient}>{ui}</DataProvider>
         </ConfirmProvider>
-      </PlatformLibraryProvider>
+      </PlatformCapabilitiesProvider>
     </I18nProvider>,
   );
 
@@ -55,14 +56,14 @@ afterEach(() => cleanup());
 
 describe('ShareDialog on a browser-local workspace', () => {
   it('discloses that no one else can reach the workspace and where the link really goes', async () => {
-    wrap(<ShareDialog pageId="p1" />, {browserLocalWorkspace: true});
+    wrap(<ShareDialog pageId="p1" />, {browserLocalLibrary: true});
     fireEvent.click(screen.getByRole('button', {name: 'Share'}));
 
-    expect(await screen.findByText(/This workspace lives only in this browser/)).toBeTruthy();
+    expect(await screen.findByText(/Only this browser can reach this library/)).toBeTruthy();
     // The copy-link hint tells the truth: a recipient opens THEIR workspace.
-    expect(await screen.findByText(/opens their own workspace, not this page/)).toBeTruthy();
+    expect(await screen.findByText(/opens their own library, not this page/)).toBeTruthy();
     // The unclaimed-instance disclosure presupposes reachability — superseded.
-    expect(screen.queryByText(/Sharing takes effect once you claim this instance/)).toBeNull();
+    expect(screen.queryByText(/Settings apply once you claim this library/)).toBeNull();
     // Still functional, not hidden: the scope picker and invite field render.
     expect(screen.getByLabelText('Who can access')).toBeTruthy();
     expect(screen.getByLabelText('Invite people')).toBeTruthy();
@@ -72,14 +73,14 @@ describe('ShareDialog on a browser-local workspace', () => {
     wrap(<ShareDialog pageId="p1" />);
     fireEvent.click(screen.getByRole('button', {name: 'Share'}));
 
-    expect(await screen.findByText(/Sharing takes effect once you claim this instance/)).toBeTruthy();
-    expect(screen.queryByText(/This workspace lives only in this browser/)).toBeNull();
+    expect(await screen.findByText(/Settings apply once you claim this library/)).toBeTruthy();
+    expect(screen.queryByText(/Only this browser can reach this library/)).toBeNull();
   });
 });
 
 describe('Sharing & publishing settings on a browser-local workspace', () => {
   it('replaces the publish promise with a desktop-app pointer', async () => {
-    wrap(<SharingPublishingSettings />, {browserLocalWorkspace: true});
+    wrap(<SharingPublishingSettings />, {browserLocalLibrary: true});
 
     expect(await screen.findByText('Publish to the web')).toBeTruthy();
     expect(screen.getByText(/isn’t hosted anywhere/)).toBeTruthy();
@@ -97,9 +98,9 @@ describe('Sharing & publishing settings on a browser-local workspace', () => {
   });
 });
 
-describe('Members settings on a browser-local workspace', () => {
+describe('People section (roster) on a browser-local workspace', () => {
   it('discloses that invited people cannot reach the workspace yet', async () => {
-    wrap(<MembersSettings />, {browserLocalWorkspace: true});
+    wrap(<PeopleSection />, {browserLocalLibrary: true});
 
     expect(await screen.findByText(/people you add here can’t open it yet/)).toBeTruthy();
     // Still functional: the invite form renders for a manager.
@@ -107,7 +108,7 @@ describe('Members settings on a browser-local workspace', () => {
   });
 
   it('shows no disclosure without the flag', async () => {
-    wrap(<MembersSettings />);
+    wrap(<PeopleSection />);
 
     expect(await screen.findByLabelText('Invite a member')).toBeTruthy();
     expect(screen.queryByText(/people you add here can’t open it yet/)).toBeNull();

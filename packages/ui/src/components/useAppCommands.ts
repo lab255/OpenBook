@@ -9,6 +9,9 @@ import {GitFork,
   Columns2,
   FilePlus2,
   FlaskConical,
+  History,
+  Link2,
+  Network,
   Monitor,
   Moon,
   Palette,
@@ -16,12 +19,12 @@ import {GitFork,
   Presentation,
   Puzzle,
   Settings as SettingsIcon,
+  Share2,
   Star,
   StarOff,
   StretchHorizontal,
   Sun,
   Table2,
-  Sparkles,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -29,12 +32,21 @@ import {seedSampleDocument} from '@book.dev/sdk';
 import {useData} from '@/data';
 import {useHud, useNavigation, useTheme, useTranslation} from '@/providers';
 import {SHORTCUTS, type ShortcutCombo} from '@/lib/shortcuts';
-import {AGENT_PANE_ID, CUSTOMISE_PANE_ID, FLOW_PANE_ID, HOME_PAGE_ID, REVIEW_PANE_ID} from '@/lib/homePage';
+import {AGENT_PANE_ID, CUSTOMISE_PANE_ID, FLOW_PANE_ID, GRAPH_PANE_ID, HISTORY_PANE_ID, HOME_PAGE_ID, LINKS_PANE_ID, REVIEW_PANE_ID} from '@/lib/homePage';
+import {SETTINGS_TABS, toggleSideNav} from '@/lib/hud';
+import {settingsKeywordsForTab} from '@/lib/settingsIndex';
 import {setPageCustomiseTarget} from '@/lib/pageCustomise';
 import {setReviewTarget} from '@/lib/reviewPane';
+import {setHistoryTarget} from '@/lib/historyPane';
+import {setLinksTarget} from '@/lib/linksPane';
+import {setGraphTarget} from '@/lib/graphPane';
+import {requestShareDialog} from '@/lib/shareDialog';
 import {togglePageFullWidth} from '@/lib/pageFullWidth';
 import {isFavorite, subscribeFavorites, toggleFavorite} from '@/lib/favorites';
+import {pageDocActions, pageDocActionsVersion, subscribePageDocActions} from '@/lib/pageDocActions';
 import {pluginCommands, subscribePluginCommands} from '@/plugins';
+import {EXPORT_ITEMS} from '@/components/PageContextMenu';
+import {useSharingCapability} from '@/components/ShareDialog';
 
 /** A command's bucket in the palette (each renders as a labelled group). */
 export type CommandGroup = 'create' | 'view' | 'navigation' | 'app';
@@ -53,6 +65,9 @@ export interface AppCommand {
   run: () => void;
   /** Greyed out and non-firing (e.g. Back with no history). */
   disabled?: boolean;
+  /** Only surfaced while the user is searching, to keep the default list calm
+   *  (the per-pane "Settings: …" deep links). */
+  searchOnly?: boolean;
 }
 
 /**
@@ -75,10 +90,14 @@ export function useAppCommands(): AppCommand[] {
     splitOpen,
     reload,
     selectPage,
+    pages,
   } = useNavigation();
   const {colorScheme, setMode} = useTheme();
   const {t} = useTranslation();
   const client = useData();
+  // Sharing capability gates the Share command (disabled, not hidden, when the
+  // server predates sharing) — parity with the "…" menu's Share item.
+  const sharing = useSharingCapability();
 
   // Re-derive the favourite command's label/icon when the pin state changes.
   const [favVersion, setFavVersion] = React.useState(0);
@@ -86,6 +105,13 @@ export function useAppCommands(): AppCommand[] {
   // Plugin commands join the palette live as extensions (de)activate.
   const [pluginVersion, setPluginVersion] = React.useState(0);
   React.useEffect(() => subscribePluginCommands(() => setPluginVersion((v) => v + 1)), []);
+  // The open document registers which export formats it offers; track it so the
+  // per-format Export commands appear only for what the current page can export.
+  const docActionsVersion = React.useSyncExternalStore(
+    subscribePageDocActions,
+    pageDocActionsVersion,
+    pageDocActionsVersion,
+  );
 
   const seedingRef = React.useRef(false);
   const insertSampleDocument = React.useCallback(async () => {
@@ -105,6 +131,9 @@ export function useAppCommands(): AppCommand[] {
   return React.useMemo<AppCommand[]>(() => {
     const isDark = colorScheme === 'dark';
     const fav = !!currentPageId && isFavorite(currentPageId);
+    // Re-read on every `docActionsVersion` bump so export formats track the page.
+    void docActionsVersion;
+    const docActions = pageDocActions(currentPageId);
     return [
       // ── Create ──────────────────────────────────────────────────────────
       {
@@ -128,7 +157,7 @@ export function useAppCommands(): AppCommand[] {
         id: 'new-from-template',
         group: 'create',
         title: t('command.newFromTemplate'),
-        keywords: 'template gallery starter tasks roadmap reading meeting planner create',
+        keywords: 'template gallery starter tasks roadmap reading grocery savings intake map create',
         icon: LayoutTemplate,
         run: () => setHud((draft) => {draft.templates.open = true; return draft;}),
       },
@@ -141,18 +170,10 @@ export function useAppCommands(): AppCommand[] {
         run: () => setHud((draft) => {draft.importer.open = true; return draft;}),
       },
       {
-        id: 'ai-search',
-        group: 'navigation',
-        title: t('command.aiSearch'),
-        keywords: 'ai search notes semantic ask find',
-        icon: Sparkles,
-        run: () => setHud((draft) => {draft.ai.open = true; return draft;}),
-      },
-      {
         id: 'ask-assistant',
         group: 'navigation',
         title: t('command.askAssistant'),
-        keywords: 'ai assistant agent chat ask help workspace',
+        keywords: 'ai assistant agent chat ask help library',
         icon: Bot,
         run: () => openInSplit(AGENT_PANE_ID),
       },
@@ -174,8 +195,7 @@ export function useAppCommands(): AppCommand[] {
         shortcut: SHORTCUTS.toggleSidebar,
         run: () =>
           setHud((draft) => {
-            draft.sideNav.open = !draft.sideNav.docked;
-            draft.sideNav.docked = !draft.sideNav.docked;
+            toggleSideNav(draft, {narrow: typeof window !== 'undefined' && window.innerWidth < 768});
             return draft;
           }),
       },
@@ -187,8 +207,13 @@ export function useAppCommands(): AppCommand[] {
         icon: StretchHorizontal,
         shortcut: SHORTCUTS.toggleFullWidth,
         // Full width is a per-page layout choice — toggle the focused page's.
+        // Pass its database-ness so DB pages toggle around the full-width default.
         run: () => {
-          if (currentPageId) togglePageFullWidth(currentPageId);
+          if (!currentPageId) return;
+          // Nav-list derivation may briefly lag a just-created DB page's default;
+          // it heals on the next list refresh (see PageContextMenu for the note).
+          const isDatabase = !!pages.find((p) => p.id === currentPageId)?.hostedDatabaseId;
+          togglePageFullWidth(currentPageId, isDatabase);
         },
       },
       {
@@ -236,6 +261,45 @@ export function useAppCommands(): AppCommand[] {
         },
       },
       {
+        id: 'page-graph',
+        group: 'view',
+        title: t('command.pageGraph'),
+        keywords: 'page graph link network map connections mentions relations backlinks neighborhood',
+        icon: Network,
+        run: () => {
+          // Centre on the current page when there is one; from Home, show the
+          // whole-library graph (null centre).
+          setGraphTarget(currentPageId && currentPageId !== HOME_PAGE_ID ? currentPageId : null);
+          openInSplit(GRAPH_PANE_ID);
+        },
+      },
+      {
+        id: 'linked-references',
+        group: 'view',
+        title: t('command.linkedReferences'),
+        keywords: 'linked references backlinks links mentions unlinked incoming who links here',
+        icon: Link2,
+        disabled: !currentPageId || currentPageId === HOME_PAGE_ID,
+        run: () => {
+          if (!currentPageId) return;
+          setLinksTarget(currentPageId);
+          openInSplit(LINKS_PANE_ID);
+        },
+      },
+      {
+        id: 'version-history',
+        group: 'view',
+        title: t('command.versionHistory'),
+        keywords: 'version history revisions snapshots restore timeline changes',
+        icon: History,
+        disabled: !currentPageId || currentPageId === HOME_PAGE_ID,
+        run: () => {
+          if (!currentPageId) return;
+          setHistoryTarget(currentPageId);
+          openInSplit(HISTORY_PANE_ID);
+        },
+      },
+      {
         id: 'present-fullscreen',
         group: 'view',
         title: t('command.presentFull'),
@@ -274,6 +338,21 @@ export function useAppCommands(): AppCommand[] {
         disabled: !splitOpen && !currentPageId,
         run: () => (splitOpen ? closeSplit() : currentPageId && openInSplit(currentPageId)),
       },
+      // One Export command per format the current page offers (EXPORT-DISC):
+      // export was reachable only from the "…" menu's submenu. Search-only so the
+      // default list stays calm — typing "export" (or a format name) surfaces
+      // them. Renders the same EXPORT_ITEMS set the page menu uses.
+      ...EXPORT_ITEMS.filter((item) => docActions?.exportKinds.includes(item.kind)).map(
+        ({kind, labelKey, icon}): AppCommand => ({
+          id: `export-${kind}`,
+          group: 'view',
+          title: t('command.exportAs', {name: t(labelKey)}),
+          keywords: `export download save ${t(labelKey)}`,
+          icon,
+          searchOnly: true,
+          run: () => void docActions?.runExport(kind),
+        }),
+      ),
       // ── Navigation ──────────────────────────────────────────────────────
       {
         id: 'go-back',
@@ -308,6 +387,20 @@ export function useAppCommands(): AppCommand[] {
         },
       },
       {
+        // Share/Publish (PUB-DISC): reachable from the palette even when the
+        // cluster's Share icon is hidden; disabled-with-parity when the server
+        // doesn't support sharing. Opens the modal via its imperative store.
+        id: 'share-page',
+        group: 'app',
+        title: t('command.sharePage'),
+        keywords: 'share publish access permissions collaborate invite link who can access',
+        icon: Share2,
+        disabled: !currentPageId || currentPageId === HOME_PAGE_ID || sharing.supported === false,
+        run: () => {
+          if (currentPageId) requestShareDialog(currentPageId);
+        },
+      },
+      {
         id: 'open-settings',
         group: 'app',
         title: t('command.openSettings'),
@@ -320,6 +413,24 @@ export function useAppCommands(): AppCommand[] {
             return draft;
           }),
       },
+      // A "Settings: <pane>" deep link per settings tab, so the palette opens the
+      // right screen directly. Search-only so they don't crowd the default list.
+      ...SETTINGS_TABS.map(
+        (settingsTab): AppCommand => ({
+          id: `settings-${settingsTab}`,
+          group: 'app',
+          title: t('command.settingsFor', {name: t(`settings.tab.${settingsTab}`)}),
+          keywords: `settings preferences ${settingsTab} ${settingsKeywordsForTab(settingsTab)}`,
+          icon: SettingsIcon,
+          searchOnly: true,
+          run: () =>
+            setHud((draft) => {
+              draft.settings.open = true;
+              draft.settings.tab = settingsTab;
+              return draft;
+            }),
+        }),
+      ),
       ...pluginCommands().map((cmd) => ({
         id: cmd.id,
         group: 'app' as const,
@@ -347,8 +458,11 @@ export function useAppCommands(): AppCommand[] {
     colorScheme,
     splitOpen,
     currentPageId,
+    pages,
     favVersion,
     pluginVersion,
+    docActionsVersion,
+    sharing.supported,
     canGoBack,
     canGoForward,
     createPage,

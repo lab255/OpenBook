@@ -1,15 +1,23 @@
 import React, {createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
-import {ForwardingClient, setForwardingAudience, type TunnelStatus} from '@book.dev/sdk';
+import {
+  ForwardingApiError,
+  ForwardingClient,
+  SiteReattachError,
+  setForwardingAudience,
+  type SiteVisibility,
+  type TunnelStatus,
+} from '@book.dev/sdk';
 import {useAccount} from './AccountProvider';
-import {usePlatformLibrary} from './PlatformLibraryProvider';
+import {useHud} from './HudProvider';
+import {usePlatformCapabilities} from './PlatformCapabilitiesProvider';
 import {
   ensureClaimedForForwarding,
-  ensureForwardingAudience,
-  unbindForwardingAudience,
+  reconcileForwardingAudience,
   type AudienceBindDeps,
   type AudienceNoticeCode,
 } from './forwardingAudience';
 import {useData} from '@/data/DataProvider';
+import {push as pushError} from '@/lib/errorLog';
 import {setShareLinkOrigin} from '@/lib/pageActions';
 import {showToast} from '@/components/ui/toast';
 import {t} from '@/i18n';
@@ -26,6 +34,7 @@ import {t} from '@/i18n';
  * once the account reconnects.
  */
 const ENABLED_KEY = 'openbook.forwarding.enabled';
+const PENDING_UNBIND_KEY_PREFIX = 'openbook.forwarding.pendingUnbind:';
 
 /**
  * How long a signed-out flip's auto-resume intent stays armed (P1-6). Bounds the
@@ -34,6 +43,64 @@ const ENABLED_KEY = 'openbook.forwarding.enabled';
  * unrelated sign-in can never silently complete the (irreversible) claim.
  */
 const SIGN_IN_RESUME_TTL_MS = 3 * 60 * 1000;
+const START_RETRY_INITIAL_MS = 2_000;
+const START_RETRY_MAX_MS = 5 * 60 * 1000;
+
+/** Only failures that can plausibly heal without user action enter the launch retry loop. */
+const isRetryableStartError = (error: unknown): boolean =>
+  (error instanceof SiteReattachError && error.retryable) ||
+  (error instanceof ForwardingApiError && (error.status >= 500 || error.status === 429)) ||
+  error instanceof TypeError ||
+  (error instanceof DOMException && (error.name === 'NetworkError' || error.name === 'TimeoutError'));
+
+export type ForwardingErrorClass = 'ipc' | 'auth' | 'network' | 'unknown';
+
+/** Reduce transport/account failures to UI-safe guidance at the provider boundary. */
+export const classifyForwardingError = (error: unknown): ForwardingErrorClass => {
+  if (error instanceof SiteReattachError) {
+    return error.code === 'unreachable' ? 'network'
+      : error.code === 'wrong-account' ? 'auth'
+        : 'unknown';
+  }
+  if (error instanceof ForwardingApiError) {
+    return error.status === 401 || error.status === 403 ? 'auth'
+      : error.status >= 500 || error.status === 429 ? 'network'
+        : 'unknown';
+  }
+
+  const fields = error && typeof error === 'object' ? (error as {status?: unknown; code?: unknown; detail?: unknown}) : {};
+  const status = fields.status;
+  const message = [error instanceof Error ? error.message : String(error), fields.detail, fields.code]
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ');
+
+  // Desktop localFetch failures are errors from the IPC bridge, not relay outages.
+  if (/ipc connect failed|\bipc\b.*(?:connect|transport|channel|invoke)|(?:local service|sidecar).*(?:unavailable|not running|connect|refused)/i.test(message)) return 'ipc';
+  if (status === 401 || status === 403 || /\b(?:401|403|unauthori[sz]ed|forbidden|account|keychain|credential|sign[ -]?in|auth(?:entication|ori[sz]ation)?)\b/i.test(message)) return 'auth';
+  if (
+    (typeof status === 'number' && status >= 500) ||
+    error instanceof TypeError ||
+    (error instanceof DOMException && (error.name === 'NetworkError' || error.name === 'TimeoutError')) ||
+    /\b(?:dns|enotfound|eai_again|timed? out|timeout|relay|websocket|network|fetch failed|connection (?:closed|reset|refused))\b/i.test(message)
+  ) return 'network';
+  return 'unknown';
+};
+
+const describeForwardingError = (error: unknown): {code?: string; message: string; detail?: string} => {
+  const fields = error && typeof error === 'object' ? (error as {code?: unknown; status?: unknown; detail?: unknown}) : {};
+  const rawCode = error instanceof ForwardingApiError ? error.status : (fields.code ?? fields.status);
+  const code = typeof rawCode === 'string' || typeof rawCode === 'number' ? String(rawCode) : undefined;
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const message = code && !rawMessage.includes(code) ? `${rawMessage} (${code})` : rawMessage;
+  const detail = typeof fields.detail === 'string' ? fields.detail : undefined;
+  return {code, message, detail};
+};
+
+const recordForwardingError = (error: unknown): ReturnType<typeof describeForwardingError> => {
+  const info = describeForwardingError(error);
+  pushError({subsystem: 'forwarding', ...info});
+  return info;
+};
 
 /** Combined provisioning/tunnel status. `idle` = never started this session. */
 export type ForwardingStatus = TunnelStatus | 'idle';
@@ -48,14 +115,35 @@ interface ForwardingContextValue {
   /** The assigned `<prefix>.book.pub` host, once known. */
   host: string | null;
   /**
-   * The host at which the workspace is *currently reachable* by others — the
+   * The host at which the library is *currently reachable* by others — the
    * assigned host, but only while publishing is enabled and the tunnel is
    * actually online; `null` otherwise. The single publish predicate behind
    * both the share-link origin registry and the Share dialog's link hint.
    */
   publishedHost: string | null;
+  /**
+   * The published site's real audience scope, read from the account (`SiteView.visibility`)
+   * once the tunnel is online — `null` until loaded or when not published. A fresh
+   * site is `restricted` by default, and the edge serves ONLY `public` anonymously, so
+   * a page set "public" on a non-`public` address is still bounced for anyone not
+   * signed in. Surfacing the REAL scope lets the UI say so honestly instead of implying
+   * "anyone with the link" works when it doesn't.
+   */
+  siteVisibility: SiteVisibility | null;
+  /** A {@link setSiteVisibility} PATCH is in flight. */
+  siteVisibilityBusy: boolean;
+  /**
+   * Set the published site's audience scope via the existing account route
+   * (`PATCH /api/sites/:id`, owner-only + whitelist-validated server-side). A no-op
+   * when not published. The desktop only ever runs this on the owner's own device
+   * under their device bearer token, so it can't widen anyone else's exposure.
+   */
+  setSiteVisibility: (v: SiteVisibility) => Promise<void>;
   busy: boolean;
   error: string | null;
+  errorClass: ForwardingErrorClass | null;
+  /** A launch retry is armed, or the live tunnel client owns automatic redial. */
+  retryPending: boolean;
   /**
    * A localizable audience-bind/unbind notice (OB-202), shown when the tunnel is up
    * but the audience hardening is incomplete (`partialUnscoped`/`ensureRescope`), a
@@ -85,6 +173,14 @@ interface ForwardingContextValue {
   enable: () => Promise<void>;
   /** Turn forwarding off: drop the tunnel but keep the site key (stable address). */
   disable: () => void;
+  /**
+   * Explicitly forget the stored site identity: drop any live tunnel and clear
+   * the keystore slot, so the next enable provisions a FRESH address. The only
+   * sanctioned identity-overwrite path (NAME-1) — reattach failures (outage,
+   * wrong account, locked keychain) surface via `error` and keep the address;
+   * intended to sit behind a future user-confirmed "reset address" affordance.
+   */
+  resetSiteIdentity: () => Promise<void>;
 }
 
 const DEFAULT: ForwardingContextValue = {
@@ -93,13 +189,19 @@ const DEFAULT: ForwardingContextValue = {
   status: 'idle',
   host: null,
   publishedHost: null,
+  siteVisibility: null,
+  siteVisibilityBusy: false,
+  setSiteVisibility: async () => undefined,
   busy: false,
   error: null,
+  errorClass: null,
+  retryPending: false,
   audienceNotice: null,
   claimRefusal: null,
   signInPending: false,
   enable: async () => undefined,
   disable: () => undefined,
+  resetSiteIdentity: async () => undefined,
 };
 
 const ForwardingContext = createContext<ForwardingContextValue>(DEFAULT);
@@ -109,9 +211,27 @@ const readEnabled = (): boolean =>
 const writeEnabled = (on: boolean): void => {
   if (typeof localStorage !== 'undefined') localStorage.setItem(ENABLED_KEY, on ? '1' : '0');
 };
+const pendingUnbindKey = (accountUrl: string): string =>
+  `${PENDING_UNBIND_KEY_PREFIX}${encodeURIComponent(accountUrl)}`;
+const hasPendingUnbind = (accountUrl: string): boolean =>
+  typeof localStorage !== 'undefined' && localStorage.getItem(pendingUnbindKey(accountUrl)) !== null;
+const writePendingUnbind = (accountUrl: string): void => {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(pendingUnbindKey(accountUrl), '1');
+};
+const clearPendingUnbind = (accountUrl: string): void => {
+  if (typeof localStorage !== 'undefined') localStorage.removeItem(pendingUnbindKey(accountUrl));
+};
+const clearAllPendingUnbinds = (): void => {
+  if (typeof localStorage === 'undefined') return;
+  for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(PENDING_UNBIND_KEY_PREFIX)) localStorage.removeItem(key);
+  }
+};
 
 export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
-  const {forwarding} = usePlatformLibrary();
+  const {forwarding} = usePlatformCapabilities();
+  const {setHud} = useHud();
   const {connected, token, accountUrl, status: accountStatus, signIn, remintIdentity, identityIssuance} =
     useAccount();
   const data = useData();
@@ -125,16 +245,28 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
   // This closes the window before the first await; cleared in `startTunnel`'s finally.
   const startingRef = useRef(false);
   const [enabled, setEnabled] = useState<boolean>(() => readEnabled());
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const startRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startRetryDelayRef = useRef(START_RETRY_INITIAL_MS);
+  const terminalStartErrorRef = useRef(false);
+  const startTunnelRef = useRef<() => Promise<void>>(async () => undefined);
   const [status, setStatus] = useState<ForwardingStatus>('idle');
   const [host, setHost] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorClass, setErrorClass] = useState<ForwardingErrorClass | null>(null);
   const [audienceNotice, setAudienceNotice] = useState<{code: AudienceNoticeCode; detail?: string} | null>(null);
   const [claimRefusal, setClaimRefusal] = useState<'unverified' | 'issuance-disabled' | 'claim-failed' | null>(null);
+  const [siteVisibility, setSiteVis] = useState<SiteVisibility | null>(null);
+  const [siteVisibilityBusy, setSiteVisBusy] = useState(false);
   const [signInPending, setSignInPending] = useState(false);
   // The auto-resume (P1-6) can complete with Settings closed / off-screen, so flag
   // the resume so we can announce it with a toast once the address is live.
   const resumedRef = useRef(false);
+  const outageFailureCountRef = useRef(0);
+  const outageToastShownRef = useRef(false);
+  const audienceReconcileRef = useRef<Promise<void>>(Promise.resolve());
 
   // The latest issuance verdict, read at claim time through a ref so the memoized
   // `audienceDeps` below stays stable across issuance state changes.
@@ -174,22 +306,82 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
   // rolls back rather than strand the owner — see `ensureForwardingAudience`.
   // `ensure` also short-circuits on relaunch when the server already persisted the
   // binding (it re-scopes this session's token instead of relaxing + re-asserting).
-  const bindAudience = useCallback(
-    async (assigned: string) => {
-      const outcome = await ensureForwardingAudience(assigned, audienceDeps);
-      // `bound` is the clean success; `partial`/`failed` keep the tunnel up (the local
-      // UX is unaffected) but surface why hardening is incomplete — as a localizable
-      // code, not raw English, so the view renders it through `t()`.
-      setAudienceNotice(outcome.status === 'bound' ? null : {code: outcome.code, detail: outcome.reason});
+  const reconcileAudience = useCallback(
+    (assigned: string | null) => {
+      // A failed re-mint must not poison the serialization chain forever; a later
+      // recovery signal still gets its turn.
+      audienceReconcileRef.current = audienceReconcileRef.current.catch(() => undefined).then(async () => {
+        const outcome = await reconcileForwardingAudience(
+          assigned,
+          {
+            hasPendingUnbind: () => hasPendingUnbind(accountUrl),
+            clearPendingUnbind: () => clearPendingUnbind(accountUrl),
+            isEnabled: () => enabledRef.current,
+          },
+          audienceDeps,
+        );
+        if (outcome.status === 'held' || outcome.status === 'partial' || outcome.status === 'failed') {
+          setAudienceNotice({code: outcome.code, detail: outcome.reason});
+        } else {
+          setAudienceNotice(null);
+        }
+      });
+      return audienceReconcileRef.current;
     },
-    [audienceDeps],
+    [accountUrl, audienceDeps],
   );
+
+  const cancelStartRetry = useCallback(() => {
+    if (startRetryTimerRef.current) clearTimeout(startRetryTimerRef.current);
+    startRetryTimerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (token) return;
+    cancelStartRetry();
+    terminalStartErrorRef.current = false;
+    setClaimRefusal(null);
+  }, [token, cancelStartRetry]);
+
+  const scheduleStartRetry = useCallback(() => {
+    if (!enabledRef.current || startRetryTimerRef.current) return;
+    const delay = startRetryDelayRef.current;
+    startRetryDelayRef.current = Math.min(delay * 2, START_RETRY_MAX_MS);
+    startRetryTimerRef.current = setTimeout(() => {
+      startRetryTimerRef.current = null;
+      if (enabledRef.current) void startTunnelRef.current();
+    }, delay);
+  }, []);
+
+  const handleTunnelStatus = useCallback((next: TunnelStatus) => {
+    if (next === 'online') {
+      outageFailureCountRef.current = 0;
+      outageToastShownRef.current = false;
+      terminalStartErrorRef.current = false;
+      setError(null);
+      setErrorClass(null);
+    }
+    setStatus(next);
+  }, []);
+
+  const handleDialError = useCallback((dialError: unknown) => {
+    const info = recordForwardingError(dialError);
+    outageFailureCountRef.current += 1;
+    if (outageFailureCountRef.current >= 2) {
+      setError(info.message);
+      setErrorClass(classifyForwardingError(dialError));
+    }
+  }, []);
 
   const startTunnel = useCallback(async () => {
     if (!forwarding || !token || clientRef.current || startingRef.current) return;
+    cancelStartRetry();
     startingRef.current = true; // latch BEFORE the first await (see startingRef)
     setBusy(true);
-    setError(null);
+    if (outageFailureCountRef.current === 0) {
+      setError(null);
+      setErrorClass(null);
+    }
     setAudienceNotice(null);
     setClaimRefusal(null);
     try {
@@ -201,11 +393,14 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
       // claim with, so we never leave it unclaimed-and-exposed. The refusal is a
       // localized, severity-aware notice (`claimRefusal`), not a raw `error` string.
       const claim = await ensureClaimedForForwarding(audienceDeps);
+      if (!enabledRef.current) return;
       if (claim.status === 'refused') {
-        setEnabled(false);
-        writeEnabled(false);
         setStatus('offline');
         setClaimRefusal(claim.code);
+        // A boot-time identity/claim race must not erase the user's durable
+        // publish intent. Keep retrying refusals that can heal; only a server
+        // that explicitly disables identity issuance is terminal for this account.
+        if (claim.code !== 'issuance-disabled') scheduleStartRetry();
         return;
       }
       const client = new ForwardingClient({
@@ -214,21 +409,47 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
         keyStore: forwarding.keyStore,
         localOrigin: '',
         localFetchImpl: forwarding.localFetch,
-        onStatus: setStatus,
+        onStatus: handleTunnelStatus,
+        onDialError: handleDialError,
+        onHost: (canonicalHost) => {
+          setHost(canonicalHost);
+          void reconcileAudience(canonicalHost).catch((bindError: unknown) => {
+            setAudienceNotice({code: 'bindFailed', detail: bindError instanceof Error ? bindError.message : String(bindError)});
+          });
+        },
       });
       clientRef.current = client;
       const {host: assigned} = await client.start();
       setHost(assigned);
-      await bindAudience(assigned);
+      startRetryDelayRef.current = START_RETRY_INITIAL_MS;
+      terminalStartErrorRef.current = false;
     } catch (e) {
+      clientRef.current?.stop();
       clientRef.current = null;
-      setStatus('offline');
-      setError(e instanceof Error ? e.message : String(e));
+      const info = recordForwardingError(e);
+      outageFailureCountRef.current += 1;
+      setError(info.message);
+      setErrorClass(classifyForwardingError(e));
+      const retryable = isRetryableStartError(e);
+      terminalStartErrorRef.current = !retryable;
+      setStatus(retryable && outageFailureCountRef.current >= 2 ? 'stalled' : 'offline');
+      if (retryable) scheduleStartRetry();
     } finally {
       setBusy(false);
       startingRef.current = false;
     }
-  }, [forwarding, token, accountUrl, bindAudience, audienceDeps]);
+  }, [
+    forwarding,
+    token,
+    accountUrl,
+    reconcileAudience,
+    audienceDeps,
+    cancelStartRetry,
+    scheduleStartRetry,
+    handleTunnelStatus,
+    handleDialError,
+  ]);
+  startTunnelRef.current = startTunnel;
 
   // Resume on launch / once the account connects, when forwarding is enabled. This
   // is the SINGLE dial point for the intent-driven paths (relaunch, and the P1-6
@@ -236,16 +457,50 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
   // exactly one ForwardingClient into `clientRef` — so `disable()` can always stop
   // it (an orphaned client started off-book would stay published after an off flip).
   useEffect(() => {
-    if (supported && enabled && connected && token && !clientRef.current && !startingRef.current) void startTunnel();
-  }, [supported, enabled, connected, token, startTunnel]);
+    if (
+      supported &&
+      enabled &&
+      connected &&
+      token &&
+      !clientRef.current &&
+      !startingRef.current &&
+      !startRetryTimerRef.current &&
+      !terminalStartErrorRef.current &&
+      !claimRefusal
+    ) {
+      void startTunnel();
+    }
+  }, [supported, enabled, connected, token, claimRefusal, startTunnel]);
+
+  // A connected data client is the cheap recovery signal for a disabled publish:
+  // retry once on launch/reconnection, without a polling loop. Reconciliation also
+  // precedes the bind path above, so a stale required audience is never resurrected.
+  useEffect(() => {
+    if (!supported || !connected || !token || !hasPendingUnbind(accountUrl)) return;
+    void reconcileAudience(enabled && host ? host : null).catch((unbindError: unknown) => {
+      setAudienceNotice({
+        code: 'unbindHeld',
+        detail: unbindError instanceof Error ? unbindError.message : String(unbindError),
+      });
+    });
+  }, [supported, connected, token, accountUrl, data, enabled, host, reconcileAudience]);
 
   // Drop the tunnel if the platform goes away (shouldn't happen mid-session).
-  useEffect(() => () => clientRef.current?.stop(), []);
+  useEffect(
+    () => () => {
+      cancelStartRetry();
+      clientRef.current?.stop();
+    },
+    [cancelStartRetry],
+  );
 
-  // Where the workspace is currently reachable by others, or `null` (see the
+  // Where the library is currently reachable by others, or `null` (see the
   // context doc). Computed once so the registry effect below and every context
   // consumer (e.g. the Share dialog's link hint) share one publish predicate.
   const publishedHost = enabled && status === 'online' && host ? host : null;
+  const retryPending = startRetryTimerRef.current !== null || (
+    clientRef.current !== null && (status === 'reconnecting' || status === 'stalled')
+  );
 
   // Publish-aware copy links (P0-1): while the tunnel is live, "Copy link"
   // everywhere must emit the forwarded https host — `window.location` here is
@@ -256,6 +511,47 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
     setShareLinkOrigin(publishedHost);
     return () => setShareLinkOrigin(null);
   }, [publishedHost]);
+
+  // Reflect the REAL published-site visibility from the account while online. A
+  // fresh site defaults to `restricted`, and the edge serves ONLY `public`
+  // anonymously — so a page set "public" on a restricted address is still bounced
+  // for anyone not signed in. Reading the true scope here lets the Share dialog /
+  // Sharing tab say so honestly (and offer the one-flip fix) instead of implying
+  // "anyone with the link" works. Cleared the moment we're not published.
+  useEffect(() => {
+    const client = clientRef.current;
+    if (!publishedHost || !client) {
+      setSiteVis(null);
+      return;
+    }
+    let live = true;
+    client
+      .getSiteVisibility()
+      .then((v) => live && setSiteVis(v))
+      .catch(() => undefined); // a read failure just leaves the control unshown; no false claim
+    return () => {
+      live = false;
+    };
+  }, [publishedHost]);
+
+  // Flip the published site's audience scope through the EXISTING owner-only account
+  // route. This never changes an access DEFAULT and only ever runs on the owner's own
+  // device (their device bearer token), so it can't widen anyone else's exposure — the
+  // account still whitelist-validates + enforces ownership server-side.
+  const setSiteVisibility = useCallback(async (v: SiteVisibility) => {
+    const client = clientRef.current;
+    if (!client) return;
+    setSiteVisBusy(true);
+    try {
+      setSiteVis(await client.setSiteVisibility(v));
+    } catch {
+      // Leave the shown value as the last-known server truth (never optimistic) and
+      // tell the owner it didn't stick, so the UI can't imply a change that didn't land.
+      showToast({message: t('forwarding.visibility.error')});
+    } finally {
+      setSiteVisBusy(false);
+    }
+  }, []);
 
   const enable = useCallback(async () => {
     if (!connected || !token) {
@@ -270,10 +566,12 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
       return;
     }
     setSignInPending(false);
+    clearAllPendingUnbinds();
+    terminalStartErrorRef.current = false;
+    enabledRef.current = true;
     setEnabled(true);
     writeEnabled(true);
-    await startTunnel();
-  }, [connected, token, signIn, startTunnel]);
+  }, [connected, token, signIn]);
 
   // Auto-resume the interrupted first flip (P1-6): the user flipped "Forward this
   // device" while signed out and we sent them off to sign in — complete the enable
@@ -288,6 +586,8 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
     if (!signInPending || !connected || !token) return;
     setSignInPending(false);
     resumedRef.current = true; // announce it once the address is live (may be off-screen)
+    clearAllPendingUnbinds();
+    enabledRef.current = true;
     setEnabled(true);
     writeEnabled(true);
   }, [signInPending, connected, token]);
@@ -318,10 +618,42 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
     }
   }, [status, host]);
 
+  // Announce a real outage once per incident. A retryable one must fail at least
+  // twice before it is considered stalled; terminal launch errors are actionable
+  // immediately. Recovery re-arms the toast in `handleTunnelStatus`.
+  useEffect(() => {
+    if (!enabled || outageToastShownRef.current || (status !== 'offline' && status !== 'stalled')) return;
+    if (!terminalStartErrorRef.current && outageFailureCountRef.current < 2) return;
+    outageToastShownRef.current = true;
+    if (status === 'stalled') {
+      showToast({
+        message: t('forwarding.stalledToast'),
+        actionLabel: t('forwarding.stalledAction'),
+        onAction: () =>
+          setHud((draft) => {
+            draft.settings.open = true;
+            draft.settings.tab = 'sharing';
+            draft.settings.section = null;
+            return draft;
+          }),
+        durationMs: 15_000,
+      });
+      return;
+    }
+    showToast({
+      message: error ? t('forwarding.offlineToastDetail', {error}) : t('forwarding.offlineToast'),
+    });
+  }, [enabled, status, error, setHud]);
+
   const disable = useCallback(() => {
+    cancelStartRetry();
     clientRef.current?.stop();
     clientRef.current = null;
     setStatus('offline');
+    terminalStartErrorRef.current = false;
+    outageFailureCountRef.current = 0;
+    outageToastShownRef.current = false;
+    enabledRef.current = false;
     setEnabled(false);
     writeEnabled(false);
     setAudienceNotice(null);
@@ -333,15 +665,42 @@ export const ForwardingProvider: React.FC<PropsWithChildren> = ({children}) => {
     // re-mint unscoped. If the relax is NOT confirmed, the scoping is left intact
     // rather than unscoping the owner behind a still-required audience (a permanent
     // loopback lockout) — see `unbindForwardingAudience`.
-    void (async () => {
-      const outcome = await unbindForwardingAudience(audienceDeps);
-      if (outcome.status === 'held') setAudienceNotice({code: outcome.code, detail: outcome.reason});
-    })();
-  }, [audienceDeps]);
+    // Record the intent before the IPC request: a process exit or dead sidecar can
+    // no longer lose the detach. Confirmed reconciliation clears it.
+    writePendingUnbind(accountUrl);
+    void reconcileAudience(null).catch((unbindError: unknown) => {
+      setAudienceNotice({
+        code: 'unbindHeld',
+        detail: unbindError instanceof Error ? unbindError.message : String(unbindError),
+      });
+    });
+  }, [accountUrl, cancelStartRetry, reconcileAudience]);
+
+  // The explicit "abandon this address" path (NAME-1): stop the tunnel, forget
+  // the stored identity, and let the resume effect (when still enabled) — or the
+  // next enable — provision a fresh address. Every OTHER path keeps the identity:
+  // reattach failures surface through `error`/`status` above and never clear it.
+  const resetSiteIdentity = useCallback(async () => {
+    clientRef.current?.stop();
+    clientRef.current = null;
+    setStatus('offline');
+    setError(null);
+    setErrorClass(null);
+    setHost(null);
+    await forwarding?.keyStore.clear();
+  }, [forwarding]);
 
   const value = useMemo<ForwardingContextValue>(
-    () => ({supported, enabled, status, host, publishedHost, busy, error, audienceNotice, claimRefusal, signInPending, enable, disable}),
-    [supported, enabled, status, host, publishedHost, busy, error, audienceNotice, claimRefusal, signInPending, enable, disable],
+    () => ({
+      supported, enabled, status, host, publishedHost,
+      siteVisibility, siteVisibilityBusy, setSiteVisibility,
+      busy, error, errorClass, retryPending, audienceNotice, claimRefusal, signInPending, enable, disable, resetSiteIdentity,
+    }),
+    [
+      supported, enabled, status, host, publishedHost,
+      siteVisibility, siteVisibilityBusy, setSiteVisibility,
+      busy, error, errorClass, retryPending, audienceNotice, claimRefusal, signInPending, enable, disable, resetSiteIdentity,
+    ],
   );
 
   return <ForwardingContext.Provider value={value}>{children}</ForwardingContext.Provider>;

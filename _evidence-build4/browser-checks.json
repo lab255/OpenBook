@@ -1,0 +1,1177 @@
+{
+  "label": "Chromium synthetic/local, Canvas2d; rAF raster-availability estimate, not physical presentation",
+  "inputBoundary": "Both input classes use synthetic mouse PointerEvents. Trackpad-class denotes the browser pointer path, not a physical trackpad measurement.",
+  "time": "2026-11-17T02:55:33.401Z",
+  "immediacy": [],
+  "cacheFidelity": {
+    "rows": [
+      {
+        "step": "initial",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "move overlapping shape",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "reorder",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "erase",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "zoom invalidation",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "stroke style",
+        "maxChannelDelta": 0
+      }
+    ],
+    "negativeControl": 253
+  },
+  "cls": {
+    "label": "Synthetic local status transitions and document join application; real provider reconnect is measured separately",
+    "cases": [
+      {
+        "name": "peer join (document update)",
+        "cls": 0,
+        "entries": []
+      },
+      {
+        "name": "saving",
+        "cls": 0,
+        "entries": []
+      },
+      {
+        "name": "saved",
+        "cls": 0,
+        "entries": []
+      },
+      {
+        "name": "save failed",
+        "cls": 0,
+        "entries": []
+      }
+    ],
+    "negativeControl": 0.07765289256198346,
+    "negativeControlDescription": "Default-size canvas mounted into an unsized holder above the same canvas surface",
+    "reloadEquivalent": true
+  },
+  "reconnectCases": [
+    {
+      "label": "Two production connectBroadcast providers, native BroadcastChannel; document packets buffered then released unchanged. Not SSE/server certification.",
+      "outage": {
+        "singleTransaction": true,
+        "transactions": [
+          {
+            "x": 408,
+            "stroke": "#b91c1c",
+            "bytes": 156
+          }
+        ],
+        "original": {
+          "id": "8922b0d4-f797-4364-8889-33c65e64b922",
+          "scalars": {
+            "id": "8922b0d4-f797-4364-8889-33c65e64b922",
+            "kind": "rect",
+            "shapeVersion": 1,
+            "name": "",
+            "ord": "V",
+            "x": 400,
+            "y": 180,
+            "w": 120,
+            "h": 80,
+            "stroke": "#111111",
+            "fill": "none",
+            "strokeWidth": 3,
+            "opacity": 1,
+            "dash": "solid",
+            "basisW": 1,
+            "basisH": 1,
+            "text": "",
+            "fontSize": 16,
+            "fontFamily": "sans",
+            "textAlign": "left",
+            "startX": 0,
+            "startY": 0,
+            "endX": 1,
+            "endY": 1,
+            "startHead": "none",
+            "endHead": "arrow",
+            "pressureMode": "constant"
+          },
+          "pointArity": 2,
+          "points": []
+        },
+        "localDuringOutage": {
+          "id": "8922b0d4-f797-4364-8889-33c65e64b922",
+          "scalars": {
+            "id": "8922b0d4-f797-4364-8889-33c65e64b922",
+            "kind": "rect",
+            "shapeVersion": 1,
+            "name": "",
+            "ord": "V",
+            "x": 400,
+            "y": 180,
+            "w": 120,
+            "h": 80,
+            "stroke": "#111111",
+            "fill": "none",
+            "strokeWidth": 3,
+            "opacity": 1,
+            "dash": "solid",
+            "basisW": 1,
+            "basisH": 1,
+            "text": "",
+            "fontSize": 16,
+            "fontFamily": "sans",
+            "textAlign": "left",
+            "startX": 0,
+            "startY": 0,
+            "endX": 1,
+            "endY": 1,
+            "startHead": "none",
+            "endHead": "arrow",
+            "pressureMode": "constant"
+          },
+          "pointArity": 2,
+          "points": []
+        },
+        "transport": {
+          "offline": true,
+          "bufferedPackets": 1,
+          "bufferedBytes": 156,
+          "deliveredBytes": 0
+        },
+        "agreement": {
+          "live": false,
+          "fresh": true
+        }
+      },
+      "before": {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "8922b0d4-f797-4364-8889-33c65e64b922"
+        ],
+        "focus": "Drawing viewport",
+        "x": 400,
+        "y": 181,
+        "stroke": "#111111"
+      },
+      "transportBefore": {
+        "offline": true,
+        "bufferedPackets": 2,
+        "bufferedBytes": 236,
+        "deliveredBytes": 0
+      },
+      "delivery": {
+        "bufferedBytes": 236,
+        "deliveredBytes": 236
+      },
+      "frames": [
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "8922b0d4-f797-4364-8889-33c65e64b922"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        }
+      ],
+      "after": {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "8922b0d4-f797-4364-8889-33c65e64b922"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      "agreement": {
+        "live": true,
+        "fresh": true
+      },
+      "layoutShifts": [],
+      "cls": 0
+    },
+    {
+      "label": "Two production connectBroadcast providers, native BroadcastChannel; document packets buffered then released unchanged. Not SSE/server certification.",
+      "outage": {
+        "singleTransaction": false,
+        "transactions": [
+          {
+            "x": 408,
+            "stroke": "#111111",
+            "bytes": 80
+          },
+          {
+            "x": 408,
+            "stroke": "#b91c1c",
+            "bytes": 91
+          }
+        ],
+        "original": {
+          "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+          "scalars": {
+            "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+            "kind": "rect",
+            "shapeVersion": 1,
+            "name": "",
+            "ord": "V",
+            "x": 400,
+            "y": 180,
+            "w": 120,
+            "h": 80,
+            "stroke": "#111111",
+            "fill": "none",
+            "strokeWidth": 3,
+            "opacity": 1,
+            "dash": "solid",
+            "basisW": 1,
+            "basisH": 1,
+            "text": "",
+            "fontSize": 16,
+            "fontFamily": "sans",
+            "textAlign": "left",
+            "startX": 0,
+            "startY": 0,
+            "endX": 1,
+            "endY": 1,
+            "startHead": "none",
+            "endHead": "arrow",
+            "pressureMode": "constant"
+          },
+          "pointArity": 2,
+          "points": []
+        },
+        "localDuringOutage": {
+          "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+          "scalars": {
+            "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+            "kind": "rect",
+            "shapeVersion": 1,
+            "name": "",
+            "ord": "V",
+            "x": 400,
+            "y": 180,
+            "w": 120,
+            "h": 80,
+            "stroke": "#111111",
+            "fill": "none",
+            "strokeWidth": 3,
+            "opacity": 1,
+            "dash": "solid",
+            "basisW": 1,
+            "basisH": 1,
+            "text": "",
+            "fontSize": 16,
+            "fontFamily": "sans",
+            "textAlign": "left",
+            "startX": 0,
+            "startY": 0,
+            "endX": 1,
+            "endY": 1,
+            "startHead": "none",
+            "endHead": "arrow",
+            "pressureMode": "constant"
+          },
+          "pointArity": 2,
+          "points": []
+        },
+        "transport": {
+          "offline": true,
+          "bufferedPackets": 2,
+          "bufferedBytes": 171,
+          "deliveredBytes": 0
+        },
+        "agreement": {
+          "live": false,
+          "fresh": true
+        }
+      },
+      "before": {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 400,
+        "y": 181,
+        "stroke": "#111111"
+      },
+      "transportBefore": {
+        "offline": true,
+        "bufferedPackets": 3,
+        "bufferedBytes": 251,
+        "deliveredBytes": 0
+      },
+      "delivery": {
+        "bufferedBytes": 251,
+        "deliveredBytes": 251
+      },
+      "frames": [
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#111111"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        },
+        {
+          "camera": {
+            "a": 1,
+            "d": 1,
+            "e": 0,
+            "f": 0
+          },
+          "selection": [
+            "a6782571-c7b7-470c-83d2-95b009cc259e"
+          ],
+          "focus": "Drawing viewport",
+          "x": 408,
+          "y": 181,
+          "stroke": "#b91c1c"
+        }
+      ],
+      "after": {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      "agreement": {
+        "live": true,
+        "fresh": true
+      },
+      "layoutShifts": [],
+      "cls": 0
+    }
+  ],
+  "reconnect": {
+    "label": "Two production connectBroadcast providers, native BroadcastChannel; document packets buffered then released unchanged. Not SSE/server certification.",
+    "outage": {
+      "singleTransaction": false,
+      "transactions": [
+        {
+          "x": 408,
+          "stroke": "#111111",
+          "bytes": 80
+        },
+        {
+          "x": 408,
+          "stroke": "#b91c1c",
+          "bytes": 91
+        }
+      ],
+      "original": {
+        "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+        "scalars": {
+          "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+          "kind": "rect",
+          "shapeVersion": 1,
+          "name": "",
+          "ord": "V",
+          "x": 400,
+          "y": 180,
+          "w": 120,
+          "h": 80,
+          "stroke": "#111111",
+          "fill": "none",
+          "strokeWidth": 3,
+          "opacity": 1,
+          "dash": "solid",
+          "basisW": 1,
+          "basisH": 1,
+          "text": "",
+          "fontSize": 16,
+          "fontFamily": "sans",
+          "textAlign": "left",
+          "startX": 0,
+          "startY": 0,
+          "endX": 1,
+          "endY": 1,
+          "startHead": "none",
+          "endHead": "arrow",
+          "pressureMode": "constant"
+        },
+        "pointArity": 2,
+        "points": []
+      },
+      "localDuringOutage": {
+        "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+        "scalars": {
+          "id": "a6782571-c7b7-470c-83d2-95b009cc259e",
+          "kind": "rect",
+          "shapeVersion": 1,
+          "name": "",
+          "ord": "V",
+          "x": 400,
+          "y": 180,
+          "w": 120,
+          "h": 80,
+          "stroke": "#111111",
+          "fill": "none",
+          "strokeWidth": 3,
+          "opacity": 1,
+          "dash": "solid",
+          "basisW": 1,
+          "basisH": 1,
+          "text": "",
+          "fontSize": 16,
+          "fontFamily": "sans",
+          "textAlign": "left",
+          "startX": 0,
+          "startY": 0,
+          "endX": 1,
+          "endY": 1,
+          "startHead": "none",
+          "endHead": "arrow",
+          "pressureMode": "constant"
+        },
+        "pointArity": 2,
+        "points": []
+      },
+      "transport": {
+        "offline": true,
+        "bufferedPackets": 2,
+        "bufferedBytes": 171,
+        "deliveredBytes": 0
+      },
+      "agreement": {
+        "live": false,
+        "fresh": true
+      }
+    },
+    "before": {
+      "camera": {
+        "a": 1,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "selection": [
+        "a6782571-c7b7-470c-83d2-95b009cc259e"
+      ],
+      "focus": "Drawing viewport",
+      "x": 400,
+      "y": 181,
+      "stroke": "#111111"
+    },
+    "transportBefore": {
+      "offline": true,
+      "bufferedPackets": 3,
+      "bufferedBytes": 251,
+      "deliveredBytes": 0
+    },
+    "delivery": {
+      "bufferedBytes": 251,
+      "deliveredBytes": 251
+    },
+    "frames": [
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#111111"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      },
+      {
+        "camera": {
+          "a": 1,
+          "d": 1,
+          "e": 0,
+          "f": 0
+        },
+        "selection": [
+          "a6782571-c7b7-470c-83d2-95b009cc259e"
+        ],
+        "focus": "Drawing viewport",
+        "x": 408,
+        "y": 181,
+        "stroke": "#b91c1c"
+      }
+    ],
+    "after": {
+      "camera": {
+        "a": 1,
+        "d": 1,
+        "e": 0,
+        "f": 0
+      },
+      "selection": [
+        "a6782571-c7b7-470c-83d2-95b009cc259e"
+      ],
+      "focus": "Drawing viewport",
+      "x": 408,
+      "y": 181,
+      "stroke": "#b91c1c"
+    },
+    "agreement": {
+      "live": true,
+      "fresh": true
+    },
+    "layoutShifts": [],
+    "cls": 0
+  },
+  "precision": {
+    "label": "DOM outline versus actual Canvas2d rendering matrix, CSS pixels; no screenshot-derived claim",
+    "alignments": [
+      {
+        "zoom": 100,
+        "expected": {
+          "x": 400,
+          "y": 180,
+          "w": 40,
+          "h": 30
+        },
+        "actual": {
+          "x": 400,
+          "y": 180,
+          "w": 40,
+          "h": 30
+        },
+        "error": 0
+      },
+      {
+        "zoom": 200,
+        "expected": {
+          "x": 400,
+          "y": 180,
+          "w": 80,
+          "h": 60
+        },
+        "actual": {
+          "x": 400,
+          "y": 180,
+          "w": 80,
+          "h": 60
+        },
+        "error": 0
+      },
+      {
+        "zoom": 400,
+        "expected": {
+          "x": 400,
+          "y": 180,
+          "w": 160,
+          "h": 120
+        },
+        "actual": {
+          "x": 400,
+          "y": 180,
+          "w": 160,
+          "h": 120
+        },
+        "error": 0
+      }
+    ],
+    "cycles": 20,
+    "drift": 0,
+    "negativeControl": 2
+  },
+  "restraint": {
+    "observed": {
+      "offTokenDurations": 0,
+      "opacityDerivedTextColors": 0
+    },
+    "negativeControl": {
+      "offTokenDurations": 1,
+      "opacityDerivedTextColors": 1
+    },
+    "plantedComputedColor": "rgba(0, 0, 0, 0.4)",
+    "elementOpacity": "1",
+    "method": "Resolve computed text colors to RGBA pixels; count color alpha below 255, independently of element opacity"
+  },
+  "legibility": {
+    "textRoles": [
+      {
+        "role": "title",
+        "selector": ".ob-canvas-title",
+        "font": "ui-sans-serif, -apple-system, \"system-ui\", Inter, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "size": "14px",
+        "weight": "600",
+        "color": "rgb(23, 23, 23)",
+        "background": "rgb(255, 255, 255)",
+        "contrast": 17.9278402530276
+      },
+      {
+        "role": "control",
+        "selector": ".ob-canvas-tools button",
+        "font": "ui-sans-serif, -apple-system, \"system-ui\", Inter, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "size": "14px",
+        "weight": "600",
+        "color": "rgb(30, 58, 138)",
+        "background": "rgb(219, 234, 254)",
+        "contrast": 8.489743903584975
+      },
+      {
+        "role": "label",
+        "selector": ".ob-canvas-properties label",
+        "font": "ui-sans-serif, -apple-system, \"system-ui\", Inter, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "size": "12px",
+        "weight": "400",
+        "color": "rgb(23, 23, 23)",
+        "background": "rgb(255, 255, 255)",
+        "contrast": 17.9278402530276
+      },
+      {
+        "role": "numeric",
+        "selector": ".ob-canvas-footer input",
+        "font": "ui-sans-serif, -apple-system, \"system-ui\", Inter, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "size": "12px",
+        "weight": "400",
+        "color": "rgb(23, 23, 23)",
+        "background": "rgb(255, 255, 255)",
+        "contrast": 17.9278402530276
+      },
+      {
+        "role": "status",
+        "selector": ".ob-canvas-status",
+        "font": "ui-sans-serif, -apple-system, \"system-ui\", Inter, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "size": "12px",
+        "weight": "500",
+        "color": "rgb(23, 23, 23)",
+        "background": "rgb(255, 255, 255)",
+        "contrast": 17.9278402530276
+      },
+      {
+        "role": "body",
+        "selector": ".ob-canvas-footer button",
+        "font": "ui-sans-serif, -apple-system, \"system-ui\", Inter, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "size": "14px",
+        "weight": "400",
+        "color": "rgb(23, 23, 23)",
+        "background": "rgb(243, 244, 246)",
+        "contrast": 16.29040944040018
+      }
+    ],
+    "boundaries": [
+      {
+        "role": "focus and selection",
+        "contrast": 6.701618401398807
+      },
+      {
+        "role": "field boundary",
+        "contrast": 4.741667181590045
+      }
+    ]
+  },
+  "browserErrors": [],
+  "completed": "2026-11-17T02:55:38.046Z"
+}

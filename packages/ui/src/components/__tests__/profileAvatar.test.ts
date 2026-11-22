@@ -22,6 +22,7 @@ describe('monogramHue', () => {
   it('is deterministic and varies across names', () => {
     expect(monogramHue('Ada Lovelace')).toBe(monogramHue('Ada Lovelace'));
     const hues = new Set(['Ada', 'Grace', 'Alan', 'Edsger', 'Barbara', 'Donald'].map(monogramHue));
+    expect(monogramHue('Ada')).toMatch(/^bg-\[var\(--data-[a-z]+-chip-bg\)\] /);
     expect(hues.size).toBeGreaterThan(1);
   });
 });

@@ -1,11 +1,16 @@
-import React, {useLayoutEffect, useRef} from 'react';
+import React, {useLayoutEffect, useRef, useState} from 'react';
+import {AppWindow, Columns2, Copy, ExternalLink, Pencil, Unlink} from 'lucide-react';
+import * as Y from 'yjs';
 import {
+  blockChildren,
   blockId,
+  nestInToggle,
   blockProp,
   blockText,
   blockType,
   cellNeighbor,
   cellPosition,
+  enclosingBlock,
   findBlock,
   htmlToBlocks,
   rootBlocks,
@@ -13,11 +18,26 @@ import {
   tableInsertRow,
   type BlockMap,
   type BlockType,
+  type InlineAttrs,
   type NewBlock,
   type TextRun,
 } from './model';
-import {attrsAt, diffText, readSelection, runsToHtml, writeSelection} from './richtext';
+import {attrsAt, diffText, domToOffset, offsetToDom, readSelectionDirected, readSelection, runsToHtml, writeSelection} from './richtext';
 import {searchEmojis} from '@/lib/emoji';
+import {pageIconToText} from '@/lib/iconValue';
+import {copyText, pageLinkUrl} from '@/lib/pageActions';
+import {pageLinks, type PageLinkResult} from '@/lib/pageLinks';
+import {useOptionalNavigation} from '@/providers';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import {MENU_WIDTH_LG} from '@/components/ui/menu-components';
+import {t} from '@/i18n';
+import {LinkPicker, LinkUrlEditor} from './LinkPicker';
 import type {BlockEditorController} from './useBlockEditor';
 import type {EditorUI} from './BlockEditor';
 
@@ -30,14 +50,27 @@ import type {EditorUI} from './BlockEditor';
  * `compositionend`, after which the result is diffed back into Y.Text.
  */
 
+/** The container type a paste must escape rather than nest into as a cell sibling. */
+const TABLE_BLOCKS: ReadonlySet<BlockType> = new Set<BlockType>(['table']);
+
 const PLACEHOLDERS: Partial<Record<BlockType, string>> = {
   heading: 'Heading',
   todo: 'To-do',
   list: 'List item',
   quote: 'Quote',
   callout: 'Callout',
+  notes: 'Note for the presenter',
   code: 'Code',
 };
+
+interface InlineLinkSubject {
+  kind: 'link' | 'mention';
+  target: string;
+  editValue: string;
+  start: number;
+  end: number;
+  anchorEl: HTMLAnchorElement;
+}
 
 export const TextBlockView: React.FC<{
   block: BlockMap;
@@ -46,9 +79,18 @@ export const TextBlockView: React.FC<{
 }> = ({block, editor, ui}) => {
   const ref = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
+  const linkMenuTriggerRef = useRef<HTMLSpanElement>(null);
+  const linkMenuPointRef = useRef({clientX: 0, clientY: 0});
+  const [linkMenu, setLinkMenu] = useState<InlineLinkSubject | null>(null);
+  const [linkEdit, setLinkEdit] = useState<InlineLinkSubject | null>(null);
+  const navigation = useOptionalNavigation();
   const id = blockId(block);
   const type = blockType(block);
-  const text = blockText(block)!;
+  // Defense in depth: a legacy / malformed block that reaches the text view
+  // without a Y.Text (or a non-text block mis-placed as a cell) renders as an
+  // empty editable instead of throwing `blockText(block)!` and taking the whole
+  // page down. Edits to the detached fallback simply don't persist.
+  const text = blockText(block) ?? new Y.Text();
   const isCode = type === 'code';
   const language = isCode ? (blockProp<string>(block, 'language') ?? '') : '';
 
@@ -95,6 +137,51 @@ export const TextBlockView: React.FC<{
     editor.doc.transact(fn, 'local');
   };
 
+  const replaceMention = (subject: InlineLinkSubject, result: PageLinkResult): void => {
+    const icon = pageIconToText(result.icon);
+    const label = icon ? `${icon} ${result.label}` : result.label;
+    apply(() => {
+      text.delete(subject.start, subject.end - subject.start);
+      text.insert(subject.start, label, {m: result.id});
+    });
+    setLinkEdit(null);
+    editor.requestCaret({blockId: id, offset: subject.start + label.length});
+  };
+
+  const replaceExternalLink = (subject: InlineLinkSubject, href: string): void => {
+    apply(() => text.format(subject.start, subject.end - subject.start, {a: href, m: null}));
+    setLinkEdit(null);
+    editor.requestCaret({blockId: id, offset: subject.end});
+  };
+
+  const removeInlineLink = (subject: InlineLinkSubject): void => {
+    apply(() => text.format(subject.start, subject.end - subject.start, {a: null, m: null}));
+    editor.requestCaret({blockId: id, offset: subject.end});
+  };
+
+  const openInlineLink = (subject: InlineLinkSubject, target: 'tab' | 'window' | 'split'): void => {
+    if (subject.kind === 'mention') {
+      if (target === 'split') {
+        if (navigation) navigation.openInSplit(subject.target);
+        else pageLinks.openPage(subject.target, 'secondary');
+      } else if (navigation) {
+        navigation.openInNew(subject.target, target);
+      } else {
+        window.open(
+          pageLinkUrl(subject.target),
+          '_blank',
+          target === 'window' ? 'noopener,noreferrer,popup,width=1280,height=860' : 'noopener,noreferrer',
+        );
+      }
+      return;
+    }
+    window.open(
+      subject.target,
+      '_blank',
+      target === 'window' ? 'noopener,noreferrer,popup,width=1280,height=860' : 'noopener,noreferrer',
+    );
+  };
+
   const deleteSelection = (sel: {start: number; end: number}): void => {
     if (sel.end > sel.start) text.delete(sel.start, sel.end - sel.start);
   };
@@ -118,13 +205,13 @@ export const TextBlockView: React.FC<{
       '###': {type: 'heading', props: {level: 3}},
       '-': {type: 'list', props: {kind: 'bullet'}},
       '*': {type: 'list', props: {kind: 'bullet'}},
-      '1.': {type: 'list', props: {kind: 'number'}},
       '[]': {type: 'todo'},
       '[ ]': {type: 'todo'},
       '[x]': {type: 'todo', props: {checked: true}},
-      '>': {type: 'quote'},
+      '>': {type: 'togglelist', props: {collapsed: false}},
+      '"': {type: 'quote'},
     };
-    const hit = map[prefix];
+    const hit = map[prefix] ?? (/^\d+\.$/.test(prefix) ? {type: 'list' as const, props: {kind: 'number'}} : undefined);
     if (!hit || type !== 'paragraph') return false;
     apply(() => {
       text.delete(0, prefix.length);
@@ -150,6 +237,17 @@ export const TextBlockView: React.FC<{
     case 'insertReplacementText': {
       ev.preventDefault();
       const data = ev.data ?? '';
+      // The third dash consumes an otherwise-empty paragraph and leaves a
+      // fresh text block after the divider, as inserting via the slash menu does.
+      if (data === '-' && type === 'paragraph' && text.toString() === '--' && sel.start === 2 && sel.end === 2) {
+        apply(() => {
+          text.delete(0, 2);
+          editor.turnInto(id, 'divider');
+          editor.insertAfter(id, {type: 'paragraph'});
+        });
+        return;
+      }
+
       // Colon-terminated emoji insert (":smile:" → 😄), matching GitHub/Slack/
       // Discord muscle memory: when the ":" picker is already open on a
       // non-empty query that has matches, the closing ":" commits the top match
@@ -166,6 +264,18 @@ export const TextBlockView: React.FC<{
         ui.emojiKey(':');
         return;
       }
+      // Bracket-terminated wikilink accept, mirroring the ":smile:" pattern: with
+      // the "[[" menu open on a non-empty query, the closing "]" of a typed "]]"
+      // commits the highlighted row (existing page or the Create row) instead of
+      // typing a literal "]". The menu owns removing the "[[query]" literal and
+      // inserting the chip; this only swallows the final "]".
+      if (data === ']' && ui.wiki.open && ui.wiki.blockId === id && ui.wiki.query.replace(/\]+$/, '').trim() !== '') {
+        const before = text.toString().slice(0, sel.start);
+        if (before.endsWith(']')) {
+          ui.wikiKey('Enter');
+          return;
+        }
+      }
       // Slash / mention / emoji menus: '/', '@' or ':' at the start or after
       // whitespace (a mid-word ':' like "3:30" must not trigger the picker).
       if ((data === '/' || data === '@' || data === ':') && !isCode && type !== 'cell') {
@@ -179,6 +289,22 @@ export const TextBlockView: React.FC<{
           if (data === '/') ui.openSlash(id, sel.start);
           else if (data === '@') ui.openMention(id, sel.start);
           else ui.openEmoji(id, sel.start);
+          return;
+        }
+      }
+      // Wikilink menu: the second "[" of a "[[" pair opens the page-link picker
+      // (a Notion-style alternative to "@"). The pair must sit at the start or
+      // after whitespace so "arr[[0]]"-style text stays literal; never in a code
+      // block or inline-code run (those keep "[[" literal per spec).
+      if (data === '[' && !isCode && type !== 'cell' && !attrsAt(text, sel.start).c) {
+        const before = text.toString().slice(0, sel.start);
+        if (before.endsWith('[') && (before.length === 1 || /\s/.test(before[before.length - 2]))) {
+          apply(() => {
+            deleteSelection(sel);
+            insertPlain(sel.start, data);
+          });
+          editor.requestCaret({blockId: id, offset: sel.start + 1});
+          ui.openWiki(id, sel.start - 1); // anchor at the FIRST "["
           return;
         }
       }
@@ -201,13 +327,14 @@ export const TextBlockView: React.FC<{
       editor.requestCaret({blockId: id, offset: sel.start + data.length});
       if (ui.slash.open && ui.slash.blockId === id) ui.updateSlash(sel.start + data.length);
       if (ui.mention.open && ui.mention.blockId === id) ui.updateMention(sel.start + data.length);
+      if (ui.wiki.open && ui.wiki.blockId === id) ui.updateWiki(sel.start + data.length);
       if (ui.emoji.open && ui.emoji.blockId === id) ui.updateEmoji(sel.start + data.length);
       return;
     }
 
     case 'insertParagraph': {
       ev.preventDefault();
-      if (ui.slash.open || ui.mention.open || ui.emoji.open) return; // Enter belongs to the open menu
+      if (ui.slash.open || ui.mention.open || ui.wiki.open || ui.emoji.open) return; // Enter belongs to the open menu
       if (type === 'cell') {
         // Tables are grids: Enter moves down the column, growing the table
         // at the bottom edge — it never splits a cell.
@@ -264,6 +391,7 @@ export const TextBlockView: React.FC<{
         editor.requestCaret({blockId: id, offset: sel.start - len});
         if (ui.slash.open && ui.slash.blockId === id) ui.updateSlash(sel.start - len);
         if (ui.mention.open && ui.mention.blockId === id) ui.updateMention(sel.start - len);
+        if (ui.wiki.open && ui.wiki.blockId === id) ui.updateWiki(sel.start - len);
         if (ui.emoji.open && ui.emoji.blockId === id) ui.updateEmoji(sel.start - len);
       } else if (type === 'cell') {
         // Never merge table cells — Backspace at a cell's start is a no-op.
@@ -360,7 +488,14 @@ export const TextBlockView: React.FC<{
           apply(() => deleteSelection(sel));
           // Pasting into an empty paragraph replaces it; otherwise insert below.
           const replaceHost = type === 'paragraph' && text.length === 0;
-          let after: string | null = id;
+          // Caret inside a table cell: a cell holds only text, so inserting
+          // blocks as cell siblings makes a container (e.g. a pasted `table`) a
+          // child of `row` — TableView then renders it via TextBlockView, whose
+          // `blockText` is undefined for a table → throw on every render →
+          // white screen, persisted by the doc-driven saver. Redirect the
+          // insertion to *after* the enclosing table instead.
+          const enclosingTable = enclosingBlock(editor.doc, id, TABLE_BLOCKS);
+          let after: string | null = enclosingTable ? blockId(enclosingTable.block) : id;
           for (const b of pasted) {
             after = editor.insertAfter(after, {...b, id: undefined});
           }
@@ -438,6 +573,13 @@ export const TextBlockView: React.FC<{
         return;
       }
     }
+    if (ui.wiki.open && ui.wiki.blockId === id) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(e.key)) {
+        e.preventDefault();
+        ui.wikiKey(e.key);
+        return;
+      }
+    }
     if (ui.emoji.open && ui.emoji.blockId === id) {
       if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(e.key)) {
         e.preventDefault();
@@ -447,6 +589,33 @@ export const TextBlockView: React.FC<{
     }
 
     const mod = e.metaKey || e.ctrlKey;
+    // Native Home/End differs by platform and does not reliably reveal a caret
+    // inside an overflowing contenteditable. Own logical-line navigation only
+    // for no-wrap code; wrapped text keeps native visual-line navigation.
+    if (isCode && !blockProp(block, 'wrap') && !e.altKey && (e.key === 'Home' || e.key === 'End')) {
+      const directed = readSelectionDirected(el);
+      const selection = window.getSelection();
+      if (!directed || !selection) return;
+      e.preventDefault();
+      const value = text.toString();
+      const nextBreak = value.indexOf('\n', directed.head);
+      const target = e.key === 'Home'
+        ? (mod ? 0 : value.slice(0, directed.head).lastIndexOf('\n') + 1)
+        : (mod || nextBreak < 0 ? value.length : nextBreak);
+      const anchor = offsetToDom(el, e.shiftKey ? directed.anchor : target);
+      const head = offsetToDom(el, target);
+      selection.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
+      // Measure the focus endpoint, not the whole selected range (Shift+Home
+      // produces a backwards selection), and scroll only the code text area.
+      const caret = document.createRange();
+      caret.setStart(head.node, head.offset);
+      caret.collapse(true);
+      const rect = caret.getBoundingClientRect();
+      const viewport = el.getBoundingClientRect();
+      if (rect.left < viewport.left) el.scrollLeft += rect.left - viewport.left;
+      else if (rect.right > viewport.right) el.scrollLeft += rect.right - viewport.right;
+      return;
+    }
     if (mod && !isCode) {
       const fmt: Record<string, 'b' | 'i' | 'u' | 's' | 'c'> = {b: 'b', i: 'i', u: 'u', e: 'c'};
       const key = e.key.toLowerCase();
@@ -497,7 +666,12 @@ export const TextBlockView: React.FC<{
     }
     if (e.key === 'Tab' && !isCode) {
       e.preventDefault();
+      const caret = readSelection(el)?.start ?? 0;
       const indent = blockProp<number>(block, 'indent') ?? 0;
+      if (!(e.shiftKey && indent > 0) && nestInToggle(editor.doc, id, e.shiftKey)) {
+        editor.requestCaret({blockId: id, offset: caret});
+        return;
+      }
       const next = e.shiftKey ? Math.max(0, indent - 1) : Math.min(4, indent + 1);
       if (next !== indent) {
         apply(() => setBlockProp(block, 'indent', next === 0 ? undefined : next));
@@ -577,8 +751,9 @@ export const TextBlockView: React.FC<{
     }
   };
 
-  const placeholder =
-    type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : (PLACEHOLDERS[type] ?? '');
+  const focusOnlyHint = ['list', 'todo', 'quote', 'callout', 'notes'].includes(type);
+  const placeholder = focusOnlyHint && editor.focusedId !== id ? undefined
+    : type === 'heading' ? `Heading ${blockProp<number>(block, 'level') ?? 2}` : ((type === 'togglelist' ? t('blockEditor.togglelistSummary') : PLACEHOLDERS[type]) ?? '');
 
   // A brand-new page is a single empty paragraph: show the "/" hint without
   // waiting for focus, so an empty document teaches its own entry point (the
@@ -590,43 +765,162 @@ export const TextBlockView: React.FC<{
       return root.length === 1 && blockId(root.get(0)) === id;
     })();
 
+  const onLinkContextMenu = (event: React.MouseEvent<HTMLDivElement>): void => {
+    const root = ref.current;
+    const target = event.target;
+    if (!root || !(target instanceof Element)) return;
+    const anchor = target.closest('a.obe-link, a.obe-mention');
+    if (!(anchor instanceof HTMLAnchorElement) || !root.contains(anchor)) return;
+
+    // CTX-5 seam: a selected range keeps bubbling to the current native/block
+    // behavior. This handler owns only a caret (collapsed-selection) anchor.
+    const selection = document.getSelection();
+    if (selection && !selection.isCollapsed) return;
+
+    const fragmentStart = domToOffset(root, anchor, 0);
+    const length = anchor.textContent?.length ?? 0;
+    const mentionId = anchor.dataset.pageId;
+    const href = anchor.getAttribute('href') ?? '';
+    if (fragmentStart === null || length === 0 || (!mentionId && !href)) return;
+
+    const linkAttr = mentionId ? 'm' : 'a';
+    const linkValue = mentionId || href;
+    let offset = 0;
+    const runs = (text.toDelta() as Array<{insert: string; attributes?: InlineAttrs}>).map((op) => {
+      const start = offset;
+      offset += op.insert.length;
+      return {start, end: offset, matches: op.attributes?.[linkAttr] === linkValue};
+    });
+    const clicked = runs.findIndex((run) => run.matches && run.start <= fragmentStart && fragmentStart < run.end);
+    let first = clicked;
+    let last = clicked;
+    while (first > 0 && runs[first - 1].matches) first -= 1;
+    while (last >= 0 && last + 1 < runs.length && runs[last + 1].matches) last += 1;
+    const start = clicked >= 0 ? runs[first].start : fragmentStart;
+    const end = clicked >= 0 ? runs[last].end : fragmentStart + length;
+
+    event.preventDefault();
+    event.stopPropagation();
+    linkMenuPointRef.current = {clientX: event.clientX, clientY: event.clientY};
+    setLinkMenu({
+      kind: mentionId ? 'mention' : 'link',
+      target: mentionId || anchor.href,
+      editValue: mentionId || href,
+      start,
+      end,
+      anchorEl: anchor,
+    });
+
+    // The rich-text DOM is owned imperatively, so anchors cannot each be React
+    // ContextMenuTriggers. Relay this one claimed event to a hidden Radix
+    // trigger; non-anchor events above never reach this path and keep bubbling.
+    requestAnimationFrame(() => {
+      const {clientX, clientY} = linkMenuPointRef.current;
+      linkMenuTriggerRef.current?.dispatchEvent(
+        // React delegates contextmenu handlers at the root, so this relay must
+        // bubble far enough to reach Radix's Trigger listener. Radix then
+        // preventDefaults it before the enclosing block trigger can claim it.
+        new MouseEvent('contextmenu', {bubbles: true, cancelable: true, clientX, clientY}),
+      );
+    });
+  };
+
   return (
-    <div
-      ref={ref}
-      contentEditable={!editor.readOnly}
-      suppressContentEditableWarning
-      role="textbox"
-      aria-multiline="true"
-      aria-label={ariaLabelFor(type)}
-      data-block-text={id}
-      // No placeholder on a read-only surface: an empty block must not advertise
-      // "Type / for commands…" / "Heading" to a viewer who can't type.
-      data-placeholder={editor.readOnly ? undefined : type === 'paragraph' && (editor.focusedId === id || soleRootParagraph) ? 'Type “/” for commands…' : placeholder}
-      className={`obe-text obe-text-${type}`}
-      spellCheck={ui.spellcheck && !isCode}
-      onKeyDown={onKeyDown}
-      onCompositionStart={() => {
-        composing.current = true;
-      }}
-      onCompositionEnd={() => {
-        composing.current = false;
-        reconcileDom();
-      }}
-      onFocus={() => {
-        editor.setFocusedId(id);
-        editor.clearSelection();
-      }}
-      onBlur={() => {
-        if (editor.focusedId === id) editor.setFocusedId(null);
-        if (ui.slash.open && ui.slash.blockId === id) ui.closeSlash();
-        if (ui.mention.open && ui.mention.blockId === id) ui.closeMention();
-        if (ui.emoji.open && ui.emoji.blockId === id) ui.closeEmoji();
-      }}
-      onMouseUp={() => ui.scheduleToolbar()}
-      onKeyUp={(e) => {
-        if (e.shiftKey || ['Shift', 'Meta', 'Alt'].includes(e.key)) ui.scheduleToolbar();
-      }}
-    />
+    <>
+      <div
+        ref={ref}
+        contentEditable={!editor.readOnly}
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-label={ariaLabelFor(type)}
+        data-block-text={id}
+        // No placeholder on a read-only surface: an empty block must not advertise
+        // "Type / for commands…" / "Heading" to a viewer who can't type.
+        data-placeholder={editor.readOnly ? undefined : type === 'paragraph' && (editor.focusedId === id || soleRootParagraph) ? 'Type “/” for commands…' : placeholder}
+        className={`obe-text obe-text-${type}`}
+        spellCheck={ui.spellcheck && !isCode}
+        onKeyDown={onKeyDown}
+        onContextMenu={onLinkContextMenu}
+        onCompositionStart={() => {
+          composing.current = true;
+        }}
+        onCompositionEnd={() => {
+          composing.current = false;
+          reconcileDom();
+        }}
+        onFocus={() => {
+          editor.setFocusedId(id);
+          editor.clearSelection();
+        }}
+        onBlur={() => {
+          if (editor.focusedId === id) editor.setFocusedId(null);
+          if (ui.slash.open && ui.slash.blockId === id) ui.closeSlash();
+          if (ui.mention.open && ui.mention.blockId === id) ui.closeMention();
+          if (ui.emoji.open && ui.emoji.blockId === id) ui.closeEmoji();
+        }}
+        onMouseUp={() => ui.scheduleToolbar()}
+        onKeyUp={(e) => {
+          if (e.shiftKey || ['Shift', 'Meta', 'Alt'].includes(e.key)) ui.scheduleToolbar();
+        }}
+      />
+      <ContextMenu onOpenChange={(open) => !open && setLinkMenu(null)}>
+        <ContextMenuTrigger
+          ref={linkMenuTriggerRef}
+          aria-hidden
+          className="pointer-events-none fixed h-px w-px opacity-0"
+        />
+        {linkMenu && (
+          <ContextMenuContent className={MENU_WIDTH_LG}>
+            <ContextMenuItem onSelect={() => openInlineLink(linkMenu, 'tab')}>
+              <ExternalLink className="mr-2 h-3.5 w-3.5" /> {t('link.open')}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => openInlineLink(linkMenu, 'window')}>
+              <AppWindow className="mr-2 h-3.5 w-3.5" /> {t('menu.openWindow')}
+            </ContextMenuItem>
+            {linkMenu.kind === 'mention' && (
+              <ContextMenuItem onSelect={() => openInlineLink(linkMenu, 'split')}>
+                <Columns2 className="mr-2 h-3.5 w-3.5" /> {t('menu.openSplit')}
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onSelect={() =>
+                void copyText(linkMenu.kind === 'mention' ? pageLinkUrl(linkMenu.target) : linkMenu.target)
+              }
+            >
+              <Copy className="mr-2 h-3.5 w-3.5" /> {t('link.copyAddress')}
+            </ContextMenuItem>
+            {!editor.readOnly && (
+              <>
+                <ContextMenuItem onSelect={() => setLinkEdit(linkMenu)}>
+                  <Pencil className="mr-2 h-3.5 w-3.5" /> {t('link.edit')}
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => removeInlineLink(linkMenu)}>
+                  <Unlink className="mr-2 h-3.5 w-3.5" /> {t('link.remove')}
+                </ContextMenuItem>
+              </>
+            )}
+          </ContextMenuContent>
+        )}
+      </ContextMenu>
+      {linkEdit?.kind === 'mention' && (
+        <LinkPicker
+          kind="page"
+          anchorEl={linkEdit.anchorEl}
+          onClose={() => setLinkEdit(null)}
+          onPick={(result) => replaceMention(linkEdit, result)}
+        />
+      )}
+      {linkEdit?.kind === 'link' && (
+        <LinkUrlEditor
+          anchorEl={linkEdit.anchorEl}
+          href={linkEdit.editValue}
+          onClose={() => setLinkEdit(null)}
+          onSave={(href) => replaceExternalLink(linkEdit, href)}
+        />
+      )}
+    </>
   );
 };
 
@@ -700,6 +994,7 @@ function mergeNext(editor: BlockEditorController, id: string, nextId: string): b
   const here = findBlock(editor.doc, id);
   const next = findBlock(editor.doc, nextId);
   if (!here || !next || here.parent !== next.parent || next.index !== here.index + 1) return false;
+  if (blockChildren(next.block)?.length) return false;
   const target = blockText(here.block);
   const source = blockText(next.block);
   if (!target || !source) return false;

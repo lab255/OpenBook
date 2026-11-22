@@ -86,7 +86,7 @@ const instanceInfo = async (a: ReturnType<typeof appWithHatch>, headers: Record<
 const putInstance = (a: ReturnType<typeof appWithHatch>, body: unknown, headers: Record<string, string> = {}) =>
   a.request('/api/instance', {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json', ...headers},
+    headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...headers},
     body: JSON.stringify(body),
   });
 
@@ -220,12 +220,12 @@ describe('ownership repair (claim-once escape hatch)', () => {
 });
 
 describe('whole-workspace export/import is instance administration', () => {
-  const exportSpace = (a: ReturnType<typeof appWithHatch>, headers: Record<string, string> = {}) =>
+  const exportLibrary = (a: ReturnType<typeof appWithHatch>, headers: Record<string, string> = {}) =>
     a.request('/api/export', {headers});
 
   it('unclaimed: the legacy floor applies (anonymous local export still works)', async () => {
     const a = appWithHatch();
-    expect((await exportSpace(a)).status).toBe(200);
+    expect((await exportLibrary(a)).status).toBe(200);
   });
 
   describe('claimed', () => {
@@ -235,29 +235,29 @@ describe('whole-workspace export/import is instance administration', () => {
 
     it('the machine owner exports even signed-out (the post-upgrade lockout fix)', async () => {
       const a = appWithHatch();
-      expect((await exportSpace(a, local())).status).toBe(200);
+      expect((await exportLibrary(a, local())).status).toBe(200);
     });
 
     it('the owner JWS exports', async () => {
       const a = appWithHatch();
-      expect((await exportSpace(a, {[IDENTITY_HEADER]: await jws('owner')})).status).toBe(200);
+      expect((await exportLibrary(a, {[IDENTITY_HEADER]: await jws('owner')})).status).toBe(200);
     });
 
     it('an admin exports', async () => {
       await store.addMember({subject: `${ISS}#adm`, role: 'admin', status: 'active'});
       const a = appWithHatch();
-      expect((await exportSpace(a, {[IDENTITY_HEADER]: await jws('adm')})).status).toBe(200);
+      expect((await exportLibrary(a, {[IDENTITY_HEADER]: await jws('adm')})).status).toBe(200);
     });
 
     it('a viewer must NOT export the whole workspace', async () => {
       await store.addMember({subject: `${ISS}#view`, role: 'viewer', status: 'active'});
       const a = appWithHatch();
-      expect((await exportSpace(a, {[IDENTITY_HEADER]: await jws('view')})).status).toBe(403);
+      expect((await exportLibrary(a, {[IDENTITY_HEADER]: await jws('view')})).status).toBe(403);
     });
 
     it('a guest must NOT export', async () => {
       const a = appWithHatch();
-      expect((await exportSpace(a)).status).toBe(403);
+      expect((await exportLibrary(a)).status).toBe(403);
     });
 
     it('import rides the same gate (viewer 403, machine owner 200)', async () => {
@@ -265,7 +265,7 @@ describe('whole-workspace export/import is instance administration', () => {
       const a = appWithHatch();
       const bundle = JSON.stringify({pages: [], databases: []});
       const post = (headers: Record<string, string>) =>
-        a.request('/api/import', {method: 'POST', headers: {'Content-Type': 'application/json', ...headers}, body: bundle});
+        a.request('/api/import', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1', ...headers}, body: bundle});
       expect((await post({[IDENTITY_HEADER]: await jws('view')})).status).toBe(403);
       expect((await post(local())).status).toBe(200);
     });

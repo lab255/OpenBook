@@ -5,10 +5,24 @@ import {useData} from '@/data';
 import {useHud, useNavigation, useTranslation} from '@/providers';
 import {writePageIcon} from '@/lib/pageIcon';
 import type {TKey} from '@/i18n';
+import {suppressContextMenu} from '@/lib/suppressContextMenu';
 
 /** Template ids are kebab-case; i18n keys are camelCase under `templates.`. */
-const keyOf = (id: PageTemplate['id'], field: 'name' | 'description'): TKey =>
+const keyOf = (id: PageTemplate['id'], field: 'name' | 'description' | 'guidance'): TKey =>
   `templates.${id.replace(/-(\w)/g, (_, c: string) => c.toUpperCase())}.${field}` as TKey;
+
+/** i18n key for a template tag chip label (`templates.tag.<tag>`). */
+const tagKey = (tag: PageTemplate['tags'][number]): TKey => `templates.tag.${tag}` as TKey;
+
+/**
+ * Gallery sections, derived from a template's tags: anything not backed by a
+ * database (the block-doc artifacts) groups under "Interactive documents"; the
+ * database templates group under "Databases". Order here is the render order.
+ */
+const SECTIONS: {key: 'documents' | 'databases'; isMember: (template: PageTemplate) => boolean}[] = [
+  {key: 'documents', isMember: (template) => !template.tags.includes('database')},
+  {key: 'databases', isMember: (template) => template.tags.includes('database')},
+];
 
 /**
  * The template gallery: ready-made pages (documents and databases with sample
@@ -33,7 +47,13 @@ export function TemplateGallery() {
     if (busyId) return;
     setBusyId(template.id);
     try {
-      const page = await instantiateTemplate(client, template);
+      // Templates with a guidance callout get the user's locale text; the SDK's
+      // canonical English is only the fallback for non-gallery instantiation.
+      const page = await instantiateTemplate(
+        client,
+        template,
+        template.guidance === undefined ? undefined : {guidance: t(keyOf(template.id, 'guidance'))},
+      );
       writePageIcon(page.id, template.icon);
       selectPage(page.id);
       setOpen(false);
@@ -46,32 +66,57 @@ export function TemplateGallery() {
 
   return (
     <Dialog open={hud.templates.open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>{t('templates.title')}</DialogTitle>
           <DialogDescription>{t('templates.description')}</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {PAGE_TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              data-template={template.id}
-              disabled={busyId !== null}
-              onClick={() => void pick(template)}
-              className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-[background-color,border-color,box-shadow] hover:border-foreground/20 hover:shadow-lift active:shadow-none disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
-            >
-              <span aria-hidden className="text-2xl leading-none">
-                {template.icon}
-              </span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-sm font-medium">{t(keyOf(template.id, 'name'))}</span>
-                <span className="text-xs text-muted-foreground">
-                  {busyId === template.id ? t('templates.creating') : t(keyOf(template.id, 'description'))}
-                </span>
-              </span>
-            </button>
-          ))}
+        {/* -m-1 p-1 keeps the focus ring from clipping against the scrollport (all sides). */}
+        <div className="-m-1 max-h-[65vh] space-y-4 overflow-y-auto p-1">
+          {SECTIONS.map(({key, isMember}) => {
+            const members = PAGE_TEMPLATES.filter(isMember);
+            if (members.length === 0) return null;
+            return (
+              <section key={key} className="space-y-2">
+                <h3 className="text-xs font-medium text-muted-foreground">{t(`templates.section.${key}` as TKey)}</h3>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {members.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      data-template={template.id}
+                      disabled={busyId !== null}
+                      onClick={() => void pick(template)}
+                      onContextMenu={suppressContextMenu}
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-[background-color,border-color,box-shadow] hover:border-foreground/20 hover:shadow-lift active:shadow-none disabled:pointer-events-none disabled:opacity-60 focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
+                    >
+                      <span aria-hidden className="text-2xl leading-none">
+                        {template.icon}
+                      </span>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm font-medium">{t(keyOf(template.id, 'name'))}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {busyId === template.id ? t('templates.creating') : t(keyOf(template.id, 'description'))}
+                        </span>
+                        {template.tags.length > 0 && (
+                          <span className="mt-1 flex flex-wrap gap-1">
+                            {template.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground"
+                              >
+                                {t(tagKey(tag))}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       </DialogContent>
     </Dialog>

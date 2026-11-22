@@ -10,6 +10,8 @@
  *  - `{label: number, …}` (pie/bar/funnel) → labelled values
  */
 
+import {DATA_PALETTE, DEFAULT_DATA_COLOR_SCHEME, SERIES_ORDER, type DataColorScheme} from '@book.dev/sdk';
+
 export interface Series {
   name: string;
   values: number[];
@@ -87,11 +89,11 @@ export function extent(values: number[]): Extent {
 export const scale = (v: number, d: Extent, r0: number, r1: number): number => r0 + ((v - d.min) / (d.max - d.min)) * (r1 - r0);
 
 /** Polyline points attribute for one series across the plot area. */
-export function linePoints(values: number[], d: Extent, w: number, h: number, pad: number): string {
+export function linePoints(values: number[], d: Extent, w: number, h: number, pad: number, padLeft = pad): string {
   const n = values.length;
   return values
     .map((v, i) => {
-      const x = n === 1 ? w / 2 : pad + (i / (n - 1)) * (w - pad * 2);
+      const x = n === 1 ? (padLeft + w - pad) / 2 : padLeft + (i / (n - 1)) * (w - padLeft - pad);
       const y = scale(v, d, h - pad, pad);
       return `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`;
     })
@@ -160,5 +162,30 @@ export function ticks(d: Extent, count = 3): number[] {
   return out;
 }
 
-/** The kit palette — readable on both themes, in series order. */
-export const PALETTE = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#14b8a6'];
+/**
+ * A compact y-axis tick label: `25000 → "25k"`, `1_500_000 → "1.5M"`, small
+ * values unchanged. The axis labels are `text-anchor:end` at the left gutter, so
+ * a raw 5–6 digit value's left edge ran past the viewBox origin and CLIPPED;
+ * abbreviating keeps every tick inside the plot (and reads cleaner) without
+ * moving any plotted geometry. Mirrored by `kitTick` in the export runtime.
+ */
+export const axisTickLabel = (n: number): string => {
+  const trim = (x: number): string => String(Math.round(x * 10) / 10);
+  const abs = Math.abs(n);
+  if (abs >= 1e6) return `${trim(n / 1e6)}M`;
+  if (abs >= 1e3) return `${trim(n / 1e3)}k`;
+  return trim(n);
+};
+
+/**
+ * The kit chart palette for a scheme: the canonical data-colour `SERIES_ORDER`
+ * resolved to concrete fills — one source shared with the database charts and
+ * the export runtime (OB-378). Concrete hex (not a `var()`) because the charts
+ * paint via the SVG `fill` presentation attribute. The kit chart block passes
+ * the active scheme from {@link useDataScheme} so it recolours live (OB-379).
+ */
+export const paletteFor = (scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME): string[] =>
+  SERIES_ORDER.map((t) => DATA_PALETTE[scheme][t].fill);
+
+/** The default (pastel) kit chart palette — provider-less / test convenience. */
+export const PALETTE = paletteFor(DEFAULT_DATA_COLOR_SCHEME);

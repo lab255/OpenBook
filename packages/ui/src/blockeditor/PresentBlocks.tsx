@@ -1,7 +1,7 @@
 import React, {useMemo} from 'react';
 import * as Y from 'yjs';
 import {BlockRow, type EditorUI, type RowShared} from './BlockEditor';
-import {KitLockContext} from './kit/lock';
+import {KitLockContext, KitPageLockContext} from './kit/lock';
 import {useBlockEditor} from './useBlockEditor';
 import {blockId, type BlockMap} from './model';
 
@@ -12,6 +12,7 @@ const CLOSED: EditorUI['slash'] = {open: false, blockId: '', anchorOffset: 0, qu
 const READONLY_UI: EditorUI = {
   slash: CLOSED,
   mention: CLOSED,
+  wiki: CLOSED,
   emoji: CLOSED,
   spellcheck: false,
   openSlash() {},
@@ -22,6 +23,10 @@ const READONLY_UI: EditorUI = {
   updateMention() {},
   closeMention() {},
   mentionKey() {},
+  openWiki() {},
+  updateWiki() {},
+  closeWiki() {},
+  wikiKey() {},
   openEmoji() {},
   updateEmoji() {},
   closeEmoji() {},
@@ -38,9 +43,9 @@ const READONLY_UI: EditorUI = {
  * It reuses the editor's {@link BlockRow} (every block type, widgets, reactivity)
  * inside a locked {@link KitLockContext}: `BlockBody` makes text and structure
  * read-only while widgets carrying `interactive` (the default) stay live.
- * Reactivity is doc-global (`computeScope` reads the doc), so charts and formulas
- * track widget changes across the whole deck. Editing chrome (gutters, the kit
- * gear, slash) is hidden by `.ob-present` CSS.
+ * Reactivity is doc-global (the evaluation cache snapshots the whole doc), so
+ * charts and formulas track widget changes across the whole deck. Editing
+ * chrome (gutters, the kit gear, slash) is hidden by `.ob-present` CSS.
  */
 export const PresentBlocks: React.FC<{doc: Y.Doc; blocks: BlockMap[]; className?: string}> = ({
   doc,
@@ -62,13 +67,15 @@ export const PresentBlocks: React.FC<{doc: Y.Doc; blocks: BlockMap[]; className?
     [editor],
   );
   return (
-    <KitLockContext.Provider value={{locked: true}}>
-      <div className={['obe-present-blocks', className].filter(Boolean).join(' ')}>
-        {blocks.map((b) => (
-          <BlockRow key={blockId(b)} block={b} {...shared} />
-        ))}
-      </div>
-    </KitLockContext.Provider>
+    <KitPageLockContext.Provider value>
+      <KitLockContext.Provider value={{locked: true}}>
+        <div className={['obe-present-blocks', className].filter(Boolean).join(' ')}>
+          {blocks.map((b) => (
+            <BlockRow key={blockId(b)} block={b} {...shared} />
+          ))}
+        </div>
+      </KitLockContext.Provider>
+    </KitPageLockContext.Provider>
   );
 };
 

@@ -1,0 +1,1614 @@
+[
+  {
+    "mode": "all",
+    "zoom": 1,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 37,
+      "pixels": 351,
+      "bounds": {
+        "minX": 52,
+        "minY": 50,
+        "maxX": 130,
+        "maxY": 99
+      },
+      "examples": [
+        {
+          "x": 69,
+          "y": 99,
+          "actual": [
+            224,
+            229,
+            236,
+            179
+          ],
+          "reference": [
+            189,
+            193,
+            199,
+            188
+          ]
+        },
+        {
+          "x": 94,
+          "y": 99,
+          "actual": [
+            224,
+            229,
+            236,
+            179
+          ],
+          "reference": [
+            189,
+            193,
+            199,
+            188
+          ]
+        }
+      ]
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 8,
+      "pixels": 117,
+      "bounds": {
+        "minX": 80,
+        "minY": 73,
+        "maxX": 117,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 105,
+          "y": 110,
+          "actual": [
+            0,
+            0,
+            0,
+            145
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            137
+          ]
+        },
+        {
+          "x": 105,
+          "y": 111,
+          "actual": [
+            0,
+            0,
+            0,
+            30
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            22
+          ]
+        },
+        {
+          "x": 107,
+          "y": 113,
+          "actual": [
+            0,
+            0,
+            0,
+            145
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            137
+          ]
+        },
+        {
+          "x": 107,
+          "y": 114,
+          "actual": [
+            0,
+            0,
+            0,
+            30
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            22
+          ]
+        },
+        {
+          "x": 109,
+          "y": 116,
+          "actual": [
+            0,
+            0,
+            0,
+            145
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            137
+          ]
+        },
+        {
+          "x": 109,
+          "y": 117,
+          "actual": [
+            0,
+            0,
+            0,
+            30
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            22
+          ]
+        },
+        {
+          "x": 110,
+          "y": 118,
+          "actual": [
+            0,
+            0,
+            0,
+            86
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            78
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "all",
+    "zoom": 1.25,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 45,
+      "pixels": 148,
+      "bounds": {
+        "minX": 63,
+        "minY": 61,
+        "maxX": 160,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 132,
+          "y": 120,
+          "actual": [
+            0,
+            0,
+            0,
+            131
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            86
+          ]
+        }
+      ]
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 45,
+      "pixels": 148,
+      "bounds": {
+        "minX": 63,
+        "minY": 61,
+        "maxX": 160,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 132,
+          "y": 120,
+          "actual": [
+            0,
+            0,
+            0,
+            131
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            86
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "all",
+    "zoom": 2,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 39,
+      "pixels": 573,
+      "bounds": {
+        "minX": 94,
+        "minY": 95,
+        "maxX": 249,
+        "maxY": 191
+      },
+      "examples": [
+        {
+          "x": 104,
+          "y": 184,
+          "actual": [
+            111,
+            114,
+            117,
+            211
+          ],
+          "reference": [
+            149,
+            152,
+            156,
+            199
+          ]
+        }
+      ]
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 47,
+      "pixels": 231,
+      "bounds": {
+        "minX": 74,
+        "minY": 78,
+        "maxX": 177,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 169,
+          "y": 85,
+          "actual": [
+            177,
+            183,
+            188,
+            236
+          ],
+          "reference": [
+            222,
+            229,
+            235,
+            232
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "rect",
+    "zoom": 1,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "rect",
+    "zoom": 1.25,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "rect",
+    "zoom": 2,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "ellipse",
+    "zoom": 1,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 31,
+      "pixels": 81,
+      "bounds": {
+        "minX": 71,
+        "minY": 37,
+        "maxX": 128,
+        "maxY": 44
+      },
+      "examples": [
+        {
+          "x": 75,
+          "y": 39,
+          "actual": [
+            0,
+            0,
+            0,
+            65
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            96
+          ]
+        },
+        {
+          "x": 124,
+          "y": 39,
+          "actual": [
+            0,
+            0,
+            0,
+            62
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            93
+          ]
+        },
+        {
+          "x": 76,
+          "y": 42,
+          "actual": [
+            136,
+            138,
+            143,
+            203
+          ],
+          "reference": [
+            106,
+            109,
+            112,
+            212
+          ]
+        },
+        {
+          "x": 123,
+          "y": 42,
+          "actual": [
+            132,
+            135,
+            140,
+            204
+          ],
+          "reference": [
+            103,
+            107,
+            109,
+            213
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "ellipse",
+    "zoom": 1.25,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "ellipse",
+    "zoom": 2,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 70,
+      "pixels": 211,
+      "bounds": {
+        "minX": 107,
+        "minY": 62,
+        "maxX": 177,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 174,
+          "y": 69,
+          "actual": [
+            157,
+            161,
+            164,
+            197
+          ],
+          "reference": [
+            221,
+            227,
+            234,
+            180
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "arrow",
+    "zoom": 1,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 11,
+      "pixels": 222,
+      "bounds": {
+        "minX": 60,
+        "minY": 37,
+        "maxX": 141,
+        "maxY": 95
+      },
+      "examples": [
+        {
+          "x": 141,
+          "y": 95,
+          "actual": [
+            0,
+            0,
+            0,
+            121
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            110
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "arrow",
+    "zoom": 1.25,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "arrow",
+    "zoom": 2,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 16,
+      "pixels": 222,
+      "bounds": {
+        "minX": 106,
+        "minY": 63,
+        "maxX": 177,
+        "maxY": 119
+      },
+      "examples": [
+        {
+          "x": 174,
+          "y": 109,
+          "actual": [
+            0,
+            0,
+            0,
+            68
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            84
+          ]
+        },
+        {
+          "x": 169,
+          "y": 113,
+          "actual": [
+            0,
+            0,
+            0,
+            69
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            85
+          ]
+        },
+        {
+          "x": 173,
+          "y": 116,
+          "actual": [
+            0,
+            0,
+            0,
+            69
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            85
+          ]
+        },
+        {
+          "x": 177,
+          "y": 119,
+          "actual": [
+            0,
+            0,
+            0,
+            69
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            85
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "text",
+    "zoom": 1,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "text",
+    "zoom": 1.25,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "text",
+    "zoom": 2,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    }
+  },
+  {
+    "mode": "stroke",
+    "zoom": 1,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 11,
+      "pixels": 203,
+      "bounds": {
+        "minX": 59,
+        "minY": 37,
+        "maxX": 119,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 63,
+          "y": 37,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 60,
+          "y": 38,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 65,
+          "y": 40,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 62,
+          "y": 41,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 67,
+          "y": 43,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 64,
+          "y": 44,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 69,
+          "y": 46,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 66,
+          "y": 47,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 71,
+          "y": 49,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 68,
+          "y": 50,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 73,
+          "y": 52,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        },
+        {
+          "x": 70,
+          "y": 53,
+          "actual": [
+            0,
+            0,
+            0,
+            84
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            73
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "stroke",
+    "zoom": 1.25,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 5,
+      "pixels": 105,
+      "bounds": {
+        "minX": 75,
+        "minY": 50,
+        "maxX": 128,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 88,
+          "y": 69,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 90,
+          "y": 72,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 92,
+          "y": 75,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 94,
+          "y": 78,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 96,
+          "y": 81,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 98,
+          "y": 84,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 100,
+          "y": 87,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 102,
+          "y": 90,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 106,
+          "y": 90,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 104,
+          "y": 93,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 108,
+          "y": 93,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        },
+        {
+          "x": 106,
+          "y": 96,
+          "actual": [
+            0,
+            0,
+            0,
+            137
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            132
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "mode": "stroke",
+    "zoom": 2,
+    "dpr": 1,
+    "dimensions": {
+      "layer": [
+        300,
+        240
+      ],
+      "main": [
+        300,
+        240
+      ]
+    },
+    "partialVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "compositeVsLayer": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "fullCacheVsReference": {
+      "maximum": 0,
+      "pixels": 0,
+      "bounds": null,
+      "examples": []
+    },
+    "freshClippedVsCroppedReference": {
+      "maximum": 12,
+      "pixels": 66,
+      "bounds": {
+        "minX": 116,
+        "minY": 70,
+        "maxX": 152,
+        "maxY": 122
+      },
+      "examples": [
+        {
+          "x": 142,
+          "y": 108,
+          "actual": [
+            0,
+            0,
+            0,
+            106
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            118
+          ]
+        },
+        {
+          "x": 144,
+          "y": 111,
+          "actual": [
+            0,
+            0,
+            0,
+            106
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            118
+          ]
+        },
+        {
+          "x": 146,
+          "y": 114,
+          "actual": [
+            0,
+            0,
+            0,
+            106
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            118
+          ]
+        },
+        {
+          "x": 148,
+          "y": 117,
+          "actual": [
+            0,
+            0,
+            0,
+            106
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            118
+          ]
+        },
+        {
+          "x": 150,
+          "y": 120,
+          "actual": [
+            0,
+            0,
+            0,
+            106
+          ],
+          "reference": [
+            0,
+            0,
+            0,
+            118
+          ]
+        }
+      ]
+    }
+  }
+]

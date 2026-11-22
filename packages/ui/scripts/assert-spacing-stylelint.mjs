@@ -1,0 +1,90 @@
+import {fileURLToPath} from 'node:url';
+import stylelint from 'stylelint';
+import config from '../stylelint.config.mjs';
+
+const codeFilename = fileURLToPath(new URL('../src/index.css', import.meta.url));
+const rule = 'declaration-property-value-allowed-list';
+
+async function warningsFor(code) {
+  const result = await stylelint.lint({code, codeFilename, config});
+  return result.results.flatMap(({warnings}) => warnings);
+}
+
+async function assertAllowed(declaration) {
+  const warnings = await warningsFor(`.spc2-positive-control { ${declaration}; }`);
+  if (warnings.length !== 0) {
+    throw new Error(`SPC-2 stylelint positive control failed for ${declaration}: ${JSON.stringify(warnings)}`);
+  }
+}
+
+async function assertRejected(declaration) {
+  const warnings = await warningsFor(`.spc2-negative-control { ${declaration}; }`);
+  if (!warnings.some((warning) => warning.severity === 'error' && [rule, 'design-tokens/role-values'].includes(warning.rule))) {
+    throw new Error(`SPC-2 stylelint negative control did not reject ${declaration}`);
+  }
+}
+
+await assertAllowed('padding: 4px');
+await assertAllowed('padding: calc(var(--x) + 4px)');
+
+await assertRejected('padding: 3px');
+await assertRejected('padding: calc(7px + var(--x))');
+await assertRejected('border-radius: calc(var(--radius) + 3px)');
+await assertRejected('PADDING: 7PX');
+
+console.log('SPC-2 stylelint controls passed (2 positive, 4 negative)');
+
+// DSX guards: token declarations and semantic colours remain legal.
+for (const value of [
+  'transition: color var(--motion-fast) var(--ease-out-soft)',
+  'transition-duration: 0s', 'animation-timing-function: linear',
+  'color: hsl(var(--foreground) / 0.6)', 'border-radius: var(--radius-lg)',
+  'z-index: var(--z-index-menu)', 'font-size: var(--obe-small-size)',
+  'font-size: .875em', 'font-size: 1em', '--motion-fast: 120ms', '--obe-code-num: hsl(28 80% 38%)',
+]) {
+  const warnings = await warningsFor(`:root { --ease-out-soft: linear; --radius-lg: 8px; } .obe-control { ${value}; }`);
+  if (warnings.length) throw new Error(`DSX allowed ${value}: ${JSON.stringify(warnings)}`);
+}
+for (const value of [
+  'transition: color 120ms ease', 'transition-duration: 0ms', 'animation: enter .2s ease-out',
+  'transition-timing-function: cubic-bezier(0, 0, 1, 1)',
+  'color: #abcdef', 'border: 1px solid rgb(1 2 3)',
+  'font-size: 14px',
+]) {
+  const warnings = await warningsFor(`:root { --ease-out-soft: linear; --radius-lg: 8px; } .obe-control { ${value}; }`);
+  if (!warnings.length || warnings.some(w => w.severity !== 'warning')) throw new Error(`DSX warn guard missed ${value}`);
+}
+for (const value of ['border-radius: 4px', 'border-radius: var(--anything)', 'z-index: 4']) {
+  const warnings = await warningsFor(`:root { --ease-out-soft: linear; --radius-lg: 8px; } .obe-control { ${value}; }`);
+  if (!warnings.length || warnings.some(w => w.severity !== 'error')) throw new Error(`DSX error guard missed ${value}`);
+}
+const {readFileSync} = await import('node:fs');
+const css = readFileSync(codeFilename, 'utf8');
+const reducedBlocks = css.match(/@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\n\}/g) ?? [];
+if (reducedBlocks.length !== 2 || !reducedBlocks[0].includes('0.01ms !important') || !reducedBlocks[1].includes('.obe-rcursor-label { animation: none; opacity: 1; }')) {
+  throw new Error('Reduced motion must use only the global switch and remote cursor end-state exception');
+}
+console.log('DSX stylelint controls passed');
+
+// FF-1: conservative G1 export boundary, including nested rules and aliases.
+const parityRule = 'design-tokens/export-parity';
+const parityControls = [
+  [false, '.obe-text { color: var(--foreground); }'],
+  [false, ':root { --radius-lg: 8px; } @theme { --radius-lg: 8px; } .obe-text { border-radius: var(--radius-lg); }'],
+  [false, '.chrome { color: var(--color-red-500); @apply flex; }'],
+  [true, '.obe-text { color: var(--color-red-500); }'],
+  [true, '.obe-text { transform: translateX(var(--tw-translate-x)); }'],
+  [true, '.obe-text { --local: var(--spacing); }'],
+  [true, '.obe-text { @media (width > 1px) { &:hover { color: var(--color-red-500); } } }'],
+  [true, '@theme { --custom-theme: 1; } .obe-text { opacity: var(--custom-theme); }'],
+  [true, ':root { --alias: var(--color-red-500); } .obe-text { color: var(--alias); }'],
+  [true, '.obe-text { color: var(--foreground, var(--color-red-500)); }'],
+  [true, '.obe-text { @apply text-red-500; }'],
+];
+for (const [reject, code] of parityControls) {
+  const warnings = await warningsFor(code);
+  if (warnings.some(w => w.rule === parityRule && w.severity === 'error') !== reject) {
+    throw new Error(`FF-1 export parity control failed: ${code}`);
+  }
+}
+console.log('FF-1 export parity controls passed (3 positive, 8 negative)');

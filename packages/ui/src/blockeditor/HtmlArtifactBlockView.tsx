@@ -202,17 +202,6 @@ export const HtmlArtifactBlockView: React.FC<{block: BlockMap; editor: BlockEdit
         spellCheck
         onChange={(e) => set('title', e.target.value || undefined)}
       />
-      {assetId && (
-        <button
-          type="button"
-          className="obe-artifact-tool"
-          aria-label={t('blocks.artifact.replace')}
-          title={t('blocks.artifact.replace')}
-          onClick={pickFile}
-        >
-          <Upload className="h-3.5 w-3.5" />
-        </button>
-      )}
     </div>
   ) : (
     title && (
@@ -281,6 +270,7 @@ export const HtmlArtifactBlockView: React.FC<{block: BlockMap; editor: BlockEdit
       {titleBar}
       <div className="obe-artifact-frame">
         <SandboxedHtml
+          className="rounded-lg"
           html={html ?? ''}
           height={height}
           title={title || t('blocks.artifact.fallbackTitle')}
@@ -290,17 +280,32 @@ export const HtmlArtifactBlockView: React.FC<{block: BlockMap; editor: BlockEdit
         {/* Run full-window: hover chrome, but a VIEWING affordance — offered
             to readers/present mode too (only obe-artifact-tool/resize are
             authoring chrome). Overlay state contract: see ArtifactOverlay. */}
-        {html !== null && (
-          <button
-            type="button"
-            className="obe-artifact-expand"
-            aria-label={t('blocks.artifact.expand')}
-            title={t('blocks.artifact.expand')}
-            onClick={() => setExpanded(true)}
-          >
-            <Maximize2 className="h-3.5 w-3.5" aria-hidden />
-          </button>
-        )}
+        <div className="obe-media-bar" data-surface="media" contentEditable={false}>
+          {html !== null && (
+            <button
+              type="button"
+              className="obe-media-btn obe-artifact-expand"
+              data-chrome="view"
+              aria-label={t('blocks.artifact.expand')}
+              title={t('blocks.artifact.expand')}
+              onClick={() => setExpanded(true)}
+            >
+              <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          )}
+          {chrome && assetId && (
+            <button
+              type="button"
+              className="obe-media-btn obe-artifact-tool"
+              data-chrome="author"
+              aria-label={t('blocks.artifact.replace')}
+              title={t('blocks.artifact.replace')}
+              onClick={pickFile}
+            >
+              <Upload className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         {chrome && (
           <button
             type="button"

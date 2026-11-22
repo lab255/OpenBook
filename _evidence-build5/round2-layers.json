@@ -1,0 +1,1013 @@
+{
+  "scope": "Real production Next app + isolated data server; native hit testing at 1280x800 and 1024x640 light/dark, inline mirror1280x1400, too-tall1024x240. No screenshots/trace/video.",
+  "rows": [
+    {
+      "phase": "before any canvas mounts",
+      "noCanvas": 0,
+      "profileTarget": {
+        "name": "AAnonymous",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 12,
+          "y": 758,
+          "width": 232,
+          "height": 36,
+          "top": 758,
+          "right": 244,
+          "bottom": 794,
+          "left": 12
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "tools": [
+        {
+          "name": "Select (V)",
+          "hittable": true
+        },
+        {
+          "name": "Pen (P)",
+          "hittable": true
+        },
+        {
+          "name": "Rectangle (R)",
+          "hittable": true
+        },
+        {
+          "name": "Ellipse (O)",
+          "hittable": true
+        },
+        {
+          "name": "Arrow (A)",
+          "hittable": true
+        },
+        {
+          "name": "Text (T)",
+          "hittable": true
+        },
+        {
+          "name": "Erase (E)",
+          "hittable": true
+        },
+        {
+          "name": "Pan (H)",
+          "hittable": true
+        }
+      ],
+      "back": {
+        "name": "Back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 8,
+          "width": 72.703125,
+          "height": 28,
+          "top": 8,
+          "right": 88.703125,
+          "bottom": 36,
+          "left": 16
+        }
+      },
+      "title": {
+        "name": "BUILD-5 layers",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 104.703125,
+          "y": 10.796875,
+          "width": 114.703125,
+          "height": 22.390625,
+          "top": 10.796875,
+          "right": 219.40625,
+          "bottom": 33.1875,
+          "left": 104.703125
+        }
+      },
+      "sidebarRight": 256
+    },
+    {
+      "theme": "light",
+      "vw": 1280,
+      "vh": 800,
+      "arrange": {
+        "name": "Send to back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 628,
+          "width": 119.109375,
+          "height": 28,
+          "top": 628,
+          "right": 135.109375,
+          "bottom": 656,
+          "left": 16
+        }
+      },
+      "menu": {
+        "rect": {
+          "x": 8,
+          "y": 620,
+          "width": 135.109375,
+          "height": 140,
+          "top": 620,
+          "right": 143.109375,
+          "bottom": 760,
+          "left": 8
+        },
+        "within": true
+      }
+    },
+    {
+      "theme": "light",
+      "vw": 1280,
+      "vh": 800,
+      "name": "Objects",
+      "menu": {
+        "rect": {
+          "x": 85.3125,
+          "y": 684.40625,
+          "width": 200,
+          "height": 75.59375,
+          "top": 684.40625,
+          "right": 285.3125,
+          "bottom": 760,
+          "left": 85.3125
+        },
+        "within": true,
+        "placement": "above"
+      },
+      "first": {
+        "name": "Rectangle 1",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 93.3125,
+          "y": 692.40625,
+          "width": 184,
+          "height": 31.59375,
+          "top": 692.40625,
+          "right": 277.3125,
+          "bottom": 724,
+          "left": 93.3125
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "vw": 1280,
+      "vh": 800,
+      "name": "Help (?)",
+      "menu": {
+        "rect": {
+          "x": 852,
+          "y": 80,
+          "width": 420,
+          "height": 485.875,
+          "top": 80,
+          "right": 1272,
+          "bottom": 565.875,
+          "left": 852
+        },
+        "within": true,
+        "placement": "below"
+      },
+      "first": {
+        "name": "Close help",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 860,
+          "y": 529.875,
+          "width": 85.90625,
+          "height": 28,
+          "top": 529.875,
+          "right": 945.90625,
+          "bottom": 557.875,
+          "left": 860
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "palette": {
+        "name": "",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 429.29998779296875,
+          "y": 170.19000244140625,
+          "width": 448.84002685546875,
+          "height": 47.03999328613281,
+          "top": 170.19000244140625,
+          "right": 878.1400146484375,
+          "bottom": 217.22999572753906,
+          "left": 429.29998779296875
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "dialog": {
+        "name": "SettingsApplication settingsSettingsPreferencesGeneralAppearanceShortcutsAccountProfileAccount & syncLibrarySharing & publishingAIExtensionsBackups & dataAdvancedLibraries & serversAgents & AI adminDiagnosticsAAnonymousGeneralThis deviceLanguage and how the app behaves.LanguageDisplay language for the app.LanguageEnglishBehaviorConfirm before trashing pagesAsk before moving a page to the trash.Spellcheck while typingUnderline misspelled words in the editor.Danger zoneThese actions affect this device’s local data, not your pages.Reset preferences & layoutRestore default appearance, language, and layout on this device. Your pages and libraries are kept.Reset",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "50",
+        "rect": {
+          "x": 224.73268127441406,
+          "y": 110.27861785888672,
+          "width": 830.53466796875,
+          "height": 579.4427490234375,
+          "top": 110.27861785888672,
+          "right": 1055.267349243164,
+          "bottom": 689.7213668823242,
+          "left": 224.73268127441406
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "tools": [
+        {
+          "name": "Select (V)",
+          "hittable": true
+        },
+        {
+          "name": "Pen (P)",
+          "hittable": true
+        },
+        {
+          "name": "Rectangle (R)",
+          "hittable": true
+        },
+        {
+          "name": "Ellipse (O)",
+          "hittable": true
+        },
+        {
+          "name": "Arrow (A)",
+          "hittable": true
+        },
+        {
+          "name": "Text (T)",
+          "hittable": true
+        },
+        {
+          "name": "Erase (E)",
+          "hittable": true
+        },
+        {
+          "name": "Pan (H)",
+          "hittable": true
+        }
+      ],
+      "back": {
+        "name": "Back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 8,
+          "width": 72.703125,
+          "height": 28,
+          "top": 8,
+          "right": 88.703125,
+          "bottom": 36,
+          "left": 16
+        }
+      },
+      "title": {
+        "name": "BUILD-5 layers",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 104.703125,
+          "y": 10.796875,
+          "width": 114.703125,
+          "height": 22.390625,
+          "top": 10.796875,
+          "right": 219.40625,
+          "bottom": 33.1875,
+          "left": 104.703125
+        }
+      },
+      "sidebarRight": 256
+    },
+    {
+      "theme": "dark",
+      "vw": 1280,
+      "vh": 800,
+      "arrange": {
+        "name": "Send to back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 628,
+          "width": 119.109375,
+          "height": 28,
+          "top": 628,
+          "right": 135.109375,
+          "bottom": 656,
+          "left": 16
+        }
+      },
+      "menu": {
+        "rect": {
+          "x": 8,
+          "y": 620,
+          "width": 135.109375,
+          "height": 140,
+          "top": 620,
+          "right": 143.109375,
+          "bottom": 760,
+          "left": 8
+        },
+        "within": true
+      }
+    },
+    {
+      "theme": "dark",
+      "vw": 1280,
+      "vh": 800,
+      "name": "Objects",
+      "menu": {
+        "rect": {
+          "x": 85.3125,
+          "y": 652.8125,
+          "width": 200,
+          "height": 107.1875,
+          "top": 652.8125,
+          "right": 285.3125,
+          "bottom": 760,
+          "left": 85.3125
+        },
+        "within": true,
+        "placement": "above"
+      },
+      "first": {
+        "name": "Rectangle 1",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 93.3125,
+          "y": 660.8125,
+          "width": 184,
+          "height": 31.59375,
+          "top": 660.8125,
+          "right": 277.3125,
+          "bottom": 692.40625,
+          "left": 93.3125
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "vw": 1280,
+      "vh": 800,
+      "name": "Help (?)",
+      "menu": {
+        "rect": {
+          "x": 852,
+          "y": 80,
+          "width": 420,
+          "height": 485.875,
+          "top": 80,
+          "right": 1272,
+          "bottom": 565.875,
+          "left": 852
+        },
+        "within": true,
+        "placement": "below"
+      },
+      "first": {
+        "name": "Close help",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 860,
+          "y": 529.875,
+          "width": 85.90625,
+          "height": 28,
+          "top": 529.875,
+          "right": 945.90625,
+          "bottom": 557.875,
+          "left": 860
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "palette": {
+        "name": "",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 429.29998779296875,
+          "y": 170.19000244140625,
+          "width": 448.84002685546875,
+          "height": 47.03999328613281,
+          "top": 170.19000244140625,
+          "right": 878.1400146484375,
+          "bottom": 217.22999572753906,
+          "left": 429.29998779296875
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "dialog": {
+        "name": "SettingsApplication settingsSettingsPreferencesGeneralAppearanceShortcutsAccountProfileAccount & syncLibrarySharing & publishingAIExtensionsBackups & dataAdvancedLibraries & serversAgents & AI adminDiagnosticsAAnonymousGeneralThis deviceLanguage and how the app behaves.LanguageDisplay language for the app.LanguageEnglishBehaviorConfirm before trashing pagesAsk before moving a page to the trash.Spellcheck while typingUnderline misspelled words in the editor.Danger zoneThese actions affect this device’s local data, not your pages.Reset preferences & layoutRestore default appearance, language, and layout on this device. Your pages and libraries are kept.Reset",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "50",
+        "rect": {
+          "x": 231.5,
+          "y": 115,
+          "width": 817,
+          "height": 570,
+          "top": 115,
+          "right": 1048.5,
+          "bottom": 685,
+          "left": 231.5
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "tools": [
+        {
+          "name": "Select (V)",
+          "hittable": true
+        },
+        {
+          "name": "Pen (P)",
+          "hittable": true
+        },
+        {
+          "name": "Rectangle (R)",
+          "hittable": true
+        },
+        {
+          "name": "Ellipse (O)",
+          "hittable": true
+        },
+        {
+          "name": "Arrow (A)",
+          "hittable": true
+        },
+        {
+          "name": "Text (T)",
+          "hittable": true
+        },
+        {
+          "name": "Erase (E)",
+          "hittable": true
+        },
+        {
+          "name": "Pan (H)",
+          "hittable": true
+        }
+      ],
+      "back": {
+        "name": "Back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 8,
+          "width": 72.703125,
+          "height": 28,
+          "top": 8,
+          "right": 88.703125,
+          "bottom": 36,
+          "left": 16
+        }
+      },
+      "title": {
+        "name": "BUILD-5 layers",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 104.703125,
+          "y": 10.796875,
+          "width": 114.703125,
+          "height": 22.390625,
+          "top": 10.796875,
+          "right": 219.40625,
+          "bottom": 33.1875,
+          "left": 104.703125
+        }
+      },
+      "sidebarRight": 256
+    },
+    {
+      "theme": "light",
+      "vw": 1024,
+      "vh": 640,
+      "arrange": {
+        "name": "Send to back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 468,
+          "width": 119.109375,
+          "height": 28,
+          "top": 468,
+          "right": 135.109375,
+          "bottom": 496,
+          "left": 16
+        }
+      },
+      "menu": {
+        "rect": {
+          "x": 8,
+          "y": 460,
+          "width": 135.109375,
+          "height": 140,
+          "top": 460,
+          "right": 143.109375,
+          "bottom": 600,
+          "left": 8
+        },
+        "within": true
+      }
+    },
+    {
+      "theme": "light",
+      "vw": 1024,
+      "vh": 640,
+      "name": "Objects",
+      "menu": {
+        "rect": {
+          "x": 85.3125,
+          "y": 461.21875,
+          "width": 200,
+          "height": 138.78125,
+          "top": 461.21875,
+          "right": 285.3125,
+          "bottom": 600,
+          "left": 85.3125
+        },
+        "within": true,
+        "placement": "above"
+      },
+      "first": {
+        "name": "Rectangle 1",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 93.3125,
+          "y": 469.21875,
+          "width": 184,
+          "height": 31.59375,
+          "top": 469.21875,
+          "right": 277.3125,
+          "bottom": 500.8125,
+          "left": 93.3125
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "vw": 1024,
+      "vh": 640,
+      "name": "Help (?)",
+      "menu": {
+        "rect": {
+          "x": 596,
+          "y": 80,
+          "width": 420,
+          "height": 485.875,
+          "top": 80,
+          "right": 1016,
+          "bottom": 565.875,
+          "left": 596
+        },
+        "within": true,
+        "placement": "below"
+      },
+      "first": {
+        "name": "Close help",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 604,
+          "y": 529.875,
+          "width": 85.90625,
+          "height": 28,
+          "top": 529.875,
+          "right": 689.90625,
+          "bottom": 557.875,
+          "left": 604
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "palette": {
+        "name": "",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 301.29998779296875,
+          "y": 107.82999420166016,
+          "width": 448.84002685546875,
+          "height": 47.040000915527344,
+          "top": 107.82999420166016,
+          "right": 750.1400146484375,
+          "bottom": 154.8699951171875,
+          "left": 301.29998779296875
+        }
+      }
+    },
+    {
+      "theme": "light",
+      "dialog": {
+        "name": "SettingsApplication settingsSettingsPreferencesGeneralAppearanceShortcutsAccountProfileAccount & syncLibrarySharing & publishingAIExtensionsBackups & dataAdvancedLibraries & serversAgents & AI adminDiagnosticsAAnonymousGeneralThis deviceLanguage and how the app behaves.LanguageDisplay language for the app.LanguageEnglishBehaviorConfirm before trashing pagesAsk before moving a page to the trash.Spellcheck while typingUnderline misspelled words in the editor.Danger zoneThese actions affect this device’s local data, not your pages.Reset preferences & layoutRestore default appearance, language, and layout on this device. Your pages and libraries are kept.Reset",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "50",
+        "rect": {
+          "x": 103.50000762939453,
+          "y": 61.60000228881836,
+          "width": 817,
+          "height": 516.800048828125,
+          "top": 61.60000228881836,
+          "right": 920.5000076293945,
+          "bottom": 578.4000511169434,
+          "left": 103.50000762939453
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "tools": [
+        {
+          "name": "Select (V)",
+          "hittable": true
+        },
+        {
+          "name": "Pen (P)",
+          "hittable": true
+        },
+        {
+          "name": "Rectangle (R)",
+          "hittable": true
+        },
+        {
+          "name": "Ellipse (O)",
+          "hittable": true
+        },
+        {
+          "name": "Arrow (A)",
+          "hittable": true
+        },
+        {
+          "name": "Text (T)",
+          "hittable": true
+        },
+        {
+          "name": "Erase (E)",
+          "hittable": true
+        },
+        {
+          "name": "Pan (H)",
+          "hittable": true
+        }
+      ],
+      "back": {
+        "name": "Back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 8,
+          "width": 72.703125,
+          "height": 28,
+          "top": 8,
+          "right": 88.703125,
+          "bottom": 36,
+          "left": 16
+        }
+      },
+      "title": {
+        "name": "BUILD-5 layers",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 104.703125,
+          "y": 10.796875,
+          "width": 114.703125,
+          "height": 22.390625,
+          "top": 10.796875,
+          "right": 219.40625,
+          "bottom": 33.1875,
+          "left": 104.703125
+        }
+      },
+      "sidebarRight": 256
+    },
+    {
+      "theme": "dark",
+      "vw": 1024,
+      "vh": 640,
+      "arrange": {
+        "name": "Send to back",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 16,
+          "y": 468,
+          "width": 119.109375,
+          "height": 28,
+          "top": 468,
+          "right": 135.109375,
+          "bottom": 496,
+          "left": 16
+        }
+      },
+      "menu": {
+        "rect": {
+          "x": 8,
+          "y": 460,
+          "width": 135.109375,
+          "height": 140,
+          "top": 460,
+          "right": 143.109375,
+          "bottom": 600,
+          "left": 8
+        },
+        "within": true
+      }
+    },
+    {
+      "theme": "dark",
+      "vw": 1024,
+      "vh": 640,
+      "name": "Objects",
+      "menu": {
+        "rect": {
+          "x": 85.3125,
+          "y": 429.625,
+          "width": 200,
+          "height": 170.375,
+          "top": 429.625,
+          "right": 285.3125,
+          "bottom": 600,
+          "left": 85.3125
+        },
+        "within": true,
+        "placement": "above"
+      },
+      "first": {
+        "name": "Rectangle 1",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 93.3125,
+          "y": 437.625,
+          "width": 184,
+          "height": 31.59375,
+          "top": 437.625,
+          "right": 277.3125,
+          "bottom": 469.21875,
+          "left": 93.3125
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "vw": 1024,
+      "vh": 640,
+      "name": "Help (?)",
+      "menu": {
+        "rect": {
+          "x": 596,
+          "y": 80,
+          "width": 420,
+          "height": 485.875,
+          "top": 80,
+          "right": 1016,
+          "bottom": 565.875,
+          "left": 596
+        },
+        "within": true,
+        "placement": "below"
+      },
+      "first": {
+        "name": "Close help",
+        "hittable": true,
+        "canvasOnTop": true,
+        "z": "auto",
+        "rect": {
+          "x": 604,
+          "y": 529.875,
+          "width": 85.90625,
+          "height": 28,
+          "top": 529.875,
+          "right": 689.90625,
+          "bottom": 557.875,
+          "left": 604
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "palette": {
+        "name": "",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 301.29998779296875,
+          "y": 107.82999420166016,
+          "width": 448.84002685546875,
+          "height": 47.040000915527344,
+          "top": 107.82999420166016,
+          "right": 750.1400146484375,
+          "bottom": 154.8699951171875,
+          "left": 301.29998779296875
+        }
+      }
+    },
+    {
+      "theme": "dark",
+      "dialog": {
+        "name": "SettingsApplication settingsSettingsPreferencesGeneralAppearanceShortcutsAccountProfileAccount & syncLibrarySharing & publishingAIExtensionsBackups & dataAdvancedLibraries & serversAgents & AI adminDiagnosticsAAnonymousGeneralThis deviceLanguage and how the app behaves.LanguageDisplay language for the app.LanguageEnglishBehaviorConfirm before trashing pagesAsk before moving a page to the trash.Spellcheck while typingUnderline misspelled words in the editor.Danger zoneThese actions affect this device’s local data, not your pages.Reset preferences & layoutRestore default appearance, language, and layout on this device. Your pages and libraries are kept.Reset",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "50",
+        "rect": {
+          "x": 88.30638885498047,
+          "y": 51.989158630371094,
+          "width": 847.38720703125,
+          "height": 536.021728515625,
+          "top": 51.989158630371094,
+          "right": 935.6935958862305,
+          "bottom": 588.0108871459961,
+          "left": 88.30638885498047
+        }
+      }
+    },
+    {
+      "openDuringExpand": true
+    },
+    {
+      "inline": {
+        "placement": "below",
+        "top": 571,
+        "anchorBottom": 567,
+        "within": true
+      }
+    },
+    {
+      "tooTall": {
+        "top": 8,
+        "height": 224,
+        "clientHeight": 224,
+        "scrollHeight": 486,
+        "overflow": "auto"
+      }
+    },
+    {
+      "tooTallScroll": {
+        "beforeScroll": {
+          "name": "Close help",
+          "hittable": false,
+          "canvasOnTop": false,
+          "z": "auto",
+          "rect": {
+            "x": 604,
+            "y": 457.875,
+            "width": 85.90625,
+            "height": 28,
+            "top": 457.875,
+            "right": 689.90625,
+            "bottom": 485.875,
+            "left": 604
+          }
+        },
+        "afterScroll": {
+          "name": "Close help",
+          "hittable": true,
+          "canvasOnTop": true,
+          "z": "auto",
+          "rect": {
+            "x": 604,
+            "y": 195.875,
+            "width": 85.90625,
+            "height": 28,
+            "top": 195.875,
+            "right": 689.90625,
+            "bottom": 223.875,
+            "left": 604
+          }
+        },
+        "scrollBefore": 0,
+        "scrollAfter": 262
+      }
+    },
+    {
+      "confirmation": {
+        "name": "Move this page to the trash?You can restore it later from the trash.CancelMove to trashClose",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 420.47998046875,
+          "y": 328.4599914550781,
+          "width": 439.0400390625,
+          "height": 143.08001708984375,
+          "top": 328.4599914550781,
+          "right": 859.52001953125,
+          "bottom": 471.5400085449219,
+          "left": 420.47998046875
+        }
+      }
+    },
+    {
+      "toast": {
+        "name": "Undo",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 729.796875,
+          "y": 743,
+          "width": 47.90625,
+          "height": 24,
+          "top": 743,
+          "right": 777.703125,
+          "bottom": 767,
+          "left": 729.796875
+        }
+      }
+    },
+    {
+      "lightbox": {
+        "name": "Close",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 1216.239990234375,
+          "y": 23.67999267578125,
+          "width": 35.280029296875,
+          "height": 35.279998779296875,
+          "top": 23.67999267578125,
+          "right": 1251.52001953125,
+          "bottom": 58.959991455078125,
+          "left": 1216.239990234375
+        }
+      }
+    },
+    {
+      "phase": "after expanded canvas unmounts",
+      "noCanvas": 0,
+      "profileTarget": {
+        "name": "AAnonymous",
+        "hittable": true,
+        "canvasOnTop": false,
+        "z": "auto",
+        "rect": {
+          "x": 12,
+          "y": 758,
+          "width": 232,
+          "height": 36,
+          "top": 758,
+          "right": 244,
+          "bottom": 794,
+          "left": 12
+        }
+      }
+    }
+  ]
+}

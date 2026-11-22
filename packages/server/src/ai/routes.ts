@@ -1,44 +1,97 @@
 import {Hono, type Context} from 'hono';
 import {HTTPException} from 'hono/http-exception';
 import {streamSSE} from 'hono/streaming';
-import {API, isPaidProvider, snapshotText, type AgentChatMessage, type AiConfig, type AiEffort, type AiProvider, type AiSkill, type PluginAgentTool} from '@book.dev/sdk';
+import {API, isPaidProvider, providerSettings, snapshotText, type AgentChatMessage, type AiConfig, type AiEffort, type AiPricingTable, type AiProvider, type AiSkill, type McpClientConfig, type McpServerConfig, type PluginAgentTool, type Principal} from '@book.dev/sdk';
 import type {PageStore} from '../store';
 import type {AppEnv} from '../appEnv';
-import {requireCreate} from '../access';
+import {isLocalInstanceOwner, requireAuthenticatedRead, requireCreate, requireInstanceAdmin, requireInstanceOwner} from '../access';
 import {AgentRunner, type AgentMessage} from './agent';
-import type {AiService} from './service';
+import {ModelDownloadConfigError, TranscriptionConfigError, type AiService} from './service';
+import {McpConfigError, type ExternalAgentTool, type McpClientManager} from './mcpClients';
+import {FixedWindowLimiter, clientIpKey} from '../agentTokens';
+import {LocalTranscriptionBusyError} from './whisper';
+import type {TokenUsage} from './providers';
+import type {AiUsageLog, UsageKind} from './usage';
+
+export const LOCAL_TRANSCRIPTION_RATE_LIMIT = 6;
+const LOCAL_TRANSCRIPTION_RATE_WINDOW_MS = 60_000;
 
 /**
  * The `/api/ai/*` surface. Generation endpoints stream tokens as SSE
  * (`data: {"token": "..."}` frames, closed by `data: {"done": true}`);
  * everything else is plain JSON. Engine failures return 503 with a
  * human-readable `error` so the UI can guide the user to Settings → AI.
+ *
+ * `aiUsage` (when provided) is the server-managed usage-attribution log: each
+ * generate / complete / agent-turn writes ONE row through it. Best-effort — a
+ * logging failure never breaks the request.
  */
-export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore, onPagesChanged?: () => Promise<void>): void {
+export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore, onPagesChanged?: () => Promise<void>, aiUsage?: AiUsageLog, mcp?: McpClientManager): void {
+  const localTranscriptionLimiter = new FixedWindowLimiter(LOCAL_TRANSCRIPTION_RATE_LIMIT, LOCAL_TRANSCRIPTION_RATE_WINDOW_MS);
+  /**
+   * Log a single generate/complete usage row against the effective provider/model.
+   * Best-effort (the logger swallows its own errors); does nothing without a logger
+   * or without captured usage.
+   */
+  const logUsage = async (kind: UsageKind, principal: Principal, usage: TokenUsage | undefined): Promise<void> => {
+    if (!aiUsage || !usage) return;
+    const config = await ai.getConfig();
+    const provider = config.provider;
+    const model = providerSettings(config, provider).model ?? '';
+    await aiUsage.log({provider, model, kind, usage, principal});
+  };
+
   app.get(API.aiStatus, async (c) => {
-    // The status stays readable to every principal that passes the request gate
-    // (clients render provider/ready state), but the embedded config carries the
-    // instance's PAID PROVIDER API KEYS — writer-only readback. Non-writers get
-    // the same status with the secrets stripped; writers (AiSettings seeds its
-    // draft from `status.config`) keep the full config.
+    // Engine status is instance-configuration metadata (provider, model, ready flag)
+    // that an anonymous reader on a claimed, internet-exposable (`published`-scope)
+    // instance has no business enumerating (GATE-7). Require a verified identity; the
+    // legacy single-user (unclaimed, loopback-only) path stays open. AI affordances on
+    // the anon viewer surface just don't render — every client call site already
+    // degrades on a rejected `aiStatus()` (AgentPanel/AiBridgeHost/AiSettings catch it).
+    await requireAuthenticatedRead(c, store);
+    // The instance's PAID-PROVIDER API KEYS never leave the server. Inference runs
+    // entirely server-side, so NO client (writer/owner/loopback included) needs the
+    // key — returning it only widens the leak surface. We strip every stored key for
+    // EVERY principal and swap in an `apiKeySet` flag, so the settings form can show
+    // a "key set" state and write a replacement without ever holding the secret.
     const status = await ai.status();
-    const decision = await store.decideCreateAccess(c.get('principal'));
-    return c.json(decision.canWrite ? status : {...status, config: redactAiConfig(status.config)});
+    return c.json({...status, config: redactAiConfig(status.config)});
   });
 
   app.put(API.aiConfig, async (c) => {
     // Instance-wide engine config (provider, API keys, model choice) — an
-    // instance-writer action, not something a viewer/guest may flip.
-    await requireCreate(c, store);
+    // owner action: it controls credentials and server-side execution. The strict
+    // owner gate also keeps an unclaimed anonymous webview caller out.
+    await requireInstanceOwner(c, store);
     const body = (await c.req.json()) as AiConfig;
     if (!['off', 'mock', 'llama', 'mlx', 'openai', 'claude'].includes(body.provider)) {
       return c.json({error: `Unknown provider: ${String(body.provider)}`}, 400);
     }
-    return c.json(await ai.setConfig(body));
+    if (body.transcription !== undefined) {
+      const audio = body.transcription;
+      if (!audio || !['off', 'local', 'openai-compat'].includes(audio.provider)
+        || [audio.baseUrl, audio.model].some((v) => v !== undefined && typeof v !== 'string')
+        || (audio.apiKey !== undefined && audio.apiKey !== null && typeof audio.apiKey !== 'string')) {
+        return c.json({error: 'Invalid transcription configuration'}, 400);
+      }
+      if (audio.baseUrl) {
+        try {
+          const url = new URL(audio.baseUrl);
+          if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error();
+        } catch {
+          return c.json({error: 'Transcription baseUrl must be an HTTP(S) URL without embedded credentials'}, 400);
+        }
+      }
+    }
+    // Redact the echoed config too: a blank-on-save PRESERVES the stored key
+    // (see `AiService.setConfig`), so returning the saved config raw would hand a
+    // previously-stored key back to the writer that just blanked the field. The key
+    // never leaves the server — the client uses `apiKeySet`, not the value.
+    return c.json(redactAiConfig(await ai.setConfig(body)));
   });
 
   app.post(API.aiIndex, async (c) => {
-    // Rebuilding the whole-workspace index is an instance-wide maintenance action
+    // Rebuilding the whole-library index is an instance-wide maintenance action
     // (it reads every page), so gate it to an instance writer (owner/admin/loopback)
     // — a viewer/guest can't trigger a global re-index.
     await requireCreate(c, store);
@@ -57,12 +110,12 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     // filtering below (cost control), not a replacement for it.
     await requirePaidInferenceAccess(c, store, (await ai.getConfig()).provider);
     // The index spans every page; filter ranked hits to the ones THIS principal may
-    // read so search can't surface restricted/members snippets on a shared instance.
+    // read and discover so search can't surface restricted or unlisted snippets.
     // The access base is resolved once and amortised across the per-page checks.
     const principal = c.get('principal');
     const base = await store.accessBase(principal);
     return c.json(
-      await ai.search(query, Math.min(Math.max(limit ?? 8, 1), 25), (pageId) => store.canReadPage(principal, pageId, base)),
+      await ai.search(query, Math.min(Math.max(limit ?? 8, 1), 25), (pageId) => store.canListPage(principal, pageId, base)),
     );
   });
 
@@ -81,51 +134,106 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     const {prompt, system, maxTokens} = (await c.req.json()) as {prompt?: string; system?: string; maxTokens?: number};
     if (!prompt?.trim()) return c.json({error: 'prompt is required'}, 400);
     await requirePaidInferenceAccess(c, store, (await ai.getConfig()).provider);
+    const principal = c.get('principal');
     return streamSSE(c, async (stream) => {
       const abort = new AbortController();
       stream.onAbort(() => abort.abort());
+      let usage: TokenUsage | undefined;
       try {
         await ai.generate(prompt, {
           system,
           maxTokens,
           signal: abort.signal,
           onToken: (token) => void stream.writeSSE({data: JSON.stringify({token})}),
+          onUsage: (u) => {
+            usage = u;
+          },
         });
         await stream.writeSSE({data: JSON.stringify({done: true})});
       } catch (err) {
         await stream.writeSSE({data: JSON.stringify({error: err instanceof Error ? err.message : String(err)})});
       }
+      await logUsage('generate', principal, usage);
     });
   });
 
   app.post(API.aiComplete, async (c) => {
     const {text, instruction} = (await c.req.json()) as {text?: string; instruction?: string};
     await requirePaidInferenceAccess(c, store, (await ai.getConfig()).provider);
+    const principal = c.get('principal');
     return streamSSE(c, async (stream) => {
       const abort = new AbortController();
       stream.onAbort(() => abort.abort());
+      let usage: TokenUsage | undefined;
       try {
         await ai.complete(text ?? '', instruction, {
           signal: abort.signal,
           maxTokens: 400,
           onToken: (token) => void stream.writeSSE({data: JSON.stringify({token})}),
+          onUsage: (u) => {
+            usage = u;
+          },
         });
         await stream.writeSSE({data: JSON.stringify({done: true})});
       } catch (err) {
         await stream.writeSSE({data: JSON.stringify({error: err instanceof Error ? err.message : String(err)})});
       }
+      await logUsage('complete', principal, usage);
     });
+  });
+
+  app.post(API.aiTranscribe, async (c) => {
+    const body = await c.req.json().catch(() => null) as {assetId?: unknown; pageId?: unknown} | null;
+    if (typeof body?.assetId !== 'string' || typeof body.pageId !== 'string' || !body.assetId || !body.pageId) {
+      return c.json({error: 'assetId and pageId are required'}, 400);
+    }
+    const {assetId, pageId} = body;
+    if (!/^[0-9a-f]{64}$/.test(assetId) || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(pageId)) {
+      return c.json({error: 'asset not found'}, 404);
+    }
+    const principal = c.get('principal');
+    if (!await store.getPageFor(principal, pageId)
+      || !(await store.pagesReferencingAsset(assetId)).includes(pageId)) {
+      return c.json({error: 'asset not found'}, 404);
+    }
+    const asset = await store.getAssetFor(principal, assetId);
+    if (!asset) return c.json({error: 'asset not found'}, 404);
+    try {
+      const {engine, provider, model} = await ai.transcriptionBackend();
+      await requirePaidInferenceAccess(c, store, provider === 'openai-compat' ? 'openai' : 'off');
+      if (provider === 'local' && localTranscriptionLimiter.exceeded(clientIpKey(c))) {
+        c.header('Retry-After', String(LOCAL_TRANSCRIPTION_RATE_WINDOW_MS / 1000));
+        return c.json({error: 'Too many local transcription requests. Please retry shortly.'}, 429);
+      }
+      const result = await engine.transcribe(asset.bytes, {mime: asset.mime, signal: c.req.raw.signal});
+      // Audio backends do not report token counts. Keep unknown cloud cost null.
+      await aiUsage?.log({provider, model, kind: 'transcribe', principal, usage: {inputTokens: 0, outputTokens: 0}});
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof HTTPException) throw err;
+      if (err instanceof LocalTranscriptionBusyError) {
+        c.header('Retry-After', String(err.retryAfterSeconds));
+        return c.json({error: err.message}, 429);
+      }
+      if (err instanceof TranscriptionConfigError) return c.json({error: err.message}, 400);
+      return c.json({error: 'Transcription failed. Check the provider in Settings → AI and retry.'}, 502);
+    }
   });
 
   app.post(API.aiModelDownload, async (c) => {
     // Fetches a caller-supplied URL onto the server's disk (SSRF + disk-fill
-    // surface) — instance-writer only.
-    await requireCreate(c, store);
+    // surface) — only the trusted instance owner may supply it.
+    await requireInstanceOwner(c, store);
     const {url} = (await c.req.json().catch(() => ({}))) as {url?: string};
-    return c.json(await ai.startDownload(url));
+    try {
+      return c.json(await ai.startDownload(url));
+    } catch (err) {
+      if (err instanceof ModelDownloadConfigError) return c.json({error: err.message}, 400);
+      throw err;
+    }
   });
 
-  // The agent harness: runs the tool loop against the workspace and streams
+  // The agent harness: runs the tool loop against the library and streams
   // each step (tool call, tool result, reasoning, proposals, final answer) as
   // its own SSE frame.
   app.post(API.agentChat, async (c) => {
@@ -139,6 +247,8 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
       pageId?: string;
       selection?: string;
       allowDirectEdits?: boolean;
+      allowExternalTools?: boolean;
+      externalToolsUsed?: boolean;
     };
     const turns = (body.messages ?? []).filter(
       (m): m is AgentMessage => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string',
@@ -156,6 +266,20 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     const thinking = body.thinking ?? config.thinking ?? true;
     const skills = await ai.skills.resolve(body.skills ?? []);
     const pluginTools = await collectPluginTools(store);
+    // External MCP tools (AGENT-3), gathered beside the plugin tools under a short
+    // deadline (a slow/unreachable server contributes nothing, the run proceeds).
+    // Q3: offered ONLY to a WRITER-GATED principal (`decideCreateAccess` — the same
+    // floor `create_page` uses). Within that set, stdio entries are filtered unless
+    // this exact request carries trusted local-owner proof; HTTP tools retain the
+    // existing writer policy.
+    const principal = c.get('principal');
+    let externalTools: ExternalAgentTool[] = [];
+    if (mcp) {
+      const canUseExternal = (await store.decideCreateAccess(principal)).canWrite;
+      if (canUseExternal) {
+        externalTools = await mcp.toolsForRun(3000, {allowStdio: isLocalInstanceOwner(c)}).catch(() => []);
+      }
+    }
 
     // Ambient context: the page the user is viewing (fetched here so we don't
     // ship its body over the wire twice) + their current selection.
@@ -177,7 +301,7 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     // Thread the request principal so the agent's autonomous read/write tools are
     // bounded by the SAME per-page/ACL decisions the content routes enforce — the
     // runner can't be driven to read/edit pages this caller can't (OB-190 follow-up).
-    const runner = new AgentRunner(ai, store, {effort, thinking, engineOverride, skills, pluginTools, context, allowDirectEdits: body.allowDirectEdits === true, onPagesChanged, principal: c.get('principal')});
+    const runner = new AgentRunner(ai, store, {effort, thinking, engineOverride, skills, pluginTools, externalTools, context, allowDirectEdits: body.allowDirectEdits === true, allowExternalTools: body.allowExternalTools === true, externalToolsUsed: body.externalToolsUsed === true, onPagesChanged, principal, usage: aiUsage});
     return streamSSE(c, async (stream) => {
       const abort = new AbortController();
       stream.onAbort(() => abort.abort());
@@ -189,13 +313,20 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
     });
   });
 
-  // ── Prompt/recipe skills (per-workspace, user-authored markdown) ─────────────
-  app.get(API.aiSkills, async (c) => c.json(await ai.skills.list()));
+  // ── Prompt/recipe skills (per-library, user-authored markdown) ─────────────
+  // The list carries the authored prompt/recipe bodies (instructions injected into
+  // agent runs) — instance-shared configuration, not viewer content — so the LIST is
+  // writer-gated like its own mutations (GATE-7), never handed to an anonymous reader
+  // on a claimed instance. The legacy single-user (unclaimed) guest keeps write.
+  app.get(API.aiSkills, async (c) => {
+    await requireCreate(c, store);
+    return c.json(await ai.skills.list());
+  });
 
   app.put(API.aiSkills, async (c) => {
-    // Skills are workspace-shared prompt/recipe definitions injected into every
-    // user's agent runs — mutations are instance-writer only.
-    await requireCreate(c, store);
+    // Skills are library-shared prompt/recipe definitions injected into every
+    // user's agent runs — mutations are owner-only.
+    await requireInstanceOwner(c, store);
     const {skill} = (await c.req.json().catch(() => ({}))) as {skill?: AiSkill};
     if (!skill?.name?.trim()) return c.json({error: 'skill.name is required'}, 400);
     try {
@@ -209,27 +340,122 @@ export function mountAiRoutes(app: Hono<AppEnv>, ai: AiService, store: PageStore
   // — that helper percent-encodes the colon, which registers the literal path
   // `/api/ai/skills/%3Aname` and never matches a real skill name.
   app.delete(`${API.aiSkills}/:name`, async (c) => {
-    await requireCreate(c, store);
+    await requireInstanceOwner(c, store);
     const removed = await ai.skills.remove(c.req.param('name') ?? '');
     return c.json({removed});
+  });
+
+  // ── Usage-attribution pricing + retention (admin only) ──────────────────────
+  // The pricing table (default + admin override merged) drives the `cost_usd`
+  // snapshotted onto every usage row. Editing it — and the usage DB's retention
+  // window — is instance ADMINISTRATION (owner/admin), stricter than the plain
+  // writer gate: an acl-write member must not be able to reprice or re-retention.
+  app.get(API.aiPricing, async (c) => {
+    await requireInstanceAdmin(c, store);
+    if (!aiUsage) return c.json({default: {}, override: {}, effective: {}});
+    return c.json(await aiUsage.pricing());
+  });
+
+  app.put(API.aiPricing, async (c) => {
+    await requireInstanceAdmin(c, store);
+    if (!aiUsage) return c.json({error: 'usage attribution is not available'}, 503);
+    const override = (await c.req.json().catch(() => ({}))) as AiPricingTable;
+    return c.json(await aiUsage.setPricingOverride(override));
+  });
+
+  app.get(API.aiUsage, async (c) => {
+    // The usage rows carry per-user attribution + cost — instance ADMINISTRATION,
+    // same gate as pricing (an acl-write member must not read the roster's spend).
+    // Reports without seeding: a library that has never used AI reports exists:false.
+    await requireInstanceAdmin(c, store);
+    if (!aiUsage) return c.json({exists: false, databaseId: null, hostPageId: null, retentionDays: null});
+    return c.json(await aiUsage.report());
+  });
+
+  app.put(API.aiUsageRetention, async (c) => {
+    await requireInstanceAdmin(c, store);
+    if (!aiUsage) return c.json({error: 'usage attribution is not available'}, 503);
+    const {days} = (await c.req.json().catch(() => ({}))) as {days?: number};
+    if (typeof days !== 'number' || !Number.isFinite(days)) return c.json({error: 'days must be a number'}, 400);
+    try {
+      return c.json(await aiUsage.setRetentionDays(days));
+    } catch (err) {
+      return c.json({error: err instanceof Error ? err.message : String(err)}, 503);
+    }
+  });
+
+  // ── External tools (MCP client) — owner only ────────────────────────────────
+  // Registering an external MCP server is host command-execution territory
+  // (a stdio server spawns a child; even an HTTP server sends library content
+  // off-box), so the whole surface is gated to the real instance owner. This gate
+  // never falls open for an unclaimed guest. Stdio is stricter again: each manager
+  // operation receives an explicit capability only from the trusted local-owner
+  // transport, so a remote JWS owner may manage HTTP endpoints but never spawn.
+  // Secrets (auth tokens) are write-only across the wire, exactly like apiKey.
+  app.get(API.aiMcp, async (c) => {
+    await requireInstanceOwner(c, store);
+    if (!mcp) return c.json({config: {enabled: false, servers: []}, stdioAllowed: false});
+    const config = mcp.redact(await mcp.getConfig());
+    return c.json({config, stdioAllowed: mcp.stdioAllowed({allowStdio: isLocalInstanceOwner(c)})});
+  });
+
+  app.put(API.aiMcp, async (c) => {
+    await requireInstanceOwner(c, store);
+    if (!mcp) return c.json({error: 'external tools are not available on this server'}, 503);
+    const body = (await c.req.json().catch(() => ({}))) as McpClientConfig;
+    const access = {allowStdio: isLocalInstanceOwner(c)};
+    try {
+      const saved = mcp.redact(
+        await mcp.setConfig(
+          {enabled: body.enabled === true, servers: Array.isArray(body.servers) ? body.servers : []},
+          access,
+        ),
+      );
+      return c.json({config: saved, stdioAllowed: mcp.stdioAllowed(access)});
+    } catch (err) {
+      // A validation error (bad slug, duplicate id, stdio without local-owner proof) is a 400 —
+      // the client's bad request, not a server fault. Never echo secrets.
+      if (err instanceof McpConfigError) return c.json({error: err.message}, 400);
+      return c.json({error: err instanceof Error ? err.message : String(err)}, 500);
+    }
+  });
+
+  app.post(API.aiMcpTest, async (c) => {
+    await requireInstanceOwner(c, store);
+    if (!mcp) return c.json({ok: false, error: 'external tools are not available on this server'});
+    const server = (await c.req.json().catch(() => ({}))) as McpServerConfig;
+    return c.json(await mcp.test(server, {allowStdio: isLocalInstanceOwner(c)}));
   });
 }
 
 /**
- * Strip the secrets from an {@link AiConfig} before returning it to a
- * non-writer: every `providers[*].apiKey` plus the legacy flat `apiKey`
- * (pre-`providers` configs stored the then-active provider's key there).
- * Everything else (provider choice, models, baseUrls, effort…) stays, so a
- * non-writer client can still render the AI surface.
+ * Strip the secrets from an {@link AiConfig} before it leaves the server: every
+ * `providers[*].apiKey` plus the legacy flat `apiKey` (pre-`providers` configs
+ * stored the then-active provider's key there). Each stripped key is replaced by
+ * an `apiKeySet: true` flag when a non-empty value was present, so a client can
+ * render a "key set" state (and offer to replace/clear it) without the value.
+ * Everything else (provider choice, models, baseUrls, effort…) stays, so the AI
+ * surface still renders. Applied to EVERY response — the key never leaves the box.
  */
 function redactAiConfig(config: AiConfig): AiConfig {
+  const hasKey = (v: unknown): boolean => typeof v === 'string' && v.trim().length > 0;
   const redacted: AiConfig = {...config};
   delete redacted.apiKey;
+  if (hasKey(config.apiKey)) redacted.apiKeySet = true;
+  else delete redacted.apiKeySet;
+  if (config.transcription) {
+    redacted.transcription = {...config.transcription};
+    delete redacted.transcription.apiKey;
+    if (hasKey(config.transcription.apiKey)) redacted.transcription.apiKeySet = true;
+    else delete redacted.transcription.apiKeySet;
+  }
   if (config.providers) {
     redacted.providers = Object.fromEntries(
       Object.entries(config.providers).map(([p, settings]) => {
         const safe = {...settings};
         delete safe.apiKey;
+        if (hasKey(settings.apiKey)) safe.apiKeySet = true;
+        else delete safe.apiKeySet;
         return [p, safe];
       }),
     ) as AiConfig['providers'];

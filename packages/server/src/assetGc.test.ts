@@ -85,6 +85,25 @@ describe('asset dedup (A1 confirmation)', () => {
 });
 
 describe('gcUnreferencedAssets — the blockdoc-usage-safe GC', () => {
+  it('keeps audio referenced only by block props until the reference is removed', async () => {
+    const bytes = bytesFor(1);
+    const {id: assetId} = await store.putAsset(bytes, 'audio/webm');
+    const page = await store.upsertPage({
+      name: `meeting-${seq}`,
+      data: {
+        ...emptySnap(),
+        editor: 'blocks',
+        blockdoc: {v: 1, update: '', blocks: [{id: 'recording', type: 'audio', props: {assetId}}]},
+      },
+    });
+    expect(await store.pagesReferencingAsset(assetId)).toEqual([]);
+    expect((await store.gcUnreferencedAssets({graceMs: 0})).reaped).toBe(0);
+    expect(await store.getAsset(assetId)).toMatchObject({mime: 'audio/webm', bytes});
+    await store.upsertPage({id: page.id, name: page.name, data: emptySnap()});
+    expect((await store.gcUnreferencedAssets({graceMs: 0})).ids).toEqual([assetId]);
+    expect(await store.getAsset(assetId)).toBeNull();
+  });
+
   it('reaps a truly-orphaned asset (no live document references it) past the grace', async () => {
     const {id} = await store.putAsset(bytesFor(1), 'image/png'); // never ref'd, in no doc
     const {reaped, bytes, ids} = await store.gcUnreferencedAssets({graceMs: 0});
@@ -229,7 +248,7 @@ describe('asset storage budget (A6)', () => {
     const app = createApp(store, undefined, new PageHub(), {assetStorageBudgetBytes: 10});
     const page = await store.upsertPage({name: `p-${seq}`, data: emptySnap()});
     const upload = (b: Uint8Array<ArrayBuffer>) =>
-      app.request(`/api/assets?pageId=${page.id}`, {method: 'POST', headers: {'Content-Type': 'image/png'}, body: b});
+      app.request(`/api/assets?pageId=${page.id}`, {method: 'POST', headers: {'Content-Type': 'image/png', 'X-OpenBook-Client': '1'}, body: b});
 
     const ok = await upload(new Uint8Array(bytesFor(1, 8)));
     expect(ok.status).toBe(201);

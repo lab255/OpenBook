@@ -1,31 +1,32 @@
 import {Hono} from 'hono';
 import {API, validateManifest, type PluginPackage} from '@book.dev/sdk';
-import type {PageStore} from './store';
+import {PluginDowngradeError, type PageStore} from './store';
 import type {AppEnv} from './appEnv';
-import {requireCreate} from './access';
+import {requireCreate, requireInstanceOwner} from './access';
 
 /** Max total source size per plugin (sources are stored inline as JSONB). */
 const MAX_PLUGIN_BYTES = 2 * 1024 * 1024;
 
 /**
- * The `/api/plugins` surface: installed extensions, stored per workspace so
+ * The `/api/plugins` surface: installed extensions, stored per library so
  * every connected client runs the same set. The server validates SHAPE only
  * — signature verification happens client-side against the user's trusted
  * registry keys (the server never decides what the user trusts).
  *
- * Access: MUTATIONS (install / enable / disable / remove) are instance-writer
- * only (`requireCreate` — a writer at the instance default scope: local-owner
- * / owner / admin), since an
- * installed plugin is executable code that runs in EVERY connected client.
- * The LIST stays open to any principal that passes the request gate: every
- * client (viewers included) syncs it on boot to run the enabled set
- * (`PluginBoot` → `syncPlugins`).
+ * Access: the source-bearing LIST is instance-writer-only (`requireCreate`,
+ * GATE-7). Mutations are stricter: only the real instance owner may install,
+ * enable, disable, or remove code that every connected client executes. The
+ * owner gate never treats an unclaimed anonymous webview caller as trusted; the
+ * desktop owner retains access through the local-owner transport signal.
  */
 export function mountPluginRoutes(app: Hono<AppEnv>, store: PageStore): void {
-  app.get(API.plugins, async (c) => c.json(await store.listPlugins()));
+  app.get(API.plugins, async (c) => {
+    await requireCreate(c, store);
+    return c.json(await store.listPlugins());
+  });
 
   app.post(API.plugins, async (c) => {
-    await requireCreate(c, store);
+    await requireInstanceOwner(c, store);
     const pkg = (await c.req.json().catch(() => null)) as PluginPackage | null;
     const problem = validateManifest(pkg?.manifest);
     if (problem) return c.json({error: problem}, 400);
@@ -41,11 +42,19 @@ export function mountPluginRoutes(app: Hono<AppEnv>, store: PageStore): void {
     if (!(pkg!.manifest.main in pkg!.files)) {
       return c.json({error: `entry file "${pkg!.manifest.main}" is not in the package`}, 400);
     }
-    return c.json(await store.upsertPlugin({manifest: pkg!.manifest, files: pkg!.files, signature: pkg!.signature}), 201);
+    // Downgrades are refused unless the caller says so explicitly (OB-641):
+    // an older version can silently reopen holes a newer one fixed.
+    const allowDowngrade = c.req.query('allowDowngrade') === '1';
+    try {
+      return c.json(await store.upsertPlugin({manifest: pkg!.manifest, files: pkg!.files, signature: pkg!.signature}, {allowDowngrade}), 201);
+    } catch (err) {
+      if (err instanceof PluginDowngradeError) return c.json({error: err.message}, 409);
+      throw err;
+    }
   });
 
   app.patch(`${API.plugins}/:id`, async (c) => {
-    await requireCreate(c, store);
+    await requireInstanceOwner(c, store);
     const {enabled} = (await c.req.json()) as {enabled?: boolean};
     if (typeof enabled !== 'boolean') return c.json({error: 'enabled (boolean) is required'}, 400);
     const plugin = await store.setPluginEnabled(c.req.param('id'), enabled);
@@ -53,7 +62,7 @@ export function mountPluginRoutes(app: Hono<AppEnv>, store: PageStore): void {
   });
 
   app.delete(`${API.plugins}/:id`, async (c) => {
-    await requireCreate(c, store);
+    await requireInstanceOwner(c, store);
     const removed = await store.removePlugin(c.req.param('id'));
     return removed ? c.body(null, 204) : c.json({error: 'plugin not found'}, 404);
   });

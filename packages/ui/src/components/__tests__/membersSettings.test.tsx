@@ -2,7 +2,7 @@ import {describe, it, expect, afterEach, vi} from 'vitest';
 import {render, screen, cleanup} from '@testing-library/react';
 import type {DataClient, Member} from '@book.dev/sdk';
 import {guestPrincipal} from '@book.dev/sdk';
-import MembersSettings from '../settings/MembersSettings';
+import {PeopleSection} from '../settings/MembersSettings';
 import {DataProvider} from '@/data/DataProvider';
 import {ConfirmProvider, I18nProvider} from '@/providers';
 
@@ -24,7 +24,7 @@ const wrap = (client: Partial<DataClient>) =>
     <I18nProvider>
       <ConfirmProvider>
         <DataProvider client={client as DataClient}>
-          <MembersSettings />
+          <PeopleSection />
         </DataProvider>
       </ConfirmProvider>
     </I18nProvider>,
@@ -47,7 +47,7 @@ afterEach(() => {
   mockPublishedHost = null;
 });
 
-describe('MembersSettings (roster)', () => {
+describe('PeopleSection (roster)', () => {
   it('lists members and shows the invite controls to a manager', async () => {
     const client: Partial<DataClient> = {
       getInstanceInfo: async () => ({
@@ -101,13 +101,13 @@ describe('MembersSettings (roster)', () => {
     mockPublishedHost = null;
     wrap(client);
     expect(await screen.findByText('rae@example.com')).toBeTruthy();
-    expect(screen.queryByText('Copy workspace link')).toBeNull();
+    expect(screen.queryByText('Copy library link')).toBeNull();
     cleanup();
 
     // Published + an invited member awaiting first sign-in: surface it.
     mockPublishedHost = 'rae.book.cloud';
     wrap(client);
-    expect(await screen.findByText('Copy workspace link')).toBeTruthy();
+    expect(await screen.findByText('Copy library link')).toBeTruthy();
   });
 
   it('hides the delivery help when published but no one is awaiting sign-in', async () => {
@@ -124,7 +124,7 @@ describe('MembersSettings (roster)', () => {
     };
     wrap(client);
     expect(await screen.findByText('rae@example.com')).toBeTruthy();
-    expect(screen.queryByText('Copy workspace link')).toBeNull();
+    expect(screen.queryByText('Copy library link')).toBeNull();
   });
 
   it('degrades to an unavailable note when the server has no instance endpoint', async () => {

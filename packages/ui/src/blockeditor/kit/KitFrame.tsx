@@ -4,7 +4,9 @@ import type {BlockEditorController} from '../useBlockEditor';
 import {KitSettings} from './KitSettings';
 import {useKitPageLock} from './lock';
 import {varNameFromLabel} from './options';
-import {inputScope} from './scope';
+import {useCachedInputScope} from './useCachedEval';
+import {NAME_RE} from './scope';
+import {cn} from '@/lib/utils';
 
 /**
  * The shared chrome for every artifact-kit input: a quiet header (display name
@@ -27,7 +29,7 @@ export const kitWide = (block: BlockMap): boolean => !blockProp<boolean>(block, 
 export const ConfigField: React.FC<{label: string; hint?: string; children: React.ReactNode}> = ({label, hint, children}) => (
   <label className="flex flex-col gap-1">
     <span className="text-xs font-medium text-foreground/80">{label}</span>
-    {hint && <span className="-mt-0.5 text-[0.7rem] text-muted-foreground">{hint}</span>}
+    {hint && <span className="-mt-0.5 text-xs text-muted-foreground">{hint}</span>}
     {children}
   </label>
 );
@@ -56,19 +58,23 @@ export const ScopeHints: React.FC<{editor: BlockEditorController; onPick: (name:
   editor,
   onPick,
 }) => {
-  const names = Object.keys(inputScope(editor.doc)).sort();
+  const cached = useCachedInputScope(editor);
+  const names = Object.keys(cached.value ?? {}).sort();
+  if (cached.pending && !cached.value) {
+    return <span className="text-xs text-muted-foreground">Loading variables…</span>;
+  }
   if (names.length === 0) {
-    return <span className="text-[0.7rem] text-muted-foreground">No named inputs on this page yet — add a slider, number, or other input block.</span>;
+    return <span className="text-xs text-muted-foreground">No named inputs on this page yet — add a slider, number, or other input block.</span>;
   }
   return (
     <div className="flex flex-wrap items-center gap-1 pt-0.5">
-      <span className="text-[0.7rem] text-muted-foreground">Variables:</span>
+      <span className="text-xs text-muted-foreground">Variables:</span>
       {names.map((name) => (
         <button
           key={name}
           type="button"
           disabled={editor.readOnly}
-          className="cursor-pointer rounded border border-border bg-muted/40 px-1 py-0.5 font-mono text-[0.7rem] text-foreground/80 transition-colors hover:bg-hover"
+          className="cursor-pointer rounded-sm border border-border bg-muted/40 px-1 py-0.5 font-mono text-xs text-foreground/80 transition-colors hover:bg-hover"
           // preventDefault on mousedown keeps focus in the expression input.
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onPick(name)}
@@ -101,7 +107,7 @@ export const ConfigToggle: React.FC<{
   <label className="flex cursor-pointer items-center justify-between gap-3">
     <span className="flex flex-col">
       <span className="text-xs font-medium text-foreground/80">{label}</span>
-      {hint && <span className="text-[0.7rem] text-muted-foreground">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </span>
     <input
       type="checkbox"
@@ -136,7 +142,7 @@ export const KitInlineText: React.FC<{
 }> = ({value, placeholder, ariaLabel, readOnly, className, onCommit}) => {
   const pageLocked = useKitPageLock();
   if (readOnly || pageLocked) {
-    return <span className={className}>{value || placeholder}</span>;
+    return <span className={cn('obe-kit-inline-readonly', className)}>{value || placeholder}</span>;
   }
   return (
     <input
@@ -147,6 +153,9 @@ export const KitInlineText: React.FC<{
       aria-label={ariaLabel}
       spellCheck={false}
       onChange={(e) => onCommit(e.target.value)}
+      onBlur={(e) => {
+        if (e.target.value !== '' && e.target.value.trim() === '') onCommit('');
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();
         e.stopPropagation();
@@ -166,10 +175,12 @@ const VariableNameField: React.FC<{block: BlockMap; editor: BlockEditorControlle
   editor,
   defaultName,
 }) => {
-  const explicit = (blockProp<string>(block, 'name') ?? '').trim();
+  const explicit = blockProp<string>(block, 'name') ?? '';
   const derived = varNameFromLabel(blockProp<string>(block, 'label') ?? '');
   const [editing, setEditing] = useState(explicit.length > 0);
   const shown = explicit || derived || defaultName || 'value';
+  const trimmedExplicit = explicit.trim();
+  const invalid = trimmedExplicit !== '' && !NAME_RE.test(trimmedExplicit);
 
   if (!editing) {
     return (
@@ -187,7 +198,10 @@ const VariableNameField: React.FC<{block: BlockMap; editor: BlockEditorControlle
     );
   }
   return (
-    <ConfigField label="Variable name" hint="The symbol formulas and charts reference.">
+    <ConfigField
+      label="Variable name"
+      hint={invalid ? 'Letters, digits and _ only — not published' : 'The symbol formulas and charts reference.'}
+    >
       <ConfigInput
         mono
         autoFocus
@@ -196,7 +210,11 @@ const VariableNameField: React.FC<{block: BlockMap; editor: BlockEditorControlle
         readOnly={editor.readOnly}
         spellCheck={false}
         aria-label="Variable name"
-        onChange={(e) => kitSet(editor, block, 'name', e.target.value.trim())}
+        onChange={(e) => kitSet(editor, block, 'name', e.target.value)}
+        onBlur={(e) => kitSet(editor, block, 'name', e.target.value.trim())}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
       />
     </ConfigField>
   );
@@ -276,6 +294,12 @@ const CommonFields: React.FC<{block: BlockMap; editor: BlockEditorController; de
 );
 
 export interface KitFrameProps {
+  as?: 'div' | 'figure';
+  rootProps?: Record<`data-${string}`, string | number>;
+  headerPlaceholder?: string;
+  hideEmptyHeaderWhenLocked?: boolean;
+  /** Existing display-name prop for containers with their own title contract. */
+  labelKey?: string;
   block: BlockMap;
   editor: BlockEditorController;
   /** Adds the `obe-kit-{kind}` class and is the block's value type. */
@@ -299,6 +323,11 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   block,
   editor,
   kind,
+  labelKey = 'label',
+  as: Root = 'div',
+  rootProps,
+  headerPlaceholder,
+  hideEmptyHeaderWhenLocked = false,
   defaultName,
   control,
   config,
@@ -306,13 +335,15 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   hideHeader = false,
   symbol = true,
 }) => {
+  const pageLocked = useKitPageLock();
+  const Header = Root === 'figure' ? 'figcaption' : 'span';
   const id = blockId(block);
-  const explicitName = (blockProp<string>(block, 'name') ?? '').trim();
-  const displayLabel = (blockProp<string>(block, 'label') ?? '').trim();
+  const explicitName = blockProp<string>(block, 'name') ?? '';
+  const displayLabel = blockProp<string>(block, labelKey) ?? '';
   // The symbol the block publishes under: explicit name, else derived from the
   // display label, else the type's fallback. Mirrors scope.ts `publishedName`.
-  const name = explicitName || varNameFromLabel(displayLabel) || defaultName;
-  const label = displayLabel || name;
+  const name = explicitName.trim() || varNameFromLabel(displayLabel) || defaultName;
+  const label = displayLabel.trim().length > 0 ? displayLabel : name;
   const description = blockProp<string>(block, 'description');
   const wide = supportsWide && kitWide(block);
 
@@ -324,20 +355,21 @@ export const KitFrame: React.FC<KitFrameProps> = ({
   );
 
   return (
-    <div
+    <Root
+      {...rootProps}
       className={`obe-kit obe-kit-${kind}${wide ? ' obe-kit-wide' : ''}`}
       contentEditable={false}
       data-kit-name={name}
     >
-      {!hideHeader && (
-        <span className="obe-kit-head">
+      {!hideHeader && !(hideEmptyHeaderWhenLocked && !displayLabel.trim() && (editor.readOnly || pageLocked)) && (
+        <Header className="obe-kit-head">
           <KitInlineText
             className="obe-kit-label"
             value={displayLabel}
-            placeholder={name}
+            placeholder={headerPlaceholder ?? name}
             readOnly={editor.readOnly}
-            ariaLabel="Display name"
-            onCommit={(v) => kitSet(editor, block, 'label', v)}
+            ariaLabel={headerPlaceholder ?? 'Display name'}
+            onCommit={(v) => kitSet(editor, block, labelKey, v)}
           />
           {/* Only render the inline description when it HAS content — an empty
               field that unfurled on hover shifted the layout. Add/edit a
@@ -351,12 +383,12 @@ export const KitFrame: React.FC<KitFrameProps> = ({
               onCommit={(v) => kitSet(editor, block, 'description', v)}
             />
           )}
-        </span>
+        </Header>
       )}
       {control}
       <KitSettings blockId={id} title={label}>
         {fields}
       </KitSettings>
-    </div>
+    </Root>
   );
 };

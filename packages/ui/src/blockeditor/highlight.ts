@@ -100,3 +100,17 @@ export function highlightCode(src: string, language?: string): string {
   if (last < src.length) out += escapeText(src.slice(last));
   return out;
 }
+
+/** Language choices for the code toolbar; unknown/free-text languages remain valid. */
+export const CODE_LANGUAGES = [
+  ['', 'Plain text'], ['js', 'JavaScript'], ['ts', 'TypeScript'], ['python', 'Python'],
+  ['html', 'HTML'], ['css', 'CSS'], ['json', 'JSON'], ['yaml', 'YAML'],
+  ['sh', 'Shell'], ['sql', 'SQL'], ['go', 'Go'], ['rust', 'Rust'],
+  ['java', 'Java'], ['c', 'C'], ['cpp', 'C++'], ['ruby', 'Ruby'],
+  ['toml', 'TOML'], ['markdown', 'Markdown'],
+] as const;
+export function codeLanguageName(language: string): string {
+  const aliases: Record<string, string> = {javascript: 'js', typescript: 'ts', py: 'python', bash: 'sh', yml: 'yaml', rb: 'ruby'};
+  const key = language.toLowerCase();
+  return CODE_LANGUAGES.find(([value]) => value === (aliases[key] ?? key))?.[1] ?? language;
+}

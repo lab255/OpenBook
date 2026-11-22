@@ -1,0 +1,388 @@
+// @ts-expect-error -- Vitest runs in Node; the browser package omits Node ambient types.
+import {readFileSync} from 'node:fs';
+import {readableTextColor} from '@/lib/presence';
+import {describe, it, expect, afterEach, beforeAll, vi} from 'vitest';
+import {act, render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
+import {createDoc, rootBlocks, type BlockMap} from '../../model';
+import type {BlockEditorController} from '../../useBlockEditor';
+import {CHART_BLOCKS, getChartKind, fmtChartValue, KitChartPlot, type ChartRenderArgs} from '../charts';
+import {PALETTE} from '../chartMath';
+import {ReactiveEvalCache} from '../evalCache';
+
+// The chart block that renders any kind (derived from the registry — one entry).
+const ChartBlock = CHART_BLOCKS[0].render;
+
+beforeAll(() => {
+  // Radix DropdownMenu (Popper + focus management) needs browser APIs happy-dom
+  // lacks. Same shim the Select tests use, plus the menu's focus/scroll calls.
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (!('ResizeObserver' in globalThis)) {
+    g.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  }
+  const proto = Element.prototype as unknown as Record<string, unknown>;
+  proto.hasPointerCapture ??= () => false;
+  proto.releasePointerCapture ??= () => {};
+  proto.setPointerCapture ??= () => {};
+  proto.scrollIntoView ??= () => {};
+});
+
+afterEach(() => cleanup());
+
+/** Render the chart block for a given kind + data with a minimal editor stub. */
+async function renderChart(props: Record<string, unknown>, opts: {readOnly?: boolean} = {}) {
+  const doc = createDoc([{id: 'c', type: 'kitchart', props}]);
+  const block: BlockMap = rootBlocks(doc).get(0);
+  const evalCache = new ReactiveEvalCache(doc);
+  const editor = {doc, version: 0, readOnly: opts.readOnly ?? false, evalCache} as unknown as BlockEditorController;
+  const utils = render(<ChartBlock block={block} editor={editor} pageReadOnly={opts.readOnly ?? false} />);
+  await waitFor(() => expect(evalCache.getCellSnapshot('c').pending).toBe(false));
+  return {...utils, doc, block};
+}
+
+const marks = (container: HTMLElement): HTMLElement[] => Array.from(container.querySelectorAll('.obe-chart-mark'));
+
+// Each kind with data that produces ≥2 marks, and the label/value we expect on
+// the first mark's aria-label + tooltip.
+const KINDS: Array<{kind: string; props: Record<string, unknown>; firstLabel: string; firstValue: string}> = [
+  {kind: 'line', props: {source: '[3, 1, 4]', labels: 'A, B, C'}, firstLabel: 'A', firstValue: '3'},
+  {kind: 'area', props: {source: '[3, 1, 4]', labels: 'A, B, C'}, firstLabel: 'A', firstValue: '3'},
+  {kind: 'bar', props: {source: '[3, 1, 4]', labels: 'A, B, C'}, firstLabel: 'A', firstValue: '3'},
+  {kind: 'pie', props: {source: '{Apples: 3, Pears: 5}'}, firstLabel: 'Apples', firstValue: '3'},
+  {kind: 'donut', props: {source: '{Apples: 3, Pears: 5}'}, firstLabel: 'Apples', firstValue: '3'},
+  {kind: 'scatter', props: {source: '[{x: 1, y: 2}, {x: 3, y: 4}]'}, firstLabel: '(1, 2)', firstValue: '2'},
+  {kind: 'funnel', props: {source: '[10, 6, 3]', labels: 'Visit, Signup, Pay'}, firstLabel: 'Visit', firstValue: '10'},
+  {kind: 'heatmap', props: {source: '{a: [1, 2], b: [3, 4]}', labels: 'X, Y'}, firstLabel: 'a · X', firstValue: '1'},
+  {kind: 'combo', props: {source: '{Sales: [3, 1, 4], Trend: [2, 2, 2]}', labels: 'A, B, C'}, firstLabel: 'Sales · A', firstValue: '3'},
+];
+
+describe('fmtChartValue', async () => {
+  it('groups integers and trims floats to two places', async () => {
+    expect(fmtChartValue(1234)).toBe((1234).toLocaleString());
+    expect(fmtChartValue(3.14159)).toBe((3.14).toLocaleString(undefined, {maximumFractionDigits: 2}));
+  });
+});
+
+describe('interactive marks — every registered kind', async () => {
+  for (const {kind, props, firstLabel, firstValue} of KINDS) {
+    it(`${kind}: renders focusable data marks labelled with label + value`, async () => {
+      const {container} = await renderChart({kind, ...props});
+      const found = marks(container);
+      expect(found.length).toBeGreaterThanOrEqual(2);
+      // Keyboard-accessible: focusable + a descriptive aria-label.
+      for (const m of found) expect(m.getAttribute('tabindex')).toBe('0');
+      expect(found[0].getAttribute('aria-label')).toBe(`${firstLabel}: ${firstValue}`);
+      expect(found[0].getAttribute('aria-haspopup')).toBe('menu');
+    });
+
+    it(`${kind}: focus shows a tooltip and highlights that mark, dimming the rest`, async () => {
+      const {container} = await renderChart({kind, ...props});
+      const found = marks(container);
+      fireEvent.focus(found[0]);
+      // Tooltip carries the same label + value.
+      const tip = container.querySelector('.obe-chart-tooltip')!;
+      expect(tip).toBeTruthy();
+      expect(tip.textContent).toContain(firstLabel);
+      expect(tip.textContent).toContain(firstValue);
+      // Highlight is shared scaffold: active mark emphasised, others de-emphasised.
+      const after = marks(container);
+      expect(after[0].classList.contains('is-active')).toBe(true);
+      expect(after[1].classList.contains('is-dim')).toBe(true);
+      // Blur clears it.
+      fireEvent.blur(found[0]);
+      expect(container.querySelector('.obe-chart-tooltip')).toBeNull();
+    });
+  }
+});
+
+describe('KPI / number tile', async () => {
+  it('reduces a scalar to one focusable figure mark', async () => {
+    const {container} = await renderChart({kind: 'kpi', source: '42', labels: 'Revenue'});
+    const found = marks(container);
+    expect(found.length).toBe(1);
+    expect(found[0].getAttribute('aria-label')).toBe('Revenue: 42');
+    expect(container.querySelector('.obe-chart-kpi-value')?.textContent).toBe('42');
+    expect(container.querySelector('.obe-chart-kpi-caption')?.textContent).toBe('Revenue');
+  });
+
+  it('sums a series and shows no progress bar without a target', async () => {
+    const {container} = await renderChart({kind: 'kpi', source: '[10, 20, 30]'});
+    expect(container.querySelector('.obe-chart-kpi-value')?.textContent).toBe('60');
+    expect(container.querySelector('.obe-chart-kpi-track')).toBeNull();
+  });
+
+  it('renders a target readout + progress bar from a {value, target} object', async () => {
+    const {container} = await renderChart({kind: 'kpi', source: '{value: 82, target: 100}'});
+    expect(container.querySelector('.obe-chart-kpi-value')?.textContent).toBe('82');
+    expect(container.querySelector('.obe-chart-kpi-sub')?.textContent).toBe('82% of 100');
+    expect(container.querySelector('.obe-chart-kpi-track')).toBeTruthy();
+  });
+
+  it('shows the placeholder when there is nothing numeric to reduce', async () => {
+    const {container} = await renderChart({kind: 'kpi', source: '{}'});
+    expect(container.querySelector('.obe-chart-kpi-value')).toBeNull();
+    expect(container.querySelector('.obe-chart-msg')).toBeTruthy();
+  });
+});
+
+describe('context menu', async () => {
+  it('opens on keyboard (Enter) with Copy value + Change chart kind', async () => {
+    const {container} = await renderChart({kind: 'bar', source: '[3, 1, 4]', labels: 'A, B, C'});
+    fireEvent.keyDown(marks(container)[0], {key: 'Enter'});
+    expect(screen.getByText('Copy value')).toBeTruthy();
+    expect(screen.getByText('Change chart kind')).toBeTruthy();
+  });
+
+  it('opens on right-click too', async () => {
+    const {container} = await renderChart({kind: 'pie', source: '{Apples: 3, Pears: 5}'});
+    fireEvent.contextMenu(marks(container)[0]);
+    expect(screen.getByText('Copy value')).toBeTruthy();
+  });
+
+  it('hides Change chart kind when the chart is read-only (Copy value stays)', async () => {
+    const {container} = await renderChart({kind: 'bar', source: '[3, 1, 4]', labels: 'A, B, C'}, {readOnly: true});
+    fireEvent.keyDown(marks(container)[0], {key: 'Enter'});
+    expect(screen.getByText('Copy value')).toBeTruthy();
+    expect(screen.queryByText('Change chart kind')).toBeNull();
+  });
+
+  it('Copy value writes "label: value" to the clipboard', async () => {
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {writeText: (t: string) => ((copied = t), Promise.resolve())},
+    });
+    const {container} = await renderChart({kind: 'bar', source: '[3, 1, 4]', labels: 'A, B, C'});
+    fireEvent.keyDown(marks(container)[0], {key: 'Enter'});
+    fireEvent.click(screen.getByText('Copy value'));
+    expect(copied).toBe('A: 3');
+  });
+
+  it('action mode copies on right-click without replacing left-click drill-down', () => {
+    let copied = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {writeText: (t: string) => ((copied = t), Promise.resolve())},
+    });
+    const onSelect = vi.fn();
+    const outerContextMenu = vi.fn();
+    const {container} = render(
+      <div onContextMenu={outerContextMenu}>
+        <KitChartPlot
+          kind="bar"
+          value={[3, 1]}
+          labels={['A', 'B']}
+          palette={PALETTE}
+          ariaLabel="Action chart"
+          mode="action"
+          onSelect={onSelect}
+        />
+      </div>,
+    );
+    const mark = marks(container)[0];
+
+    fireEvent.contextMenu(mark);
+    expect(screen.getByText('Copy value')).toBeTruthy();
+    expect(outerContextMenu).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Copy value'));
+    expect(copied).toBe('A: 3');
+
+    fireEvent.click(mark);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({label: 'A', value: 3}));
+  });
+
+  it('decorative mode keeps arcs aria-hidden and offers Copy value only on right-click', () => {
+    const onSelect = vi.fn();
+    const {container} = render(
+      <KitChartPlot
+        kind="pie"
+        value={{Apples: 3, Pears: 5}}
+        palette={PALETTE}
+        ariaLabel="Decorative chart"
+        mode="decorative"
+        onSelect={onSelect}
+      />,
+    );
+    const mark = marks(container)[0];
+    expect(mark.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.queryByText('Copy value')).toBeNull();
+
+    fireEvent.contextMenu(mark);
+    expect(screen.getByText('Copy value')).toBeTruthy();
+    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(mark);
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({label: 'Apples', value: 3}));
+  });
+});
+
+describe('additive render contract — no interactions', async () => {
+  // The static-export / provider-less / test path: `<Mark>` is an inert
+  // passthrough, so the invariant is that NO `.obe-chart-mark` interaction
+  // wrappers are emitted. The kinds still draw their data elements — including,
+  // for line/area, the per-point `.obe-chart-dot` hit circles, which always ship
+  // but are invisible (`.obe-chart-dot { fill-opacity: 0 }`); they add no visual
+  // change, so this path stays byte-equivalent in appearance.
+  it('bar: no interaction wrappers, bars still draw', async () => {
+    const args: ChartRenderArgs = {value: [3, 1, 4], labels: ['A', 'B', 'C'], palette: PALETTE};
+    const {container} = render(<svg>{getChartKind('bar')!.render(args)}</svg>);
+    expect(container.querySelectorAll('.obe-chart-mark').length).toBe(0);
+    expect(container.querySelectorAll('rect').length).toBeGreaterThanOrEqual(3);
+  });
+
+  for (const kind of ['line', 'area'] as const) {
+    it(`${kind}: no interaction wrappers even though invisible hit dots ship`, async () => {
+      const args: ChartRenderArgs = {value: [3, 1, 4], labels: ['A', 'B', 'C'], palette: PALETTE};
+      const {container} = render(<svg>{getChartKind(kind)!.render(args)}</svg>);
+      // The true invariant: zero interaction wrappers in the no-context path…
+      expect(container.querySelectorAll('.obe-chart-mark').length).toBe(0);
+      // …while the always-shipped (invisible) point dots are still present.
+      expect(container.querySelectorAll('.obe-chart-dot').length).toBe(3);
+    });
+  }
+
+  it('heatmap: no interaction wrappers, cells still draw', async () => {
+    const args: ChartRenderArgs = {value: {a: [1, 2], b: [3, 4]}, labels: ['X', 'Y'], palette: PALETTE};
+    const {container} = render(<svg>{getChartKind('heatmap')!.render(args)}</svg>);
+    expect(container.querySelectorAll('.obe-chart-mark').length).toBe(0);
+    // 4 cell rects, each with a fill-opacity intensity.
+    expect(container.querySelectorAll('rect[fill-opacity]').length).toBe(4);
+    // Values 4 and 3 clear the intensity threshold → the strong (fixed-dark) ink;
+    // 1 and 2 keep the theme foreground. Proves the theme-agnostic label contrast.
+    expect(container.querySelectorAll('.obe-chart-heat-label').length).toBe(4);
+    expect(container.querySelectorAll('.obe-chart-heat-label-strong').length).toBe(2);
+  });
+
+  it('combo: no interaction wrappers, bars + line still draw, legend glyphs match', async () => {
+    const args: ChartRenderArgs = {value: {Sales: [3, 1, 4], Trend: [2, 2, 2]}, labels: ['A', 'B', 'C'], palette: PALETTE};
+    const {container} = render(<svg>{getChartKind('combo')!.render(args)}</svg>);
+    expect(container.querySelectorAll('.obe-chart-mark').length).toBe(0);
+    expect(container.querySelectorAll('rect').length).toBeGreaterThanOrEqual(3); // bars
+    expect(container.querySelectorAll('polyline').length).toBe(1); // the trend line
+    // Legend: the bar series (Sales) keeps a square swatch, the line series
+    // (Trend) gets a rule glyph — one of each inside the legend group.
+    const legend = container.querySelector('.obe-chart-legend')!;
+    expect(legend.querySelectorAll('rect').length).toBe(1);
+    expect(legend.querySelectorAll('.obe-chart-legend-line').length).toBe(1);
+  });
+
+  it('kpi: no interaction wrapper, the figure still renders', async () => {
+    const args: ChartRenderArgs = {value: {value: 82, target: 100}, labels: ['Revenue'], palette: PALETTE};
+    const {container} = render(<svg>{getChartKind('kpi')!.render(args)}</svg>);
+    expect(container.querySelectorAll('.obe-chart-mark').length).toBe(0);
+    expect(container.querySelector('.obe-chart-kpi-value')?.textContent).toBe('82');
+  });
+});
+
+it('funnel labels use per-stage readable ink without a CSS fill override', () => {
+  const palette = ['#1b2a4a', '#e4a33c'];
+  const {container} = render(<KitChartPlot kind="funnel" value={[10, 5]} labels={['Visit', 'Won']} palette={palette} ariaLabel="Funnel" />);
+  const labels = container.querySelectorAll('.obe-chart-funnel-label');
+  expect(labels).toHaveLength(2);
+  labels.forEach((label, i) => expect(label.getAttribute('fill')).toBe(readableTextColor(palette[i])));
+  const css: string = readFileSync('src/index.css', 'utf8');
+  const rule = css.match(/\.obe-chart-funnel-label\s*\{([^}]+)\}/)?.[1];
+  expect(rule).toBeTruthy();
+  expect(rule).not.toMatch(/\bfill\s*:/);
+});
+
+
+describe('kit pixel geometry', () => {
+  it('shrinks a long KPI value at w=240/h=150 and keeps its top below the caption baseline', () => {
+    const args: ChartRenderArgs = {
+      value: {value: 12345678.9, target: 20000000}, labels: ['Revenue'], palette: PALETTE, width: 240, height: 150,
+    };
+    const {container} = render(<svg>{getChartKind('kpi')!.render(args)}</svg>);
+    const value = container.querySelector<SVGTextElement>('.obe-chart-kpi-value')!;
+    const caption = container.querySelector<SVGTextElement>('.obe-chart-kpi-caption')!;
+    const fontSize = Number.parseFloat(value.style.fontSize);
+    expect(value.textContent!.length).toBeGreaterThanOrEqual(9);
+    expect(fontSize).toBeGreaterThan(0);
+    expect(fontSize).toBeLessThan(60);
+    // A full em above the baseline conservatively bounds the digit tops.
+    const valueTop = Number(value.getAttribute('y')) - fontSize;
+    expect(Number(caption.getAttribute('y'))).toBeLessThan(valueTop);
+  });
+
+  it('keeps the KPI value below its caption at 320px width', async () => {
+    let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: typeof resize) { resize = callback; }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    });
+    try {
+      const {container, unmount, doc} = await renderChart({kind: 'kpi', source: '{value: 50, target: 100}', labels: 'Revenue'});
+      act(() => resize([{contentRect: {width: 320}}]));
+      const value = container.querySelector('.obe-chart-kpi-value')!;
+      const caption = container.querySelector('.obe-chart-kpi-caption')!;
+      expect(Number(value.getAttribute('y'))).toBeGreaterThanOrEqual(Number(caption.getAttribute('y')) + 40);
+      unmount();
+      doc.destroy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each([...KINDS, {kind: 'kpi', props: {source: '{value: 50, target: 100}', labels: 'Revenue'}}])(
+    '$kind follows content width, including marks, labels and legends', async ({kind, props}) => {
+      let resize: (entries: Array<{contentRect: {width: number}}>) => void = () => {};
+      const disconnect = vi.fn();
+      vi.stubGlobal('ResizeObserver', class {
+        constructor(callback: typeof resize) { resize = callback; }
+        observe = vi.fn();
+        disconnect = disconnect;
+      });
+      try {
+        const {container, unmount, doc} = await renderChart({kind, ...props});
+        const svg = container.querySelector('svg.obe-chart-svg')!;
+        expect(svg.getAttribute('viewBox')).toBe('0 0 640 240');
+        for (const [width, height] of [[1200, 240], [400, 150]]) {
+          act(() => resize([{contentRect: {width}}]));
+          expect(svg.getAttribute('viewBox')).toBe(`0 0 ${width} ${height}`);
+          expect(marks(container).length).toBeGreaterThan(0);
+          // All numeric marks and label anchors must stay inside the measured box.
+          for (const node of svg.querySelectorAll('rect, circle, text')) {
+            for (const [attr, limit] of [['x', width], ['cx', width], ['y', height], ['cy', height]] as const) {
+              if (node.hasAttribute(attr)) {
+                const value = Number(node.getAttribute(attr));
+                expect(value).toBeGreaterThanOrEqual(0);
+                expect(value).toBeLessThanOrEqual(limit);
+              }
+            }
+          }
+          const grid = svg.querySelector('.obe-chart-grid line');
+          if (['line', 'area', 'bar', 'scatter', 'combo'].includes(kind)) {
+            expect(grid?.getAttribute('x1')).toBe('40');
+            expect(grid?.getAttribute('x2')).toBe(String(width - 28));
+          }
+          const xLabel = svg.querySelector('.obe-chart-xlabels text');
+          if (xLabel) expect(xLabel.getAttribute('y')).toBe(String(height - (kind === 'heatmap' ? 7 : 8)));
+          if (['pie', 'donut'].includes(kind)) {
+            expect(svg.querySelector('.obe-chart-legend > g')?.getAttribute('transform'))
+              .toBe(`translate(${height + 24}, 28)`);
+            expect(svg.querySelector('path')?.getAttribute('d')).toContain(String(height / 2));
+          }
+          if (kind === 'kpi') expect(svg.querySelector('.obe-chart-kpi-value')?.getAttribute('x')).toBe(String(width / 2));
+          if (['line', 'area'].includes(kind)) {
+            const dots = svg.querySelectorAll('.obe-chart-dot');
+            expect(dots[0].getAttribute('cx')).toBe('40');
+            expect(dots[dots.length - 1].getAttribute('cx')).toBe(String(width - 28));
+          }
+          if (kind === 'combo') expect(svg.querySelector('.obe-chart-legend > g')?.getAttribute('transform')).toBe(`translate(${width - 118}, 16)`);
+        }
+        act(() => resize([{contentRect: {width: 0}}]));
+        expect(svg.getAttribute('viewBox')).toBe('0 0 400 150');
+        unmount();
+        expect(disconnect).toHaveBeenCalled();
+        doc.destroy();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+});

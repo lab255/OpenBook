@@ -1,5 +1,5 @@
 /**
- * The desktop implementation of `PlatformLibrary.updates` (OB-342): version
+ * The desktop implementation of `PlatformCapabilities.updates` (OB-342): version
  * surface + update check + download/relaunch, wrapping the Tauri v2 updater.
  *
  * Config-vs-JS asymmetry (intentional, security-relevant): there are TWO
@@ -48,12 +48,14 @@ export function createDesktopUpdates(): UpdatesPlatform {
 
     // Stage the newest same-major update via the pinned manifest + pubkey. The
     // plugin's check() returns null when the manifest says we're current (its
-    // 204 path) — that's a successful no-op, not an error. Download/signature
-    // failures reject, per the contract; callers own that error surface.
-    downloadAndInstall: async (): Promise<void> => {
+    // 204 path) — that's a successful no-op (→ false), not an error, and the
+    // caller must not relaunch on it. A staged update returns true. Download/
+    // signature failures reject, per the contract; callers own that surface.
+    downloadAndInstall: async (): Promise<boolean> => {
       const update = await check();
-      if (!update) return;
+      if (!update) return false;
       await update.downloadAndInstall();
+      return true;
     },
 
     // Apply a staged update by relaunching (tauri-plugin-process).

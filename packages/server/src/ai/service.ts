@@ -1,11 +1,14 @@
-import {createWriteStream, existsSync, mkdirSync} from 'node:fs';
-import {rename, unlink} from 'node:fs/promises';
+import {existsSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
-import {providerSettings, type AiConfig, type AiProvider, type AiSearchResponse, type AiStatus, type AiTasksResponse} from '@book.dev/sdk';
+import {providerSettings, type AiConfig, type AiProvider, type AiProviderSettings, type AiSearchResponse, type AiStatus, type AiTasksResponse} from '@book.dev/sdk';
 import type {Db} from '../db';
-import {createEngine, type AiEngine, type GenerateOptions} from './providers';
-import {bm25Scores, buildIndex, chunkText, cosine, parseTaskList, snapshotText, snippetFor, type Bm25Index, type IndexedDoc} from './search';
+import {createEngine, MockEngine, OpenAiCompatEngine, type TranscriptionEngine, type AiEngine, type GenerateOptions} from './providers';
+import {assembleSearchResults, bm25Scores, buildIndex, cosine, pageRowsToDocs, parseTaskList, type Bm25Index} from './search';
+import {WHISPER_MODEL} from './whisper';
 import {SkillStore} from './skills';
+import {downloadFile} from './download';
+import {downloadPinned} from './pinnedDownload';
+import {WHISPER_MODEL_PIN} from './runtimeManifest';
 
 /**
  * The optional local-AI subsystem: holds the configured engine, the note
@@ -20,6 +23,69 @@ import {SkillStore} from './skills';
 
 const DEFAULT_CONFIG: AiConfig = {provider: 'off'};
 
+/**
+ * Resolve one incoming API-key field against its stored value. The key is
+ * WRITE-ONLY over the wire (the status route never returns it), so the settings
+ * form saves back a config with the field blank — which must not wipe the secret.
+ * Convention (see {@link AiProviderSettings.apiKey}):
+ *   • `undefined` / blank / whitespace-only → PRESERVE the stored key (blank-on-save no-op);
+ *   • a non-empty string                    → set the new (trimmed) key;
+ *   • explicit `null`                        → CLEAR the stored key.
+ */
+function resolveKey(prev: string | null | undefined, next: string | null | undefined): string | undefined {
+  if (next === null) return undefined; // explicit clear
+  if (next === undefined) return prev ?? undefined; // omitted → preserve stored
+  const v = next.trim();
+  if (v === '') return prev ?? undefined; // blank / whitespace-only → preserve (no unclearable ghost key)
+  return v; // new key (trimmed)
+}
+
+/**
+ * Merge an incoming {@link AiConfig} over the stored one, preserving API keys the
+ * client can't see (per {@link resolveKey}) and dropping the response-only
+ * `apiKeySet` flags so they never get persisted. Covers the legacy flat `apiKey`
+ * and every `providers[*].apiKey`. The provider map is OVERLAID onto the stored
+ * one, not rebuilt from `next`: a provider omitted from a partial PUT keeps its
+ * stored settings (and secret) untouched, while a provider present in `next`
+ * replaces its entry with the incoming settings + its resolved key.
+ */
+function mergeStoredKeys(prev: AiConfig, next: AiConfig): AiConfig {
+  const merged: AiConfig = {...next};
+  delete merged.apiKeySet;
+  const flat = resolveKey(prev.apiKey, next.apiKey);
+  if (flat === undefined) delete merged.apiKey;
+  else merged.apiKey = flat;
+  const prevProviders = prev.providers ?? {};
+  if (next.providers || prev.providers) {
+    // Start from the stored providers so an OMITTED provider keeps its key…
+    const out: Partial<Record<AiProvider, AiProviderSettings>> = {};
+    for (const [p, settings] of Object.entries(prevProviders)) {
+      const carried: AiProviderSettings = {...settings};
+      delete carried.apiKeySet; // response-only flag never persists
+      out[p as AiProvider] = carried;
+    }
+    // …then overlay each provider present in `next`, resolving its write-only key.
+    for (const [p, settings] of Object.entries(next.providers ?? {})) {
+      if (!settings || typeof settings !== 'object') continue; // ignore a malformed `{claude: null}` entry
+      const safe: AiProviderSettings = {...settings};
+      delete safe.apiKeySet;
+      const key = resolveKey(prevProviders[p as AiProvider]?.apiKey, settings.apiKey);
+      if (key === undefined) delete safe.apiKey;
+      else safe.apiKey = key;
+      out[p as AiProvider] = safe;
+    }
+    merged.providers = out as AiConfig['providers'];
+  }
+  if (next.transcription || prev.transcription) {
+    merged.transcription = {...(next.transcription ?? prev.transcription!)};
+    delete merged.transcription.apiKeySet;
+    const key = resolveKey(prev.transcription?.apiKey, next.transcription?.apiKey);
+    if (key === undefined) delete merged.transcription.apiKey;
+    else merged.transcription.apiKey = key;
+  }
+  return merged;
+}
+
 /** A small, capable default for the in-process engine (~0.9 GB Q4). */
 export const DEFAULT_MODEL_URL =
   'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf';
@@ -32,6 +98,9 @@ interface DownloadState {
   error?: string;
 }
 
+export class TranscriptionConfigError extends Error {}
+export class ModelDownloadConfigError extends Error {}
+
 export class AiService {
   private config: AiConfig = DEFAULT_CONFIG;
   private engine: AiEngine | null = null;
@@ -41,12 +110,17 @@ export class AiService {
   private indexedVersion = -1;
   private download: DownloadState | null = null;
   private loaded = false;
-  /** User-authored prompt/recipe skills (per-workspace markdown). */
+  private readonly downloadsAbort = new AbortController();
+  private pendingDownload?: Promise<void>;
+  /** User-authored prompt/recipe skills (per-library markdown). */
   readonly skills: SkillStore;
 
   constructor(
     private readonly db: Db,
     private readonly modelsDir: string,
+    /** MEET-3: lazily resolve the managed local audio backend. */
+    private readonly localTranscription?: () => Promise<TranscriptionEngine | null>,
+    private readonly localLifecycle?: {status(): Promise<NonNullable<AiStatus['transcription']>>; dispose(): Promise<void>; provision?(signal?: AbortSignal): Promise<void>},
   ) {
     this.skills = new SkillStore(db);
   }
@@ -64,6 +138,7 @@ export class AiService {
     }
     this.loaded = true;
     this.engine = createEngine(this.config, this.modelsDir);
+    if (this.config.transcription?.provider === 'local') await this.startDownload(WHISPER_MODEL_PIN.url);
   }
 
   async getConfig(): Promise<AiConfig> {
@@ -74,14 +149,31 @@ export class AiService {
   async setConfig(next: AiConfig): Promise<AiConfig> {
     await this.loadConfig();
     await this.engine?.dispose().catch(() => undefined);
-    this.config = {...DEFAULT_CONFIG, ...next};
+    this.config = mergeStoredKeys(this.config, {...DEFAULT_CONFIG, ...next});
     await this.db.query(
       `INSERT INTO settings (key, value) VALUES ('ai', $1)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [JSON.stringify(this.config)],
     );
     this.engine = createEngine(this.config, this.modelsDir);
+    if (this.config.transcription?.provider === 'local') await this.startDownload(WHISPER_MODEL_PIN.url);
     return this.config;
+  }
+
+  /** Resolve once per request so config changes cannot bypass the paid gate. */
+  async transcriptionBackend(): Promise<{engine: TranscriptionEngine; provider: 'local' | 'mock' | 'openai-compat'; model: string}> {
+    const config = await this.getConfig();
+    const audio = config.transcription;
+    if (audio?.provider === 'off') {
+      throw new TranscriptionConfigError('Transcription is off. Enable it in Settings → AI.');
+    }
+    if (audio?.provider === 'openai-compat') {
+      return {engine: new OpenAiCompatEngine(audio.baseUrl?.trim() || 'https://api.openai.com', audio.model?.trim() || 'whisper-1', 'openai', audio.apiKey), provider: 'openai-compat', model: audio.model?.trim() || 'whisper-1'};
+    }
+    const local = await this.localTranscription?.();
+    if (local) return {engine: local, provider: 'local', model: WHISPER_MODEL};
+    if (config.provider === 'mock') return {engine: new MockEngine(), provider: 'mock', model: 'mock'};
+    throw new TranscriptionConfigError('Local transcription is unavailable. Download the Whisper model and check the local runtime in Settings → AI.');
   }
 
   async status(): Promise<AiStatus> {
@@ -100,6 +192,7 @@ export class AiService {
     }
     return {
       config: this.config,
+      transcription: await this.localLifecycle?.status(),
       ready,
       embeddings,
       detail,
@@ -122,33 +215,20 @@ export class AiService {
     const rows = await this.db.query<{id: string; name: string | null; data: unknown}>(
       'SELECT id, name, data FROM pages WHERE deleted_at IS NULL',
     );
-    const docs: IndexedDoc[] = [];
-    for (const row of rows) {
-      const data = typeof row.data === 'string' ? (JSON.parse(row.data) as never) : (row.data as never);
-      const text = snapshotText(data);
-      if (!text && !row.name) continue;
-      const chunks = chunkText(text);
-      if (chunks.length === 0) chunks.push('');
-      chunks.forEach((chunk, chunkIndex) => {
-        docs.push({pageId: row.id, title: row.name ?? 'Untitled', chunkIndex, text: chunk});
-      });
-    }
-    this.index = buildIndex(docs);
+    this.index = buildIndex(pageRowsToDocs(rows));
     this.indexBuiltAt = new Date();
     this.indexedVersion = version;
     return this.index;
   }
 
   /**
-   * Rank the index for a query. `canRead`, when supplied, is the per-principal
-   * access gate (OB-190 follow-up): a page is only emitted as a result when it
-   * passes — so a shared instance can't leak `restricted`/`members` snippets to a
-   * caller who can't read those pages. Filtering happens during the per-page
-   * dedup so the caller still gets up to `limit` *readable* hits (we walk the
-   * whole ranked candidate set, not just its top slice), with no existence oracle
-   * (an unreadable page is silently skipped, never surfaced).
+   * Rank the index for a query. `canInclude`, when supplied, is the
+   * per-principal access + discovery gate: a page is only emitted as a result
+   * when it passes, so a shared instance can't leak restricted or unlisted
+   * snippets. Filtering happens during per-page dedup so the caller still gets
+   * up to `limit` eligible hits, with no existence oracle.
    */
-  async search(query: string, limit = 8, canRead?: (pageId: string) => Promise<boolean>): Promise<AiSearchResponse> {
+  async search(query: string, limit = 8, canInclude?: (pageId: string) => Promise<boolean>): Promise<AiSearchResponse> {
     const index = await this.ensureIndex();
     const lexical = bm25Scores(index, query).slice(0, limit * 4);
 
@@ -175,23 +255,8 @@ export class AiService {
       }
     }
 
-    // One result per page (best chunk wins), gated to the pages the caller may read.
-    const seen = new Set<string>();
-    const results = [];
-    for (const {i, score} of ranked) {
-      const doc = index.docs[i];
-      if (seen.has(doc.pageId)) continue;
-      seen.add(doc.pageId);
-      if (canRead && !(await canRead(doc.pageId))) continue;
-      results.push({
-        pageId: doc.pageId,
-        title: doc.title,
-        snippet: snippetFor(doc.text, query),
-        score: Math.round(score * 1000) / 1000,
-      });
-      if (results.length >= limit) break;
-    }
-    return {results, mode};
+    // One result per page (best chunk wins), gated to what the caller may enumerate.
+    return {results: await assembleSearchResults(index, ranked, query, limit, canInclude), mode};
   }
 
   // ── Generation ─────────────────────────────────────────────────────────────
@@ -279,45 +344,43 @@ export class AiService {
   // ── Model downloads (llama provider) ───────────────────────────────────────
 
   async startDownload(url = DEFAULT_MODEL_URL): Promise<DownloadState> {
+    this.downloadsAbort.signal.throwIfAborted();
     await this.loadConfig();
     if (this.download && !this.download.done && !this.download.error) return this.download;
-    const fileName = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'model.gguf');
+    let fileName: string;
+    try {
+      fileName = decodeURIComponent(new URL(url).pathname.split('/').pop() || 'model.gguf');
+    } catch {
+      throw new ModelDownloadConfigError('Invalid model download URL or filename encoding.');
+    }
+    if (fileName !== path.basename(fileName) || fileName === '.' || fileName === '..' || fileName.includes('\\')) throw new ModelDownloadConfigError('Invalid model filename');
     mkdirSync(this.modelsDir, {recursive: true});
     const dest = path.join(this.modelsDir, fileName);
     const state: DownloadState = {url, received: 0, total: null, done: false};
     this.download = state;
 
-    void (async () => {
-      const partial = `${dest}.part`;
+    this.pendingDownload = (async () => {
       try {
-        if (existsSync(dest)) {
+        if (fileName === WHISPER_MODEL) {
+          // Never allow an arbitrary URL to populate the managed Whisper filename.
+          const runtimeError = await this.localLifecycle?.provision?.(this.downloadsAbort.signal).then(() => undefined, (e: unknown) => e);
+          this.downloadsAbort.signal.throwIfAborted();
+          await downloadPinned(WHISPER_MODEL_PIN, dest, (progress) => Object.assign(state, progress), this.downloadsAbort.signal);
+          state.done = true;
+          if (runtimeError) state.error = runtimeError instanceof Error ? runtimeError.message : String(runtimeError);
+        } else if (existsSync(dest)) {
           state.done = true;
           state.received = state.total ?? 0;
         } else {
-          const res = await fetch(url, {redirect: 'follow'});
-          if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-          state.total = Number(res.headers.get('content-length')) || null;
-          const out = createWriteStream(partial);
-          const reader = res.body.getReader();
-          for (;;) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            state.received += value.byteLength;
-            await new Promise<void>((resolve, reject) => {
-              out.write(value, (err) => (err ? reject(err) : resolve()));
-            });
-          }
-          await new Promise<void>((resolve, reject) => out.end((err: Error | null | undefined) => (err ? reject(err) : resolve())));
-          await rename(partial, dest);
+          await downloadFile(url, dest, (progress) => Object.assign(state, progress), undefined, this.downloadsAbort.signal);
           state.done = true;
         }
         // Auto-select the downloaded model for the llama provider.
-        if (this.config.provider === 'llama' && !this.config.model) {
+        if (fileName !== WHISPER_MODEL && this.config.provider === 'llama' && !this.config.model) {
           await this.setConfig({...this.config, model: fileName});
         }
       } catch (err) {
         state.error = err instanceof Error ? err.message : String(err);
-        await unlink(partial).catch(() => undefined);
       }
     })();
 
@@ -325,6 +388,7 @@ export class AiService {
   }
 
   async dispose(): Promise<void> {
-    await this.engine?.dispose().catch(() => undefined);
+    this.downloadsAbort.abort();
+    await Promise.all([this.pendingDownload, this.engine?.dispose().catch(() => undefined), this.localLifecycle?.dispose()]);
   }
 }

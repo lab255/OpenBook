@@ -1,4 +1,5 @@
 import {defineConfig, devices} from '@playwright/test';
+import {singleProcessConfig} from './e2e/single-process';
 
 /**
  * Playwright e2e for the web shell. Playwright manages one Next.js dev server
@@ -11,7 +12,8 @@ import {defineConfig, devices} from '@playwright/test';
  *
  * Prerequisite: the workspace libs must be built (`pnpm build:libs`) — Next dev
  * and the tsx servers both resolve `@book.dev/{ui,sdk}` from their dist. CI
- * runs `verify` (which builds libs) before this.
+ * restores the shared built-libs cache in each browser job and runs
+ * `pnpm build:libs` on a cache miss before starting Playwright.
  *
  * Visual diffs: archiving is decoupled from functional runs (OB-222). Tests
  * import from `e2e/fixtures`, which only extends `@chromatic-com/playwright`
@@ -19,7 +21,11 @@ import {defineConfig, devices} from '@playwright/test';
  * `@playwright/test`. `pnpm chromatic` sets that flag, archives just the
  * `@visual` specs, then uploads (needs CHROMATIC_PROJECT_TOKEN).
  */
-const WEB_PORT = 3000;
+// Overridable for machines where :3000 is held by an UNRELATED app: with
+// `reuseExistingServer` on locally, Playwright would happily point every spec
+// at whatever squats there and fail all of them against a foreign page.
+// Default (and CI) stays 3000.
+const WEB_PORT = Number(process.env.OPENBOOK_WEB_PORT ?? 3000);
 
 export default defineConfig({
   testDir: './e2e',
@@ -44,6 +50,12 @@ export default defineConfig({
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // STAB-8: the server's guest-write gate rejects an unauthenticated mutating
+    // request that lacks the first-party `X-OpenBook-Client` marker. Real clients send
+    // it via the sdk transport; the `request` fixture's hand-rolled seed writes need it
+    // set here so they aren't 403'd. (Node-context raw `fetch` calls in specs/fixtures
+    // set it inline — `extraHTTPHeaders` only covers Playwright-issued requests.)
+    extraHTTPHeaders: {'X-OpenBook-Client': '1'},
   },
   projects: [{name: 'chromium', use: {...devices['Desktop Chrome']}}],
   webServer: {
@@ -52,4 +64,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
-});
+}, singleProcessConfig());

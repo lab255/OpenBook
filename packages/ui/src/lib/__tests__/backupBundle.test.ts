@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {remapBundle, type SpaceBackup, type StoredDatabase, type StoredPage} from '@book.dev/sdk';
-import {bundleRoots, closure, overwriteCount, parseBackup} from '../backupBundle';
+import {remapBundle, type LibraryBackup, type StoredDatabase, type StoredPage} from '@book.dev/sdk';
+import {backupAccessDelta, bundleRoots, closure, overwriteCount, parseBackup} from '../backupBundle';
 
 const page = (id: string, over: Partial<StoredPage> = {}): StoredPage => ({
   id,
@@ -25,7 +25,7 @@ const db = (id: string, pageId: string): StoredDatabase => ({
   updatedAt: '2026-01-01T00:00:00.000Z',
 });
 
-const backup = (pages: StoredPage[], databases: StoredDatabase[] = []): SpaceBackup => ({
+const backup = (pages: StoredPage[], databases: StoredDatabase[] = []): LibraryBackup => ({
   version: 1,
   exportedAt: '2026-01-01',
   pages,
@@ -36,6 +36,58 @@ describe('parseBackup', () => {
   it('rejects non-backup JSON', () => {
     expect(() => parseBackup('{}')).toThrow();
     expect(() => parseBackup(JSON.stringify({version: 1, pages: [], databases: []}))).not.toThrow();
+  });
+
+  it('carries the v2 ledger durability section through (LGR-15) — dropping it would export a book whose restore cannot verify', () => {
+    const ledger = {settings: {ledgerDb: {}}, audit: [], assets: []};
+    const parsed = parseBackup(JSON.stringify({version: 2, pages: [], databases: [], ledger}));
+    expect(parsed.ledger).toEqual(ledger);
+    // …and a v1 file simply has none.
+    expect(parseBackup(JSON.stringify({version: 1, pages: [], databases: []})).ledger).toBeUndefined();
+  });
+
+  it('carries the v3 asset, page-access, and skipped manifests through unchanged (OB-699)', () => {
+    const assets = [{id: 'a'.repeat(64), mime: 'image/png', size: 1, bytesBase64: 'AA==', refs: ['p']}];
+    const pageAccess = [{pageId: 'p', visibility: 'restricted', agentEdits: 'suggest', acl: []}];
+    const skipped = [{id: 'b'.repeat(64), refs: ['p'], reason: 'missing-bytes'}];
+    const parsed = parseBackup(JSON.stringify({
+      version: 3,
+      instanceId: 'instance-a',
+      ownerSubject: 'account#owner',
+      pages: [page('p')],
+      databases: [],
+      assets,
+      pageAccess,
+      skipped,
+    }));
+    expect(parsed.assets).toEqual(assets);
+    expect(parsed.pageAccess).toEqual(pageAccess);
+    expect(parsed.skipped).toEqual(skipped);
+    expect(parsed.instanceId).toBe('instance-a');
+    expect(parsed.ownerSubject).toBe('account#owner');
+  });
+
+  it('rejects invalid and future format versions', () => {
+    expect(() => parseBackup(JSON.stringify({version: 0, pages: [], databases: []}))).toThrow();
+    expect(() => parseBackup(JSON.stringify({version: 4, pages: [], databases: []}))).toThrow();
+  });
+});
+
+describe('backupAccessDelta', () => {
+  it('counts only selected public pages, subject grants, and direct-agent relaxations', () => {
+    const acl = (subject: string | null, email: string | null) => ({
+      subject,
+      email,
+      issuer: email ? 'https://account.example' : null,
+      level: 'write' as const,
+      invitedBy: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(backupAccessDelta([
+      {pageId: 'a', visibility: 'public', agentEdits: 'direct', acl: [acl('acct#a', null), acl(null, 'a@example.com')]},
+      {pageId: 'b', visibility: 'restricted', agentEdits: 'direct', acl: [acl('acct#b', null)]},
+      {pageId: 'c', visibility: 'public', agentEdits: 'suggest', acl: [acl('acct#c', null)]},
+    ], new Set(['a', 'b']))).toEqual({publicPages: 1, subjectGrants: 2, agentEditRelaxations: 2});
   });
 });
 

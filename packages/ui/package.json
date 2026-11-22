@@ -1,10 +1,10 @@
 {
   "name": "@book.dev/ui",
-  "version": "1.72.0",
+  "version": "3.29.0",
   "description": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eliotlim/OpenBook.git",
+    "url": "git+https://github.com/lab255/OpenBook.git",
     "directory": "packages/ui"
   },
   "publishConfig": {
@@ -14,25 +14,32 @@
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "fonts"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/style.css",
+    "./app-font.css": "./fonts/app-font.css"
   },
   "module": "dist/index.js",
   "scripts": {
-    "build": "pnpm run build:viewer && vite build && tsc",
+    "build": "pnpm run gen:bundled-plugins && pnpm run build:viewer && vite build && tsc",
+    "gen:bundled-plugins": "node --import tsx scripts/bundlePlugins.ts",
+    "check:gen": "pnpm run gen:bundled-plugins && (git diff --exit-code -- src/plugins/bundled.gen.ts src/export/ledgerFolds.gen || (echo 'Committed .gen mirror is STALE: run pnpm --filter @book.dev/ui run gen:bundled-plugins and commit the result.' >&2 && exit 1))",
     "build:viewer": "vite build --config vite.viewer.config.js",
-    "gen:export-fixtures": "vitest run scripts/exportParityFixtures.test.ts",
+    "gen:export-fixtures": "vitest run scripts/exportParityFixtures.test.ts scripts/motionFixture.test.ts",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "dev": "vite build --watch",
     "dev-css": "pnpm exec tailwindcss --input ./src/index.css --output ./dist/index.css --watch",
     "dev-types": "tsc --watch",
-    "lint": "eslint .",
+    "lint": "eslint . && pnpm run lint:css && pnpm run test:stylelint",
+    "lint:css": "stylelint src/index.css src/export/exportTokens.css src/export/exportTokensDark.css",
     "lint-fix": "eslint . --fix",
+    "test:stylelint": "node scripts/assert-spacing-stylelint.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -40,14 +47,17 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@heroicons/react": "^2.1.5",
-    "@observablehq/plot": "^0.6.17",
     "@book.dev/sdk": "workspace:*",
+    "@heroicons/react": "^2.1.5",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
+    "@observablehq/plot": "^0.6.17",
     "@preact/signals-core": "^1.14.2",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dismissable-layer": "^1.1.11",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
+    "@radix-ui/react-focus-scope": "1.1.7",
     "@radix-ui/react-icons": "^1.3.0",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-navigation-menu": "^1.2.0",
@@ -65,7 +75,9 @@
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
+    "motion": "^12.43.0",
     "node-emoji": "^2.2.0",
+    "quickjs-emscripten-core": "0.32.0",
     "react-leaflet": "^5.0.0",
     "sucrase": "^3.35.1",
     "svg2pdf.js": "^2.7.0",
@@ -89,6 +101,7 @@
     "postcss": "^8.4.47",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "stylelint": "^17.14.1",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.0",

@@ -1,10 +1,13 @@
-/** The settings sidebar: three sections, each with its sub-screens, in order.
- *  Preferences = how the app behaves and looks; Account = who you are
- *  (identity first); Workspace = this workspace's server and capabilities. */
+/** The settings sidebar: four sections, each with its sub-screens, in order
+ *  (SET2-6). Preferences = how the app behaves and looks; Account = who you are
+ *  (identity first); Library = this library's policy + capabilities (Sharing
+ *  leads — the most-used surface); Advanced = mixed-scope plumbing/admin/support
+ *  that's rarely touched (the scope chips carry the truth for these). */
 export const SETTINGS_SECTIONS = [
   {id: 'preferences', tabs: ['general', 'appearance', 'customisation']},
   {id: 'account', tabs: ['profile', 'signin']},
-  {id: 'workspace', tabs: ['connection', 'sharing', 'members', 'extensions', 'ai', 'admin', 'diagnostics']},
+  {id: 'library', tabs: ['sharing', 'ai', 'extensions', 'admin']},
+  {id: 'advanced', tabs: ['libraries', 'agents', 'diagnostics']},
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]['id'];
@@ -26,22 +29,46 @@ export type PresentMode = 'fullscreen' | 'presenter';
 export const isSettingsTab = (value: unknown): value is SettingsTab =>
   typeof value === 'string' && (SETTINGS_TABS as readonly string[]).includes(value);
 
-/** Sub-screens that were renamed when the flat tabs became grouped sections,
- *  plus the retired "coming soon" stubs (signup/support/integrations) mapped
- *  to their nearest real screen. */
+/** Sub-screens that were renamed/merged when the flat tabs became grouped
+ *  sections, plus the retired "coming soon" stubs (signup/support/integrations)
+ *  mapped to their nearest real screen. `members` folded into the Sharing tab
+ *  (SHR-5) — its roster is now the People section there. `connection` folded into
+ *  the Libraries screen (SET2-1) — the per-library rows are the one place to set
+ *  a server + token; `server`/`connection` both resolve there now. */
 const LEGACY_TAB_MAP: Record<string, SettingsTab> = {
-  server: 'connection',
+  server: 'libraries',
+  connection: 'libraries',
   backup: 'admin',
   signup: 'signin',
   support: 'profile',
   integrations: 'extensions',
+  members: 'sharing',
 };
 
 /**
- * Resolve a persisted tab id to a current one: map renamed legacy ids
- * (`server`→`connection`, `backup`→`admin`, retired stubs → their nearest real
- * screen) and fall back to the default for anything no longer a valid tab, so
- * an old `settings.tab` never dead-ends.
+ * In-tab scroll anchors carried transiently in `hud.settings.section`, so a
+ * deep-link can land on a specific group *within* a merged tab. Doubles as the
+ * DOM id of that group's container. Currently just the People roster, reached
+ * from ShareDialog's "manage members" link and the legacy `?settings=members`.
+ */
+export const SETTINGS_SECTION_PEOPLE = 'settings-people';
+
+/** Legacy tab params that should also scroll to a group inside the merged tab
+ *  they resolve to (e.g. `members` → the Sharing tab's People section). */
+export const SETTINGS_ALIAS_SECTIONS: Record<string, string> = {
+  members: SETTINGS_SECTION_PEOPLE,
+};
+
+/** Whether a persisted/URL param names a real tab or a known legacy alias — so
+ *  a stray value leaves the current tab alone instead of resetting it. */
+export const isTabParam = (value: unknown): boolean =>
+  isSettingsTab(value) || (typeof value === 'string' && value in LEGACY_TAB_MAP);
+
+/**
+ * Resolve a persisted tab id to a current one: map renamed/merged legacy ids
+ * (`connection`/`server`→`libraries`, `backup`→`admin`, retired stubs → their
+ * nearest real screen) and fall back to the default for anything no longer a
+ * valid tab, so an old `settings.tab` never dead-ends.
  */
 export const normalizeTab = (value: unknown): SettingsTab => {
   if (isSettingsTab(value)) return value;
@@ -59,6 +86,10 @@ export interface HudProps {
     mode: SettingsMode;
     /** The currently selected settings panel. */
     tab: SettingsTab;
+    /** A transient in-tab scroll target (e.g. {@link SETTINGS_SECTION_PEOPLE}):
+     *  a deep-link sets it, the target section scrolls itself into view and
+     *  clears it. Never persisted or restored. */
+    section?: string | null;
   };
   present: {
     open: boolean;
@@ -80,13 +111,20 @@ export interface HudProps {
   importer: {
     open: boolean;
   };
-  ai: {
-    open: boolean;
-  };
   agent: {
     open: boolean;
   };
 }
+
+/** Toggle the sidebar using its breakpoint-specific presentation semantics. */
+export const toggleSideNav = (draft: HudProps, {narrow}: {narrow: boolean}): void => {
+  if (narrow) {
+    draft.sideNav.open = !draft.sideNav.open;
+    return;
+  }
+  draft.sideNav.open = !draft.sideNav.docked;
+  draft.sideNav.docked = !draft.sideNav.docked;
+};
 
 export const HudDefault: HudProps = {
   commandPalette: {
@@ -96,6 +134,7 @@ export const HudDefault: HudProps = {
     open: false,
     mode: 'modal',
     tab: DEFAULT_SETTINGS_TAB,
+    section: null,
   },
   present: {
     open: false,
@@ -115,9 +154,6 @@ export const HudDefault: HudProps = {
   importer: {
     open: false,
   },
-  ai: {
-    open: false,
-  },
   agent: {
     open: false,
   },
@@ -135,14 +171,14 @@ export const loadHudStorage = (): HudProps => {
   const settings = {...HudDefault.settings, ...stored.settings};
   return {
     commandPalette: {...HudDefault.commandPalette, ...stored.commandPalette},
-    // Resolve a possibly-legacy persisted tab to a current one.
-    settings: {...settings, tab: normalizeTab(settings.tab)},
+    // Resolve a possibly-legacy persisted tab to a current one; never restore a
+    // stale in-tab scroll target (it's a one-shot nav hint, not a preference).
+    settings: {...settings, tab: normalizeTab(settings.tab), section: null},
     sideNav: {...HudDefault.sideNav, ...stored.sideNav},
     // Never restore transient overlays open (the trash, the template gallery).
     trash: {open: false},
     templates: {open: false},
     importer: {open: false},
-    ai: {open: false},
     agent: {open: false},
     present: {...HudDefault.present},
   };
@@ -154,11 +190,13 @@ export const saveHudStorage = (hud: HudProps) => {
   // re-opens settings.
   const persisted: HudProps = {
     ...hud,
-    settings: {...hud.settings, open: false},
+    settings: {...hud.settings, open: false, section: null},
+    // `open` is transient: reconstruct it from the persisted dock preference
+    // so a resize-driven narrow close cannot leave a docked desktop seam.
+    sideNav: {...hud.sideNav, open: hud.sideNav.docked},
     trash: {open: false},
     templates: {open: false},
     importer: {open: false},
-    ai: {open: false},
     agent: {open: false},
     present: {...HudDefault.present},
   };

@@ -1,18 +1,22 @@
 import type * as Y from 'yjs';
+import {KIT_VALUE_BLOCK_TYPES} from '@book.dev/sdk';
 import {blockChildren, blockId, blockProp, blockType, rootBlocks, setBlockProp, type TextRun, walkBlocks, type BlockMap} from '../model';
 import {varNameFromLabel} from './options';
 import {containerCompletions} from './completion';
+import type {DbChartSeriesMap} from './chartData';
+import {quickJSEvalBackend} from './sandbox/quickjsBackend';
+import {quickJSSyncEvalBackend} from './sandbox/quickjsSyncBackend';
 
 /**
  * The artifact kit's reactive backbone. Every *input* block publishes a named
  * value; formulas, charts, and status lights evaluate expressions over the
  * whole scope. Values are ordinary CRDT block props, so a stepper click or a
- * radio pick syncs to every collaborator — and the editor's version counter
- * re-renders every consumer on any change. No subscription plumbing needed.
+ * radio pick syncs to every collaborator. The evaluation cache snapshots each
+ * document version and notifies subscribed render consumers asynchronously.
  */
 
 /** A legal reactive identifier. */
-const NAME_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+export const NAME_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 /**
  * The name a block publishes under: its explicit variable `name` when set,
@@ -28,17 +32,8 @@ export function publishedName(block: BlockMap): string {
   return derived && NAME_RE.test(derived) ? derived : '';
 }
 
-/** Block types that publish a named value into the scope. Deliberately NOT
- *  here despite looking input-ish in the slash menu: `progressbar` (displays a
- *  computed expression — a consumer, like charts/status lights) and
- *  `actionbutton` (mutates OTHER inputs; publishes nothing itself). */
-export const INPUT_TYPES = new Set([
-  'slider', 'number', 'textfield', 'radio', 'checklist', 'dropdown', 'location', 'toggle',
-  // June-2026 additions (kit/inputs2.tsx). Choice cards publish single|multi like
-  // radio/checklist; the two long-text variants publish a plain string; the
-  // searchable select / tag field publish single|multi like dropdown/checklist.
-  'choicecards', 'longtext', 'richtext', 'searchselect', 'tagfield',
-]);
+/** Block types that publish a named value into the scope, derived from the SDK catalogue. */
+export const INPUT_TYPES = KIT_VALUE_BLOCK_TYPES;
 
 /**
  * The reactive namespace a group publishes under — a legal identifier derived
@@ -112,7 +107,7 @@ export function inputValue(block: BlockMap): unknown {
   case 'location': {
     const lat = blockProp<number>(block, 'lat');
     const lng = blockProp<number>(block, 'lng');
-    return {lat: lat ?? null, lng: lng ?? null, label: blockProp<string>(block, 'label') ?? ''};
+    return {lat: lat ?? null, lng: lng ?? null, label: blockProp<string>(block, 'labeltext') ?? ''};
   }
   default:
     return undefined;
@@ -140,8 +135,9 @@ export function inputScope(doc: Y.Doc): Record<string, unknown> {
 
 /** Find the first input block published under `name`, or null. */
 export function findInput(doc: Y.Doc, name: string): BlockMap | null {
+  const target = name.trim();
   for (const {block} of walkBlocks(rootBlocks(doc))) {
-    if (INPUT_TYPES.has(blockType(block) as string) && publishedName(block) === name) return block;
+    if (INPUT_TYPES.has(blockType(block) as string) && publishedName(block) === target) return block;
   }
   return null;
 }
@@ -169,7 +165,12 @@ export function setInputValue(block: BlockMap, value: unknown): void {
     setBlockProp(block, 'runs', [{t: String(value ?? '')}]);
     break;
   case 'location':
-    // Composite value — left to its own controls for now.
+    if (value && typeof value === 'object') {
+      const location = value as {lat?: unknown; lng?: unknown; label?: unknown};
+      setBlockProp(block, 'lat', location.lat);
+      setBlockProp(block, 'lng', location.lng);
+      setBlockProp(block, 'labeltext', String(location.label ?? ''));
+    }
     break;
   default:
     setBlockProp(block, 'value', value);
@@ -222,49 +223,161 @@ export function setNamedNumber(doc: Y.Doc, name: string, next: (current: number)
   }, 'local');
 }
 
-/**
- * Evaluate an expression over the input scope. Same trust model as the app's
- * expr blocks: the document's own code runs client-side with the inputs in
- * scope. Returns `{value}` or `{error}` — callers render, never throw.
- */
-export function evalExpr(source: string, scope: Record<string, unknown>): {value?: unknown; error?: string} {
-  if (!source.trim()) return {value: undefined};
-  try {
-    const fn = new Function(...Object.keys(scope), `"use strict"; return (${source});`);
-    return {value: fn(...Object.values(scope)) as unknown};
-  } catch (err) {
-    return {error: err instanceof Error ? err.message : String(err)};
-  }
+/** One evaluation result. Evaluators surface document errors; they never throw
+ * them through the render tree. */
+export interface EvalResult {
+  value?: unknown;
+  error?: string;
 }
 
-/**
- * Evaluate live-code: a single expression, or — when that doesn't parse — a
- * function body (multi-line code with its own `return`). Lets a live code
- * block hold real programs, not just one-liners.
- */
-export function evalCode(source: string, scope: Record<string, unknown>): {value?: unknown; error?: string} {
-  if (!source.trim()) return {value: undefined};
-  const keys = Object.keys(scope);
-  const values = Object.values(scope);
-  try {
-    const fn = new Function(...keys, `"use strict"; return (${source});`);
-    return {value: fn(...values) as unknown};
-  } catch (err) {
-    if (!(err instanceof SyntaxError)) return {error: err instanceof Error ? err.message : String(err)};
-  }
-  try {
-    const fn = new Function(...keys, `"use strict"; ${source}`);
-    return {value: fn(...values) as unknown};
-  } catch (err) {
-    return {error: err instanceof Error ? err.message : String(err)};
-  }
+/** A serializable request at the evaluator/Worker boundary. */
+export interface EvalRequest {
+  kind: 'expression' | 'code';
+  source: string;
+  scope: Record<string, unknown>;
+  /** Absolute host timestamp shared by one authoritative export pass. */
+  deadlineMs?: number;
+}
+
+/** Async evaluator seam, implemented by the resident QuickJS Worker. */
+export interface EvalBackend {
+  evaluate(request: EvalRequest): Promise<EvalResult>;
+}
+
+/** Synchronous evaluator seam for authoritative save/export checkpoints. */
+export interface SyncEvalBackend {
+  /** Fixed-cost WASM setup is lazy, but happens before the document budget starts. */
+  prepare?(): Promise<void>;
+  /** The release-SYNC VM runs without yielding once its lazily-loaded WASM is ready. */
+  evaluate(request: EvalRequest): Promise<EvalResult>;
+}
+
+interface ExportSafeResult {
+  ok: boolean;
+  value?: unknown;
+}
+
+type ExportSafeReader = (
+  source: string,
+  get: (cellId: string) => unknown,
+  bindings: Readonly<Record<string, unknown>>,
+) => ExportSafeResult;
+
+/** The standalone viewer injects SBX-3's compiler-free interpreter first. */
+function readExportExpression(source: string, scope: Record<string, unknown>): EvalResult {
+  const reader = (globalThis as {__OB_SAFE_EXPRESSION__?: ExportSafeReader}).__OB_SAFE_EXPRESSION__;
+  if (!reader) return {error: 'Safe expression runtime is unavailable'};
+  const result = reader(source, () => undefined, scope);
+  return result.ok ? {value: result.value} : {error: 'Unsupported expression in standalone export'};
+}
+
+/** Viewer render evaluation stays inside SBX-3's interpreter; the app uses the Worker. */
+export const renderEvalBackend: EvalBackend = __OB_SAFE_EXPORT_VIEWER__ ? {
+  evaluate(request) {
+    return Promise.resolve(readExportExpression(request.source, request.scope));
+  },
+} : quickJSEvalBackend;
+
+/** Non-render async helpers. UI components should use `useCachedEval` so they
+ * also get versioning, subscriptions, and last-known snapshots. */
+export function evalExpr(
+  source: string,
+  scope: Record<string, unknown>,
+  backend: EvalBackend = renderEvalBackend,
+): Promise<EvalResult> {
+  return backend.evaluate({kind: 'expression', source, scope});
+}
+
+export function evalCode(
+  source: string,
+  scope: Record<string, unknown>,
+  backend: EvalBackend = renderEvalBackend,
+): Promise<EvalResult> {
+  return backend.evaluate({kind: 'code', source, scope});
 }
 
 export interface ComputedScope {
   /** Every name a consumer can reference: inputs + named live-code outputs. */
   scope: Record<string, unknown>;
   /** Per-block evaluation results (live code + legacy formulas), by block id. */
-  results: Map<string, {value?: unknown; error?: string}>;
+  results: Map<string, EvalResult>;
+}
+
+/** An immutable document-order program captured for asynchronous evaluation. */
+export interface ScopeProgram {
+  input: Record<string, unknown>;
+  cells: Array<{id: string; name?: string; request: Omit<EvalRequest, 'scope'>}>;
+}
+
+/** Capture mutable CRDT state before the first async hop. */
+export function captureScopeProgram(doc: Y.Doc): ScopeProgram {
+  const cells: ScopeProgram['cells'] = [];
+  for (const {block} of walkBlocks(rootBlocks(doc))) {
+    const type = blockType(block) as string;
+    const isLiveCode = type === 'code' && Boolean(blockProp<boolean>(block, 'live'));
+    if (!isLiveCode && type !== 'formula') continue;
+    cells.push({
+      id: String(block.get('id')),
+      name: blockProp<string>(block, 'name'),
+      request: {
+        kind: isLiveCode ? 'code' : 'expression',
+        source: isLiveCode ? (blockTextString(block) ?? '') : (blockProp<string>(block, 'source') ?? ''),
+      },
+    });
+  }
+  return {input: inputScope(doc), cells};
+}
+
+/** Evaluate a captured program through the async backend, preserving ordered
+ * chaining (each named cell is visible to the cells below it). */
+export async function evaluateScopeProgram(
+  program: ScopeProgram,
+  backend: EvalBackend = renderEvalBackend,
+): Promise<ComputedScope> {
+  const scope = {...program.input};
+  const results = new Map<string, EvalResult>();
+  for (const cell of program.cells) {
+    const result = await backend.evaluate({...cell.request, scope});
+    results.set(cell.id, result);
+    const name = cell.name?.trim();
+    if (name && NAME_RE.test(name) && !result.error) scope[name] = result.value;
+  }
+  return {scope, results};
+}
+
+export const EXPORT_EVALUATION_BUDGET_MS = 100;
+export const EXPORT_DEADLINE_ERROR = `Export evaluation exceeded the ${EXPORT_EVALUATION_BUDGET_MS} ms budget`;
+
+const deadlineResult = (): EvalResult => ({error: EXPORT_DEADLINE_ERROR});
+
+/**
+ * Authoritative expression evaluation composes both safety layers: the app
+ * awaits the lazily-created in-process release-SYNC QuickJS VM, while the
+ * standalone viewer delegates to SBX-3's compiler-free expression reader.
+ */
+function evalExprSync(
+  source: string,
+  scope: Record<string, unknown>,
+  backend: SyncEvalBackend,
+  deadlineMs: number,
+): Promise<EvalResult> {
+  if (!source.trim()) return Promise.resolve({value: undefined});
+  if (Date.now() >= deadlineMs) return Promise.resolve(deadlineResult());
+  if (__OB_SAFE_EXPORT_VIEWER__) return Promise.resolve(readExportExpression(source, scope));
+  return backend.evaluate({kind: 'expression', source, scope, deadlineMs});
+}
+
+/** Same composition for live-code bodies (the safe reader supports its bounded statement shell). */
+function evalCodeSync(
+  source: string,
+  scope: Record<string, unknown>,
+  backend: SyncEvalBackend,
+  deadlineMs: number,
+): Promise<EvalResult> {
+  if (!source.trim()) return Promise.resolve({value: undefined});
+  if (Date.now() >= deadlineMs) return Promise.resolve(deadlineResult());
+  if (__OB_SAFE_EXPORT_VIEWER__) return Promise.resolve(readExportExpression(source, scope));
+  return backend.evaluate({kind: 'code', source, scope, deadlineMs});
 }
 
 /**
@@ -274,17 +387,24 @@ export interface ComputedScope {
  * A single ordered pass: forward references read `undefined`, cycles can't
  * happen.
  */
-export function computeScope(doc: Y.Doc): ComputedScope {
-  const scope = inputScope(doc);
-  const results = new Map<string, {value?: unknown; error?: string}>();
-  for (const {block} of walkBlocks(rootBlocks(doc))) {
-    const type = blockType(block) as string;
-    const isLiveCode = type === 'code' && Boolean(blockProp<boolean>(block, 'live'));
-    if (!isLiveCode && type !== 'formula') continue;
-    const source = isLiveCode ? (blockTextString(block) ?? '') : (blockProp<string>(block, 'source') ?? '');
-    const result = isLiveCode ? evalCode(source, scope) : evalExpr(source, scope);
-    results.set(String(block.get('id')), result);
-    const name = blockProp<string>(block, 'name');
+export async function computeScopeAuthoritative(
+  doc: Y.Doc,
+  backend: SyncEvalBackend = quickJSSyncEvalBackend,
+  deadlineMs?: number,
+): Promise<ComputedScope> {
+  await backend.prepare?.();
+  const evaluationDeadline = deadlineMs ?? Date.now() + EXPORT_EVALUATION_BUDGET_MS;
+  const program = captureScopeProgram(doc);
+  const scope = {...program.input};
+  const results = new Map<string, EvalResult>();
+  for (const cell of program.cells) {
+    const result = Date.now() >= evaluationDeadline
+      ? deadlineResult()
+      : await (cell.request.kind === 'code'
+        ? evalCodeSync(cell.request.source, scope, backend, evaluationDeadline)
+        : evalExprSync(cell.request.source, scope, backend, evaluationDeadline));
+    results.set(cell.id, result);
+    const name = cell.name?.trim();
     if (name && NAME_RE.test(name) && !result.error) scope[name] = result.value;
   }
   return {scope, results};
@@ -341,12 +461,22 @@ export interface ExportCell {
  * Resolve every reactive block's CURRENT value the way the editor does, keyed by
  * block id — so static exports (PDF / Markdown) and the pre-hydration HTML show
  * the same numbers, charts, lights and bars as the live window. Inputs publish
- * their value; live code / formulas come from {@link computeScope}; charts,
+ * their value; live code / formulas come from
+ * {@link computeScopeAuthoritative}; charts,
  * status lights, and progress bars evaluate their expression over the same
  * scope (mirroring their block components).
  */
-export function computeExportCells(doc: Y.Doc): Map<string, ExportCell> {
-  const {scope, results} = computeScope(doc);
+export async function computeExportCells(
+  doc: Y.Doc,
+  dbSeries?: DbChartSeriesMap,
+  backend: SyncEvalBackend = quickJSSyncEvalBackend,
+): Promise<Map<string, ExportCell>> {
+  // Export is an explicit non-render checkpoint and reflects this exact
+  // document through an in-process QuickJS sandbox. It must not depend on an
+  // async render Worker or execute document formulas in the host realm.
+  await backend.prepare?.();
+  const deadlineMs = Date.now() + EXPORT_EVALUATION_BUDGET_MS;
+  const {scope, results} = await computeScopeAuthoritative(doc, backend, deadlineMs);
   const cells = new Map<string, ExportCell>();
   for (const {block} of walkBlocks(rootBlocks(doc))) {
     const id = blockId(block);
@@ -356,10 +486,17 @@ export function computeExportCells(doc: Y.Doc): Map<string, ExportCell> {
     } else if (type === 'formula' || (type === 'code' && Boolean(blockProp<boolean>(block, 'live')))) {
       const r = results.get(id);
       cells.set(id, {value: r?.error ? undefined : r?.value});
+    } else if (type === 'kitchart' && blockProp<string>(block, 'sourceMode') === 'database') {
+      // A database-bound chart's data can't be recomputed from the doc alone (it
+      // needs the data client, absent in a static export). It's resolved live at
+      // export time and threaded in via `dbSeries` — the doc holds NO derived
+      // snapshot, so viewing/presenting the chart never writes anything.
+      cells.set(id, {value: dbSeries?.get(id)?.value});
     } else if (type === 'kitchart' || type === 'progressbar') {
-      cells.set(id, {value: evalExpr(blockProp<string>(block, 'source') ?? '', scope).value});
+      const {value} = await evalExprSync(blockProp<string>(block, 'source') ?? '', scope, backend, deadlineMs);
+      cells.set(id, {value});
     } else if (type === 'statuslight') {
-      const {value, error} = evalExpr(blockProp<string>(block, 'source') ?? '', scope);
+      const {value, error} = await evalExprSync(blockProp<string>(block, 'source') ?? '', scope, backend, deadlineMs);
       const okAt = Number(blockProp<number>(block, 'okAt') ?? 1);
       const warnAt = Number(blockProp<number>(block, 'warnAt') ?? 0);
       cells.set(id, {value, status: statusOf(value, error, okAt, warnAt)});

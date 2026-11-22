@@ -17,6 +17,7 @@
 import {jsPDF} from 'jspdf';
 import 'svg2pdf.js';
 import {elementToSVG} from 'dom-to-svg';
+import {KIT_EXPORT_PRIMARY} from '../blockeditor/colors';
 
 const PAGE_W = 612; // US Letter, points
 const PAGE_H = 792;
@@ -90,12 +91,29 @@ function staticizeSliders(root: Element): void {
     const track = doc.createElement('span');
     track.setAttribute('style', 'position:relative;display:inline-block;width:60%;height:8px;background:rgba(127,127,127,.18);border-radius:999px;vertical-align:middle');
     const fill = doc.createElement('span');
-    fill.setAttribute('style', `position:absolute;left:0;top:0;height:8px;width:${pct.toFixed(2)}%;background:#6366f1;border-radius:999px`);
+    fill.setAttribute('style', `position:absolute;left:0;top:0;height:8px;width:${pct.toFixed(2)}%;background:${KIT_EXPORT_PRIMARY};border-radius:999px`);
     const thumb = doc.createElement('span');
-    thumb.setAttribute('style', `position:absolute;top:-3px;left:${pct.toFixed(2)}%;width:14px;height:14px;margin-left:-7px;background:#6366f1;border-radius:999px`);
+    thumb.setAttribute('style', `position:absolute;top:-3px;left:${pct.toFixed(2)}%;width:14px;height:14px;margin-left:-7px;background:${KIT_EXPORT_PRIMARY};border-radius:999px`);
     track.appendChild(fill);
     track.appendChild(thumb);
     el.replaceWith(track);
+  }
+}
+
+/** Replace frozen form controls with their plain field inventory for PDF. */
+export function staticizeForms(root: Element): void {
+  const doc = root.ownerDocument;
+  for (const form of Array.from(root.querySelectorAll('[data-ob-form]'))) {
+    for (const field of Array.from(form.querySelectorAll('[data-ob-form-field]'))) {
+      const label = field.querySelector(':scope > span')?.textContent?.trim() ?? '';
+      const kind = field.getAttribute('data-form-kind') ?? '';
+      const row = doc.createElement('div');
+      row.className = 'ob-form-field';
+      row.textContent = `${label}${kind ? ` (${kind})` : ''}`;
+      field.replaceWith(row);
+    }
+    form.querySelectorAll('input,textarea,select,button,a.ob-form-live').forEach((node) => node.remove());
+    form.setAttribute('data-pdf-form', '');
   }
 }
 
@@ -172,6 +190,7 @@ async function layout(html: string): Promise<{frame: HTMLIFrameElement; el: Elem
   await awaitImages(el); // images must be decoded or dom-to-svg snapshots blank boxes
   deEmoji(el);
   staticizeSliders(el);
+  staticizeForms(el);
   return {frame, el};
 }
 

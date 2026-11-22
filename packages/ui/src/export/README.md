@@ -89,3 +89,52 @@ only the root page, tabs show the first tab, accordions are native
 `<details>` (still openable without JS), and HTML artifacts show their
 captioned placeholder. Covered by the parity suite's `javaScriptEnabled:
 false` test.
+
+## FF-6 plain token mirror policy (CARD-11, 2026-11-10)
+
+The static export carries the entire **plain `:root` / `.dark` custom-property
+contract** from `src/index.css`. `exportTokens.css` holds the light additions;
+`exportTokensDark.css` holds explicit dark overrides. The five existing tween
+declarations stay in `toHtml.ts`. These are independent CSS literals/expressions,
+not generated from the app at runtime: `scripts/exportTokens.test.ts` compares
+the complete inventory and every emitted value against the live stylesheet.
+A new root token or dark override must therefore get an explicit mirror, or a
+documented policy change with corresponding tests; it cannot silently drift.
+
+| Source | Export policy | Reason |
+| --- | --- | --- |
+| Plain root/dark literal | Mirror exactly, including unused tokens | Standalone CSS does not need Tailwind or app state to interpret it. Availability is not visual adoption. |
+| Plain expression referencing other root tokens | Mirror its complete dependency chain | CSS `var`, `calc`, `max` and HSL expressions remain transportable when all dependencies travel with them. |
+| `@theme` alias also declared in root | Use the independent root declaration | The plain definition, not Tailwind's generated output, is the authority. |
+| `@theme`-only name, Tailwind utility or `--tw-*` | Exclude | No independent plain declaration/equality contract. Even a literal-looking theme value does not authorize consuming its generated variable. |
+| Component-scoped tokens | Keep with the existing component | They are local overrides, not global defaults; copying them to root would change scope. |
+| JavaScript spring presets | Viewer runtime only | CSS duration/easing tokens cannot represent spring behavior. Motion adoption requires its existing ledger and disposition checks. |
+
+The mirrors deliberately retain compatibility values (`xs=24px`, `md=32px`,
+switch-only `--ease-spring`) and existing named alpha recipes. They introduce
+no consumers and do not promote compatibility steps into the FF 28/36px ladder.
+The lint command checks both mirror files in full, as well as `.obe-*` rules in
+`index.css`; Tailwind references, indirect aliases and `@apply` still error.
+The G1 conservative boundary is not relaxed by this token inventory.
+
+Dark overrides are emitted inside the **existing** dark-preference media block
+for legacy pages, fallback sites and decks. Hydrated pages/sites carry only the
+light static mirror, preserving their light first paint; the viewer already
+ships the full live stylesheet. No consuming selector, font, eyebrow, data
+palette, script, source island or runtime-selection rule changes in CARD-11.
+App-only InterVariable loading and sentence-case eyebrow adoption remain
+deferred per the 2026-11-04 owner ruling; token availability alone does not
+authorize those appearance changes.
+
+Byte classification: the added declaration blocks change HTML bytes on every
+export path, but no existing static rule consumes a newly introduced name.
+This is a **cosmetic, deferrable fork** (inert CSS payload), not a semantic
+change. Removing only the marked addition blocks must recover the pre-card
+HTML byte-for-byte for fixed page, site, database-fallback, legacy and deck
+inputs. Same-input exports remain deterministic. Keep existing G2 literal-rule
+tests as well: named-token availability does not prove a consuming rule uses it.
+
+No `exportedObservable` changes are needed for declaration-only additions.
+Any later behavior adoption must update its disposition. Layout-class adoption
+must explicitly say **the element is present immediately and animates only on
+subsequent changes** (snap on load), and satisfy the Motion feature ledger.

@@ -1,7 +1,11 @@
+import {FluidHover} from "./fluid-hover"
+import { OVERLAY_MOTION } from "./overlay-motion"
 import * as React from "react"
 import {Check, ChevronDown} from "lucide-react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 
+import {EmptyState} from "@/components/ui/empty-state"
+import {t} from "@/i18n"
 import {cn} from "@/lib/utils"
 import {inputVariants} from "@/components/ui/input"
 
@@ -39,6 +43,11 @@ export interface SelectProps {
   wrapperClassName?: string
   align?: "start" | "center" | "end"
   "aria-label"?: string
+  /** Id of the element describing this control — read out on focus, not just on
+   *  change. Forwarded to the trigger so a live hint below the picker can be its
+   *  accessible description (the native `<select>` behaviour this control replaced). */
+  "aria-describedby"?: string
+  title?: string
   id?: string
   name?: string
 }
@@ -49,6 +58,7 @@ interface OptionItem {
   label: string
   disabled?: boolean
   group?: string
+  description?: string
 }
 
 /** Flatten a React node to its text, for type-ahead and the trigger fallback. */
@@ -70,8 +80,8 @@ function collectItems(children: React.ReactNode): OptionItem[] {
         const p = child.props as {label?: string; children?: React.ReactNode}
         walk(p.children, p.label)
       } else if (child.type === "option") {
-        const p = child.props as {value?: string | number; children?: React.ReactNode; disabled?: boolean}
-        items.push({value: String(p.value ?? ""), node: p.children, label: nodeText(p.children), disabled: p.disabled, group})
+        const p = child.props as {value?: string | number; children?: React.ReactNode; disabled?: boolean; "data-description"?: string}
+        items.push({value: String(p.value ?? ""), node: p.children, label: nodeText(p.children), disabled: p.disabled, group, description: p["data-description"]})
       }
     })
   }
@@ -153,6 +163,8 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
             role="combobox"
             aria-expanded={open}
             aria-label={rest["aria-label"]}
+            aria-describedby={rest["aria-describedby"]}
+            title={rest.title}
             data-value={current}
             disabled={disabled}
             className={cn(
@@ -187,21 +199,22 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
           onCloseAutoFocus={(e) => e.preventDefault()}
           onKeyDown={onKeyDown}
           className={cn(
-            "z-50 max-h-[var(--radix-popover-content-available-height)] min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)]",
-            "overflow-y-auto overflow-x-hidden overscroll-contain rounded-md border bg-popover p-1 text-popover-foreground shadow-overlay outline-hidden",
-            // Entrance only — no exit animation, so the content (and its dismissable
-            // layer) unmounts immediately on close rather than lingering and
-            // interfering with an enclosing popover.
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+            "relative isolate z-50 max-h-[var(--radix-popover-content-available-height)] min-w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)]",
+            "overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border bg-popover p-1 text-popover-foreground shadow-overlay outline-hidden",
+            // Entrance only — no exit animation (nested dismissable layer).
+            OVERLAY_MOTION.menuEnter,
           )}
         >
-          {items.length === 0 && <div className="px-2 py-1.5 text-sm text-muted-foreground">No options</div>}
+          <FluidHover surface="select" selector="[role=option]" />
+          {items.length === 0 && (
+            <EmptyState variant="overlay" className="px-2 text-muted-foreground" title={t("common.noOptions")} />
+          )}
           {items.map((it, i) => {
             const header = it.group && it.group !== items[i - 1]?.group
             return (
               <React.Fragment key={`${it.group ?? ""}:${it.value}:${i}`}>
                 {header && (
-                  <div className="px-2 pb-0.5 pt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                  <div className="px-2 pb-0.5 pt-1.5 text-xs font-medium text-muted-foreground">
                     {it.group}
                   </div>
                 )}
@@ -216,15 +229,21 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(function Select(
                   tabIndex={-1}
                   onClick={() => pick(it.value)}
                   className={cn(
-                    "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden",
-                    it.value === current ? "bg-hover font-medium" : "hover:bg-hover focus:bg-hover",
+                    // A minimum preserves multi-line descriptions; the viewer stays byte-stable.
+                    __OB_SAFE_EXPORT_VIEWER__
+                      ? "flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden"
+                      : "flex min-h-control-sm w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm leading-4 outline-hidden",
+                    it.value === current && "bg-hover-strong",
                     it.disabled && "pointer-events-none opacity-50",
                   )}
                 >
                   <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                     {it.value === current && <Check className="h-3.5 w-3.5" aria-hidden />}
                   </span>
-                  <span className="min-w-0 truncate">{it.node}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate">{it.node}</span>
+                    {it.description && <span className="block text-xs text-muted-foreground">{it.description}</span>}
+                  </span>
                 </button>
               </React.Fragment>
             )

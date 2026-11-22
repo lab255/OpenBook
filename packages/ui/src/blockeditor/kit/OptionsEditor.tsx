@@ -1,5 +1,6 @@
 import React, {useRef} from 'react';
 import {Select} from '@/components/ui/select';
+import {IconButton} from '@/components/ui/icon-button';
 import {ImagePlus, Plus, X} from 'lucide-react';
 import {blockProp, setBlockProp, type BlockMap} from '../model';
 import type {BlockEditorController} from '../useBlockEditor';
@@ -21,13 +22,99 @@ import {rawOptions, slugify} from './options';
  * don't pass `media`, so they stay a two-column editor.
  */
 
-interface Row {
+export interface EditableOptionRow {
   label: string;
   value: string;
+}
+
+interface Row extends EditableOptionRow {
   image?: string;
   icon?: string;
   color?: string;
 }
+
+export interface OptionsListEditorCopy {
+  fieldLabel: string;
+  hint: string;
+  labelPlaceholder: string;
+  valuePlaceholder: string;
+  add: string;
+  remove: (index: number) => string;
+}
+
+const DEFAULT_COPY: OptionsListEditorCopy = {
+  fieldLabel: 'Options',
+  hint: 'Label readers see, and the value it serialises to.',
+  labelPlaceholder: 'Label',
+  valuePlaceholder: 'value',
+  add: 'Add option',
+  remove: (index) => `Remove option ${index + 1}`,
+};
+
+/** Controlled option rows shared by kit inputs and form select fields. */
+export const OptionsListEditor: React.FC<{
+  rows: EditableOptionRow[];
+  onChange: (rows: EditableOptionRow[]) => void;
+  readOnly?: boolean;
+  copy?: OptionsListEditorCopy;
+}> = ({rows, onChange, readOnly, copy = DEFAULT_COPY}) => {
+  const update = (i: number, patch: Partial<EditableOptionRow>): void =>
+    onChange(rows.map((row, j) => (j === i ? {...row, ...patch} : row)));
+  const remove = (i: number): void => onChange(rows.filter((_, j) => j !== i));
+  const add = (): void => onChange([...rows, {label: '', value: ''}]);
+
+  return (
+    <div className="flex flex-col gap-1" role="group" aria-label={copy.fieldLabel}>
+      <span className="text-xs font-medium text-foreground/80">{copy.fieldLabel}</span>
+      <span className="-mt-0.5 text-xs text-muted-foreground">{copy.hint}</span>
+      <div className="flex flex-col gap-1.5">
+        {rows.map((row, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <ConfigInput
+              value={row.label}
+              readOnly={readOnly}
+              aria-label={`${copy.labelPlaceholder} ${i + 1}`}
+              placeholder={copy.labelPlaceholder}
+              onChange={(e) => update(i, {label: e.target.value})}
+            />
+            <span className="text-muted-foreground/80" aria-hidden>→</span>
+            <ConfigInput
+              mono
+              value={row.value}
+              readOnly={readOnly}
+              aria-label={`${copy.valuePlaceholder} ${i + 1}`}
+              placeholder={slugify(row.label) || copy.valuePlaceholder}
+              onChange={(e) => update(i, {value: e.target.value})}
+              onBlur={(e) => update(i, {value: e.target.value.trim()})}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
+            />
+            {!readOnly && (
+              <button
+                type="button"
+                className="cursor-pointer shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+                aria-label={copy.remove(i)}
+                onClick={() => remove(i)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        ))}
+        {!readOnly && (
+          <button
+            type="button"
+            className="mt-0.5 inline-flex w-fit cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+            onClick={add}
+          >
+            <Plus className="h-3.5 w-3.5" /> {copy.add}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const readRows = (block: BlockMap): Row[] =>
   rawOptions({opts: blockProp<unknown>(block, 'opts'), options: blockProp<unknown>(block, 'options')}).map((o) => ({
@@ -56,7 +143,7 @@ async function fileToImageDataUrl(file: File, max = 320): Promise<string> {
 /** Strip empties so a row only stores the fields it actually uses. */
 const cleanRow = (r: Row): Row => ({
   label: r.label,
-  ...(r.value.trim() ? {value: r.value.trim()} : {}),
+  ...(r.value ? {value: r.value} : {}),
   ...(r.image ? {image: r.image} : {}),
   ...(r.icon ? {icon: r.icon} : {}),
   ...(r.color ? {color: r.color} : {}),
@@ -76,6 +163,10 @@ export const OptionsEditor: React.FC<{block: BlockMap; editor: BlockEditorContro
   const remove = (i: number): void => commit(rows.filter((_, j) => j !== i));
   const add = (): void => commit([...rows, {label: '', value: ''}]);
 
+  if (!media) {
+    return <OptionsListEditor rows={rows} readOnly={editor.readOnly} onChange={(next) => commit(next)} />;
+  }
+
   return (
     <ConfigField label="Options" hint="Label readers see, and the value it serialises to.">
       <div className="flex flex-col gap-1.5">
@@ -89,7 +180,7 @@ export const OptionsEditor: React.FC<{block: BlockMap; editor: BlockEditorContro
                 placeholder="Label"
                 onChange={(e) => update(i, {label: e.target.value})}
               />
-              <span className="text-muted-foreground/60" aria-hidden>
+              <span className="text-muted-foreground/80" aria-hidden>
                 →
               </span>
               <ConfigInput
@@ -99,16 +190,20 @@ export const OptionsEditor: React.FC<{block: BlockMap; editor: BlockEditorContro
                 aria-label={`Option ${i + 1} value`}
                 placeholder={slugify(row.label) || 'value'}
                 onChange={(e) => update(i, {value: e.target.value})}
+                onBlur={(e) => update(i, {value: e.target.value.trim()})}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
               />
               {!editor.readOnly && (
-                <button
+                <IconButton
+                  size="sm"
                   type="button"
-                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
                   aria-label={`Remove option ${i + 1}`}
                   onClick={() => remove(i)}
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </IconButton>
               )}
             </div>
             {media && <MediaRow index={i} row={row} editor={editor} onChange={(patch) => update(i, patch)} />}
@@ -145,7 +240,11 @@ const MediaRow: React.FC<{
         aria-label={`Option ${index + 1} image URL`}
         placeholder={row.image?.startsWith('data:') ? 'uploaded image' : 'Image URL…'}
         spellCheck={false}
-        onChange={(e) => onChange({image: e.target.value.trim() || undefined})}
+        onChange={(e) => onChange({image: e.target.value || undefined})}
+        onBlur={(e) => onChange({image: e.target.value.trim() || undefined})}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
       />
       {!editor.readOnly && (
         <>
@@ -161,15 +260,15 @@ const MediaRow: React.FC<{
               e.target.value = '';
             }}
           />
-          <button
+          <IconButton
+            size="sm"
             type="button"
-            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
             aria-label={`Upload option ${index + 1} image`}
             title="Upload image"
             onClick={() => fileRef.current?.click()}
           >
             <ImagePlus className="h-3.5 w-3.5" />
-          </button>
+          </IconButton>
         </>
       )}
       <ConfigInput
@@ -178,7 +277,11 @@ const MediaRow: React.FC<{
         readOnly={editor.readOnly}
         aria-label={`Option ${index + 1} icon`}
         placeholder="🙂"
-        onChange={(e) => onChange({icon: e.target.value.trim() || undefined})}
+        onChange={(e) => onChange({icon: e.target.value || undefined})}
+        onBlur={(e) => onChange({icon: e.target.value.trim() || undefined})}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+        }}
       />
       <Select unstyled
         className="rounded-md border border-border bg-card px-1.5 py-1 text-sm"

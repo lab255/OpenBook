@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
+import {inputVariants} from '@/components/ui/input';
 import {Select} from '@/components/ui/select';
-import {ChevronLeft, ChevronRight, Copy, GripVertical, PanelRightOpen, Plus, Trash2} from 'lucide-react';
+import {ChevronLeft, ChevronRight, ChevronsDownUp, ChevronsUpDown, GripVertical, Palette, PanelRightOpen, Pencil, Plus, Trash2} from 'lucide-react';
 import {
   dateEnd,
   dateStart,
@@ -10,10 +11,12 @@ import {
   PARENT_GROUP_ID,
   parseDay,
   rowMatchesCondition,
+  SELECT_COLORS,
   summarizeColumn,
   TITLE_PROPERTY_ID,
   type DatabaseProperty,
   type DatabaseRow,
+  type DatabaseSelectOption,
   type DatabaseView as DbView,
   type RowGroup,
   type SummaryType,
@@ -22,20 +25,29 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {IconButton} from '@/components/ui/icon-button';
+import {MENU_DESTRUCTIVE_CLASS, MENU_WIDTH_MD} from '@/components/ui/menu-components';
 import {cn} from '@/lib/utils';
+import {chipBgVar} from '@/lib/dataColorVars';
 import {hydratePageIcons, readPageIcon, subscribePageIcon} from '@/lib/pageIcon';
 import {PageIcon} from '@/components/PageIcon';
 import {pageLinks, subscribePageLinks} from '@/lib/pageLinks';
 import {useData} from '@/data';
 import {useNavigation} from '@/providers';
 import type {UseDatabase} from './useDatabase';
+import {RowMenuItems} from './databaseMenuItems';
 import {cellValue, formatCellValue, SelectChip} from './databaseCells';
-import {SWATCH_HEX} from './databaseColors';
+import {dotStyle, swatchColor} from './databaseColors';
 import {RowHoverCard} from './DatabaseCard';
+import {ViewSetupCard} from './ViewSetupCard';
 
 // ── Group headings ───────────────────────────────────────────────────────────
 // A group's key is a page id when grouping by **parent item** or by a **relation**
@@ -118,25 +130,39 @@ export function useRelationGroupTitles(...props: Array<DatabaseProperty | undefi
 /**
  * Compact, read-only chips summarising a row's property values. Shared by the
  * list, gallery, and board layouts so a row reads the same wherever it appears.
+ * `resolveProperties` is the full set derived values resolve against (pass
+ * `db.rollupProperties` so a rollup finds its relation/target even when those
+ * columns aren't shown as chips); `pending` suppresses cross-database rollup
+ * chips until their foreign rows load (no 0-flash).
  */
-export const RowChips: React.FC<{row: DatabaseRow; properties: DatabaseProperty[]; rows?: DatabaseRow[]; labelled?: boolean}> = ({
+export const RowChips: React.FC<{
+  row: DatabaseRow;
+  properties: DatabaseProperty[];
+  rows?: DatabaseRow[];
+  resolveProperties?: DatabaseProperty[];
+  pending?: ReadonlySet<string>;
+  labelled?: boolean;
+}> = ({
   row,
   properties,
   rows,
+  resolveProperties,
+  pending,
   labelled,
 }) => (
   <div className="flex min-w-0 flex-wrap items-center gap-1">
     {properties.map((property) => {
-      const value = cellValue(row, property, properties, rows);
+      if (property.type === 'rollup' && pending?.has(property.id)) return null;
+      const value = cellValue(row, property, resolveProperties ?? properties, rows);
       if (property.type === 'select' || property.type === 'status') {
         const option = property.options?.find((o) => o.id === value);
-        return option ? <SelectChip key={property.id} option={option} /> : null;
+        return option ? <SelectChip key={property.id} option={option} pill={property.type === 'status'} title={property.name} /> : null;
       }
       if (property.type === 'multi_select') {
         const ids = Array.isArray(value) ? (value as string[]) : [];
         const opts = (property.options ?? []).filter((o) => ids.includes(o.id));
         return opts.length ? (
-          <span key={property.id} className="flex flex-wrap items-center gap-1">
+          <span key={property.id} title={property.name} className="flex flex-wrap items-center gap-1">
             {opts.map((o) => (
               <SelectChip key={o.id} option={o} />
             ))}
@@ -150,7 +176,7 @@ export const RowChips: React.FC<{row: DatabaseRow; properties: DatabaseProperty[
           <span key={property.id} className="flex flex-wrap items-center gap-1">
             {ids.map((id) => (
               <RowHoverCard key={id} rowId={id}>
-                <span className="truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                <span title={property.name} className="truncate rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   {pageLinks.label(id)}
                 </span>
               </RowHoverCard>
@@ -161,8 +187,8 @@ export const RowChips: React.FC<{row: DatabaseRow; properties: DatabaseProperty[
       const text = formatCellValue(property, value);
       if (!text) return null;
       return (
-        <span key={property.id} className="truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          {labelled ? `${property.name}: ${text}` : text}
+        <span key={property.id} title={property.name} className="truncate rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+          {labelled ? `${property.name}: ${text}` : property.type === 'checkbox' && value ? `✓ ${property.name}` : text}
         </span>
       );
     })}
@@ -174,7 +200,7 @@ export function cardAccent(row: DatabaseRow, colorProperty: DatabaseProperty | u
   if (!colorProperty || (colorProperty.type !== 'select' && colorProperty.type !== 'status')) return undefined;
   const optId = row.properties[colorProperty.id];
   const color = colorProperty.options?.find((o) => o.id === optId)?.color;
-  return color ? SWATCH_HEX[color] ?? undefined : undefined;
+  return color ? swatchColor(color) : undefined;
 }
 
 /**
@@ -184,35 +210,223 @@ export function cardAccent(row: DatabaseRow, colorProperty: DatabaseProperty | u
  */
 export function rowColor(row: DatabaseRow, view: DbView, properties: DatabaseProperty[], rows?: DatabaseRow[]): string | undefined {
   for (const rule of view.colorRules ?? []) {
-    if (rowMatchesCondition(row, rule, properties, rows)) return SWATCH_HEX[rule.color] ?? rule.color;
+    if (rowMatchesCondition(row, rule, properties, rows)) return swatchColor(rule.color) ?? rule.color;
   }
   return view.cardColorPropertyId ? cardAccent(row, properties.find((p) => p.id === view.cardColorPropertyId)) : undefined;
 }
 
 /**
  * Right-click any card (board / gallery) for the same quick row actions as the
- * table — open, insert below, duplicate, delete — without opening the row first.
+ * table — open (in the split, a new tab, or a new window), copy a link to the
+ * row, insert below, duplicate, delete — without opening the row first. A row is
+ * a page, so the open targets and the copied link mirror the page menus exactly
+ * ({@link PageMenuItems}); `openRowIn` seeds the title hint so a freshly opened
+ * surface shows the row's name at once.
  */
 export const RowContextMenu: React.FC<{db: UseDatabase; rowId: string; children: React.ReactNode}> = ({db, rowId, children}) => (
   <ContextMenu>
-    <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-    <ContextMenuContent className="w-48">
-      <ContextMenuItem onSelect={() => db.openRow(rowId)}>
-        <PanelRightOpen className="mr-2 h-3.5 w-3.5" /> Open
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => void db.addRowAfter(rowId)}>
-        <Plus className="mr-2 h-3.5 w-3.5" /> Insert below
-      </ContextMenuItem>
-      <ContextMenuItem onSelect={() => void db.duplicateRow(rowId)}>
-        <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem onSelect={() => void db.deleteRow(rowId)} className="text-destructive focus:text-destructive">
-        <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-      </ContextMenuItem>
+    {/* `data-row-anchor` marks the row's DOM node so a copied row link
+        (`?page=<hostDb>&row=<id>`) can scroll to + flash it on load. asChild
+        forwards the attribute onto the wrapped card/row element (Radix Slot). */}
+    <ContextMenuTrigger asChild data-row-anchor={rowId}>
+      {children}
+    </ContextMenuTrigger>
+    <ContextMenuContent className={MENU_WIDTH_MD}>
+      {/* The shared row item list — the same items as the table's cell
+          right-click and the row `⋯` dropdown (TBL-9, single source). */}
+      <RowMenuItems db={db} rowId={rowId} menu="context" />
     </ContextMenuContent>
   </ContextMenu>
 );
+
+/** The in-menu rename field: an input pre-filled with the group's label, committing
+ *  on Enter/blur and cancelling on Escape (a `done` latch prevents the unmount blur
+ *  from double-firing after Enter/Escape). Lives in the menu content so no dialog is
+ *  needed; `onKeyDown` stop-propagation keeps the menu's typeahead from stealing keys. */
+const GroupRenameField: React.FC<{initial: string; onCommit: (value: string) => void; onCancel: () => void}> = ({
+  initial,
+  onCommit,
+  onCancel,
+}) => {
+  const done = React.useRef(false);
+  const finish = (commit: boolean, value: string): void => {
+    if (done.current) return;
+    done.current = true;
+    if (commit) onCommit(value);
+    else onCancel();
+  };
+  return (
+    <div className="p-1" onKeyDown={(e) => e.stopPropagation()}>
+      {/* The stronger tier remains AA on the accent fill, and therefore on its 40% composite. */}
+      <input
+        autoFocus
+        defaultValue={initial}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') finish(true, e.currentTarget.value);
+          else if (e.key === 'Escape') finish(false, '');
+        }}
+        onBlur={(e) => finish(true, e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        placeholder="Group name…"
+        aria-label="Rename group"
+        className="w-full rounded-sm bg-accent/40 px-1.5 py-1 text-sm outline-hidden placeholder:text-muted-foreground-strong"
+      />
+    </div>
+  );
+};
+
+/**
+ * Right-click a **group header** — in any grouped layout (table sections, board
+ * columns & swimlanes, list, gallery, timeline bands) — for group-scoped actions:
+ * rename the group, recolour it, collapse/expand it (or every group), and delete
+ * it. Without this, a group-header right-click bubbled up to the database-level
+ * menu ("Rename view"), so there was no way to act on the group itself (CM-1).
+ *
+ * `stopPropagation` on the trigger keeps a group right-click from ALSO opening the
+ * surrounding {@link DatabaseContextMenu}. Rename/recolour/delete apply to a
+ * `select`/`status` **option** group (mutating the option) or — rename only — a
+ * parent-item/relation **page** group (renaming the linked page). The "No value"
+ * and ungrouped sentinels aren't editable, so those actions disable.
+ */
+export const GroupContextMenu: React.FC<{
+  db: UseDatabase;
+  group: RowGroup;
+  /** The group-by property (undefined when grouping by parent item). */
+  prop: DatabaseProperty | undefined;
+  groupByParent: boolean;
+  /** Whether this group currently reads as collapsed (drives the toggle label). */
+  collapsed: boolean;
+  onToggle: () => void;
+  onCollapseAll: () => void;
+  onExpandAll: () => void;
+  children: React.ReactNode;
+}> = ({db, group, prop, groupByParent, collapsed, onToggle, onCollapseAll, onExpandAll, children}) => {
+  const {renamePage} = useNavigation();
+  const [renaming, setRenaming] = useState(false);
+
+  const sentinel = GROUP_SENTINELS.has(group.key);
+  const isOptionGroup = !sentinel && (prop?.type === 'select' || prop?.type === 'status');
+  const isPage = isPageGroup(group, prop, groupByParent);
+  const option = isOptionGroup ? prop?.options?.find((o) => o.id === group.key) : undefined;
+  const canRename = isOptionGroup || isPage;
+
+  // ContextMenuPrimitive.Root is uncontrolled (no `open` prop — it opens at the
+  // pointer on right-click), so we dismiss it by dispatching Escape, which the
+  // open menu's DismissableLayer catches on document. Used to close after an
+  // in-menu rename commit / colour pick, which aren't menu-item selects.
+  const dismiss = (): void => {
+    if (typeof document !== 'undefined') document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+  };
+
+  const patchOption = (patch: Partial<DatabaseSelectOption>): void => {
+    if (!prop) return;
+    void db.updateProperty(prop.id, {options: (prop.options ?? []).map((o) => (o.id === group.key ? {...o, ...patch} : o))});
+  };
+  const commitRename = (value: string): void => {
+    setRenaming(false);
+    dismiss();
+    const name = value.trim();
+    if (!name) return;
+    if (isOptionGroup) patchOption({label: name});
+    else if (isPage) void renamePage(group.key, name);
+  };
+  const deleteGroup = (): void => {
+    if (!prop) return;
+    void db.updateProperty(prop.id, {options: (prop.options ?? []).filter((o) => o.id !== group.key)});
+  };
+
+  return (
+    <ContextMenu onOpenChange={(next) => !next && setRenaming(false)}>
+      {/* stopPropagation so a group right-click doesn't also bubble to the DB-level menu.
+          `data-group-anchor` marks the header so a copied group link
+          (`?page=<hostDb>&group=<key>`) can scroll to + flash it on load. */}
+      <ContextMenuTrigger asChild onContextMenu={(e) => e.stopPropagation()} data-group-anchor={group.key}>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent className={MENU_WIDTH_MD}>
+        {renaming ? (
+          <GroupRenameField
+            initial={option?.label ?? groupHeading(group, prop)}
+            onCommit={commitRename}
+            onCancel={() => {
+              setRenaming(false);
+              dismiss();
+            }}
+          />
+        ) : (
+          <>
+            <ContextMenuLabel className="truncate text-xs font-medium text-muted-foreground">
+              {groupHeading(group, prop) || 'No value'}
+            </ContextMenuLabel>
+            <ContextMenuItem
+              disabled={!canRename}
+              // A page group's "rename" reaches the linked page app-wide, so name
+              // the action + its scope; the sentinel groups say why they're inert.
+              title={!canRename ? 'Only option or linked-page groups can be renamed' : isPage ? 'Renames the linked page everywhere' : undefined}
+              onSelect={(e) => {
+                e.preventDefault();
+                setRenaming(true);
+              }}
+            >
+              <Pencil className="mr-2 h-3.5 w-3.5" /> {isPage ? 'Rename page' : 'Rename group'}
+            </ContextMenuItem>
+            <ContextMenuSub>
+              <ContextMenuSubTrigger
+                disabled={!isOptionGroup}
+                title={isOptionGroup ? undefined : isPage ? 'Linked page groups have no colour' : 'Only option groups have a colour'}
+              >
+                <Palette className="mr-2 h-3.5 w-3.5" /> Change colour
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="p-2">
+                {/* Swatches are ContextMenuItems (not raw buttons) so Radix's
+                    roving tabindex collects them and arrow keys + Enter reach
+                    every colour; the round swatch look overrides the item padding. */}
+                <div className="grid grid-cols-5 gap-1.5">
+                  {SELECT_COLORS.map((c) => (
+                    <ContextMenuItem
+                      key={c}
+                      onSelect={() => patchOption({color: c})}
+                      aria-label={c}
+                      title={c}
+                      className={cn(
+                        'h-5 w-5 justify-center rounded-full border border-foreground/10 p-0 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 focus:ring-2 focus:ring-foreground/30 focus:ring-offset-1 dark:border-foreground/20',
+                        (option?.color ?? 'gray') === c && 'ring-2 ring-foreground/50 ring-offset-1',
+                      )}
+                      style={{backgroundColor: swatchColor(c)}}
+                    />
+                  ))}
+                </div>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={onToggle}>
+              <ChevronRight className={cn('mr-2 h-3.5 w-3.5 transition-transform', !collapsed && 'rotate-90')} />
+              {collapsed ? 'Expand group' : 'Collapse group'}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onCollapseAll}>
+              <ChevronsDownUp className="mr-2 h-3.5 w-3.5" /> Collapse all
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={onExpandAll}>
+              <ChevronsUpDown className="mr-2 h-3.5 w-3.5" /> Expand all
+            </ContextMenuItem>
+            {/* Copy link (COPYLINK-AUDIT): dropped from the group header — a link
+                to a swimlane/section is niche noise. Copy link stays on the row
+                (contextual, per-page) and the page cluster; the group deep-link
+                anchor (`groupLinkUrl`) is still honoured on load. */}
+            {isOptionGroup && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem onSelect={deleteGroup} className={MENU_DESTRUCTIVE_CLASS}>
+                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete group
+                </ContextMenuItem>
+              </>
+            )}
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+};
 
 const NewRowButton: React.FC<{onClick: () => void; label?: string; className?: string}> = ({onClick, label, className}) => (
   <button
@@ -222,7 +436,7 @@ const NewRowButton: React.FC<{onClick: () => void; label?: string; className?: s
       className,
     )}
   >
-    <Plus className="h-4 w-4" /> {label ?? 'New'}
+    <Plus className="h-4 w-4" /> {label ?? 'New row'}
   </button>
 );
 
@@ -241,7 +455,7 @@ const CardCover: React.FC<{src: string | null; heightClass: string; icon: string
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="flex h-16 items-center justify-center bg-muted/40 text-3xl">
+      <div className="flex h-16 items-center justify-center bg-muted text-3xl">
         <PageIcon value={icon} />
       </div>
     );
@@ -272,18 +486,21 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
 
   const card = (row: DatabaseRow): React.ReactNode => {
     const cover = view.coverPropertyId ? coverImageUrl(row.properties[view.coverPropertyId]) : null;
-    const accent = rowColor(row, view, schema, db.rows);
+    const accent = rowColor(row, view, db.rollupProperties, db.rollupRows);
     return (
       <RowContextMenu key={row.id} db={db} rowId={row.id}>
         <button
           onClick={() => db.openRow(row.id)}
           style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
-          className="group flex flex-col gap-2 overflow-hidden rounded-lg border border-border bg-card text-left transition-[background-color,border-color,box-shadow] hover:border-foreground/20 hover:shadow-lift"
+          className="group flex flex-col gap-2 overflow-hidden rounded-lg border border-border bg-card text-left transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
         >
-          <CardCover src={cover} heightClass={GALLERY_COVER[size]} icon={readPageIcon(row.id)} />
-          <div className="flex flex-col gap-2 px-3 pb-3">
-            <div className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</div>
-            <RowChips row={row} properties={cardProps} rows={db.rows} />
+          {view.coverPropertyId && <CardCover src={cover} heightClass={GALLERY_COVER[size]} icon={readPageIcon(row.id)} />}
+          <div className={cn('flex flex-col gap-2', view.coverPropertyId ? 'px-3 pb-3' : 'p-3')}>
+            <div className="flex items-center gap-1.5">
+              {!view.coverPropertyId && <PageIcon value={readPageIcon(row.id)} className="shrink-0 text-sm leading-none" />}
+              <span className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</span>
+            </div>
+            <RowChips row={row} properties={cardProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />
           </div>
         </button>
       </RowContextMenu>
@@ -300,18 +517,29 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
           const glyph = groupGlyph(group, groupProp, groupByParent);
           return (
             <section key={group.key} data-group={group.key}>
-              <button onClick={() => toggle(group.key)} className="mb-2 flex w-full items-center gap-1.5 text-sm font-medium">
-                <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform', !isCollapsed && 'rotate-90')} />
-                {group.color && <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor: SWATCH_HEX[group.color] ?? '#9ca3af'}} />}
-                {glyph && <span className="text-base leading-none">{glyph}</span>}
-                <span className="truncate">{groupHeading(group, groupProp)}</span>
-                <span className="text-muted-foreground/60">{group.rows.length}</span>
-              </button>
+              <GroupContextMenu
+                db={db}
+                group={group}
+                prop={groupProp}
+                groupByParent={groupByParent}
+                collapsed={isCollapsed}
+                onToggle={() => toggle(group.key)}
+                onCollapseAll={() => setCollapsed(setAllGroupsCollapsed(groups, true, collapseEmpty))}
+                onExpandAll={() => setCollapsed(setAllGroupsCollapsed(groups, false, collapseEmpty))}
+              >
+                <button onClick={() => toggle(group.key)} className="mb-2 flex w-full items-center gap-1.5 text-sm font-medium">
+                  <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/80 transition-transform', !isCollapsed && 'rotate-90')} />
+                  {group.color && <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(group.color)} />}
+                  {glyph && <span className="text-base leading-none">{glyph}</span>}
+                  <span className="truncate">{groupHeading(group, groupProp)}</span>
+                  <span className="text-muted-foreground">{group.rows.length}</span>
+                </button>
+              </GroupContextMenu>
               {!isCollapsed && grid(group.rows)}
             </section>
           );
         })}
-        <NewRowButton onClick={() => void db.addRow()} label="New card" className="mt-3" />
+        <NewRowButton onClick={() => void db.addRow()} label="New row" className="mt-3" />
       </div>
     );
   }
@@ -320,16 +548,16 @@ export const GalleryView: React.FC<{db: UseDatabase; view: DbView; properties: D
     <div>
       {grid(db.visibleRows)}
       {db.visibleRows.length === 0 && (
-        <div className="rounded-md border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border px-3 py-10 text-center text-sm text-muted-foreground">
         No rows{db.rows.length > 0 ? ' match the current filters' : ' yet'}.
         </div>
       )}
-      <NewRowButton onClick={() => void db.addRow()} label="New card" className="mt-3" />
+      <NewRowButton onClick={() => void db.addRow()} label="New row" className="mt-3" />
     </div>
   );
 };
 
-const fieldClass = 'w-full rounded border border-border bg-background px-1.5 py-1 text-xs outline-hidden';
+const fieldClass = cn(inputVariants({inputSize: 'sm'}), 'text-xs');
 const BOARD_CALCS: {value: SummaryType; label: string}[] = [
   {value: 'count_all', label: 'Count'},
   {value: 'count_values', label: 'Count values'},
@@ -349,7 +577,9 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
   const summary = view.boardSummary ?? (numeric ? {propertyId: numeric.id, type: 'sum' as SummaryType} : {propertyId: TITLE_PROPERTY_ID, type: 'count_all' as SummaryType});
   const prop = summary.propertyId === TITLE_PROPERTY_ID ? TITLE_PROPERTY_ID : properties.find((p) => p.id === summary.propertyId);
   if (!prop) return null;
-  const value = summarizeColumn(rows, prop, summary.type, properties);
+  // Resolve against the rollup rows/properties so a footer over a
+  // cross-database rollup folds real foreign rows (matches the cells).
+  const value = summarizeColumn(rows, prop, summary.type, db.rollupProperties, db.rollupRows);
   const calc = BOARD_CALCS.find((c) => c.value === summary.type)?.label ?? summary.type;
   const label = summary.propertyId === TITLE_PROPERTY_ID ? 'Count' : `${calc} · ${(prop as DatabaseProperty).name}`;
   const update = (patch: Partial<typeof summary>): void => void db.updateView(view.id, {boardSummary: {...summary, ...patch}});
@@ -357,15 +587,15 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="flex w-full items-center justify-between gap-1 border-t border-border/50 px-1 pt-1 text-[11px] text-muted-foreground/70 transition-colors hover:text-foreground">
+        <button className="flex w-full items-center justify-between gap-1 border-t border-border/50 px-1 pt-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <span className="truncate">{label}</span>
           <span className="font-medium tabular-nums text-foreground/70">{value || '—'}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-48 space-y-2 p-2.5">
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Property</span>
-          <Select unstyled aria-label="Summary property" value={summary.propertyId} onChange={(e) => update({propertyId: e.target.value})} className={cn(fieldClass, 'mt-1')}>
+          <span className="text-xs font-semibold text-muted-foreground">Property</span>
+          <Select inputSize="sm" aria-label="Summary property" value={summary.propertyId} onChange={(e) => update({propertyId: e.target.value})} className={cn(fieldClass, 'mt-1')}>
             <option value={TITLE_PROPERTY_ID}>Rows (count)</option>
             {properties.map((p) => (
               <option key={p.id} value={p.id}>
@@ -375,8 +605,8 @@ const BoardColumnFooter: React.FC<{db: UseDatabase; view: DbView; properties: Da
           </Select>
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Calculate</span>
-          <Select unstyled aria-label="Summary calculation" value={summary.type} onChange={(e) => update({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1')}>
+          <span className="text-xs font-semibold text-muted-foreground">Calculate</span>
+          <Select inputSize="sm" aria-label="Summary calculation" value={summary.type} onChange={(e) => update({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1')}>
             {BOARD_CALCS.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
@@ -428,17 +658,23 @@ const BoardColumnCards: React.FC<{
   <>
     <div className="flex flex-col gap-2">
       {rows.map((row) => {
-        const accent = rowColor(row, view, properties, db.rows);
+        const accent = rowColor(row, view, db.rollupProperties, db.rollupRows);
         return (
           <RowContextMenu key={row.id} db={db} rowId={row.id}>
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); db.openRow(row.id); } }}
               draggable={canMove}
               onDragStart={() => dnd.setDragRow(row.id)}
-              onDragEnd={() => dnd.setDragRow(null)}
+              onDragEnd={() => {
+                dnd.setDragRow(null);
+                dnd.setOverKey(null);
+              }}
               onClick={() => db.openRow(row.id)}
               style={accent ? {borderLeftColor: accent, borderLeftWidth: 3} : undefined}
               className={cn(
-                'group cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-lift',
+                'group cursor-pointer overflow-hidden rounded-md border border-border bg-card p-2.5 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20 focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]',
                 dnd.dragRow === row.id && 'opacity-50',
               )}
             >
@@ -451,9 +687,9 @@ const BoardColumnCards: React.FC<{
               <div className="mb-1 flex items-center gap-1.5">
                 <PageIcon value={readPageIcon(row.id)} className="shrink-0 text-sm leading-none" />
                 <span className="truncate text-sm font-medium">{row.name?.trim() || 'Untitled'}</span>
-                <PanelRightOpen className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/0 transition group-hover:text-muted-foreground/60" />
+                <PanelRightOpen className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/0 transition group-hover:text-muted-foreground/80" />
               </div>
-              <RowChips row={row} properties={cardProps} rows={db.rows} />
+              <RowChips row={row} properties={cardProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />
             </div>
           </RowContextMenu>
         );
@@ -615,46 +851,59 @@ export const BoardView: React.FC<{
         const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
         const glyph = groupGlyph(group, groupProp, groupByParent);
         const heading = groupHeading(group, groupProp);
+        const opt = groupProp?.options?.find((o) => o.id === group.key);
         return (
-          <div
+          <GroupContextMenu
             key={group.key}
-            data-col-key={group.key}
-            draggable={isOption(group.key)}
-            onDragStart={(e) => {
-              e.stopPropagation();
-              setDragCol(group.key);
-            }}
-            onDragEnd={() => {
-              setDragCol(null);
-              setOverKey(null);
-            }}
-            onDragOver={(e) => {
-              if (dragCol && isOption(group.key)) {
-                e.preventDefault();
-                setOverKey(cellKey(group.key, null));
-              }
-            }}
-            onDrop={() => dragCol && reorderColumn(dragCol, group.key)}
-            className={cn(
-              'flex shrink-0 items-center gap-1.5 rounded-md bg-muted/30 px-2 py-1.5 text-xs font-medium',
-              isCollapsed ? 'w-11 justify-center' : 'w-64',
-              isOption(group.key) && 'cursor-grab active:cursor-grabbing',
-              dragCol === group.key && 'opacity-40',
-              overKey === cellKey(group.key, null) && 'ring-1 ring-brand/40',
-            )}
+            db={db}
+            group={group}
+            prop={groupProp}
+            groupByParent={groupByParent}
+            collapsed={isCollapsed}
+            onToggle={() => toggleCol(group.key)}
+            onCollapseAll={() => setCollapsedCols(setAllGroupsCollapsed(groups, true, collapseEmpty))}
+            onExpandAll={() => setCollapsedCols(setAllGroupsCollapsed(groups, false, collapseEmpty))}
           >
-            {group.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor: SWATCH_HEX[group.color] ?? '#9ca3af'}} />}
-            {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
-            {!isCollapsed && <span className="truncate">{heading}</span>}
-            <span className="text-muted-foreground/60">{group.rows.length}</span>
-            <button
-              onClick={() => toggleCol(group.key)}
-              aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${heading} column`}
-              className={cn('shrink-0 rounded p-0.5 text-muted-foreground/50 transition-colors hover:bg-hover hover:text-foreground', !isCollapsed && 'ml-auto')}
+            <div
+              data-col-key={group.key}
+              draggable={isOption(group.key)}
+              onDragStart={(e) => {
+                e.stopPropagation();
+                setDragCol(group.key);
+              }}
+              onDragEnd={() => {
+                setDragCol(null);
+                setOverKey(null);
+              }}
+              onDragOver={(e) => {
+                if (dragCol && isOption(group.key)) {
+                  e.preventDefault();
+                  setOverKey(cellKey(group.key, null));
+                }
+              }}
+              onDrop={() => dragCol && reorderColumn(dragCol, group.key)}
+              className={cn(
+                'flex shrink-0 items-center gap-1.5 rounded-md bg-muted/30 px-2 py-1.5 text-xs font-medium',
+                isCollapsed ? 'w-11 justify-center' : 'w-64',
+                isOption(group.key) && 'cursor-grab active:cursor-grabbing',
+                dragCol === group.key && 'opacity-40',
+                overKey === cellKey(group.key, null) && 'ring-1 ring-brand/40',
+              )}
             >
-              {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+              {isCollapsed && group.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(group.color)} />}
+              {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
+              {!isCollapsed && (opt ? <SelectChip option={opt} pill={groupProp?.type === 'status'} /> : <span className="truncate">{heading}</span>)}
+              <span className="text-muted-foreground">{group.rows.length}</span>
+              <IconButton
+                size="inline"
+                onClick={() => toggleCol(group.key)}
+                aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${heading} column`}
+                className={cn('text-muted-foreground/80', !isCollapsed && 'ml-auto')}
+              >
+                {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+              </IconButton>
+            </div>
+          </GroupContextMenu>
         );
       })}
     </div>
@@ -664,7 +913,9 @@ export const BoardView: React.FC<{
   const Cell: React.FC<{group: RowGroup; rows: DatabaseRow[]; subKey: string | null}> = ({group, rows, subKey}) => {
     const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
     const key = cellKey(group.key, subKey);
-    if (isCollapsed) return <div className="w-11 shrink-0" />;
+    const tint = group.color && groupProp?.options?.some((o) => o.id === group.key);
+    const tintStyle = tint && overKey !== key ? {backgroundColor: `color-mix(in srgb, ${chipBgVar(group.color)} var(--data-column-tint), transparent)`} : undefined;
+    if (isCollapsed) return <div className="w-11 shrink-0 rounded-lg" style={tintStyle} />;
     return (
       <div
         onDragOver={(e) => {
@@ -674,8 +925,10 @@ export const BoardView: React.FC<{
           }
         }}
         onDrop={() => !dragCol && drop({colKey: group.key, subKey})}
+        style={tintStyle}
         className={cn(
-          'flex w-64 shrink-0 flex-col gap-2 rounded-lg bg-muted/30 p-2 transition-colors',
+          'flex w-64 shrink-0 flex-col gap-2 rounded-lg p-2 transition-colors',
+          !tint && 'bg-muted/30',
           overKey === key && 'bg-accent/50 ring-1 ring-brand/40',
         )}
       >
@@ -712,59 +965,70 @@ export const BoardView: React.FC<{
             const laneCollapsed = groupCollapsed(lane, collapsedLanes, collapseEmpty);
             const laneGlyph = groupGlyph(lane, subProp, subByParent);
             const laneHeading = groupHeading(lane, subProp);
+            const laneOpt = subProp?.options?.find((o) => o.id === lane.key);
             const byCol = new Map(groups.map((g) => [g.key, new Set(g.rows.map((r) => r.id))]));
             return (
               <div key={lane.key} className="space-y-2">
                 {/* Full-width horizontal lane bar above the cards: a drag gutter,
                     chevron, dot, label, count. Spans every column so it reads as a
                     swimlane; drag the gutter to reorder the sub-group's options. */}
-                <div
-                  data-lane-key={lane.key}
-                  onDragOver={(e) => {
-                    if (dragLane && isLaneOption(lane.key)) {
-                      e.preventDefault();
-                      setOverLane(lane.key);
-                    }
-                  }}
-                  onDrop={() => dragLane && reorderLane(dragLane, lane.key)}
-                  className={cn(
-                    'flex w-full items-center rounded-md border-b border-border/70 bg-muted/40 text-xs font-medium transition-colors',
-                    dragLane === lane.key && 'opacity-40',
-                    overLane === lane.key && 'ring-1 ring-brand/40',
-                  )}
+                <GroupContextMenu
+                  db={db}
+                  group={lane}
+                  prop={subProp}
+                  groupByParent={subByParent}
+                  collapsed={laneCollapsed}
+                  onToggle={() => toggleLane(lane.key)}
+                  onCollapseAll={() => setCollapsedLanes(() => setAllGroupsCollapsed(lanes, true, collapseEmpty))}
+                  onExpandAll={() => setCollapsedLanes(() => setAllGroupsCollapsed(lanes, false, collapseEmpty))}
                 >
-                  {isLaneOption(lane.key) && (
-                    <span
-                      draggable
-                      onDragStart={(e) => {
-                        e.stopPropagation();
-                        setDragLane(lane.key);
-                      }}
-                      onDragEnd={() => {
-                        setDragLane(null);
-                        setOverLane(null);
-                      }}
-                      aria-label={`Reorder ${laneHeading} lane`}
-                      className="flex cursor-grab items-center self-stretch rounded-l-md px-1 text-muted-foreground/30 transition-colors hover:bg-hover hover:text-muted-foreground active:cursor-grabbing"
-                    >
-                      <GripVertical className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggleLane(lane.key)}
-                    aria-label={`${laneCollapsed ? 'Expand' : 'Collapse'} ${laneHeading} lane`}
+                  <div
+                    data-lane-key={lane.key}
+                    onDragOver={(e) => {
+                      if (dragLane && isLaneOption(lane.key)) {
+                        e.preventDefault();
+                        setOverLane(lane.key);
+                      }
+                    }}
+                    onDrop={() => dragLane && reorderLane(dragLane, lane.key)}
                     className={cn(
-                      'flex flex-1 items-center gap-1.5 py-1.5 pr-2.5 text-left transition-colors hover:bg-hover',
-                      isLaneOption(lane.key) ? 'rounded-r-md' : 'rounded-md pl-2.5',
+                      'group/lane flex w-full items-center rounded-md border-b border-border/70 bg-muted/40 text-xs font-medium transition-colors',
+                      dragLane === lane.key && 'opacity-40',
+                      overLane === lane.key && 'ring-1 ring-brand/40',
                     )}
                   >
-                    <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform', !laneCollapsed && 'rotate-90')} />
-                    {lane.color && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor: SWATCH_HEX[lane.color] ?? '#9ca3af'}} />}
-                    {laneGlyph && <span className="shrink-0 text-sm leading-none">{laneGlyph}</span>}
-                    <span className="truncate text-foreground/80">{laneHeading}</span>
-                    <span className="text-muted-foreground/60">{lane.rows.length}</span>
-                  </button>
-                </div>
+                    {isLaneOption(lane.key) && (
+                      <span
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          setDragLane(lane.key);
+                        }}
+                        onDragEnd={() => {
+                          setDragLane(null);
+                          setOverLane(null);
+                        }}
+                        aria-label={`Reorder ${laneHeading} lane`}
+                        className="flex cursor-grab items-center self-stretch rounded-l-md px-1 text-muted-foreground/80 opacity-0 transition-opacity group-hover/lane:opacity-100 focus-visible:opacity-100 hover:bg-hover hover:text-muted-foreground active:cursor-grabbing"
+                      >
+                        <GripVertical className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                    <button
+                      onClick={() => toggleLane(lane.key)}
+                      aria-label={`${laneCollapsed ? 'Expand' : 'Collapse'} ${laneHeading} lane`}
+                      className={cn(
+                        'flex flex-1 items-center gap-1.5 min-h-7 py-1 pr-2.5 text-left transition-colors hover:bg-hover',
+                        isLaneOption(lane.key) ? 'rounded-r-md' : 'rounded-md pl-2.5',
+                      )}
+                    >
+                      <ChevronRight className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground/80 transition-transform', !laneCollapsed && 'rotate-90')} />
+                      {laneGlyph && <span className="shrink-0 text-sm leading-none">{laneGlyph}</span>}
+                      {laneOpt ? <SelectChip option={laneOpt} pill={subProp?.type === 'status'} /> : <span className="truncate text-foreground">{laneHeading}</span>}
+                      <span className="text-muted-foreground">{lane.rows.length}</span>
+                    </button>
+                  </div>
+                </GroupContextMenu>
                 {!laneCollapsed && (
                   <div className="flex gap-3">
                     {groups.map((group) => {
@@ -788,7 +1052,7 @@ export const BoardView: React.FC<{
         <div className="mb-2 flex justify-end">
           <button
             onClick={() => setCollapsedCols(setAllGroupsCollapsed(groups, !allCollapsed, collapseEmpty))}
-            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
           >
             <ChevronRight className={cn('h-3.5 w-3.5 transition-transform', !allCollapsed && 'rotate-90')} />
             {allCollapsed ? 'Expand all' : 'Collapse all'}
@@ -800,6 +1064,7 @@ export const BoardView: React.FC<{
           const isCollapsed = groupCollapsed(group, collapsedCols, collapseEmpty);
           const glyph = groupGlyph(group, groupProp, groupByParent);
           const heading = groupHeading(group, groupProp);
+          const opt = groupProp?.options?.find((o) => o.id === group.key);
           return (
             <div
               key={group.key}
@@ -810,60 +1075,82 @@ export const BoardView: React.FC<{
                 }
               }}
               onDrop={() => (dragCol ? reorderColumn(dragCol, group.key) : drop({colKey: group.key, subKey: null}))}
+              style={opt && group.color && overKey !== cellKey(group.key, null) ? {backgroundColor: `color-mix(in srgb, ${chipBgVar(group.color)} var(--data-column-tint), transparent)`} : undefined}
               className={cn(
-                'flex shrink-0 flex-col gap-2 rounded-lg bg-muted/30 p-2 transition-colors',
+                'flex shrink-0 flex-col gap-2 rounded-lg p-2 transition-colors',
+                !(opt && group.color) && 'bg-muted/30',
                 isCollapsed ? 'w-11 items-center' : 'w-64',
                 overKey === cellKey(group.key, null) && 'bg-accent/50 ring-1 ring-brand/40',
               )}
             >
               {isCollapsed ? (
-                <button
-                  data-col-key={group.key}
-                  onClick={() => toggleCol(group.key)}
-                  aria-label={`Expand ${heading} column`}
-                  className="flex flex-1 flex-col items-center gap-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                <GroupContextMenu
+                  db={db}
+                  group={group}
+                  prop={groupProp}
+                  groupByParent={groupByParent}
+                  collapsed
+                  onToggle={() => toggleCol(group.key)}
+                  onCollapseAll={() => setCollapsedCols(setAllGroupsCollapsed(groups, true, collapseEmpty))}
+                  onExpandAll={() => setCollapsedCols(setAllGroupsCollapsed(groups, false, collapseEmpty))}
                 >
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                  {group.color && (
-                    <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor: SWATCH_HEX[group.color] ?? '#9ca3af'}} />
-                  )}
-                  {glyph && <span className="text-sm leading-none">{glyph}</span>}
-                  <span className="text-muted-foreground/60">{group.rows.length}</span>
-                  <span className="truncate [writing-mode:vertical-rl]">{heading}</span>
-                </button>
+                  <button
+                    data-col-key={group.key}
+                    onClick={() => toggleCol(group.key)}
+                    aria-label={`Expand ${heading} column`}
+                    className="flex flex-1 flex-col items-center gap-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                    {group.color && (
+                      <span className="h-2.5 w-2.5 rounded-full" style={dotStyle(group.color)} />
+                    )}
+                    {glyph && <span className="text-sm leading-none">{glyph}</span>}
+                    <span className="text-muted-foreground">{group.rows.length}</span>
+                    <span className="truncate [writing-mode:vertical-rl]">{heading}</span>
+                  </button>
+                </GroupContextMenu>
               ) : (
                 <>
-                  <div
-                    data-col-key={group.key}
-                    draggable={isOption(group.key)}
-                    onDragStart={(e) => {
-                      e.stopPropagation();
-                      setDragCol(group.key);
-                    }}
-                    onDragEnd={() => {
-                      setDragCol(null);
-                      setOverKey(null);
-                    }}
-                    className={cn(
-                      'flex items-center gap-1.5 px-1 text-xs font-medium',
-                      isOption(group.key) && 'cursor-grab active:cursor-grabbing',
-                      dragCol === group.key && 'opacity-40',
-                    )}
+                  <GroupContextMenu
+                    db={db}
+                    group={group}
+                    prop={groupProp}
+                    groupByParent={groupByParent}
+                    collapsed={false}
+                    onToggle={() => toggleCol(group.key)}
+                    onCollapseAll={() => setCollapsedCols(setAllGroupsCollapsed(groups, true, collapseEmpty))}
+                    onExpandAll={() => setCollapsedCols(setAllGroupsCollapsed(groups, false, collapseEmpty))}
                   >
-                    {group.color && (
-                      <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor: SWATCH_HEX[group.color] ?? '#9ca3af'}} />
-                    )}
-                    {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
-                    <span className="truncate">{heading}</span>
-                    <span className="text-muted-foreground/60">{group.rows.length}</span>
-                    <button
-                      onClick={() => toggleCol(group.key)}
-                      aria-label={`Collapse ${heading} column`}
-                      className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground/50 transition-colors hover:bg-hover hover:text-foreground"
+                    <div
+                      data-col-key={group.key}
+                      draggable={isOption(group.key)}
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        setDragCol(group.key);
+                      }}
+                      onDragEnd={() => {
+                        setDragCol(null);
+                        setOverKey(null);
+                      }}
+                      className={cn(
+                        'flex items-center gap-1.5 px-1 text-xs font-medium',
+                        isOption(group.key) && 'cursor-grab active:cursor-grabbing',
+                        dragCol === group.key && 'opacity-40',
+                      )}
                     >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                      {glyph && <span className="shrink-0 text-sm leading-none">{glyph}</span>}
+                      {opt ? <SelectChip option={opt} pill={groupProp?.type === 'status'} /> : <span className="truncate">{heading}</span>}
+                      <span className="text-muted-foreground">{group.rows.length}</span>
+                      <IconButton
+                        size="inline"
+                        onClick={() => toggleCol(group.key)}
+                        aria-label={`Collapse ${heading} column`}
+                        className="ml-auto text-muted-foreground/80"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </IconButton>
+                    </div>
+                  </GroupContextMenu>
                   <BoardColumnCards
                     db={db}
                     view={view}
@@ -924,7 +1211,7 @@ const NewGroupColumn: React.FC<{onAdd: (label: string) => void}> = ({onAdd}) => 
     return (
       <button
         onClick={() => setAdding(true)}
-        className="flex h-9 w-44 shrink-0 items-center gap-1 rounded-lg border border-dashed border-border/70 px-3 text-sm text-muted-foreground/70 transition-colors hover:border-border hover:bg-muted/30 hover:text-foreground"
+        className="flex h-9 w-44 shrink-0 items-center gap-1 rounded-lg border border-dashed border-border/70 px-3 text-sm text-muted-foreground transition-colors hover:border-border hover:bg-muted/30 hover:text-foreground"
       >
         <Plus className="h-4 w-4" /> New group
       </button>
@@ -946,7 +1233,7 @@ const NewGroupColumn: React.FC<{onAdd: (label: string) => void}> = ({onAdd}) => 
         onBlur={commit}
         placeholder="Group name…"
         aria-label="New group name"
-        className="w-full bg-transparent py-0.5 text-sm outline-hidden placeholder:text-muted-foreground/50"
+        className="w-full bg-transparent py-0.5 text-sm outline-hidden placeholder:text-placeholder-foreground"
       />
     </div>
   );
@@ -1020,11 +1307,7 @@ export const CalendarView: React.FC<{
   };
 
   if (!dateProp) {
-    return (
-      <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-        Choose a date property in the view options to lay rows out on a calendar.
-      </div>
-    );
+    return <ViewSetupCard kind="calendar" db={db} view={view} properties={properties} />;
   }
 
   // Bucket rows by their day key.
@@ -1053,24 +1336,24 @@ export const CalendarView: React.FC<{
   const todayKey = ymd(today.getFullYear(), today.getMonth(), today.getDate());
 
   return (
-    <div className="rounded-md border border-border">
+    <div className="rounded-lg border border-border">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="text-sm font-medium">
           {MONTHS[cursor.month]} {cursor.year}
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setCursor({year: today.getFullYear(), month: today.getMonth()})} className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
+          <button onClick={() => setCursor({year: today.getFullYear(), month: today.getMonth()})} className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
             Today
           </button>
-          <button onClick={() => shift(-1)} className="rounded p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground" aria-label="Previous month">
+          <IconButton size="sm" onClick={() => shift(-1)} aria-label="Previous month">
             <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button onClick={() => shift(1)} className="rounded p-1 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground" aria-label="Next month">
+          </IconButton>
+          <IconButton size="sm" onClick={() => shift(1)} aria-label="Next month">
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </IconButton>
         </div>
       </div>
-      <div className="grid grid-cols-7 border-b border-border bg-muted/20 text-center text-[11px] font-medium text-muted-foreground">
+      <div className="grid grid-cols-7 border-b border-border bg-muted/20 text-center text-xs font-medium text-muted-foreground">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">
             {w}
@@ -1093,7 +1376,7 @@ export const CalendarView: React.FC<{
               }}
               onDrop={() => key && reschedule(dragRow!, key)}
               className={cn(
-                'group/day min-h-[88px] border-b border-r border-border/60 p-1 last:border-r-0 [&:nth-child(7n)]:border-r-0',
+                'group/day min-h-22 border-b border-r border-border/60 p-1 last:border-r-0 [&:nth-child(7n)]:border-r-0',
                 !day && 'bg-muted/10',
                 overKey === key && key && 'bg-accent/50 ring-1 ring-inset ring-brand/40',
               )}
@@ -1101,22 +1384,23 @@ export const CalendarView: React.FC<{
               {day && (
                 <div className="mb-1 flex items-center justify-between">
                   {editable ? (
-                    <button
+                    <IconButton
+                      size="inline"
                       onClick={() => createOn(key!)}
                       aria-label={`Add on ${key}`}
-                      className="rounded p-0.5 text-muted-foreground/60 opacity-0 transition hover:bg-hover hover:text-foreground group-hover/day:opacity-100"
+                      className="text-muted-foreground/80 opacity-0 transition-[opacity,background-color,color] group-hover/day:opacity-100"
                     >
                       <Plus className="h-3 w-3" />
-                    </button>
+                    </IconButton>
                   ) : (
                     <span />
                   )}
-                  <span className={cn('text-xs', key === todayKey ? 'font-semibold text-brand' : 'text-muted-foreground/70')}>{day}</span>
+                  <span className={cn('text-xs', key === todayKey ? 'font-semibold text-brand' : 'text-muted-foreground')}>{day}</span>
                 </div>
               )}
               <div className="flex flex-col gap-0.5">
                 {rows.map((row) => {
-                  const accent = rowColor(row, view, properties, db.rows);
+                  const accent = rowColor(row, view, db.rollupProperties, db.rollupRows);
                   return (
                     <RowContextMenu key={row.id} db={db} rowId={row.id}>
                       <button
@@ -1124,9 +1408,9 @@ export const CalendarView: React.FC<{
                         onDragStart={() => setDragRow(row.id)}
                         onDragEnd={() => setDragRow(null)}
                         onClick={() => db.openRow(row.id)}
-                        style={accent ? {backgroundColor: `${accent}24`, borderLeft: `3px solid ${accent}`} : undefined}
+                        style={accent ? {borderLeft: `3px solid ${accent}`} : undefined}
                         className={cn(
-                          'flex flex-col gap-0.5 rounded bg-brand/10 px-1 py-0.5 text-left text-[11px] text-foreground/80 transition-colors hover:bg-brand/20',
+                          'flex flex-col gap-0.5 rounded-sm bg-card px-1 py-0.5 text-left text-xs text-foreground shadow-sm ring-1 ring-border transition-colors hover:bg-hover',
                           editable && 'cursor-grab active:cursor-grabbing',
                           dragRow === row.id && 'opacity-40',
                         )}
@@ -1136,7 +1420,7 @@ export const CalendarView: React.FC<{
                           <PageIcon value={readPageIcon(row.id)} className="shrink-0 leading-none" />
                           <span className="truncate">{row.name?.trim() || 'Untitled'}</span>
                         </span>
-                        {tileProps.length > 0 && <RowChips row={row} properties={tileProps} rows={db.rows} />}
+                        {tileProps.length > 0 && <RowChips row={row} properties={tileProps} rows={db.rollupRows} resolveProperties={db.rollupProperties} pending={db.pendingRollups} />}
                       </button>
                     </RowContextMenu>
                   );

@@ -2,7 +2,7 @@ import {mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import postgres from 'postgres';
 import type {PGliteOptions} from '@electric-sql/pglite';
-import {PgliteDb, type Db} from './dbCore';
+import {PgliteDb, type Db, type TransactionOptions} from './dbCore';
 import {DirLock, DirLockedError} from './dirLock';
 
 // The isomorphic core (Mutex, the `Db` interface, the PGlite-backed `PgliteDb`)
@@ -10,16 +10,75 @@ import {DirLock, DirLockedError} from './dirLock';
 // app/web webview. This Node-only module re-exports it and adds the pieces that
 // genuinely need Node: the real-Postgres backend and a filesystem `dataDir`
 // helper.
-export {Mutex, PgliteQueryableDb, PgliteDb, type Db} from './dbCore';
+export {Mutex, PgliteQueryableDb, PgliteDb, type Db, type TransactionOptions} from './dbCore';
 
 type Sql = ReturnType<typeof postgres>;
+type SavepointSql = {
+  savepoint<T>(fn: (tx: Sql) => T | Promise<T>): Promise<T>;
+};
+
+/**
+ * JSON/JSONB parameter serializer for the porsager driver (LGR-15).
+ *
+ * THE BUG THIS FIXES: every jsonb write in this codebase binds
+ * `JSON.stringify(value)` — a STRING — as the parameter (`$n::jsonb`), which
+ * PGlite parses into the intended object. The wire driver, however, learns the
+ * parameter's type from the server's ParameterDescription and then runs its
+ * default json serializer — `JSON.stringify` — over the ALREADY-STRINGIFIED
+ * value, storing a jsonb STRING scalar (`"{\"a\":1}"`), not an object. Reads
+ * through `parseJson` still worked (it re-parses strings — which is why this
+ * survived undetected until the LGR-15 durability CI ran the ledger on real
+ * Postgres), but every SQL-level extraction (`properties->>'…'`, the ledger's
+ * posting reader, the icon projection) silently returned NULL.
+ *
+ * Fix: a string bound to a json/jsonb parameter IS ALREADY JSON text — pass it
+ * through verbatim; anything else serializes once. This matches PGlite's
+ * behavior exactly, which is the property the whole store relies on
+ * ("byte-identical SQL on both backends").
+ *
+ * LEGACY POSTURE — deliberately NO repair migration (LGR-15, Quinn Q1). Rows
+ * written through this driver before the fix hold jsonb STRING scalars. They
+ * cannot be repaired mechanically: a stored string that PARSES as JSON is
+ * indistinguishable from a value that legitimately IS a JSON string scalar —
+ * "un-double-encode everything parseable" would corrupt any genuine
+ * string-typed value. So legacy rows stay as written, with these consequences:
+ *  - application READS keep working: every read path goes through `parseJson`,
+ *    whose string branch re-parses exactly this shape;
+ *  - SQL-level extraction (`properties->>'…'`) on a legacy row returns NULL —
+ *    visible as e.g. missing icons in list projections for pages written
+ *    pre-fix on an external-Postgres deployment. New writes are correct, and
+ *    any full row UPDATE through the app rewrites the value properly;
+ *  - the LGR-15 durability CI runs the ledger suite against real Postgres, so
+ *    a regression of this serializer is caught, not re-hidden.
+ * Operators who want a clean store can export + restore into a fresh library
+ * (docs/ledger/backup-restore.md), which rewrites every row through the fixed
+ * driver.
+ */
+const jsonParamPassthrough = (value: unknown): string =>
+  typeof value === 'string' ? value : JSON.stringify(value);
 
 /** Real Postgres via the `postgres` (porsager) driver. */
 export class PostgresDb implements Db {
   private readonly sql: Sql;
+  private readonly inTransaction: boolean;
 
-  constructor(databaseUrl: string, opts?: {sql?: Sql; max?: number}) {
-    this.sql = opts?.sql ?? postgres(databaseUrl, {max: opts?.max ?? 10, onnotice: () => undefined});
+  constructor(databaseUrl: string, opts?: {
+    sql?: Sql;
+    max?: number;
+    inTransaction?: boolean;
+    onclose?: (connectionId: number) => void;
+  }) {
+    this.inTransaction = opts?.inTransaction === true;
+    this.sql =
+      opts?.sql ??
+      postgres(databaseUrl, {
+        max: opts?.max ?? 10,
+        onnotice: () => undefined,
+        onclose: opts?.onclose,
+        types: {
+          json: {to: 114, from: [114, 3802], serialize: jsonParamPassthrough, parse: (raw: string) => JSON.parse(raw) as unknown},
+        },
+      });
   }
 
   async query<T = Record<string, unknown>>(text: string, params: unknown[] = []): Promise<T[]> {
@@ -27,8 +86,26 @@ export class PostgresDb implements Db {
     return rows as unknown as T[];
   }
 
-  async begin<T>(fn: (tx: Db) => Promise<T>): Promise<T> {
-    return this.sql.begin((tx) => fn(new PostgresDb('', {sql: tx as unknown as Sql}))) as Promise<T>;
+  async begin<T>(fn: (tx: Db) => Promise<T>, options?: TransactionOptions): Promise<T> {
+    if (this.inTransaction) {
+      // Use porsager's native scope, not raw SAVEPOINT statements: the driver
+      // tracks query failures per scope and only its savepoint wrapper contains
+      // that marker when the caller catches the nested failure and continues.
+      return (this.sql as unknown as SavepointSql).savepoint((tx) => fn(new PostgresDb('', {
+        sql: tx,
+        inTransaction: true,
+      })));
+    }
+    return this.sql.begin(async (tx) => {
+      const transaction = new PostgresDb('', {
+        sql: tx as unknown as Sql,
+        inTransaction: true,
+      });
+      if (options?.isolationLevel === 'read committed') {
+        await transaction.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      }
+      return fn(transaction);
+    }) as Promise<T>;
   }
 
   async close(): Promise<void> {

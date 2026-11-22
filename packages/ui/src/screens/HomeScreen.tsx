@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {seedSampleDocument, type PageMeta} from '@book.dev/sdk';
 import {Clock, Database, FilePlus, LayoutTemplate, Pencil, Search, SlidersHorizontal, Sparkles, Star, Trash2, Upload} from 'lucide-react';
+import {ContextMenu, ContextMenuContent, ContextMenuTrigger} from '@/components/ui/context-menu';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -9,10 +10,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {IconButton} from '@/components/ui/icon-button';
+import {MENU_WIDTH_MD} from '@/components/ui/menu-components';
 import {useData} from '@/data';
 import {useHud, useNavigation, usePreferences, useTranslation} from '@/providers';
 import {readPageIcon, subscribePageIcon} from '@/lib/pageIcon';
 import {PageIcon} from '@/components/PageIcon';
+import {PageMenuItems} from '@/components/PageContextMenu';
 import {readRecents, subscribeRecents} from '@/lib/recents';
 import {readFavorites, subscribeFavorites} from '@/lib/favorites';
 import {
@@ -41,20 +44,27 @@ function timeAgo(iso: string): string {
 /** A small tile linking to a page: icon + name, card-shaped. */
 function PageTile({page, onOpen}: {page: PageMeta; onOpen: (id: string) => void}) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(page.id)}
-      className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] hover:border-foreground/15 hover:shadow-lift active:shadow-none focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
-    >
-      <PageIcon value={readPageIcon(page.id)} className="text-lg leading-none" />
-      <span className="min-w-0 truncate text-sm font-medium">{displayName(page.name)}</span>
-    </button>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <button
+          type="button"
+          onClick={() => onOpen(page.id)}
+          className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] hover:border-foreground/15 hover:shadow-lift active:shadow-none focus-visible:outline-hidden focus-visible:shadow-[var(--ring-control)]"
+        >
+          <PageIcon value={readPageIcon(page.id)} className="text-lg leading-none" />
+          <span className="min-w-0 truncate text-sm font-medium">{displayName(page.name)}</span>
+        </button>
+      </ContextMenuTrigger>
+      <ContextMenuContent className={MENU_WIDTH_MD}>
+        <PageMenuItems pageId={page.id} surface="row" menu="context" />
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
 function WidgetHeading({icon: Icon, children}: {icon: typeof Clock; children: string}) {
   return (
-    <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+    <h2 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
       <Icon className="h-3.5 w-3.5" />
       {children}
     </h2>
@@ -75,9 +85,9 @@ export default function HomeScreen() {
   const client = useData();
   const seedingRef = useRef(false);
 
-  // A brand-new workspace: no pages at all. Home is the landing screen then
+  // A brand-new library: no pages at all. Home is the landing screen then
   // (NavigationProvider falls back to it), so it carries the guided start.
-  // An emptied-out workspace (everything in the trash) is NOT a newcomer:
+  // An emptied-out library (everything in the trash) is NOT a newcomer:
   // greet normally and lead with the recovery path instead of "Welcome".
   const firstRun = pages.length === 0;
   const [trashCount, setTrashCount] = useState(0);
@@ -145,7 +155,7 @@ export default function HomeScreen() {
 
   // First-run starters: the paths that teach the product (templates, the
   // interactive sample) get equal billing with a plain new page. When the
-  // workspace was emptied out rather than never used, recovery leads.
+  // library was emptied out rather than never used, recovery leads.
   const starterActions = [
     ...(emptiedOut
       ? [
@@ -233,7 +243,7 @@ export default function HomeScreen() {
     <div className="w-full px-6 pb-24 pt-16 md:px-10" data-home-screen>
       <div className="mx-auto w-full max-w-content">
         <header className="mb-10 flex items-start justify-between gap-4">
-          <div className={cn('transition-opacity duration-300', now ? 'opacity-100' : 'opacity-0')}>
+          <div className={cn('transition-opacity duration-(--motion-fast)', now ? 'opacity-100' : 'opacity-0')}>
             <h1 className="text-3xl font-semibold tracking-tight" data-home-greeting>
               {greeting}
             </h1>
@@ -245,7 +255,7 @@ export default function HomeScreen() {
                 <SlidersHorizontal className="h-4 w-4" />
               </IconButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuContent align="end" className={MENU_WIDTH_MD}>
               <DropdownMenuLabel>{t('home.customize')}</DropdownMenuLabel>
               {WIDGET_LABELS.map(({key, label}) => (
                 <DropdownMenuCheckboxItem
@@ -328,16 +338,22 @@ export default function HomeScreen() {
               <WidgetHeading icon={Pencil}>{t('home.widgetEdited')}</WidgetHeading>
               <div className="flex flex-col">
                 {edited.map((page) => (
-                  <button
-                    key={page.id}
-                    type="button"
-                    onClick={() => selectPage(page.id)}
-                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-hover"
-                  >
-                    <PageIcon value={readPageIcon(page.id)} className="text-base leading-none" />
-                    <span className="min-w-0 grow truncate text-sm">{displayName(page.name)}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground/70">{timeAgo(page.updatedAt)}</span>
-                  </button>
+                  <ContextMenu key={page.id}>
+                    <ContextMenuTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => selectPage(page.id)}
+                        className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-hover"
+                      >
+                        <PageIcon value={readPageIcon(page.id)} className="text-base leading-none" />
+                        <span className="min-w-0 grow truncate text-sm">{displayName(page.name)}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground/70">{timeAgo(page.updatedAt)}</span>
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className={MENU_WIDTH_MD}>
+                      <PageMenuItems pageId={page.id} surface="row" menu="context" />
+                    </ContextMenuContent>
+                  </ContextMenu>
                 ))}
               </div>
             </section>

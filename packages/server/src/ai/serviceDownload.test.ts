@@ -1,0 +1,127 @@
+import {createHash} from 'node:crypto';
+import {mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {afterEach, beforeEach, expect, it, vi} from 'vitest';
+import type {Db} from '../db';
+import {AiService} from './service';
+import {WHISPER_MODEL_PIN} from './runtimeManifest';
+
+vi.mock('./runtimeManifest', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./runtimeManifest')>();
+  const {createHash} = await import('node:crypto');
+  return {...actual, WHISPER_MODEL_PIN: {...actual.WHISPER_MODEL_PIN,
+    sha256: createHash('sha256').update('model bytes').digest('hex'), size: 11,
+  }};
+});
+
+let dir: string;
+let service: AiService;
+const fetchMock = vi.fn(async () => new Response('model bytes'));
+beforeEach(async () => {
+  dir = await mkdtemp(path.join(tmpdir(), 'service-download-'));
+  const db = {query: vi.fn(async () => [])} as unknown as Db;
+  service = new AiService(db, dir);
+  await service.setConfig({provider: 'llama'});
+  fetchMock.mockClear();
+  vi.stubGlobal('fetch', fetchMock);
+});
+afterEach(async () => {
+  await service.dispose();
+  vi.unstubAllGlobals();
+  await rm(dir, {recursive: true, force: true});
+});
+
+async function finish(url: string) {
+  const state = await service.startDownload(url);
+  await expect.poll(() => state.done || Boolean(state.error)).toBe(true);
+  return state;
+}
+
+it('routes Whisper through verification, skips a matching receipt, and refreshes an old version', async () => {
+  const pin = WHISPER_MODEL_PIN;
+  expect(await finish(pin.url)).toMatchObject({done: true, received: 11, total: 11});
+  expect(await finish(pin.url)).toMatchObject({done: true, received: 11, total: 11});
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const receipt = path.join(dir, `${pin.fileName}.verified.json`);
+  const stored = JSON.parse(await readFile(receipt, 'utf8'));
+  await writeFile(receipt, JSON.stringify({...stored, version: 'previous-version'}));
+  expect(await finish(pin.url)).toMatchObject({done: true});
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(await readFile(receipt, 'utf8')).version).toBe(pin.version);
+  expect((await service.getConfig()).model).toBeUndefined();
+});
+
+it('reports corrupt Whisper bytes as an error and removes the partial', async () => {
+  fetchMock.mockResolvedValueOnce(new Response('wrong bytes'));
+  expect(await finish(WHISPER_MODEL_PIN.url)).toMatchObject({done: false, error: expect.stringContaining('SHA-256 mismatch')});
+  expect(await readdir(dir)).toEqual([]);
+});
+
+it('maps the legacy mutable model URL to the current immutable pin', async () => {
+  await finish('https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin');
+  expect(fetchMock).toHaveBeenCalledWith(WHISPER_MODEL_PIN.url, {redirect: 'follow', signal: expect.any(AbortSignal)});
+});
+
+it('keeps arbitrary llama downloads unverified, auto-selected, and skipped when present', async () => {
+  const arbitrary = 'arbitrary GGUF content';
+  expect(createHash('sha256').update(arbitrary).digest('hex')).not.toBe(WHISPER_MODEL_PIN.sha256);
+  fetchMock.mockResolvedValueOnce(new Response(arbitrary));
+  const url = 'https://example.test/custom.gguf';
+  expect(await finish(url)).toMatchObject({done: true});
+  await expect.poll(async () => (await service.getConfig()).model).toBe('custom.gguf');
+  expect(await readFile(path.join(dir, 'custom.gguf'), 'utf8')).toBe(arbitrary);
+  expect(await finish(url)).toMatchObject({done: true});
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(await readdir(dir)).toEqual(['custom.gguf']);
+});
+
+it('enabling local provisions runtime and model; disposal aborts the active fetch', async () => {
+  let signal: AbortSignal | undefined;
+  fetchMock.mockImplementationOnce(async (_url?: unknown, options?: RequestInit) => {
+    signal = options?.signal as AbortSignal;
+    return new Promise<Response>((_resolve, reject) => {
+      signal!.addEventListener('abort', () => reject(signal!.reason), {once: true});
+    });
+  });
+  const provision = vi.fn(async () => undefined);
+  const local = {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)};
+  const enabled = new AiService({query: vi.fn(async () => [])} as unknown as Db, dir, undefined, local);
+  await enabled.setConfig({provider: 'off', transcription: {provider: 'local'}});
+  await expect.poll(() => signal !== undefined).toBe(true);
+  await enabled.dispose();
+  expect(provision).toHaveBeenCalledOnce();
+  expect(signal?.aborted).toBe(true);
+  expect((await enabled.status()).download?.error).toContain('abort');
+});
+
+it('rechecks persisted local enablement on startup and refreshes an obsolete model receipt', async () => {
+  await finish(WHISPER_MODEL_PIN.url);
+  const receipt = path.join(dir, `${WHISPER_MODEL_PIN.fileName}.verified.json`);
+  const stored = JSON.parse(await readFile(receipt, 'utf8'));
+  await writeFile(receipt, JSON.stringify({...stored, version: 'old'}));
+  const provision = vi.fn(async () => undefined);
+  const restarted = new AiService({query: vi.fn(async () => [{value: {provider: 'off', transcription: {provider: 'local'}}}])} as unknown as Db,
+    dir, undefined, {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)});
+  try {
+    await restarted.getConfig();
+    await expect.poll(async () => (await restarted.status()).download?.done).toBe(true);
+    expect(provision).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(await readFile(receipt, 'utf8')).version).toBe(WHISPER_MODEL_PIN.version);
+  } finally { await restarted.dispose(); }
+});
+
+it('publishes the model receipt even when runtime provisioning rejects', async () => {
+  const provision = vi.fn(async () => { throw new Error('Runtime download failed'); });
+  const enabled = new AiService({query: vi.fn(async () => [])} as unknown as Db, dir, undefined,
+    {provision, status: vi.fn(), dispose: vi.fn(async () => undefined)});
+  try {
+    const state = await enabled.startDownload(WHISPER_MODEL_PIN.url);
+    await expect.poll(() => state.done).toBe(true);
+    expect(state).toMatchObject({done: true, error: 'Runtime download failed', received: 11, total: 11});
+    expect(provision).toHaveBeenCalledOnce();
+    expect(await readFile(path.join(dir, WHISPER_MODEL_PIN.fileName), 'utf8')).toBe('model bytes');
+    expect(JSON.parse(await readFile(path.join(dir, `${WHISPER_MODEL_PIN.fileName}.verified.json`), 'utf8')).version).toBe(WHISPER_MODEL_PIN.version);
+  } finally { await enabled.dispose(); }
+});

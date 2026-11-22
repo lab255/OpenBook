@@ -1,9 +1,43 @@
-import {isSafeHref} from '@book.dev/sdk';
-import type {BlockJSON, InlineAttrs, TextRun} from './model';
-import {decodeSnapshot} from './model';
+import {isSafeHref, type DatabaseFormReference, type FormField, type FormSchema} from '@book.dev/sdk';
+import {t} from '@/i18n';
+import type {BlockJSON, BlockType, CellRangeExportCell, InlineAttrs, TextRun} from './model';
+import {CONTAINER_BLOCKS, normalizeColumnSpans, TABLE_COLBG_PREFIX, TABLE_COL_PREFIX, TABLE_COLW_PREFIX, TEXT_BLOCKS} from './model';
+import {describeUnknownBlock} from './unknownBlock';
 import {COLOR_EXPORT_HEX} from './colors';
 import {resolveOptionsFromProps, varNameFromLabel} from './kit/options';
-import {computeExportCells, type ExportCell} from './kit/scope';
+import {statusOf, type ExportCell} from './kit/scope';
+import type {DbChartSeriesMap} from './kit/chartData';
+import {formSchemaFromProps} from './formBlock';
+import {meetingTime} from './meetingTime';
+import {meetingTranscriptLines} from './meetingManagement';
+import {AUDIO_DATA_URI_RE, withMeetingAudioOffsets} from './meetingAudio';
+import type {MeetingAudio} from './meetingRecorder';
+
+/** Meeting text remains readable even when audio assets cannot be resolved. */
+function meetingContent(b: BlockJSON): BlockJSON[] {
+  const children = b.children ?? [];
+  const summary = children.find((child) => child.type === 'meetingsummary');
+  return [...(summary?.children ?? String(b.props?.summary ?? '').split('\n').filter(Boolean).map((text): BlockJSON => ({id: '', type: 'paragraph', text: [{t: text}]}))), ...children.filter((child) => child.type !== 'meetingsummary')];
+}
+
+function meetingParagraphs(b: BlockJSON): string[] {
+  const p = b.props ?? {};
+  const segments = Array.isArray(p.transcript) ? p.transcript as {startMs: number; text: string}[] : [];
+  return [String(p.title || t('meetingBlock.label')), ...(p.status !== 'done' ? [t('meetingBlock.incomplete')] : []),
+    ...meetingTranscriptLines(segments)];
+}
+
+function meetingAudioLinks(b: BlockJSON, opts: DatabaseFormExportOptions, format: 'html' | 'markdown' = 'html'): string[] {
+  const chunks = Array.isArray(b.props?.audioChunks) ? b.props.audioChunks as MeetingAudio[] : [];
+  return withMeetingAudioOffsets(chunks).map((chunk) => {
+    const label = `${t('meetingBlock.exportAudio')} (${meetingTime(chunk.startedAtMs)})`;
+    const uri = opts.audioAssets?.get(chunk.assetId);
+    const escapedLabel = format === 'markdown' ? escapeMd(label) : escapeHtml(label);
+    if (!uri || !AUDIO_DATA_URI_RE.test(uri)) return escapedLabel;
+    return format === 'markdown' ? `[${escapedLabel}](${uri})`
+      : `<a download href="${escapeHtml(uri)}">${escapedLabel}</a>`;
+  });
+}
 
 // TextRun is referenced in the kit emit cases below.
 
@@ -16,6 +50,63 @@ import {computeExportCells, type ExportCell} from './kit/scope';
 
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const formFieldControlHtml = (field: FormField): string => {
+  const label = escapeHtml(field.label || t('formBlock.untitledField'));
+  const placeholder = field.placeholder ? ` placeholder="${escapeHtml(field.placeholder)}"` : '';
+  switch (field.kind) {
+  case 'longtext':
+    return `<textarea rows="3" disabled aria-label="${label}"${placeholder}></textarea>`;
+  case 'select':
+  case 'multiselect': {
+    const empty = field.kind === 'select' ? '<option value="">—</option>' : '';
+    const options = (field.options ?? [])
+      .map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`)
+      .join('');
+    return `<select disabled aria-label="${label}"${field.kind === 'multiselect' ? ' multiple' : ''}>${empty}${options}</select>`;
+  }
+  case 'checkbox':
+    return `<input type="checkbox" disabled aria-label="${label}">`;
+  case 'rating':
+    return `<input type="range" min="1" max="5" value="1" disabled aria-label="${label}">`;
+  case 'files':
+    return `<input type="file" disabled aria-label="${label}">`;
+  default: {
+    const type = field.kind === 'phone' ? 'tel' : field.kind;
+    return `<input type="${type}" disabled aria-label="${label}"${placeholder}>`;
+  }
+  }
+};
+
+/** A frozen, non-submitting form for clipboard/static HTML and PDF first paint. */
+export function formToStaticHtml(schema: FormSchema, originPageUrl?: string | null): string {
+  const fields = schema.fields.length === 0
+    ? `<p class="ob-form-empty">${escapeHtml(t('formBlock.noFields'))}</p>`
+    : schema.fields.map((field) => {
+      const label = escapeHtml(field.label || t('formBlock.untitledField'));
+      return `<label class="ob-form-field" data-ob-form-field="${escapeHtml(field.id)}" data-form-kind="${escapeHtml(field.kind)}">` +
+        `<span>${label}${field.required ? ' <span aria-hidden="true">*</span>' : ''}</span>` +
+        formFieldControlHtml(field) +
+        '</label>';
+    }).join('');
+  const submit = escapeHtml(schema.submitLabel || t('formBlock.submit'));
+  const live = originPageUrl && isSafeHref(originPageUrl)
+    ? `<a class="ob-form-live" href="${escapeHtml(originPageUrl)}">${escapeHtml(t('formBlock.liveLink'))}</a>`
+    : '';
+  return `<section class="ob-form" data-ob-form data-form-id="${escapeHtml(schema.formId)}">${fields}<button type="button" disabled>${submit}</button>${live}</section>`;
+}
+
+/** Plain field inventory used by Markdown and the PDF staticization pass. */
+export function formToMarkdown(schema: FormSchema): string {
+  const title = `**${escapeMd(t('formBlock.label'))}**`;
+  if (schema.fields.length === 0) return `${title}\n\n- ${escapeMd(t('formBlock.noFields'))}`;
+  return `${title}\n\n${schema.fields.map((field) => {
+    const label = escapeMd(field.label || t('formBlock.untitledField'));
+    const kind = escapeMd(field.kind);
+    const required = field.required ? `, ${escapeMd(t('formBlock.required'))}` : '';
+    return `- ${label} (${kind}${required})`;
+  }).join('\n')}`;
+}
 
 function runToHtml(run: TextRun): string {
   let out = escapeHtml(run.t).replace(/\n/g, '<br>');
@@ -36,6 +127,114 @@ function runToHtml(run: TextRun): string {
 
 const textHtml = (runs: TextRun[] | undefined): string => (runs ?? []).map(runToHtml).join('');
 
+function databaseFormReference(props: Record<string, unknown> | undefined): DatabaseFormReference | null {
+  const databaseId = props?.databaseId;
+  const viewId = props?.viewId;
+  return typeof databaseId === 'string' && databaseId && typeof viewId === 'string' && viewId
+    ? {databaseId, viewId}
+    : null;
+}
+
+interface DatabaseFormExportOptions {
+  originPageUrl?: string | null;
+  audioAssets?: Map<string, string>;
+}
+
+const databaseFormAttributes = (reference: DatabaseFormReference | null): string => reference
+  ? ` data-database-id="${escapeHtml(reference.databaseId)}" data-form-view-id="${escapeHtml(reference.viewId)}"`
+  : '';
+
+const databaseFormHtml = (reference: DatabaseFormReference | null, originPageUrl?: string | null): string => {
+  const attrs = databaseFormAttributes(reference);
+  if (!originPageUrl || !isSafeHref(originPageUrl)) {
+    return `<span class="ob-dbform-placeholder"${attrs}>📋 ${escapeHtml(t('slash.custom.dbform.label'))}</span>`;
+  }
+  return `<a class="ob-dbform-link" href="${escapeHtml(originPageUrl)}"${attrs}>${escapeHtml(t('formBlock.databaseReference.openForm'))}</a>`;
+};
+
+// ── Cell-range clipboard (TBL-5) ─────────────────────────────────────────────
+// A copied multi-cell selection is a rectangular grid of rich-text runs
+// (`grid[r][c]` = a cell's runs). TSV feeds text/plain consumers (spreadsheets,
+// editors); the HTML <table> round-trips through the paste importer
+// (normalizeTableGrid → tableFromRuns) back into a fresh table block.
+
+/** A cell RANGE as tab/newline-separated plain text (text/plain flavour). Tabs
+ *  and newlines inside a cell collapse to a space so the row/column grid stays
+ *  unambiguous. */
+export function cellRangeToTsv(grid: TextRun[][][]): string {
+  return grid
+    .map((row) => row.map((cell) => cell.map((r) => r.t).join('').replace(/[\t\n]+/g, ' ')).join('\t'))
+    .join('\n');
+}
+
+/** A cell RANGE as an HTML `<table>` (text/html flavour) — pasting it into an
+ *  OpenBook page recreates a table with the same grid (acceptance #3). */
+export function cellRangeToHtml(grid: TextRun[][][]): string {
+  const body = grid
+    .map((row) => `<tr>${row.map((cell) => `<td>${textHtml(cell)}</td>`).join('')}</tr>`)
+    .join('');
+  return `<table class="obe-x-table"><tbody>${body}</tbody></table>`;
+}
+
+/** Span-aware cell-range HTML. Covered slots emit nothing; anchors carry the
+ *  native attributes that {@link htmlToBlocks} imports back to null gaps. */
+export function cellRangeExportToHtml(grid: CellRangeExportCell[][]): string {
+  const body = grid
+    .map((row) =>
+      `<tr>${row
+        .flatMap((cell) =>
+          cell.kind === 'covered'
+            ? []
+            : [`<td${cell.colspan > 1 ? ` colspan="${cell.colspan}"` : ''}${cell.rowspan > 1 ? ` rowspan="${cell.rowspan}"` : ''}${tintStyle(cell.color)}>${textHtml(cell.runs)}</td>`],
+        )
+        .join('')}</tr>`,
+    )
+    .join('');
+  return `<table class="obe-x-table"><tbody>${body}</tbody></table>`;
+}
+
+type Props = Record<string, unknown> | undefined;
+const strProp = (p: Props, k: string): string | null => (typeof p?.[k] === 'string' && (p[k] as string) ? (p[k] as string) : null);
+const exportedColumns = (props: Props): string[] => Object.entries(props ?? {})
+  .filter(([key, value]) => key.startsWith(TABLE_COL_PREFIX) && typeof value === 'string' && value)
+  .sort((a, b) => a[1] !== b[1] ? (String(a[1]) < String(b[1]) ? -1 : 1) : a[0] < b[0] ? -1 : 1)
+  .map(([key]) => key.slice(TABLE_COL_PREFIX.length));
+
+/**
+ * The composited tint token for a table cell in an export projection (TBL-4 +
+ * TBL-6): the CELL colour (`cell.props.bg`) wins over the ROW colour
+ * (`row.props.bg`), which wins over the COLUMN colour
+ * (`table.props['colbg:<colId>']`, keyed on the cell's `col` binding), matching
+ * the editor's {@link tableCellColor} precedence. Returns the palette token, or
+ * null. Column lookup is by colId so it is order-independent.
+ */
+function tableCellTint(tableProps: Props, rowProps: Props, cellProps: Props): string | null {
+  const cellBg = strProp(cellProps, 'bg');
+  if (cellBg) return cellBg;
+  const rowBg = strProp(rowProps, 'bg');
+  if (rowBg) return rowBg;
+  const colId = strProp(cellProps, 'col');
+  return colId ? strProp(tableProps, TABLE_COLBG_PREFIX + colId) : null;
+}
+
+/** An inline `style="background:…"` for a cell tint token, or '' (for the
+ *  self-contained HTML/PDF exports that can't use the theme CSS classes). */
+const tintStyle = (token: string | null): string =>
+  token && COLOR_EXPORT_HEX[token] ? ` style="background:${COLOR_EXPORT_HEX[token].bg}"` : '';
+
+/** A canonical projected-cell span (absent or malformed means one). */
+const tableCellSpan = (props: Props, key: 'colspan' | 'rowspan'): number => {
+  const raw = props?.[key];
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 2 ? Math.min(512, Math.floor(raw)) : 1;
+};
+
+/** Canonical HTML span attributes from a projected cell (absent means one). */
+const tableCellSpanAttrs = (props: Props): string => {
+  const colspan = tableCellSpan(props, 'colspan');
+  const rowspan = tableCellSpan(props, 'rowspan');
+  return `${colspan > 1 ? ` colspan="${colspan}"` : ''}${rowspan > 1 ? ` rowspan="${rowspan}"` : ''}`;
+};
+
 /** The current value of a June-2026 kit input rendered as HTML (selection text
  *  for the choosers, escaped/markup text for long/rich text). */
 function kitInputText(b: BlockJSON): string {
@@ -54,14 +253,45 @@ function runToMd(run: TextRun): string {
   let out = run.t;
   const a: InlineAttrs = run.a ?? {};
   if (a.c) out = `\`${out}\``;
-  if (a.b) out = `**${out}**`;
-  if (a.i) out = `*${out}*`;
+  if (a.b && a.i) out = `***${out}***`;
+  else if (a.b) out = `**${out}**`;
+  else if (a.i) out = `*${out}*`;
   if (a.s) out = `~~${out}~~`;
   if (a.a) out = `[${out}](${a.a})`;
   return out;
 }
 
-const textMd = (runs: TextRun[] | undefined): string => (runs ?? []).map(runToMd).join('');
+const textMd = (runs: TextRun[] | undefined): string => {
+  const source = runs ?? [];
+  let out = '';
+  for (let i = 0; i < source.length; i += 1) {
+    const run = source[i];
+    const next = source[i + 1];
+    if (run.a?.b && !run.a.i && Object.keys(run.a).length === 1
+      && next?.a?.b && next.a.i && Object.keys(next.a).length === 2) {
+      out += `**${run.t}*${next.t}***`;
+      i += 1;
+    } else {
+      out += runToMd(run);
+    }
+  }
+  return out;
+};
+
+const escapeMd = (s: string): string => s.replace(/([\\`*_[\]<>])/g, '\\$1');
+
+/**
+ * Whether a block type that fell through the export projection's switch is a
+ * Catalogue text or container type eligible for the fallback text projection.
+ * CONTAINER_BLOCKS includes kit containers, not only core types. Containers
+ * with meaningful props/children (including meeting) need explicit cases above
+ * this fallback; orphaned structural children can use the text projection.
+ * Those keep the plain-text projection; every OTHER unhandled type is
+ * plugin-contributed or from a newer version and must keep its identity so the
+ * renderers can label it instead of silently flattening it (LX-1).
+ */
+const isCoreTextType = (type: string): boolean =>
+  TEXT_BLOCKS.has(type as BlockType) || CONTAINER_BLOCKS.has(type as BlockType);
 
 /** The current value of a June-2026 kit input rendered as Markdown. */
 function kitInputMd(b: BlockJSON): string {
@@ -75,7 +305,7 @@ function kitInputMd(b: BlockJSON): string {
 }
 
 /** Render block JSON to clean semantic HTML (one string, no wrapper). */
-export function blocksToHtml(blocks: BlockJSON[]): string {
+export function blocksToHtml(blocks: BlockJSON[], opts: DatabaseFormExportOptions = {}): string {
   const parts: string[] = [];
   let i = 0;
   while (i < blocks.length) {
@@ -107,12 +337,16 @@ export function blocksToHtml(blocks: BlockJSON[]): string {
       i += 1;
       break;
     }
+    case 'togglelist':
+      parts.push(`<details${b.props?.collapsed ? '' : ' open'}><summary>${textHtml(b.text)}</summary>${blocksToHtml(b.children ?? [], opts)}</details>`);
+      i += 1;
+      break;
     case 'quote':
       parts.push(`<blockquote>${textHtml(b.text)}</blockquote>`);
       i += 1;
       break;
     case 'callout':
-      parts.push(`<aside class="obe-x-callout obe-x-${(b.props?.variant as string) ?? 'info'}">${textHtml(b.text)}</aside>`);
+      parts.push(`<aside class="obe-x-callout obe-x-${(b.props?.variant as string) ?? 'info'}"${b.props?.bg ? ` data-bg="${escapeHtml(String(b.props.bg))}"` : ''}>${textHtml(b.text)}</aside>`);
       i += 1;
       break;
     case 'code':
@@ -156,10 +390,11 @@ export function blocksToHtml(blocks: BlockJSON[]): string {
     }
     case 'columns': {
       const cols = b.children ?? [];
+      const spans = normalizeColumnSpans(cols.map((col) => col.props?.span as number | undefined));
       const colHtml = cols
-        .map((col) => `<div style="flex:1;min-width:0">${blocksToHtml(col.children ?? [])}</div>`)
+        .map((col, index) => `<div style="flex:${spans[index]} 1 0;min-width:0">${blocksToHtml(col.children ?? [], opts)}</div>`)
         .join('');
-      parts.push(`<div style="display:flex;gap:1.25rem" class="obe-x-columns">${colHtml}</div>`);
+      parts.push(`<div style="display:flex;gap:28px" class="obe-x-columns">${colHtml}</div>`);
       i += 1;
       break;
     }
@@ -169,11 +404,22 @@ export function blocksToHtml(blocks: BlockJSON[]): string {
       const body = rows
         .map((row, r) => {
           const tag = header && r === 0 ? 'th' : 'td';
-          const cells = (row.children ?? []).map((cell) => `<${tag}>${textHtml(cell.text)}</${tag}>`).join('');
+          // TBL-4/TBL-6: carry cell/row/column tints as inline styles into the
+          // clipboard HTML.
+          const cells = (row.children ?? [])
+            .map(
+              (cell) =>
+                `<${tag}${tableCellSpanAttrs(cell.props)}${tintStyle(tableCellTint(b.props, row.props, cell.props))}>${textHtml(cell.text)}</${tag}>`,
+            )
+            .join('');
           return `<tr>${cells}</tr>`;
         })
         .join('');
-      parts.push(`<table class="obe-x-table"><tbody>${body}</tbody></table>`);
+      const colgroup = exportedColumns(b.props).map((colId) => {
+        const width = b.props?.[TABLE_COLW_PREFIX + colId];
+        return `<col${typeof width === 'number' && Number.isInteger(width) && width >= 48 ? ` style="width:${width}px"` : ''}>`;
+      }).join('');
+      parts.push(`<table class="obe-x-table">${colgroup ? `<colgroup>${colgroup}</colgroup>` : ''}<tbody>${body}</tbody></table>`);
       i += 1;
       break;
     }
@@ -184,22 +430,42 @@ export function blocksToHtml(blocks: BlockJSON[]): string {
       );
       i += 1;
       break;
+    case 'dbform':
+      parts.push(`<p>${databaseFormHtml(databaseFormReference(b.props), opts.originPageUrl)}</p>`);
+      i += 1;
+      break;
+    case 'meetingsummary':
+      parts.push(blocksToHtml(b.children ?? [], opts));
+      i += 1;
+      break;
+    case 'meeting':
+      parts.push(`<section>${meetingParagraphs(b).map((line) => `<p>${escapeHtml(line)}</p>`).join('')}${meetingAudioLinks(b, opts).map((link) => `<p>${link}</p>`).join('')}${blocksToHtml(meetingContent(b), opts)}</section>`);
+      i += 1;
+      break;
+    case 'form':
+      parts.push(formToStaticHtml(formSchemaFromProps(b.props), opts.originPageUrl));
+      i += 1;
+      break;
     case 'group': {
       const name = String(b.props?.name ?? '').trim();
-      const heading = name ? `<p class="obe-x-group-name"><strong>${escapeHtml(name)}</strong></p>` : '';
-      parts.push(`<section class="obe-x-group">${heading}${blocksToHtml(b.children ?? [])}</section>`);
+      const heading = name ? `<p class="obe-x-group-name" style="${CONTAINER_EYEBROW_STYLE}">${escapeHtml(name)}</p>` : '';
+      parts.push(`<section class="obe-x-group" style="${CONTAINER_FRAME_STYLE}">${heading}${blocksToHtml(b.children ?? [], opts)}</section>`);
       i += 1;
       break;
     }
     case 'tabs':
     case 'accordion': {
-      // Each tab/section becomes a titled block (the static export has no
-      // interactive tab/accordion widget).
+      // Tabs flatten in reading order; accordion items retain native disclosure.
       const sections = (b.children ?? [])
-        .map((s) => {
+        .map((s, index) => {
           const label = String(s.props?.label ?? '').trim();
-          const head = label ? `<h3>${escapeHtml(label)}</h3>` : '';
-          return `<section class="obe-x-section">${head}${blocksToHtml(s.children ?? [])}</section>`;
+          const body = blocksToHtml(s.children ?? [], opts);
+          if (b.type === 'accordion') {
+            const summary = label || t('blockEditor.accordionItem', {number: index + 1});
+            return `<details class="obe-x-section"${containerExpanded(s.props) ? ' open' : ''}><summary>${escapeHtml(summary)}</summary>${body}</details>`;
+          }
+          const head = label ? `<p class="obe-x-group-name" style="${CONTAINER_EYEBROW_STYLE}">${escapeHtml(label)}</p>` : '';
+          return `<section class="obe-x-section">${head}${body}</section>`;
         })
         .join('');
       parts.push(`<section class="obe-x-${b.type}">${sections}</section>`);
@@ -218,16 +484,34 @@ export function blocksToHtml(blocks: BlockJSON[]): string {
       i += 1;
       break;
     }
-    default:
-      parts.push(`<p>${textHtml(b.text) || '&nbsp;'}</p>`);
+    default: {
+      // Only PLUGIN-shaped types get the placeholder card here. Core kit blocks
+      // (slider, kitchart, …) have no case in this exporter either, and calling
+      // them “unsupported” in a paste would be a lie — they keep their
+      // historical plain-text output.
+      const {pluginId, label, hint} = describeUnknownBlock(b.type);
+      if (pluginId === null) {
+        parts.push(`<p>${textHtml(b.text) || '&nbsp;'}</p>`);
+        i += 1;
+        break;
+      }
+      const body = textHtml(b.text);
+      parts.push(
+        `<div class="obe-x-plugin" data-block-type="${escapeHtml(b.type)}">` +
+          `<p class="obe-x-plugin-label"><strong>${escapeHtml(label)}</strong></p>` +
+          `<p class="obe-x-plugin-hint">${escapeHtml(hint)}</p>` +
+          (body ? `<p class="obe-x-plugin-text">${body}</p>` : '') +
+          '</div>',
+      );
       i += 1;
+    }
     }
   }
   return parts.join('\n');
 }
 
 /** Render block JSON to GitHub-flavoured Markdown. */
-export function blocksToMarkdown(blocks: BlockJSON[]): string {
+export function blocksToMarkdown(blocks: BlockJSON[], opts: DatabaseFormExportOptions = {}): string {
   const out: string[] = [];
   let n = 0; // numbered-list counter (resets when the run breaks)
   for (const b of blocks) {
@@ -247,6 +531,11 @@ export function blocksToMarkdown(blocks: BlockJSON[]): string {
     case 'todo':
       out.push(`- [${b.props?.checked ? 'x' : ' '}] ${textMd(b.text)}`);
       break;
+    case 'togglelist': {
+      const body = blocksToMarkdown(b.children ?? [], opts);
+      out.push(textMd(b.text) + (body ? '\n' + body.split('\n').map(line => line ? `  ${line}` : '').join('\n') : ''));
+      break;
+    }
     case 'quote':
       out.push(`> ${textMd(b.text)}`);
       break;
@@ -279,10 +568,38 @@ export function blocksToMarkdown(blocks: BlockJSON[]): string {
       break;
     }
     case 'columns':
-      for (const col of b.children ?? []) out.push(blocksToMarkdown(col.children ?? []));
+      for (const col of b.children ?? []) out.push(blocksToMarkdown(col.children ?? [], opts));
       break;
     case 'table': {
-      const rows = (b.children ?? []).map((row) => (row.children ?? []).map((cell) => textMd(cell.text).replace(/\|/g, '\\|')));
+      // Covered slots are absent from tableChildrenToJSON. Reconstruct their
+      // coordinates before emitting Markdown so later cells stay in their
+      // rendered columns (the carry map mirrors normalizeTableGrid).
+      const carry = new Map<number, number>();
+      const rows = (b.children ?? []).map((row) => {
+        const slots: Array<string | undefined> = [];
+        for (const [col, remaining] of carry) {
+          if (remaining <= 0) {
+            carry.delete(col);
+            continue;
+          }
+          slots[col] = '';
+          if (remaining === 1) carry.delete(col);
+          else carry.set(col, remaining - 1);
+        }
+        let col = 0;
+        for (const cell of row.children ?? []) {
+          while (slots[col] !== undefined) col += 1;
+          const colspan = tableCellSpan(cell.props, 'colspan');
+          const rowspan = tableCellSpan(cell.props, 'rowspan');
+          slots[col] = textMd(cell.text).replace(/\|/g, '\\|');
+          for (let offset = 0; offset < colspan; offset += 1) {
+            if (offset > 0) slots[col + offset] = '';
+            if (rowspan > 1) carry.set(col + offset, rowspan - 1);
+          }
+          col += colspan;
+        }
+        return Array.from({length: slots.length}, (_, c) => slots[c] ?? '');
+      });
       if (rows.length > 0) {
         const width = Math.max(...rows.map((r) => r.length));
         const pad = (r: string[]): string[] => [...r, ...Array.from({length: width - r.length}, () => '')];
@@ -298,10 +615,25 @@ export function blocksToMarkdown(blocks: BlockJSON[]): string {
     case 'dbview':
       out.push(`**🗃 ${String(b.props?.name ?? 'Database')}**`);
       break;
+    case 'dbform': {
+      out.push(opts.originPageUrl && isSafeHref(opts.originPageUrl)
+        ? `[${escapeMd(t('formBlock.databaseReference.openForm'))}](${opts.originPageUrl})`
+        : `**📋 ${escapeMd(t('slash.custom.dbform.label'))}**`);
+      break;
+    }
+    case 'meetingsummary':
+      out.push(blocksToMarkdown(b.children ?? [], opts));
+      break;
+    case 'meeting':
+      out.push(meetingParagraphs(b).map(escapeMd).join('\n\n'), ...meetingAudioLinks(b, opts, 'markdown'), blocksToMarkdown(meetingContent(b), opts));
+      break;
+    case 'form':
+      out.push(formToMarkdown(formSchemaFromProps(b.props)));
+      break;
     case 'group': {
       const name = String(b.props?.name ?? '').trim();
       if (name) out.push(`**${name}**`);
-      out.push(blocksToMarkdown(b.children ?? []));
+      out.push(blocksToMarkdown(b.children ?? [], opts));
       break;
     }
     case 'tabs':
@@ -309,7 +641,7 @@ export function blocksToMarkdown(blocks: BlockJSON[]): string {
       for (const section of b.children ?? []) {
         const label = String(section.props?.label ?? '').trim();
         if (label) out.push(`### ${label}`);
-        out.push(blocksToMarkdown(section.children ?? []));
+        out.push(blocksToMarkdown(section.children ?? [], opts));
       }
       break;
     case 'choicecards':
@@ -322,25 +654,50 @@ export function blocksToMarkdown(blocks: BlockJSON[]): string {
       out.push(label ? `**${label}:** ${body}` : body);
       break;
     }
-    default:
-      out.push(textMd(b.text));
+    default: {
+      // Plugin-shaped types only — see the note in `blocksToHtml`.
+      const {pluginId, label, hint} = describeUnknownBlock(b.type);
+      if (pluginId === null) {
+        out.push(textMd(b.text));
+        break;
+      }
+      const body = textMd(b.text);
+      // Mirror of toMarkdown's unknown-block emitter — keep the two identical.
+      // `hint` (plugin name / verbatim type) is untrusted; escape it.
+      out.push(`> **${escapeMd(label)}**\n>\n> ${escapeMd(hint)}${body ? `\n>\n> ${body}` : ''}`);
+    }
     }
   }
   return out.join('\n\n');
 }
 
-// ── EditorJS adapter (the bridge into the app's export pipeline) ─────────────
+// ── Export projection (the bridge into the app's export pipeline) ────────────
 
-interface EditorJsOut {
+/**
+ * The block-native intermediate representation every exporter consumes: a flat
+ * `{blocks}` list plus the reactive `values`/`names` indices. Persisted on the
+ * page snapshot under the back-compat storage key `editorjs` (see
+ * `projectSnapshotForExport`); in memory it is always this `ExportDoc` shape.
+ */
+interface ExportDoc {
   blocks: Array<{id?: string; type: string; data: Record<string, unknown>}>;
   values: Array<[string, unknown]>;
   names: Array<[string, string]>;
 }
 
+/** Static mirrors of editor tokens; containerParity.test.ts guards equality. */
+export const CONTAINER_EYEBROW_STYLE = 'font-size:12px;line-height:1.33;letter-spacing:0.04em;color:var(--obe-x-muted,hsl(40 3% 43.2%))';
+export const CONTAINER_FRAME_STYLE = 'border:1px solid var(--obe-x-border,hsl(40 8% 90%));border-radius:8px;padding:4px 24px';
+
+/** `collapsed` is canonical; honour an explicit expanded flag on imported data. */
+function containerExpanded(props: Record<string, unknown> | undefined): boolean {
+  return props?.collapsed !== undefined ? !props.collapsed : props?.expanded !== false;
+}
+
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Project a block document into the EditorJS shape the export pipeline
+ * Project a block document into the export-projection shape the export pipeline
  * (markdown / PDF / the interactive HTML site) consumes — so block pages get
  * every exporter, including the live reactive runtime, without a second
  * pipeline. Sliders/formulas become reactive blocks keyed by their block id
@@ -367,8 +724,13 @@ const KIT_INPUT_VALUE: Record<string, (props: Record<string, unknown>) => unknow
   richtext: (p) => (Array.isArray(p.runs) ? (p.runs as Array<{t?: string}>).map((r) => r?.t ?? '').join('') : ''),
 };
 
-export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, ExportCell>): EditorJsOut {
-  const out: EditorJsOut = {blocks: [], values: [], names: []};
+export function projectBlocksForExport(
+  blocks: BlockJSON[],
+  computed?: Map<string, ExportCell>,
+  dbSeries?: DbChartSeriesMap,
+  opts: DatabaseFormExportOptions = {},
+): ExportDoc {
+  const out: ExportDoc = {blocks: [], values: [], names: []};
   // Seed a reactive cell's CURRENT value (resolved by the editor's evaluator) so
   // static exports show the same numbers/series/states as the live window. Only
   // when a value was actually computed — never a spurious `undefined` entry.
@@ -384,7 +746,7 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
   // Mirror the editor's scope exactly (kit/scope.ts): an INPUT inside a named
   // `group` is addressable as `<group>.<field>.value` (inputScope namespaces it);
   // a top-level input as the bare `<field>`. Live code / formulas publish their
-  // bare name regardless of nesting (computeScope does NOT namespace them). `group`
+  // bare name regardless of nesting (the reactive scope does NOT namespace them). `group`
   // tracks the nearest enclosing group's key (`varNameFromLabel` of its name).
   const collect = (list: BlockJSON[], group: string): void => {
     for (const b of list) {
@@ -394,7 +756,7 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         propsById.set(b.id, b.props ?? {});
       }
       if (b.type === 'code' && b.props?.live && b.props?.name) inputs.push({id: b.id, name: String(b.props.name)});
-      // Formula blocks publish a named value too (computeScope treats them the
+      // Formula blocks publish a named value too (the reactive scope treats them the
       // same as live code) — so a formula referencing another formula/input must
       // be tokenizable, or its dependents resolve to `undefined` in the runtime.
       if (b.type === 'formula' && b.props?.name) inputs.push({id: b.id, name: String(b.props.name)});
@@ -420,7 +782,7 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
     if (b.props?.name) out.names.push([String(b.props.name), b.id]);
   };
 
-  const emit = (list: BlockJSON[], sink: EditorJsOut['blocks'] = out.blocks): void => {
+  const emit = (list: BlockJSON[], sink: ExportDoc['blocks'] = out.blocks): void => {
     let i = 0;
     while (i < list.length) {
       const b = list[i];
@@ -448,12 +810,19 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         sink.push({type: 'checklist', data: {items}});
         break;
       }
+      case 'togglelist': {
+        const children: ExportDoc['blocks'] = [];
+        emit(b.children ?? [], children);
+        sink.push({id: b.id, type: 'togglelist', data: {text: textHtml(b.text), open: !b.props?.collapsed, children}});
+        i += 1;
+        break;
+      }
       case 'quote':
         sink.push({id: b.id, type: 'quote', data: {text: textHtml(b.text)}});
         i += 1;
         break;
       case 'callout':
-        sink.push({id: b.id, type: 'callout', data: {variant: (b.props?.variant as string) ?? 'info', text: textHtml(b.text)}});
+        sink.push({id: b.id, type: 'callout', data: {variant: (b.props?.variant as string) ?? 'info', icon: b.props?.icon, bg: b.props?.bg, text: textHtml(b.text)}});
         i += 1;
         break;
       case 'code': {
@@ -480,8 +849,18 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         i += 1;
         break;
       case 'table': {
-        const content = (b.children ?? []).map((row) => (row.children ?? []).map((cell) => textHtml(cell.text)));
-        sink.push({id: b.id, type: 'table', data: {withHeadings: Boolean(b.props?.header), content}});
+        const rows = b.children ?? [];
+        const content = rows.map((row) => (row.children ?? []).map((cell) => textHtml(cell.text)));
+        // TBL-4/TBL-6: parallel per-cell tint tokens (cell-over-row-over-column)
+        // so the static HTML/PDF exporter can paint them with COLOR_EXPORT_HEX.
+        const cellColors = rows.map((row) => (row.children ?? []).map((cell) => tableCellTint(b.props, row.props, cell.props)));
+        const cellSpans = rows.map((row) =>
+          (row.children ?? []).map((cell) => ({
+            colspan: typeof cell.props?.colspan === 'number' ? cell.props.colspan : 1,
+            rowspan: typeof cell.props?.rowspan === 'number' ? cell.props.rowspan : 1,
+          })),
+        );
+        sink.push({id: b.id, type: 'table', data: {withHeadings: Boolean(b.props?.header), content, cellColors, cellSpans}});
         i += 1;
         break;
       }
@@ -531,34 +910,38 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         // side-by-side (PDF/Markdown flatten them later). Inner reactive blocks
         // still publish via emit, so charts/formulas stay live wherever they sit.
         const columns = (b.children ?? []).map((col) => {
-          const sub: EditorJsOut['blocks'] = [];
+          const sub: ExportDoc['blocks'] = [];
           emit(col.children ?? [], sub);
           return sub;
         });
-        sink.push({id: b.id, type: 'columns', data: {columns}});
+        const spans = normalizeColumnSpans((b.children ?? []).map((col) => col.props?.span as number | undefined));
+        sink.push({id: b.id, type: 'columns', data: {columns, spans}});
         i += 1;
         break;
       }
       case 'tabs':
       case 'accordion':
-        // No tab/accordion widget in the standalone runtime — flatten each
-        // tab/section's blocks in reading order (a labelled heading per
-        // section keeps them legible). Inputs inside still publish/stay live.
-        for (const section of b.children ?? []) {
-          const heading = String(section.props?.label ?? '').trim();
-          if (heading) sink.push({type: 'header', data: {text: textHtml([{t: heading}]), level: 3}});
+        // Preserve the flat projection contract for reactive/linear consumers.
+        // Range metadata lets HTML wrap those same live children in a frame.
+        for (const [index, section] of (b.children ?? []).entries()) {
+          const heading = String(section.props?.label ?? '').trim() || (b.type === 'accordion' ? t('blockEditor.accordionItem', {number: index + 1}) : '');
+          const start = sink.length;
+          const data = {text: textHtml([{t: heading}]), level: 3, container: b.type === 'tabs' ? 'tab' : 'accordion', childCount: 0, open: containerExpanded(section.props)};
+          sink.push({id: section.id, type: 'header', data});
           emit(section.children ?? [], sink);
+          data.childCount = sink.length - start - 1;
         }
         i += 1;
         break;
-      case 'group':
-        // A group is a container (lock / cross-page sync in the editor); the
-        // standalone runtime has no frame widget, so flatten its children inline.
-        // Without this the group fell through to `default` and ALL its reactive
-        // content (inputs, code, charts) was silently dropped from the export.
+      case 'group': {
+        const start = sink.length;
+        const data = {text: textHtml([{t: String(b.props?.name ?? '').trim()}]), level: 3, container: 'group', childCount: 0};
+        sink.push({id: b.id, type: 'header', data});
         emit(b.children ?? [], sink);
+        data.childCount = sink.length - start - 1;
         i += 1;
         break;
+      }
       case 'slider': {
         const name = String(b.props?.name ?? 'x');
         const value = Number(b.props?.value ?? 50);
@@ -587,7 +970,7 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         sink.push({id: b.id, type: 'expr', data: {name, source: tokenize(String(b.props?.source ?? ''))}});
         pushCell(b.id);
         // Publish the name so the runtime maps cell→name (and downstream
-        // tokenized refs to this formula resolve live), matching computeScope.
+        // tokenized refs to this formula resolve live), matching the reactive scope.
         if (name) out.names.push([name, b.id]);
         i += 1;
         break;
@@ -618,12 +1001,22 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         // is the readout — no `title = value` line), and a chart block draws it.
         // Exported charts stay LIVE: moving a slider recomputes the cell and the
         // plot redraws; the seeded value renders the static export + first paint.
-        sink.push({id: b.id, type: 'expr', data: {name: String(b.props?.title ?? 'chart'), source: tokenize(String(b.props?.source ?? '')), hidden: true}});
+        //
+        // A DATABASE-bound chart (DASH-3) has no reactive expression — its data is
+        // the series resolved live at export time and threaded in via `dbSeries`
+        // (never persisted to the doc). Bake it in as a constant literal so both
+        // the static render and the runtime's recompute show that data; its labels
+        // are the groups (from the resolved series), not the manual `labels` prop.
+        const dbBound = b.props?.sourceMode === 'database';
+        const series = dbBound ? dbSeries?.get(b.id) : undefined;
+        const exprSource = dbBound ? JSON.stringify(series?.value ?? []) : String(b.props?.source ?? '');
+        const chartLabels = dbBound ? (series?.labels ?? []).map(String).join(', ') : String(b.props?.labels ?? '');
+        sink.push({id: b.id, type: 'expr', data: {name: String(b.props?.title ?? 'chart'), source: tokenize(exprSource), hidden: true}});
         pushCell(b.id);
         sink.push({
           id: `${b.id}-plot`,
           type: 'chart',
-          data: {refCellIds: [b.id], kind: String(b.props?.kind ?? 'line'), title: String(b.props?.title ?? ''), labels: String(b.props?.labels ?? '')},
+          data: {refCellIds: [b.id], kind: String(b.props?.kind ?? 'line'), title: String(b.props?.title ?? ''), labels: chartLabels},
         });
         i += 1;
         break;
@@ -752,9 +1145,58 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
         });
         i += 1;
         break;
-      default:
-        sink.push({id: b.id, type: 'paragraph', data: {text: textHtml(b.text)}});
+      case 'dbform': {
+        // A static export cannot run the authenticated row-create path. Keep
+        // only the durable reference as data attributes and link back to the
+        // live page when the export entry point knows its origin.
+        const reference = databaseFormReference(b.props);
+        sink.push({
+          id: b.id,
+          type: 'paragraph',
+          data: {text: databaseFormHtml(reference, opts.originPageUrl)},
+        });
         i += 1;
+        break;
+      }
+      case 'meetingsummary': {
+        emit(b.children ?? [], sink);
+        i += 1;
+        break;
+      }
+      case 'meeting': {
+        for (const line of meetingParagraphs(b)) sink.push({type: 'paragraph', data: {text: textHtml([{t: line}])}});
+        for (const link of meetingAudioLinks(b, opts)) sink.push({type: 'paragraph', data: {text: link}});
+        emit(meetingContent(b), sink);
+        i += 1;
+        break;
+      }
+      case 'form': {
+        // Keep the exact durable props under `data.props` for FORM-1/FORM-5,
+        // while mirroring them at `data.*` for the static export renderers.
+        const props = b.props ?? {};
+        sink.push({id: b.id, type: 'form', data: {...props, props}});
+        i += 1;
+        break;
+      }
+      default: {
+        // Core text-only types (a bare `paragraph`, or an orphaned container
+        // child) project as paragraphs — they have no props worth carrying.
+        if (isCoreTextType(b.type)) {
+          sink.push({id: b.id, type: 'paragraph', data: {text: textHtml(b.text)}});
+          i += 1;
+          break;
+        }
+        // LX-1: a plugin-contributed (`{pluginId}/{blockName}`) or newer-version
+        // type. PRESERVE ITS IDENTITY — `type` verbatim plus `props` nested (so a
+        // plugin prop can never collide with the projection's own `data` keys
+        // like `text`/`level`). Relabelling these `paragraph` erased both, and
+        // since plugin blocks carry no text it printed a literal empty <p> into
+        // every HTML/PDF/Markdown export. Downstream renderers now see the real
+        // type and draw a labelled placeholder; unknown types are inert in every
+        // other consumer of this projection (assets/link/search/mtime walks).
+        sink.push({id: b.id, type: b.type, data: {props: b.props ?? {}, text: textHtml(b.text)}});
+        i += 1;
+      }
       }
     }
   };
@@ -763,24 +1205,49 @@ export function blocksToEditorJs(blocks: BlockJSON[], computed?: Map<string, Exp
 }
 
 /** Snapshot-level normalization: pages written by the block editor project
- *  into the EditorJS shape; everything else passes through untouched. Export
- *  entry points call this so mixed trees (an EditorJS parent linking block
- *  subpages, or vice versa) export every page faithfully. */
-export function blockSnapshotToEditorJs<T extends {editor?: string; blockdoc?: unknown}>(snapshot: T): T {
+ *  into the export-projection shape; everything else passes through untouched.
+ *  Export entry points call this so mixed trees (a legacy stored page linking
+ *  block subpages, or vice versa) export every page faithfully. */
+export function projectSnapshotForExport<T extends {editor?: string; blockdoc?: unknown}>(
+  snapshot: T,
+  dbSeries?: DbChartSeriesMap,
+  evaluated?: Map<string, ExportCell>,
+  opts: DatabaseFormExportOptions = {},
+): T {
   if (!snapshot || snapshot.editor !== 'blocks' || !snapshot.blockdoc) return snapshot;
   const blockdoc = snapshot.blockdoc as {blocks?: BlockJSON[]; update?: string};
   const blocks = (blockdoc.blocks ?? []) as BlockJSON[];
-  // Resolve the reactive graph the way the editor does, so the export carries the
-  // same computed values (numbers, chart series, light/progress states) the
-  // window shows — not empty cells. Falls back to an empty map if the CRDT update
-  // can't be decoded (the projection still works, just without precomputed
-  // values; the interactive HTML recomputes them anyway).
-  let computed: Map<string, ExportCell> | undefined;
-  try {
-    computed = computeExportCells(decodeSnapshot(blockdoc as never));
-  } catch {
-    computed = undefined;
+  // Evaluation is intentionally NOT performed here: this projection is sync,
+  // while lazy initialization of the in-process QuickJS VM is async. Explicit
+  // save/export checkpoints pass `evaluated`; secondary stored pages fall back
+  // to their last sandboxed values.
+  const persisted = new Map<string, ExportCell>();
+  const storedValues = (snapshot as {values?: unknown}).values;
+  if (Array.isArray(storedValues)) {
+    for (const pair of storedValues) {
+      if (Array.isArray(pair) && typeof pair[0] === 'string') persisted.set(pair[0], {value: pair[1]});
+    }
   }
-  const projected = blocksToEditorJs(blocks, computed);
+  const computed = evaluated ?? persisted;
+  const enrichStatuses = (list: BlockJSON[]): void => {
+    for (const block of list) {
+      if (block.type === 'statuslight' && computed.has(block.id)) {
+        const cell = computed.get(block.id)!;
+        cell.status = statusOf(
+          cell.value,
+          undefined,
+          Number(block.props?.okAt ?? 1),
+          Number(block.props?.warnAt ?? 0),
+        );
+      }
+      if (block.children) enrichStatuses(block.children);
+    }
+  };
+  enrichStatuses(blocks);
+  const projected = projectBlocksForExport(blocks, computed, dbSeries, opts);
+  // `editorjs` is the RETAINED on-disk storage key for the export projection
+  // (back-compat alias — see PageSnapshot in sdk/types.ts). Every consumer reads
+  // `snapshot.editorjs.blocks`; the key name must not change or persisted
+  // snapshots would be stranded. Only the in-memory TYPE is `ExportDoc`.
   return {...snapshot, editorjs: {blocks: projected.blocks}, values: projected.values, names: projected.names};
 }

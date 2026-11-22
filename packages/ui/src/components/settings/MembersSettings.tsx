@@ -1,21 +1,25 @@
-import {useCallback, useEffect, useMemo, useState, type ReactNode} from 'react';
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
+import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
 import {Check, Link2, Loader2, Trash2, UserPlus} from 'lucide-react';
 import type {InstanceInfo, Member, MemberRole, MemberStatus, Principal} from '@book.dev/sdk';
 import {useData} from '@/data';
-import {useConfirm, useForwarding, usePlatformLibrary, useTranslation} from '@/providers';
+import {useConfirm, useForwarding, useHud, usePlatformCapabilities, useTranslation} from '@/providers';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {IconButton} from '@/components/ui/icon-button';
 import {Select} from '@/components/ui/select';
-import {SettingsScreen, SettingsSection} from '@/components/settings/primitives';
+import {isForbidden} from '@/components/settings/adminGate';
+import {SettingsSection} from '@/components/settings/primitives';
+import {SETTINGS_SECTION_PEOPLE} from '@/lib/hud';
 import {copyText} from '@/lib/pageActions';
 import {cn} from '@/lib/utils';
 import type {TKey} from '@/i18n';
 
 /**
- * The instance member roster (OB-204). Lists who has a role on this workspace,
- * and — for a manager (loopback owner / admin / claimed owner, or any writer on a
- * still-unclaimed instance) — lets them invite by email or handle, change a
+ * The instance member roster (OB-204), rendered as the **People** section of the
+ * merged Sharing tab (SHR-5). Lists who has a role on this library, and — for a
+ * manager (loopback owner / admin / claimed owner, or any writer on a
+ * still-unclaimed instance) — lets them invite by email, change a
  * member's role, and remove access. All driven by the OB-191 roster API
  * (`listMembers`/`inviteMember`/`updateMember`/`removeMember`).
  *
@@ -26,12 +30,6 @@ import type {TKey} from '@/i18n';
  * every mutation. A server that predates multi-user (no `/api/instance`) degrades
  * to an "unavailable" note rather than a broken tab.
  */
-
-/** `true` when the SDK's wrapped error reads as a 401/403 (a manage refusal). */
-function isForbidden(e: unknown): boolean {
-  const raw = e instanceof Error ? e.message : String(e);
-  return /\b40[13]\b|forbidden|unauthor/i.test(raw);
-}
 
 /**
  * The server's human-written detail out of the SDK's wrapper. `request()` throws
@@ -58,8 +56,8 @@ const STATUS_LABEL: Record<MemberStatus, TKey> = {
 };
 
 const STATUS_TONE: Record<MemberStatus, string> = {
-  active: 'text-emerald-600 dark:text-emerald-400',
-  invited: 'text-amber-600 dark:text-amber-400',
+  active: STATUS_INK_CLASS.ok,
+  invited: STATUS_INK_CLASS.warn,
   suspended: 'text-muted-foreground',
 };
 
@@ -116,15 +114,16 @@ function GuardTip({reason, children}: {reason?: string; children: ReactNode}) {
   );
 }
 
-export default function MembersSettings() {
+export function PeopleSection() {
   const client = useData();
   const {t} = useTranslation();
   const confirm = useConfirm();
-  // The standalone web app's in-browser workspace (P0-4): the roster stays
+  const {hud, setHud} = useHud();
+  // The standalone web app's in-browser library (P0-4): the roster stays
   // fully editable (it persists with the data), but no one else can reach this
-  // workspace, so an invitation here can't let anyone in yet — say so.
-  const browserLocal = usePlatformLibrary().browserLocalWorkspace === true;
-  // The forwarded root address, known only while the workspace is published
+  // library, so an invitation here can't let anyone in yet — say so.
+  const browserLocal = usePlatformCapabilities().browserLocalLibrary === true;
+  // The forwarded root address, known only while the library is published
   // (P0-2). Inviting a member sends no email, so when there's a reachable
   // address we hand the owner that link to deliver by hand.
   const {publishedHost} = useForwarding();
@@ -144,8 +143,11 @@ export default function MembersSettings() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // The People region itself, so a deep-link can move focus here (not just scroll).
+  const sectionRef = useRef<HTMLElement>(null);
+
   const [deliverCopied, setDeliverCopied] = useState(false);
-  const copyWorkspaceLink = useCallback(async () => {
+  const copyLibraryLink = useCallback(async () => {
     if (publishedHost && (await copyText(`https://${publishedHost}`))) {
       setDeliverCopied(true);
       window.setTimeout(() => setDeliverCopied(false), 1500);
@@ -186,6 +188,23 @@ export default function MembersSettings() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Deep-link landing (SHR-5): a "manage members" link / `?settings=members`
+  // opens the Sharing tab and asks (via the transient `settings.section` hint)
+  // to reveal the roster. Scroll this group into view AND move focus here so the
+  // deep-link takes keyboard / screen-reader users along too — then clear the
+  // one-shot (so a normal, non-deep-link render never steals focus).
+  useEffect(() => {
+    if (hud.settings.section !== SETTINGS_SECTION_PEOPLE) return;
+    const el = sectionRef.current ?? document.getElementById(SETTINGS_SECTION_PEOPLE);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    el?.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'start'});
+    el?.focus({preventScroll: true});
+    setHud((draft) => {
+      draft.settings.section = null;
+      return draft;
+    });
+  }, [hud.settings.section, setHud]);
 
   const submitInvite = useCallback(async () => {
     const value = invitee.trim();
@@ -251,7 +270,13 @@ export default function MembersSettings() {
   }, [info, t]);
 
   return (
-    <SettingsScreen title={t('members.title')} description={t('members.description')}>
+    <SettingsSection
+      id={SETTINGS_SECTION_PEOPLE}
+      sectionRef={sectionRef}
+      tabIndex={-1}
+      title={t('members.title')}
+      description={t('members.description')}
+    >
       {unavailable ? (
         <p className="text-sm text-muted-foreground">{t('members.unavailable')}</p>
       ) : canManage === null ? (
@@ -263,7 +288,7 @@ export default function MembersSettings() {
         <>
           {youLine && <p className="text-sm text-muted-foreground">{youLine}</p>}
 
-          {/* In-browser workspace disclosure (P0-4): invitations can't take
+          {/* In-browser library disclosure (P0-4): invitations can't take
               effect while nothing outside this browser can reach the data. */}
           {browserLocal && (
             <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -279,8 +304,8 @@ export default function MembersSettings() {
           ) : (
             <>
               {/* Invite */}
-              <SettingsSection title={t('members.inviteLabel')} description={t('members.inviteHint')}>
-                <div className="flex items-start gap-2">
+              <SettingsSection subdued title={t('members.inviteLabel')} description={t('members.inviteHint')}>
+                <div className="flex items-center gap-2">
                   <Input
                     id="member-invitee"
                     inputSize="sm"
@@ -303,12 +328,12 @@ export default function MembersSettings() {
                     disabled={inviting}
                     onChange={setInviteRole}
                   />
-                  <Button size="sm" onClick={() => void submitInvite()} disabled={inviting || !invitee.trim()}>
+                  <Button size="xs" onClick={() => void submitInvite()} disabled={inviting || !invitee.trim()}>
                     {inviting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
-                        <UserPlus className="mr-1.5 h-4 w-4" />
+                        <UserPlus className="h-4 w-4" />
                         {t('members.invite')}
                       </>
                     )}
@@ -320,21 +345,21 @@ export default function MembersSettings() {
                   </p>
                 )}
                 {/* Delivery help (P0-2): an invite writes a roster row but sends
-                    no email. Once the workspace is published AND someone is
+                    no email. Once the library is published AND someone is
                     actually awaiting first sign-in, hand the owner the forwarded
                     root to send and explain the sign-in they must relay. */}
                 {!browserLocal && publishedHost && members?.some((m) => m.status === 'invited') && (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2.5">
                     <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t('members.deliver.hint')}</p>
-                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => void copyWorkspaceLink()}>
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => void copyLibraryLink()}>
                       {deliverCopied ? (
                         <>
-                          <Check className="mr-1.5 h-4 w-4" />
+                          <Check className="h-4 w-4" />
                           {t('members.deliver.copied')}
                         </>
                       ) : (
                         <>
-                          <Link2 className="mr-1.5 h-4 w-4" />
+                          <Link2 className="h-4 w-4" />
                           {t('members.deliver.copy')}
                         </>
                       )}
@@ -344,7 +369,7 @@ export default function MembersSettings() {
               </SettingsSection>
 
               {/* Roster */}
-              <SettingsSection title={t('members.listLabel')}>
+              <SettingsSection subdued title={t('members.listLabel')}>
                 {loadError ? (
                   <div className="flex flex-col items-start gap-2">
                     <p className="text-sm text-destructive">{t('members.loadError', {error: loadError})}</p>
@@ -388,12 +413,12 @@ export default function MembersSettings() {
                                 {name}
                               </span>
                               {isOwnerRow && (
-                                <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                   {t('members.owner')}
                                 </span>
                               )}
                               {self && !isOwnerRow && (
-                                <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                                   {t('members.you')}
                                 </span>
                               )}
@@ -437,6 +462,6 @@ export default function MembersSettings() {
           )}
         </>
       )}
-    </SettingsScreen>
+    </SettingsSection>
   );
 }

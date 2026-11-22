@@ -51,7 +51,7 @@ export default function EmojiGrid({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t(source === 'emoji' ? 'emoji.searchEmoji' : 'emoji.searchIcons')}
-          className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-hidden placeholder:text-muted-foreground focus-visible:border-ring focus-visible:shadow-[var(--ring-field)]"
+          className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-hidden placeholder:text-placeholder-foreground focus-visible:border-ring focus-visible:shadow-[var(--ring-field)]"
           aria-label={t('emoji.search')}
         />
       </div>
@@ -84,7 +84,7 @@ function Tab({active, onClick, label}: {active: boolean; onClick: () => void; la
 /** A section heading inside the scroll area. */
 function SectionLabel({children}: {children: React.ReactNode}) {
   return (
-    <div className="sticky top-0 z-10 bg-popover px-1 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+    <div className="sticky top-0 z-10 bg-popover px-1 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">
       {children}
     </div>
   );

@@ -1,4 +1,5 @@
 import {defineConfig, devices} from '@playwright/test';
+import {singleProcessConfig} from './e2e/single-process';
 
 /**
  * Standalone harness for the self-contained viewer bundle (OpenBookViewer).
@@ -20,4 +21,4 @@ export default defineConfig({
   expect: {timeout: 10_000},
   use: {trace: 'on-first-retry', screenshot: 'only-on-failure'},
   projects: [{name: 'chromium', use: {...devices['Desktop Chrome']}}],
-});
+}, singleProcessConfig());

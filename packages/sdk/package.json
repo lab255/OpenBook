@@ -1,10 +1,10 @@
 {
   "name": "@book.dev/sdk",
-  "version": "1.72.0",
+  "version": "3.29.0",
   "description": "Shared OpenBook types and HTTP client used by the server, desktop, and web.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eliotlim/OpenBook.git",
+    "url": "git+https://github.com/lab255/OpenBook.git",
     "directory": "packages/sdk"
   },
   "publishConfig": {
@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "fflate": "^0.8.3",
-    "marked": "^18.0.5"
+    "marked": "^18.0.5",
+    "zod": "^3.25.0"
   }
 }

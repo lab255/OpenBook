@@ -41,6 +41,49 @@ test('web runs on in-webview PGlite: a page created with no server survives a re
   expect(errors).toEqual([]);
 });
 
+// Epic 3.5 (OB search): content search must work on the in-webview PGlite build,
+// not just the hosted server. Before Epic 3.1, LocalDataClient.aiSearch was a
+// stub returning [] — so ⌘K surfaced page titles and database rows but never a
+// body-text ("Notes") hit on the pure-web build. This proves the unstub end to
+// end through the real palette: a body-only word finds its page and navigates.
+test('web (in-webview PGlite): ⌘K content search finds a page by its body text', {tag: ['@datalayer', '@search', '@p1']}, async ({page}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.stack ?? e.message));
+
+  await page.goto('/');
+  const newPage = page.getByRole('button', {name: 'New page'}).first();
+  await expect(newPage).toBeVisible();
+  await newPage.click();
+  await expect
+    .poll(() => {
+      const param = new URL(page.url()).searchParams.get('page');
+      return param && param !== 'home' ? param : null;
+    })
+    .toBeTruthy();
+  const id = new URL(page.url()).searchParams.get('page')!;
+  await expect(page.getByRole('button', {name: 'Page actions'})).toBeVisible();
+
+  // 'marmalade' lives ONLY in the body, never the title — so a hit proves body
+  // content search, not the title match that already worked locally.
+  await page.locator('.obe-text').first().click();
+  await page.keyboard.type('Marmalade orbits the lighthouse every Tuesday.');
+  // Wait for the save to flush: it persists the page AND invalidates the
+  // in-webview search index (LocalDataClient.broadcastList → searchIndex).
+  await expect(page.getByText('Saved')).toBeVisible();
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.getByPlaceholder(/Search pages or run a command/).fill('marmalade');
+  const snippet = page.locator('[data-search-snippet]').first();
+  await expect(snippet).toBeVisible();
+  await expect(snippet).toContainText(/marmalade/i);
+
+  // The hit deep-links back to the page its text came from.
+  await snippet.click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBe(id);
+
+  expect(errors).toEqual([]);
+});
+
 // P0-4 (sharing audit 2026-07-03): on the in-browser store nothing outside this
 // browser can reach the workspace, so the sharing surfaces must say so instead
 // of presenting a fully-wired-looking UI that is 100% inert. Only this spec
@@ -59,12 +102,12 @@ test('web sharing surfaces disclose the in-browser workspace honestly', {tag: ['
 
   // Share dialog: the browser-local disclosure replaces the unclaimed-instance
   // one, and the copy-link hint admits the link opens the recipient's OWN
-  // workspace. The controls stay functional (scope picker + invite field).
+  // library. The controls stay functional (scope picker + invite field).
   await page.getByRole('button', {name: 'Share', exact: true}).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText(/This workspace lives only in this browser/)).toBeVisible();
-  await expect(dialog.getByText(/opens their own workspace, not this page/)).toBeVisible();
-  await expect(dialog.getByText(/Sharing takes effect once you claim/)).toHaveCount(0);
+  await expect(dialog.getByText(/Only this browser can reach this library/)).toBeVisible();
+  await expect(dialog.getByText(/for anyone else it opens their own library/)).toBeVisible();
+  await expect(dialog.getByText(/Settings apply once you claim this library/)).toHaveCount(0);
   await expect(dialog.locator('#share-scope')).toBeVisible();
   await page.keyboard.press('Escape');
 
@@ -78,8 +121,9 @@ test('web sharing surfaces disclose the in-browser workspace honestly', {tag: ['
   await expect(page.getByText(/isn’t hosted anywhere/)).toBeVisible();
   await expect(page.getByText('Guests & access')).toBeVisible();
 
-  // Members: the roster stays usable but says invitees can't reach it yet.
-  await page.getByRole('button', {name: 'Members'}).click();
+  // Members: the roster (now a section of the same Sharing tab, SHR-5) stays
+  // usable but says invitees can't reach it yet.
+  await expect(page.getByRole('heading', {name: 'Members', exact: true})).toBeVisible();
   await expect(page.getByText(/people you add here can’t open it yet/)).toBeVisible();
   await expect(page.getByLabel('Invite a member')).toBeVisible();
 });

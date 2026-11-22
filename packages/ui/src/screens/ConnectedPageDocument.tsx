@@ -1,7 +1,10 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {ICON_PROPERTY_ID, type PageSnapshot, type StoredPage} from '@book.dev/sdk';
 import {useData} from '@/data';
-import {useConfirm, useNavigation, usePreferences, useTranslation} from '@/providers';
+import {clearLastPage, useConfirm, useNavigation, usePreferences, useTranslation} from '@/providers';
+import {ErrorBoundary, ErrorFallback} from '@/components/ErrorBoundary';
+import {HOME_PAGE_ID} from '@/lib/homePage';
+import {markPageCrashed} from '@/lib/crashRecovery';
 import {hydratePageIcons, usePageIcon, writePageIcon} from '@/lib/pageIcon';
 import {pageSaveStatus, setPageSaveStatus} from '@/lib/pageSaveStatus';
 import {DatabaseView} from '@/components/database/DatabaseView';
@@ -25,7 +28,7 @@ export const ConnectedPageDocument: React.FC<ConnectedPageDocumentProps> = ({pag
   const confirm = useConfirm();
   const {preferences} = usePreferences();
   const {t} = useTranslation();
-  const {pages, deletePage, setPageHint, closePage} = useNavigation();
+  const {pages, deletePage, setPageHint, closePage, selectPage} = useNavigation();
 
   const [title, setTitle] = useState('');
   // The icon lives on page.properties (lib/pageIcon's cache); read it reactively
@@ -57,26 +60,36 @@ export const ConnectedPageDocument: React.FC<ConnectedPageDocumentProps> = ({pag
   // events. Echo handling (not re-saving content a peer sent us) lives in
   // PageDocument's content-digest check, so this is just an ordering guard.
   const lastUpdatedRef = useRef<string>('');
+  // Title metadata has its own ordering watermark. Content saves advance
+  // `lastUpdatedRef`, but an equal-timestamp rename must still be applied.
+  const lastTitleUpdatedRef = useRef<string>('');
   const titleActiveRef = useRef(false);
   const versionRef = useRef(0);
 
   const applyPage = useCallback(
     (page: StoredPage) => {
-      // Stale event (older than what we've already applied/saved) — ignore.
-      if (page.updatedAt <= lastUpdatedRef.current) return;
-      lastUpdatedRef.current = page.updatedAt;
       // Don't let an incoming name overwrite the title while the field is
       // focused (the user is typing) or a local rename is still unconfirmed
       // (its echo predates this edit) — OB-278.
-      if (!titleActiveRef.current && !hasPendingRenameRef.current) {
+      if (
+        page.updatedAt >= lastTitleUpdatedRef.current &&
+        !titleActiveRef.current &&
+        !hasPendingRenameRef.current
+      ) {
         setTitle(page.name ?? '');
         nameRef.current = page.name ?? null;
         setPageHint(pageId, page.name);
+        lastTitleUpdatedRef.current = page.updatedAt;
       }
       setResolvedHostedDbId(page.hostedDatabaseId);
       hydratePageIcons([{id: page.id, icon: page.properties[ICON_PROPERTY_ID] as string | null | undefined}]);
-      versionRef.current += 1;
-      setIncoming({data: page.data, version: versionRef.current});
+      // Content ordering remains strict: equal/older snapshots are echoes, but
+      // their independently-versioned metadata above may still be new to us.
+      if (page.updatedAt > lastUpdatedRef.current) {
+        lastUpdatedRef.current = page.updatedAt;
+        versionRef.current += 1;
+        setIncoming({data: page.data, version: versionRef.current});
+      }
     },
     [pageId, setPageHint],
   );
@@ -98,7 +111,7 @@ export const ConnectedPageDocument: React.FC<ConnectedPageDocumentProps> = ({pag
     void client
       .renamePage(pageId, nameRef.current)
       .then((saved) => {
-        lastUpdatedRef.current = saved.updatedAt;
+        lastTitleUpdatedRef.current = saved.updatedAt;
         // Clear the guard only once the server matches our latest local name; a
         // keystroke that landed mid-flight keeps it pending for its own commit.
         if ((saved.name ?? null) === nameRef.current) hasPendingRenameRef.current = false;
@@ -130,6 +143,7 @@ export const ConnectedPageDocument: React.FC<ConnectedPageDocumentProps> = ({pag
     // until getPage/subscribePage resolves it (don't carry the prior page's id).
     setResolvedHostedDbId(meta ? meta.hostedDatabaseId : undefined);
     lastUpdatedRef.current = meta?.updatedAt ?? '';
+    lastTitleUpdatedRef.current = meta?.updatedAt ?? '';
     return () => {
       disposedRef.current = true;
       if (renameTimer.current) clearTimeout(renameTimer.current);
@@ -147,6 +161,7 @@ export const ConnectedPageDocument: React.FC<ConnectedPageDocumentProps> = ({pag
     }
     if (page) {
       lastUpdatedRef.current = page.updatedAt;
+      lastTitleUpdatedRef.current = page.updatedAt;
       setResolvedHostedDbId(page.hostedDatabaseId);
       hydratePageIcons([{id: page.id, icon: page.properties[ICON_PROPERTY_ID] as string | null | undefined}]);
     }
@@ -227,22 +242,45 @@ export const ConnectedPageDocument: React.FC<ConnectedPageDocumentProps> = ({pag
   const meta = pages.find((p) => p.id === pageId);
   const databaseIdHint = meta ? meta.hostedDatabaseId : resolvedHostedDbId;
 
+  // Page-level render-crash containment (STAB-3): a page whose stored content
+  // throws while rendering must not blank the whole app — the sidebar, tabs and
+  // nav live outside this boundary and stay usable. On catch we quarantine the
+  // page (so startup won't auto-reopen it into the same crash) and forget the
+  // last-page key, then offer a one-click way Home. Keyed by pageId so navigating
+  // to a healthy page mounts a fresh boundary (auto-recovers).
   return (
-    <BlockPageDocument
+    <ErrorBoundary
       key={pageId}
-      title={title}
-      icon={icon}
-      incoming={incoming}
-      onTitleChange={onTitleChange}
-      onTitleActiveChange={onTitleActiveChange}
-      onIconChange={onIconChange}
-      onDelete={onDelete}
-      onLoad={onLoad}
-      onSave={onSave}
-      pageId={pageId}
-      hasDatabase={!!databaseIdHint}
-      footer={<DatabaseView pageId={pageId} databaseIdHint={databaseIdHint} />}
-    />
+      resetKey={pageId}
+      onError={(error) => {
+        console.error(`OpenBook: page "${pageId}" crashed while rendering:`, error);
+        markPageCrashed(pageId);
+        clearLastPage();
+      }}
+      fallback={() => (
+        <ErrorFallback
+          variant="inline"
+          title={t('errorBoundary.pageTitle')}
+          message={t('errorBoundary.pageMessage')}
+          onHome={() => selectPage(HOME_PAGE_ID)}
+        />
+      )}
+    >
+      <BlockPageDocument
+        title={title}
+        icon={icon}
+        incoming={incoming}
+        onTitleChange={onTitleChange}
+        onTitleActiveChange={onTitleActiveChange}
+        onIconChange={onIconChange}
+        onDelete={onDelete}
+        onLoad={onLoad}
+        onSave={onSave}
+        pageId={pageId}
+        hasDatabase={!!databaseIdHint}
+        footer={<DatabaseView pageId={pageId} databaseIdHint={databaseIdHint} />}
+      />
+    </ErrorBoundary>
   );
 };
 

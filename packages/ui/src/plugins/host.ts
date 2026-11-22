@@ -1,14 +1,20 @@
 import {
   verifyPlugin,
-  OPENBOOK_REGISTRY,
+  pluginApiVersionError,
+  OPENBOOK_REGISTRY_KEYS,
+  compareSemver,
+  isSemver,
   type DataClient,
+  type PluginPackage,
   type StoredPlugin,
 } from '@book.dev/sdk';
 import {executePlugin} from './loader';
 import {buildPluginApi, hostModulesFor, type PluginModule} from './api';
+import {refreshRevocations, revokedEntryFor} from './registryStores';
+import {BUNDLED_PLUGINS} from './bundled.gen';
 
 /**
- * The plugin host: loads the workspace's enabled plugins, activates each in
+ * The plugin host: loads the library's enabled plugins, activates each in
  * isolation (one plugin's crash never takes down another, or the app), and
  * tears contributions down on disable/remove. A module singleton — the same
  * set of plugins serves every editor on the page.
@@ -16,7 +22,9 @@ import {buildPluginApi, hostModulesFor, type PluginModule} from './api';
 
 export interface PluginStatus {
   plugin: StoredPlugin;
-  state: 'active' | 'disabled' | 'error';
+  /** `revoked`: a pinned store's kill switch covers this exact version — the
+   *  plugin is disabled regardless of its enabled flag (PROTOCOL.md §6.6). */
+  state: 'active' | 'disabled' | 'error' | 'revoked';
   error?: string;
   /** The trusted registry that vouches for this exact content, if any. */
   verifiedBy?: string;
@@ -41,7 +49,15 @@ export const subscribePlugins = (cb: () => void): (() => void) => {
 
 const TRUSTED_KEYS_STORAGE = 'openbook.trustedRegistries';
 
-/** First-party key + any registries the user has chosen to trust. */
+const isPinnedKey = (publicKey: string): boolean => OPENBOOK_REGISTRY_KEYS.some((k) => k.publicKey === publicKey);
+// Case-insensitive: a user-added "openbook registry" would render a badge
+// indistinguishable from first-party provenance (see addTrustedRegistry).
+const isPinnedName = (name: string): boolean => {
+  const wanted = name.trim().toLowerCase();
+  return OPENBOOK_REGISTRY_KEYS.some((k) => k.name.trim().toLowerCase() === wanted);
+};
+
+/** ALL pinned first-party keys + any registries the user has chosen to trust. */
 export function trustedRegistryKeys(): Array<{name: string; publicKey: string}> {
   const extra = (() => {
     try {
@@ -52,27 +68,52 @@ export function trustedRegistryKeys(): Array<{name: string; publicKey: string}> 
       return [];
     }
   })();
-  return [OPENBOOK_REGISTRY, ...extra];
+  return [...OPENBOOK_REGISTRY_KEYS, ...extra];
 }
 
-/** Persist a user-trusted registry key (and re-verify on next sync). */
+/**
+ * Persist a user-trusted registry key (and re-verify on next sync). No-ops on
+ * any pinned key, and on any name that collides (case-insensitively) with a
+ * pinned registry name: a social-engineered paste must not be able to mint a
+ * "Verified by OpenBook Registry" badge for a non-first-party key.
+ */
 export function addTrustedRegistry(name: string, publicKey: string): void {
   const key = publicKey.trim();
-  if (key === OPENBOOK_REGISTRY.publicKey) return;
-  const list = trustedRegistryKeys().filter((k) => k.publicKey !== OPENBOOK_REGISTRY.publicKey);
+  if (isPinnedKey(key) || isPinnedName(name)) return;
+  const list = trustedRegistryKeys().filter((k) => !isPinnedKey(k.publicKey));
   if (list.some((k) => k.publicKey === key)) return;
   localStorage.setItem(TRUSTED_KEYS_STORAGE, JSON.stringify([...list, {name: name.trim(), publicKey: key}]));
 }
 
 export function removeTrustedRegistry(publicKey: string): void {
-  const list = trustedRegistryKeys().filter((k) => k.publicKey !== OPENBOOK_REGISTRY.publicKey && k.publicKey !== publicKey);
+  const list = trustedRegistryKeys().filter((k) => !isPinnedKey(k.publicKey) && k.publicKey !== publicKey);
   localStorage.setItem(TRUSTED_KEYS_STORAGE, JSON.stringify(list));
 }
 
 function activate(plugin: StoredPlugin, client: DataClient): {error?: string} {
+  // API-version gate first: a plugin built against a newer PluginApi gets a
+  // clear "update the app" error instead of crashing on a missing surface.
+  // Plugins without `apiVersion` (all pre-gate plugins) pass unchanged.
+  const versionError = pluginApiVersionError(plugin.manifest);
+  if (versionError) return {error: versionError};
+  let disposed = false;
   const disposables: Array<() => void> = [];
+  // Registrations made AFTER dispose (a retained setTimeout/event handler
+  // calling back into the api) are torn down immediately instead of leaking
+  // into the already-emptied disposables array.
+  const track = (d: () => void): void => {
+    if (disposed) {
+      try {
+        d();
+      } catch {
+        // late teardown must not throw into plugin code
+      }
+      return;
+    }
+    disposables.push(d);
+  };
   try {
-    const api = buildPluginApi(plugin.manifest, client, disposables);
+    const api = buildPluginApi(plugin.manifest, client, track);
     const mod = executePlugin(plugin, hostModulesFor(api)) as PluginModule;
     const entry = mod.default ?? mod.activate;
     if (typeof entry !== 'function') throw new Error('the entry file must export an activate function (default export)');
@@ -80,6 +121,7 @@ function activate(plugin: StoredPlugin, client: DataClient): {error?: string} {
     if (result && typeof result.deactivate === 'function') disposables.push(result.deactivate);
     active.set(plugin.manifest.id, {
       dispose: () => {
+        disposed = true;
         for (const d of disposables.splice(0).reverse()) {
           try {
             d();
@@ -91,6 +133,7 @@ function activate(plugin: StoredPlugin, client: DataClient): {error?: string} {
     });
     return {};
   } catch (err) {
+    disposed = true;
     for (const d of disposables.splice(0).reverse()) {
       try {
         d();
@@ -102,13 +145,103 @@ function activate(plugin: StoredPlugin, client: DataClient): {error?: string} {
   }
 }
 
+// ── Bundled plugin auto-install ───────────────────────────────────────────────
+
+/**
+ * localStorage key that records bundled plugins the user has explicitly removed.
+ * Value is a JSON array of plugin ids. Once an id is in this list, syncPlugins
+ * will not re-install it — the user's choice to remove wins over the bundle.
+ */
+const DISMISSED_BUNDLED_KEY = 'openbook.bundledPluginsDismissed';
+
+function getDismissedBundled(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_BUNDLED_KEY);
+    if (!raw) return new Set();
+    const list = JSON.parse(raw) as unknown;
+    return new Set(Array.isArray(list) ? (list as string[]).filter((id) => typeof id === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Mark a bundled plugin as dismissed so auto-install won't re-add it. */
+export function dismissBundledPlugin(id: string): void {
+  const set = getDismissedBundled();
+  set.add(id);
+  try {
+    localStorage.setItem(DISMISSED_BUNDLED_KEY, JSON.stringify([...set]));
+  } catch {
+    // storage quota / private mode — best effort
+  }
+}
+
+const bundledIds = new Set(BUNDLED_PLUGINS.map((p) => p.manifest.id));
+
+/** Whether `id` is a first-party bundled plugin. */
+export function isBundledPlugin(id: string): boolean {
+  return bundledIds.has(id);
+}
+
+/**
+ * Reconcile the bundled first-party plugins against the server: install any
+ * that are missing (and not explicitly dismissed), and UPGRADE any whose
+ * installed copy is older than what this build ships — a version compare,
+ * not a presence check, so shipping v1.1 actually lands on libraries that
+ * installed v1.0. The server preserves the user's enabled choice on upgrade
+ * (a disabled plugin stays disabled) and refuses downgrades, so a build
+ * older than the library's copy leaves it alone. Returns the list of
+ * installed/upgraded StoredPlugins (empty when nothing was needed).
+ */
+async function seedBundledPlugins(client: DataClient, existing: StoredPlugin[]): Promise<StoredPlugin[]> {
+  const byId = new Map(existing.map((p) => [p.manifest.id, p]));
+  const dismissed = getDismissedBundled();
+  const toInstall: PluginPackage[] = [];
+  for (const pkg of BUNDLED_PLUGINS) {
+    const current = byId.get(pkg.manifest.id);
+    if (!current) {
+      // Fresh install — unless the user explicitly removed this bundled
+      // plugin before (their choice outlives the bundle).
+      if (!dismissed.has(pkg.manifest.id)) toInstall.push(pkg);
+      continue;
+    }
+    // Installed: upgrade only when the bundle is strictly newer. Non-semver
+    // versions (dev builds) are not comparable — leave them alone.
+    if (isSemver(pkg.manifest.version) && isSemver(current.manifest.version) && compareSemver(pkg.manifest.version, current.manifest.version) > 0) {
+      toInstall.push(pkg);
+    }
+  }
+  const results: StoredPlugin[] = [];
+  for (const pkg of toInstall) {
+    try {
+      results.push(await client.installPlugin(pkg));
+    } catch {
+      // Network/permission failure — skip silently; next sync will retry.
+    }
+  }
+  return results;
+}
+
 /**
  * Reconcile the running set against the server's list: activate newly
  * enabled plugins, dispose disabled/removed ones, verify signatures against
  * the user's trusted keys. Safe to call repeatedly (boot + after changes).
  */
 export async function syncPlugins(client: DataClient): Promise<PluginStatus[]> {
-  const plugins = await client.listPlugins();
+  let plugins = await client.listPlugins();
+
+  // Auto-install bundled first-party plugins that are missing and not dismissed.
+  const seeded = await seedBundledPlugins(client, plugins);
+  if (seeded.length > 0) {
+    plugins = await client.listPlugins();
+  }
+
+  // Revocations (PROTOCOL.md §6.6): refresh the pinned stores' kill-switch
+  // lists (staleness-windowed; a no-store setup is a no-op) so the check
+  // below runs against the freshest copy available. The fetch failing never
+  // blocks a sync — the cached, append-only copy still applies.
+  await refreshRevocations().catch(() => undefined);
+
   const seen = new Set<string>();
   const next: PluginStatus[] = [];
 
@@ -116,6 +249,15 @@ export async function syncPlugins(client: DataClient): Promise<PluginStatus[]> {
     const id = plugin.manifest.id;
     seen.add(id);
     const verdict = await verifyPlugin(plugin, trustedRegistryKeys());
+    const revoked = await revokedEntryFor(id, plugin.manifest.version);
+    if (revoked) {
+      // Revoked means disabled, not merely flagged — regardless of the
+      // enabled switch, and even for an already-running instance.
+      active.get(id)?.dispose();
+      active.delete(id);
+      next.push({plugin, state: 'revoked', error: revoked.reason, verifiedBy: verdict?.registry});
+      continue;
+    }
     if (!plugin.enabled) {
       active.get(id)?.dispose();
       active.delete(id);

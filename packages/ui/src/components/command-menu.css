@@ -1,0 +1,5 @@
+/* App-only entry policy: expose command rows on the first presented frame.
+   The imported dialog still owns scale entry and the faster fade exit. */
+[role='dialog'][data-state='open']:has([data-command-palette-input]) {
+  --tw-enter-opacity: 1;
+}

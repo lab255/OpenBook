@@ -1,3 +1,4 @@
+import {FluidHover} from "./fluid-hover"
 import * as React from "react"
 import { DialogProps } from "@radix-ui/react-dialog"
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons"
@@ -5,6 +6,7 @@ import { Command as CommandPrimitive } from "cmdk"
 
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { EmptyState } from "@/components/ui/empty-state"
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -58,7 +60,7 @@ const CommandInput = React.forwardRef<
       autoComplete="off"
       spellCheck={false}
       className={cn(
-        "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-placeholder-foreground disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
@@ -71,12 +73,12 @@ CommandInput.displayName = CommandPrimitive.Input.displayName
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn("relative isolate max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
     {...props}
-  />
+  ><FluidHover surface="command" selector="[cmdk-item]" selected='[cmdk-item][aria-selected="true"]' />{children}</CommandPrimitive.List>
 ))
 
 CommandList.displayName = CommandPrimitive.List.displayName
@@ -84,12 +86,13 @@ CommandList.displayName = CommandPrimitive.List.displayName
 const CommandEmpty = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Empty>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
->((props, ref) => (
+>(({ className, children, ...props }, ref) => (
   <CommandPrimitive.Empty
     ref={ref}
-    className="py-6 text-center text-sm"
     {...props}
-  />
+  >
+    <EmptyState variant="overlay" className={cn("text-center", className)} title={children} />
+  </CommandPrimitive.Empty>
 ))
 
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName
@@ -159,7 +162,11 @@ const CommandItem = React.forwardRef<
         // data-[disabled=true] (not bare data-disabled): cmdk ≥1.0 sets
         // data-disabled="false" on ENABLED items, and the presence-matching
         // variant greyed out + pointer-disabled every row.
-        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden aria-selected:bg-hover aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none",
+        // CommandDialog deliberately keeps its py-3 density override; default
+        // rows use the small ladder step, without clipping multi-line content.
+        __OB_SAFE_EXPORT_VIEWER__
+          ? "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden aria-[current=page]:bg-hover-strong aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none"
+          : "relative flex min-h-control-sm cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm leading-4 outline-hidden aria-[current=page]:bg-hover-strong aria-selected:text-accent-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_*]:pointer-events-none",
         className
       )}
     />

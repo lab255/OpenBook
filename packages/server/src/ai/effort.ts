@@ -18,10 +18,26 @@ export interface EffortProfile {
   maxSteps: number;
 }
 
+// Budgets are sized for Opus 4.8's extended thinking: every tier clears the
+// ≥1024-token floor the Anthropic engine needs to switch thinking on, so
+// reasoning is always available and merely scales with effort. maxTokens rises
+// in step so a deliberate answer isn't truncated mid-thought.
+//
+// maxSteps = the number of model turns (each a full generate() call) the run
+// loop may take before it gives up. Real multi-tool work is a chain of
+// DEPENDENT calls the model must serialise — e.g. building a database is
+// create_database → describe_database → create_property ×N → create_row ×M,
+// which is already >10 turns for a handful of rows. Under the JSON protocol
+// that's strictly one tool per turn; even native tool-calling serialises
+// dependent calls (each needs the prior result). The prior caps (4/8/16)
+// truncated these mid-task with the unhelpful "ran out of steps" reply. Opus
+// 4.8 with adaptive thinking plans further ahead per turn, so we raise the caps
+// to fit an end-to-end build while keeping a bounded ceiling (a step is a paid
+// model turn, so `high` stays finite — 24, not unbounded).
 const PROFILES: Record<AiEffort, EffortProfile> = {
-  low: {thinkingBudget: 256, temperature: 0.1, maxTokens: 600, maxSteps: 4},
-  med: {thinkingBudget: 1024, temperature: 0.2, maxTokens: 900, maxSteps: 8},
-  high: {thinkingBudget: 4096, temperature: 0.3, maxTokens: 1400, maxSteps: 16},
+  low: {thinkingBudget: 2048, temperature: 0.1, maxTokens: 4000, maxSteps: 6},
+  med: {thinkingBudget: 8192, temperature: 0.2, maxTokens: 8000, maxSteps: 12},
+  high: {thinkingBudget: 16384, temperature: 0.3, maxTokens: 16000, maxSteps: 24},
 };
 
 export const DEFAULT_EFFORT: AiEffort = 'med';

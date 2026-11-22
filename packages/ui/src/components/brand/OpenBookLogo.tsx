@@ -141,12 +141,12 @@ const IDS = [
 
 /** Cover/ribbon shades derived from the accent; pages/ink stay neutral. */
 const themedVars: Record<string, string> = {
-  '--cover': 'hsl(var(--brand, 207 76% 47%))',
-  '--cover-edge': 'color-mix(in srgb, hsl(var(--brand, 207 76% 47%)) 88%, #000)',
-  '--cover-deep': 'color-mix(in srgb, hsl(var(--brand, 207 76% 47%)) 74%, #000)',
-  '--ribbon': 'color-mix(in srgb, hsl(var(--brand, 207 76% 47%)) 74%, #000)',
-  '--ribbon-deep': 'color-mix(in srgb, hsl(var(--brand, 207 76% 47%)) 58%, #000)',
-  '--ribbon-dark': 'color-mix(in srgb, hsl(var(--brand, 207 76% 47%)) 42%, #000)',
+  '--cover': 'hsl(var(--brand, 207 75% 44%))',
+  '--cover-edge': 'color-mix(in srgb, hsl(var(--brand, 207 75% 44%)) 88%, #000)',
+  '--cover-deep': 'color-mix(in srgb, hsl(var(--brand, 207 75% 44%)) 74%, #000)',
+  '--ribbon': 'color-mix(in srgb, hsl(var(--brand, 207 75% 44%)) 74%, #000)',
+  '--ribbon-deep': 'color-mix(in srgb, hsl(var(--brand, 207 75% 44%)) 58%, #000)',
+  '--ribbon-dark': 'color-mix(in srgb, hsl(var(--brand, 207 75% 44%)) 42%, #000)',
   '--ink': '#57534E',
 };
 

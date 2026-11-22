@@ -27,43 +27,92 @@ const h = vi.hoisted(() => ({
   claimSpy: vi.fn(async () => ({status: 'claimed'}) as {status: 'claimed'}),
   bindSpy: vi.fn(async () => ({status: 'bound'}) as {status: 'bound'}),
   unbindSpy: vi.fn(async () => ({status: 'relaxed'}) as {status: 'relaxed'}),
+  reconcileSpy: vi.fn(),
   clientCtor: vi.fn(),
+  clientStart: vi.fn(),
+  clientStop: vi.fn(),
+  clientCallbacks: {} as {onStatus?: (s: string) => void; onDialError?: (error: unknown) => void; onHost?: (host: string) => void},
   showToastSpy: vi.fn(),
+  setHud: vi.fn(),
+  data: {setInstancePolicy: vi.fn(), getInstanceInfo: vi.fn()},
 }));
 
 vi.mock('../AccountProvider', () => ({useAccount: () => h.account}));
-vi.mock('../PlatformLibraryProvider', () => ({
-  usePlatformLibrary: () => ({forwarding: {keyStore: {load: async () => null}, localFetch: vi.fn()}}),
+vi.mock('../PlatformCapabilitiesProvider', () => ({
+  usePlatformCapabilities: () => ({forwarding: {keyStore: {load: async () => null}, localFetch: vi.fn()}}),
 }));
 vi.mock('@/data/DataProvider', () => ({
-  useData: () => ({setInstancePolicy: vi.fn(), getInstanceInfo: vi.fn()}),
+  useData: () => h.data,
 }));
 vi.mock('../forwardingAudience', () => ({
   ensureClaimedForForwarding: h.claimSpy,
-  ensureForwardingAudience: h.bindSpy,
-  unbindForwardingAudience: h.unbindSpy,
+  reconcileForwardingAudience: h.reconcileSpy,
 }));
 vi.mock('@book.dev/sdk', () => ({
   setForwardingAudience: vi.fn(),
+  ForwardingApiError: class extends Error {
+    constructor(
+      public readonly path: string,
+      public readonly status: number,
+    ) {
+      super(`${path} → ${status}`);
+    }
+  },
+  SiteReattachError: class extends Error {
+    readonly retryable: boolean;
+    constructor(
+      public readonly code: string,
+      message: string,
+    ) {
+      super(message);
+      this.retryable = code === 'unreachable';
+    }
+  },
   ForwardingClient: class {
     onStatus?: (s: string) => void;
-    constructor(opts: {onStatus?: (s: string) => void}) {
+    constructor(opts: {onStatus?: (s: string) => void; onDialError?: (error: unknown) => void; onHost?: (host: string) => void}) {
       this.onStatus = opts.onStatus;
+      h.clientCallbacks = opts;
       h.clientCtor();
     }
     async start() {
-      this.onStatus?.('online');
-      return {host: 'abc.book.cloud'};
+      return h.clientStart(this.onStatus);
     }
-    stop() {}
+    async getSiteVisibility() {
+      return 'restricted' as const; // account default; the load effect reads this once online
+    }
+    async setSiteVisibility(v: 'public' | 'restricted') {
+      return v;
+    }
+    stop() {
+      h.clientStop();
+    }
   },
 }));
 vi.mock('@/components/ui/toast', () => ({showToast: h.showToastSpy}));
 vi.mock('@/lib/pageActions', () => ({setShareLinkOrigin: vi.fn()}));
+vi.mock('../HudProvider', () => ({useHud: () => ({setHud: h.setHud})}));
 
-import {ForwardingProvider, useForwarding} from '../ForwardingProvider';
+import {ForwardingApiError, SiteReattachError} from '@book.dev/sdk';
+import {list as listErrors} from '@/lib/errorLog';
+import {classifyForwardingError, ForwardingProvider, useForwarding} from '../ForwardingProvider';
 
 const wrapper = ({children}: {children: React.ReactNode}) => <ForwardingProvider>{children}</ForwardingProvider>;
+
+describe('classifyForwardingError', () => {
+  it.each([
+    [new Error('ipc connect failed: Connection refused'), 'ipc'],
+    [new ForwardingApiError('/api/sites', 401), 'auth'],
+    [new Error('keychain item is locked'), 'auth'],
+    [new SiteReattachError('unreachable', 'account unavailable'), 'network'],
+    [new SiteReattachError('wrong-account', 'this saved address belongs to a different account — switch to that account, or reset the saved address to publish a new one here'), 'auth'],
+    [new ForwardingApiError('/api/sites/attach-ticket', 503), 'network'],
+    [new TypeError('fetch failed'), 'network'],
+    [new SiteReattachError('rejected', 'reattach was refused (/api/sites/reattach → 401 (bad signature)) — your address is kept'), 'unknown'],
+  ] as const)('classifies %s as %s', (error, expected) => {
+    expect(classifyForwardingError(error)).toBe(expected);
+  });
+});
 
 /** Flip the fake account to a connected/signed-in state. */
 function signIn(token = 'tok', status = 'connected'): void {
@@ -79,8 +128,30 @@ beforeEach(() => {
   h.account.status = 'disconnected';
   h.account.signIn.mockClear();
   h.claimSpy.mockClear();
+  h.bindSpy.mockClear();
+  h.unbindSpy.mockReset();
+  h.unbindSpy.mockResolvedValue({status: 'relaxed'});
+  h.reconcileSpy.mockReset();
+  h.reconcileSpy.mockImplementation(async (host, state) => {
+    if (state.hasPendingUnbind()) {
+      const outcome = await h.unbindSpy() as {status: 'relaxed'} | {status: 'held'; code: 'unbindHeld'; reason: string};
+      if (outcome.status === 'held') return outcome;
+      state.clearPendingUnbind();
+      if (!state.isEnabled()) return outcome;
+    }
+    if (host && state.isEnabled()) return h.bindSpy();
+    return {status: 'idle'};
+  });
   h.clientCtor.mockClear();
+  h.clientStart.mockReset();
+  h.clientStart.mockImplementation(async (onStatus?: (s: string) => void) => {
+    onStatus?.('online');
+    return {host: 'abc.book.cloud'};
+  });
+  h.clientStop.mockClear();
+  h.clientCallbacks = {};
   h.showToastSpy.mockClear();
+  h.setHud.mockClear();
 });
 
 afterEach(() => {
@@ -176,8 +247,8 @@ describe('ForwardingProvider — signed-out flip resume (P1-6)', () => {
     signIn(); // already connected before the flip
     const {result} = renderHook(() => useForwarding(), {wrapper});
 
-    // enable() dials directly AND sets `enabled`, which also arms the launch effect —
-    // the startingRef guard must collapse that into a single claim.
+    // enable() records intent and the launch effect owns the sole dial, while the
+    // startingRef guard still protects effect re-entry during the async claim.
     await act(async () => {
       await result.current.enable();
     });
@@ -185,5 +256,261 @@ describe('ForwardingProvider — signed-out flip resume (P1-6)', () => {
     await waitFor(() => expect(h.claimSpy).toHaveBeenCalledTimes(1));
     expect(h.clientCtor).toHaveBeenCalledTimes(1);
     expect(result.current.signInPending).toBe(false);
+  });
+});
+
+describe('ForwardingProvider — retrying launch failures (TUN-1)', () => {
+  it('retries a retryable failure after 2s and reaches online without another enable', async () => {
+    vi.useFakeTimers();
+    signIn();
+    h.clientStart
+      .mockRejectedValueOnce(new SiteReattachError('unreachable', 'account temporarily unavailable'))
+      .mockImplementationOnce(async (onStatus?: (s: string) => void) => {
+        onStatus?.('online');
+        return {host: 'abc.book.cloud'};
+      });
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => result.current.enable());
+    expect(result.current.status).toBe('offline');
+    expect(result.current.retryPending).toBe(true);
+    expect(h.clientStart).toHaveBeenCalledTimes(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1_999));
+    expect(h.clientStart).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+
+    expect(h.clientStart).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('online');
+    expect(result.current.error).toBeNull();
+    expect(listErrors()[0]).toMatchObject({subsystem: 'forwarding', code: 'unreachable'});
+  });
+
+  it('doubles launch backoff and caps every later delay at five minutes', async () => {
+    vi.useFakeTimers();
+    signIn();
+    h.clientStart.mockRejectedValue(new ForwardingApiError('/api/sites/attach-ticket', 503));
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => result.current.enable());
+    const delays = [2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000];
+    for (const [index, delay] of delays.entries()) {
+      await act(async () => vi.advanceTimersByTimeAsync(delay - 1));
+      expect(h.clientStart).toHaveBeenCalledTimes(index + 1);
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(h.clientStart).toHaveBeenCalledTimes(index + 2);
+    }
+  });
+
+  it('leaves a non-retryable refusal terminal', async () => {
+    vi.useFakeTimers();
+    signIn();
+    h.clientStart.mockRejectedValue(new SiteReattachError('wrong-account', 'use the account that owns this address'));
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => result.current.enable());
+    await act(async () => vi.advanceTimersByTimeAsync(10 * 60 * 1000));
+
+    expect(h.clientStart).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('offline');
+    expect(result.current.error).toContain('owns this address');
+    expect(result.current.retryPending).toBe(false);
+  });
+
+  it('does not arm a retry for a plain Error classified by its network string', async () => {
+    vi.useFakeTimers();
+    signIn();
+    h.clientStart.mockRejectedValue(new Error('network connection reset'));
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => result.current.enable());
+    await act(async () => vi.advanceTimersByTimeAsync(10 * 60 * 1000));
+
+    expect(h.clientStart).toHaveBeenCalledTimes(1);
+    expect(result.current.errorClass).toBe('network');
+    expect(result.current.retryPending).toBe(false);
+  });
+
+  it('disable cancels a pending launch retry', async () => {
+    vi.useFakeTimers();
+    signIn();
+    h.clientStart.mockRejectedValue(new TypeError('fetch failed'));
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => result.current.enable());
+    await act(async () => {
+      result.current.disable();
+      await Promise.resolve();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(10 * 60 * 1000));
+
+    expect(h.clientStart).toHaveBeenCalledTimes(1);
+    expect(result.current.enabled).toBe(false);
+  });
+});
+
+describe('ForwardingProvider — stalled dial diagnostics (TUN-3)', () => {
+  it('debounces a 403 stall toast, exposes its code, logs it, and clears the error on recovery', async () => {
+    signIn();
+    h.clientStart.mockImplementationOnce(async (onStatus?: (s: string) => void) => {
+      onStatus?.('connecting');
+      return {host: 'abc.book.cloud'};
+    });
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+    await act(async () => result.current.enable());
+    const forbidden = new ForwardingApiError('/api/sites/attach-ticket', 403);
+
+    act(() => {
+      h.clientCallbacks.onDialError?.(forbidden);
+      h.clientCallbacks.onStatus?.('reconnecting');
+    });
+    expect(result.current.error).toBeNull();
+    expect(h.showToastSpy).not.toHaveBeenCalled(); // one transient blip stays quiet
+
+    act(() => {
+      h.clientCallbacks.onDialError?.(forbidden);
+      h.clientCallbacks.onStatus?.('stalled');
+    });
+    expect(result.current.status).toBe('stalled');
+    expect(result.current.retryPending).toBe(true);
+    expect(result.current.error).toContain('403');
+    expect(h.showToastSpy).toHaveBeenCalledTimes(1);
+    const toast = h.showToastSpy.mock.calls[0][0];
+    expect(toast).toMatchObject({
+      message: 'Publishing can\'t reconnect — your library isn\'t reachable online right now.',
+      actionLabel: 'Open sharing settings',
+      durationMs: 15_000,
+    });
+    expect(toast.message).not.toContain('403');
+    expect(listErrors()[0]).toMatchObject({subsystem: 'forwarding', code: '403'});
+
+    act(() => toast.onAction?.());
+    const openSettings = h.setHud.mock.calls[0][0];
+    const draft = {settings: {open: false, tab: 'general', section: 'stale'}};
+    openSettings(draft);
+    expect(draft.settings).toEqual({open: true, tab: 'sharing', section: null});
+
+    act(() => {
+      h.clientCallbacks.onDialError?.(forbidden);
+      h.clientCallbacks.onStatus?.('stalled');
+    });
+    expect(h.showToastSpy).toHaveBeenCalledTimes(1); // no toast storm within one outage
+
+    act(() => h.clientCallbacks.onStatus?.('online'));
+    expect(result.current.status).toBe('online');
+    expect(result.current.error).toBeNull();
+  });
+});
+
+describe('ForwardingProvider — claim refusal intent (TUN-4)', () => {
+  it('keeps persisted enable intent and auto-attaches when a boot-time refusal clears', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('openbook.forwarding.enabled', '1');
+    signIn();
+    h.claimSpy.mockResolvedValueOnce({
+      status: 'refused',
+      code: 'unverified',
+      reason: 'identity is not ready yet',
+    } as never);
+    const {result} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(h.claimSpy).toHaveBeenCalledTimes(1);
+    expect(h.clientCtor).not.toHaveBeenCalled();
+    expect(result.current.enabled).toBe(true);
+    expect(localStorage.getItem('openbook.forwarding.enabled')).toBe('1');
+    expect(result.current.claimRefusal).toBe('unverified');
+
+    // The account/instance becomes claim-ready before the scheduled retry; the
+    // mock's normal `claimed` result now succeeds without another user action.
+    await act(async () => vi.advanceTimersByTimeAsync(2_000));
+    expect(h.claimSpy).toHaveBeenCalledTimes(2);
+    expect(h.clientCtor).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('online');
+    expect(result.current.claimRefusal).toBeNull();
+    expect(localStorage.getItem('openbook.forwarding.enabled')).toBe('1');
+  });
+
+  it('clears a boot refusal across sign-out so signing back in can attach', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem('openbook.forwarding.enabled', '1');
+    signIn();
+    h.claimSpy.mockResolvedValueOnce({
+      status: 'refused',
+      code: 'unverified',
+      reason: 'identity is not ready yet',
+    } as never);
+    const {result, rerender} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.claimRefusal).toBe('unverified');
+    expect(h.clientCtor).not.toHaveBeenCalled();
+
+    await act(async () => {
+      h.account.connected = false;
+      h.account.token = null;
+      h.account.status = 'disconnected';
+      rerender();
+    });
+    expect(result.current.claimRefusal).toBeNull();
+
+    await act(async () => {
+      signIn('fresh-token');
+      rerender();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(h.clientCtor).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('online');
+  });
+});
+
+describe('ForwardingProvider — durable unpublish (IPC-3)', () => {
+  const pendingKey = 'openbook.forwarding.pendingUnbind:https%3A%2F%2Faccount.example';
+
+  it('persists a held detach, retries on reconnect, and clears the notice and intent', async () => {
+    signIn();
+    h.unbindSpy
+      .mockResolvedValueOnce({status: 'held', code: 'unbindHeld', reason: 'ipc unavailable'} as never)
+      .mockResolvedValueOnce({status: 'relaxed'});
+    const {result, rerender} = renderHook(() => useForwarding(), {wrapper});
+
+    act(() => result.current.disable());
+    await waitFor(() => expect(result.current.audienceNotice?.code).toBe('unbindHeld'));
+    expect(result.current.enabled).toBe(false);
+    expect(localStorage.getItem(pendingKey)).not.toBeNull();
+
+    await act(async () => {
+      h.account.connected = false;
+      h.account.token = null;
+      rerender();
+    });
+    await act(async () => {
+      signIn('recovered-token');
+      rerender();
+    });
+    await waitFor(() => expect(localStorage.getItem(pendingKey)).toBeNull());
+    expect(result.current.audienceNotice).toBeNull();
+    expect(h.unbindSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-enable cancels a pending detach and proceeds to bind', async () => {
+    localStorage.setItem(pendingKey, 'abc.book.cloud');
+    const foreignPendingKey = 'openbook.forwarding.pendingUnbind:https%3A%2F%2Fforeign.example';
+    localStorage.setItem(foreignPendingKey, '1');
+    const {result, rerender} = renderHook(() => useForwarding(), {wrapper});
+
+    await act(async () => result.current.enable());
+    await act(async () => {
+      signIn();
+      rerender();
+    });
+    await waitFor(() => expect(h.clientStart).toHaveBeenCalled());
+    act(() => h.clientCallbacks.onHost?.('abc.book.cloud'));
+    await waitFor(() => expect(h.reconcileSpy).toHaveBeenCalledWith('abc.book.cloud', expect.anything(), expect.anything()));
+    expect(h.bindSpy).toHaveBeenCalled();
+    expect(localStorage.getItem(pendingKey)).toBeNull();
+    expect(localStorage.getItem(foreignPendingKey)).toBeNull();
+    expect(h.unbindSpy).not.toHaveBeenCalled();
+    expect(result.current.enabled).toBe(true);
   });
 });

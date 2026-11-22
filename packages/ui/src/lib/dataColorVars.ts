@@ -1,0 +1,144 @@
+/**
+ * Runtime plumbing for the canonical data palette (`@book.dev/sdk` dataColors):
+ * writes the palette as CSS variables so chips, dots, swatches, charts and
+ * status lights all read one live source, and dark-mode / future per-page
+ * scheme overrides come free (manifest §4.3).
+ *
+ * Variables (on `:root`, chip + stroke values flipped by `.dark`):
+ *
+ *   --data-<token>            fill (mode-invariant)
+ *   --data-<token>-chip-bg    select-chip background for the active mode
+ *   --data-<token>-chip-fg    select-chip text for the active mode
+ *   --data-series-1 … -12     SERIES_ORDER fills (aliases, for charts)
+ *   --data-status-ok|warn|bad status-lamp fills (aliases)
+ *   --data-stroke             pastel/muted light-mode hairline (else transparent)
+ *
+ * Consumers should use the `…Var()` helpers below: they carry the
+ * default-scheme value as a `var()` fallback so provider-less embeds (the
+ * published-site viewer mounts BlockEditor without providers) still render.
+ */
+import {
+  DATA_COLOR_TOKENS,
+  DATA_PALETTE,
+  DATA_STROKE,
+  DEFAULT_DATA_COLOR_SCHEME,
+  SERIES_ORDER,
+  STATUS_TOKENS,
+  isDataColorToken,
+  type DataColorScheme,
+  type DataColorToken,
+} from '@book.dev/sdk';
+
+const DEFAULTS = DATA_PALETTE[DEFAULT_DATA_COLOR_SCHEME];
+
+/** CSS for the given scheme: `:root` light values + a `.dark` flip block. */
+export function dataColorCss(scheme: DataColorScheme): string {
+  const palette = DATA_PALETTE[scheme];
+  const root: string[] = [];
+  const dark: string[] = [];
+  for (const t of DATA_COLOR_TOKENS) {
+    const c = palette[t];
+    root.push(`--data-${t}:${c.fill};`, `--data-${t}-chip-bg:${c.chip.light.bg};`, `--data-${t}-chip-fg:${c.chip.light.fg};`);
+    // Dot/swatch fill flips to the dark-mode fill; chip bg/fg flip too. (`--data-series-*`
+    // and `--data-status-*` alias `--data-<token>`, so they inherit the flip.)
+    dark.push(`--data-${t}:${c.fillDark};`, `--data-${t}-chip-bg:${c.chip.dark.bg};`, `--data-${t}-chip-fg:${c.chip.dark.fg};`);
+  }
+  SERIES_ORDER.forEach((t, i) => root.push(`--data-series-${i + 1}:var(--data-${t});`));
+  for (const [state, token] of Object.entries(STATUS_TOKENS)) root.push(`--data-status-${state}:var(--data-${token});`);
+  // Hairline: pastel/muted, light mode only.
+  root.push(`--data-stroke:${scheme === 'vivid' ? 'transparent' : DATA_STROKE};`);
+  dark.push('--data-stroke:transparent;');
+  return `:root{${root.join('')}}\n.dark{${dark.join('')}}`;
+}
+
+const STYLE_ID = 'ob-data-colors';
+
+/**
+ * Install (or swap) the data-colour variables for a scheme. Driven by the
+ * "Data colours" appearance control (OB-379): `ThemeProvider` passes the active
+ * scheme, so the CSS-var surfaces (chips, dots, swatches, status) recolour live
+ * on change. The concrete-hex surfaces (charts, map pins) resolve the scheme via
+ * {@link useDataScheme} instead (they can't read `var()`).
+ */
+export function applyDataColors(scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME): void {
+  if (typeof document === 'undefined') return;
+  let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = STYLE_ID;
+    document.head.appendChild(el);
+  }
+  const css = dataColorCss(scheme);
+  if (el.textContent !== css) el.textContent = css;
+}
+
+// ── var() accessors (with default-scheme fallbacks for provider-less mounts) ─
+
+/** The fill colour of a data token as a live CSS value. */
+export const dataFillVar = (token: DataColorToken): string => `var(--data-${token}, ${DEFAULTS[token].fill})`;
+
+/** The fill of a select swatch token, or `undefined` for unknown/absent tokens. */
+export const swatchColor = (token: string | undefined | null): string | undefined =>
+  isDataColorToken(token) ? dataFillVar(token) : undefined;
+
+/** The default (gray) swatch fill. */
+export const DEFAULT_SWATCH = dataFillVar('gray');
+
+/** The fill for chart series `i` (cycles over `SERIES_ORDER`). */
+export const seriesFillVar = (i: number): string => {
+  const n = ((i % SERIES_ORDER.length) + SERIES_ORDER.length) % SERIES_ORDER.length;
+  return `var(--data-series-${n + 1}, ${DEFAULTS[SERIES_ORDER[n]].fill})`;
+};
+
+// ── Resolved concrete-hex accessors (scheme-aware) ──────────────────────────
+// For consumers that CANNOT resolve `var()`: `<canvas>` contexts, Leaflet
+// markers, and SVG *presentation attributes* (`fill="…"`). They resolve the
+// ACTIVE scheme (OB-379) — callers pass it from `useDataScheme()` (in-app) or
+// the export/viewer scheme; it defaults to pastel for provider-less mounts.
+
+/** The resolved (non-var) fill hex for a token in `scheme`, or `undefined` when
+ *  the token is unknown. */
+export const swatchHex = (
+  token: string | undefined | null,
+  scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME,
+): string | undefined => (isDataColorToken(token) ? DATA_PALETTE[scheme][token].fill : undefined);
+
+/** The resolved (non-var) fill hex for chart series `i` in `scheme` (cycles
+ *  `SERIES_ORDER`). */
+export const seriesHex = (i: number, scheme: DataColorScheme = DEFAULT_DATA_COLOR_SCHEME): string => {
+  const n = ((i % SERIES_ORDER.length) + SERIES_ORDER.length) % SERIES_ORDER.length;
+  return DATA_PALETTE[scheme][SERIES_ORDER[n]].fill;
+};
+
+/** Select-chip background/text for a token (gray when unknown). */
+export const chipBgVar = (token: string | undefined | null): string => {
+  const t = isDataColorToken(token) ? token : 'gray';
+  return `var(--data-${t}-chip-bg, ${DEFAULTS[t].chip.light.bg})`;
+};
+export const chipFgVar = (token: string | undefined | null): string => {
+  const t = isDataColorToken(token) ? token : 'gray';
+  return `var(--data-${t}-chip-fg, ${DEFAULTS[t].chip.light.fg})`;
+};
+
+/** The pastel/muted light-mode hairline stroke (transparent in vivid/dark). */
+export const dataStrokeVar = (): string => `var(--data-stroke, ${DATA_STROKE})`;
+
+/** Inset hairline ring for swatch dots and status lamps. */
+export const DATA_DOT_RING = `inset 0 0 0 1px ${dataStrokeVar()}`;
+
+/** Data-palette chip pair as utilities (status chips, identity hues, diff marks).
+ *  Literal per token so Tailwind generates every class. */
+export const DATA_CHIP_CLASS = {
+  gray: 'bg-[var(--data-gray-chip-bg)] text-[var(--data-gray-chip-fg)]',
+  brown: 'bg-[var(--data-brown-chip-bg)] text-[var(--data-brown-chip-fg)]',
+  orange: 'bg-[var(--data-orange-chip-bg)] text-[var(--data-orange-chip-fg)]',
+  yellow: 'bg-[var(--data-yellow-chip-bg)] text-[var(--data-yellow-chip-fg)]',
+  green: 'bg-[var(--data-green-chip-bg)] text-[var(--data-green-chip-fg)]',
+  blue: 'bg-[var(--data-blue-chip-bg)] text-[var(--data-blue-chip-fg)]',
+  purple: 'bg-[var(--data-purple-chip-bg)] text-[var(--data-purple-chip-fg)]',
+  pink: 'bg-[var(--data-pink-chip-bg)] text-[var(--data-pink-chip-fg)]',
+  red: 'bg-[var(--data-red-chip-bg)] text-[var(--data-red-chip-fg)]',
+  teal: 'bg-[var(--data-teal-chip-bg)] text-[var(--data-teal-chip-fg)]',
+  cyan: 'bg-[var(--data-cyan-chip-bg)] text-[var(--data-cyan-chip-fg)]',
+  indigo: 'bg-[var(--data-indigo-chip-bg)] text-[var(--data-indigo-chip-fg)]',
+} as const satisfies Record<DataColorToken, string>;

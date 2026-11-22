@@ -1,14 +1,17 @@
-import {describe, it, expect} from 'vitest';
+import {beforeAll, describe, it, expect} from 'vitest';
 import type {PageSnapshot} from '@book.dev/sdk';
-import {createDoc, encodeSnapshot, type NewBlock} from '../../blockeditor/model';
-import {blockSnapshotToEditorJs} from '../../blockeditor/exportBlocks';
+import {createDoc, decodeSnapshot, encodeSnapshot, type NewBlock} from '../../blockeditor/model';
+import {projectSnapshotForExport} from '../../blockeditor/exportBlocks';
+import {computeExportCells} from '../../blockeditor/kit/scope';
 import {buildDocumentModel} from '../documentModel';
 import {toHtml, toSlideDeck} from '../toHtml';
 import {toMarkdown} from '../toMarkdown';
+import {buildChartSvg} from '../chartSvg';
+import type {NormalizedSeries} from '../chartNormalize';
 
 /**
  * Exports start from a CRDT block document (`editor: 'blocks'` + `blockdoc`), not
- * the EditorJS shape the other tests feed directly. This exercises that real path:
+ * the export-projection shape the other tests feed directly. This exercises that real path:
  * the reactive graph must be resolved the way the live editor resolves it, so a
  * static export shows the SAME computed numbers, chart series, status-light state,
  * and progress as the window — instead of empty `—` cells.
@@ -30,9 +33,19 @@ const DOC: NewBlock[] = [
   {type: 'callout', text: [{t: 'Tip'}], props: {variant: 'success'}},
 ];
 
-const blockSnapshot = (): PageSnapshot => {
+let preparedBlockSnapshot: PageSnapshot;
+
+beforeAll(async () => {
   const doc = createDoc(DOC);
-  return {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: encodeSnapshot(doc)} as never;
+  const raw = {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: encodeSnapshot(doc)} as never;
+  preparedBlockSnapshot = projectSnapshotForExport(raw, undefined, await computeExportCells(doc));
+});
+
+const blockSnapshot = (): PageSnapshot => preparedBlockSnapshot;
+
+const authoritativeSnapshot = async (raw: PageSnapshot): Promise<PageSnapshot> => {
+  const doc = decodeSnapshot(raw.blockdoc as never);
+  return projectSnapshotForExport(raw, undefined, await computeExportCells(doc));
 };
 
 describe('reactive export from a block document', () => {
@@ -83,6 +96,15 @@ describe('reactive export from a block document', () => {
     expect(html).toContain('<span data-val>86</span>'); // best
     expect(html).toContain('data-status="ok"'); // status light colour
     expect(html).toContain('width:72%'); // progress fill
+    expect(html).toContain('.kit-pill.kit-on { background: #1c79c4; border-color: #1c79c4;');
+    expect(html).toContain('accent-color: #1c79c4');
+    expect(html).toContain('background: rgba(28,121,196,0.08); border-color: #1c79c4');
+    expect(html).toContain('border-radius: 9999px; background: #1c79c4; transition: width 160ms cubic-bezier(0.32,0.72,0,1)');
+    // Only static styles: the bundled viewer also carries the out-of-scope data palette.
+    const staticCss = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
+    expect(staticCss).toBeTruthy();
+    expect(staticCss).not.toMatch(/#6366f1|rgba\(99,102,241/);
+
     expect(html).toContain('<figcaption class="chart-title">Baskets</figcaption>');
     expect(html).toContain('<svg'); // the kit chart is drawn at build time (first paint)
     expect(html).not.toContain('= <span data-val>—</span>'); // nothing left uncomputed
@@ -102,9 +124,88 @@ describe('reactive export from a block document', () => {
 
   });
 
+  // OB-378: exports inline the canonical soft-pastel data palette (self-contained:
+  // no live CSS vars), so an exported doc's colours match the in-app render.
+  it('inlines the canonical soft-pastel palette for status lights and kit charts', () => {
+    const html = toHtml(blockSnapshot(), 'T', '🛒');
+    // Status-light CSS: soft-pastel green `ok` (#9fdf9f), the 25%-alpha ring, and
+    // the pastel/muted light-mode hairline. Warn is yellow, bad is red.
+    expect(html).toContain('.kitlight[data-status=ok] .kit-light-dot { background: #9fdf9f;');
+    expect(html).toContain('0 0 0 3px rgba(159,223,159,0.25)');
+    expect(html).toContain('inset 0 0 0 1px rgba(0,0,0,0.12)');
+    expect(html).toContain('.kitlight[data-status=warn] .kit-light-dot { background: #e0ce86;'); // yellow
+    expect(html).toContain('.kitlight[data-status=bad] .kit-light-dot { background: #dc9896;'); // red
+    // The drawn kit bar (series 0) uses the canonical blue-first SERIES_ORDER fill.
+    expect(html).toContain('fill="#a9ccdf"');
+  });
+
+  it('prepends the canonical KIT_PALETTE to the live chart runtime (no drift)', () => {
+    const html = toSlideDeck(blockSnapshot(), 'T', '🛒'); // legacy runtime path (#ob-data)
+    // The blue-first SERIES_ORDER, resolved to soft-pastel fills, is inlined as
+    // the runtime palette — one source shared with the in-app kit charts.
+    expect(html).toContain('const KIT_PALETTE=["#a9ccdf","#debea6","#9fdf9f","#cdade1"');
+  });
+
+  // OB-379: the export bakes the ACTIVE data-colour scheme (not always pastel),
+  // so a Vivid/Muted user's file is self-contained in their chosen colours.
+  it('bakes the chosen data-colour scheme into charts, status lights, and the viewer', () => {
+    const vivid = toHtml(blockSnapshot(), 'T', '🛒', undefined, {}, 'vivid');
+    // Status-light green + drawn kit bar swap pastel → the vivid set. (The inlined
+    // viewer bundle still carries pastel fallback literals in its code — it repaints
+    // to vivid at runtime via the scheme global — so only the emitted CSS/SVG asserts.)
+    expect(vivid).toContain('.kitlight[data-status=ok] .kit-light-dot { background: #22c55e;');
+    expect(vivid).toContain('fill="#3b82f6"'); // vivid blue (series 0), not pastel #a9ccdf
+    // The provider-less viewer bundle is told which scheme to paint.
+    expect(vivid).toContain('window.__OB_DATA_SCHEME="vivid"');
+
+    // The legacy runtime path (deck) inlines the vivid palette too.
+    const deck = toSlideDeck(blockSnapshot(), 'T', '🛒', undefined, {}, 'muted');
+    expect(deck).toContain('const KIT_PALETTE=["#778db1"'); // muted blue leads SERIES_ORDER
+  });
+
   // PDF is now rendered from the HTML in a real browser (dom-to-svg → svg2pdf),
   // so it can't run under happy-dom — its coverage lives in the e2e suite
   // (export.spec.ts downloads + validates the paged/continuous PDFs).
+});
+
+// OB-380: a kind-less reactive chart (a chart cell with no fixed `kind`) exports
+// via Observable Plot. Its colour range is the canonical data palette for the
+// active scheme — the same blue-first SERIES_ORDER fills the kit/db charts use —
+// not Plot's default categorical scheme, so an exported chart colour-matches the
+// window. Both the client runtime (inlined) and the server SVG path are covered.
+describe('kind-less (Plot) reactive chart export uses the canonical palette (OB-380)', () => {
+  const multiSeries: NormalizedSeries[] = [
+    {name: 'A', data: [1, 2, 3]},
+    {name: 'B', data: [3, 2, 1]},
+    {name: 'C', data: [2, 2, 2]},
+  ];
+
+  it('server SVG paints the SERIES_ORDER fills (blue/orange/green), not Plot defaults', () => {
+    const pastel = buildChartSvg(multiSeries);
+    expect(pastel).not.toBeNull();
+    const svg = pastel!.outerHTML;
+    // Series 0/1/2 → canonical pastel blue/orange/green (SERIES_ORDER lead trio),
+    // inlined as concrete `stroke` hex — Plot's default scheme would lead elsewhere.
+    expect(svg).toContain('stroke="#a9ccdf"'); // blue
+    expect(svg).toContain('stroke="#debea6"'); // orange
+    expect(svg).toContain('stroke="#9fdf9f"'); // green
+    // The passed scheme is honoured — vivid swaps to the saturated set.
+    const vivid = buildChartSvg(multiSeries, 600, '#111111', 'vivid');
+    expect(vivid!.outerHTML).toContain('stroke="#3b82f6"'); // vivid blue (not pastel #a9ccdf)
+  });
+
+  it('client runtime sets Plot color.range to the inlined KIT_PALETTE (self-contained)', () => {
+    const deck = toSlideDeck(blockSnapshot(), 'T', '🛒'); // legacy runtime path (#ob-data)
+    // The kind-less Plot spec draws its series colours from the prepended palette
+    // const (not Plot's default scheme); the const inlines the pastel fills, so the
+    // export needs no live CSS vars or app modules at runtime.
+    expect(deck).toContain('color:{range:KIT_PALETTE,legend:series.length>1}');
+    expect(deck).toContain('const KIT_PALETTE=["#a9ccdf"'); // pastel blue leads SERIES_ORDER
+    // A vivid export bakes the vivid fills into that same range.
+    const vividDeck = toSlideDeck(blockSnapshot(), 'T', '🛒', undefined, {}, 'vivid');
+    expect(vividDeck).toContain('color:{range:KIT_PALETTE,legend:series.length>1}');
+    expect(vividDeck).toContain('const KIT_PALETTE=["#3b82f6"'); // vivid blue leads
+  });
 });
 
 // Inline marks, columns, and every chart kind must survive the projection into
@@ -152,30 +253,31 @@ describe('export block fidelity', () => {
     // HYDRATE path is light-only v1 (the viewer bundle has no dark theme), so
     // the var() just falls back; the brighter dark override is only defined on
     // the legacy/no-hydrate path, whose static body honours the OS scheme.
-    expect(html).toContain('color:var(--obtc-red, #b91c1c)');
-    expect(html).not.toContain('--obtc-red: #f87171'); // no dark override on the light-only hydrate path
+    expect(html).toContain('color:var(--obtc-red, #ce2727)');
+    expect(html).not.toContain('--obtc-red: #e97777'); // no dark override on the light-only hydrate path
     const legacy = toHtml({editorjs: {blocks: [{type: 'paragraph', data: {text: 'x'}}]}, values: [], names: []} as never, 'T', '');
-    expect(legacy).toContain('--obtc-red: #f87171'); // dark-capable legacy path keeps it
-    expect(html).toMatch(/<mark style="background:#fef3c7">lit<\/mark>/); // yellow highlight tint
+    expect(legacy).toContain('--obtc-red: #e97777'); // dark-capable legacy path keeps it
+    expect(legacy).toContain('mark[style] { color: inherit; }');
+    expect(html).toMatch(/<mark style="background:#f9ce1f66">lit<\/mark>/); // yellow highlight tint
     // The document model resolves the run colours so the PDF can use them.
     const model = buildDocumentModel({title: 'T', icon: '', snapshot: snap});
     const para = model.blocks.find((b) => b.type === 'paragraph') as {runs: Array<{color?: string; markerColor?: string}>};
-    expect(para.runs.find((r) => r.color)?.color).toBe('#b91c1c');
-    expect(para.runs.find((r) => r.markerColor)?.markerColor).toBe('#fef3c7');
+    expect(para.runs.find((r) => r.color)?.color).toBe('#ce2727');
+    expect(para.runs.find((r) => r.markerColor)?.markerColor).toBe('#f9ce1f66');
   });
 
   it('lays columns side-by-side in HTML but flattens them for Markdown', () => {
     const html = toHtml(fancy(), 'T', '');
     expect(html).toContain('<div class="cols">');
-    expect(html).toMatch(/<div class="col">[\s\S]*LEFTCOL[\s\S]*<\/div><div class="col">[\s\S]*RIGHTCOL/);
+    expect(html).toMatch(/<div class="col" style="flex:6 1 0">[\s\S]*LEFTCOL[\s\S]*<\/div><div class="col" style="flex:6 1 0">[\s\S]*RIGHTCOL/);
     const md = toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot: fancy()}));
     expect(md).toContain('LEFTCOL');
     expect(md).toContain('RIGHTCOL');
     expect(md).not.toContain('class="cols"');
   });
 
-  it('summarises a pie chart by label:value in Markdown', () => {
-    const md = toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot: fancy()}));
+  it('summarises a pie chart by label:value in Markdown', async () => {
+    const md = toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot: await authoritativeSnapshot(fancy())}));
     expect(md).toContain('**Slices**');
     expect(md).toContain('- Red: 2');
     expect(md).toContain('- Blue: 3');
@@ -184,7 +286,7 @@ describe('export block fidelity', () => {
   // The intake template binds a progress bar to a gated accordion's auto-computed
   // completion (`intake.ratio`) — a container-completion signal that must resolve
   // in the export the same way it does live.
-  it('resolves a gated-accordion completion into a progress bar', () => {
+  it('resolves a gated-accordion completion into a progress bar', async () => {
     const doc = createDoc([
       {type: 'accordion', props: {name: 'intake', gated: true}, children: [
         {type: 'accordionsection', props: {label: 'A'}, children: [{type: 'textfield', props: {name: 'goal', value: 'ship'}}]},
@@ -193,21 +295,22 @@ describe('export block fidelity', () => {
       {type: 'progressbar', props: {label: 'Completed', source: 'intake.ratio', max: 1, format: 'percent'}},
     ]);
     const snap = {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: encodeSnapshot(doc)} as never;
-    const model = buildDocumentModel({title: 'T', icon: '', snapshot: snap});
+    const resolved = await authoritativeSnapshot(snap);
+    const model = buildDocumentModel({title: 'T', icon: '', snapshot: resolved});
     const progress = model.blocks.find((b) => b.type === 'progress') as {pct: number} | undefined;
     expect(progress?.pct).toBe(50); // one of two fields filled → 50%
-    expect(toHtml(snap, 'T', '')).toContain('width:50%');
+    expect(toHtml(resolved, 'T', '')).toContain('width:50%');
   });
 
   // The savings template's live code returns an object of arrays (multi-series);
   // the chart and the Markdown summary must both read it.
-  it('handles a multi-series object chart (object of arrays)', () => {
+  it('handles a multi-series object chart (object of arrays)', async () => {
     const doc = createDoc([
       {type: 'code', text: [{t: 'return {Invested: [10, 20, 30], Projected: [10, 25, 44]}'}], props: {live: true, name: 'proj'}},
       {type: 'kitchart', props: {kind: 'area', title: 'Balance', source: 'proj'}},
     ]);
     const snap = {editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: encodeSnapshot(doc)} as never;
-    const md = toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot: snap}));
+    const md = toMarkdown(buildDocumentModel({title: 'T', icon: '', snapshot: await authoritativeSnapshot(snap)}));
     expect(md).toContain('**Balance**');
     expect(md).toContain('- Invested: 10, 20, 30');
     expect(md).toContain('- Projected: 10, 25, 44');
@@ -222,7 +325,7 @@ describe('export block fidelity', () => {
 describe('export runtime reference resolution', () => {
   type Out = {editorjs: {blocks: Array<{type?: string; data?: Record<string, unknown>}>}; names: Array<[string, string]>};
   const project = (blocks: NewBlock[]): Out =>
-    blockSnapshotToEditorJs({editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: encodeSnapshot(createDoc(blocks))} as never) as unknown as Out;
+    projectSnapshotForExport({editorjs: {blocks: []}, values: [], names: [], editor: 'blocks', blockdoc: encodeSnapshot(createDoc(blocks))} as never) as unknown as Out;
 
   it('tokenizes formula→formula references so dependents stay live (not undefined)', () => {
     const out = project([

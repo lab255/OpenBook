@@ -1,17 +1,14 @@
-import {useCallback, useEffect, useState, type ReactNode} from 'react';
+import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {ChevronDown, ChevronRight, Trash2} from 'lucide-react';
-import {providerSettings, type AiConfig, type AiEffort, type AiProvider, type AiProviderSettings, type AiSkill, type AiStatus} from '@book.dev/sdk';
-import {SettingsField, SettingsScreen, SettingsSection, SettingsToggle} from '@/components/settings/primitives';
+import {providerSettings, type AiConfig, type AiEffort, type AiProvider, type AiProviderSettings, type AiSkill, type AiStatus, type AiTranscriptionConfig} from '@book.dev/sdk';
+import {ScopeChip, SettingsField, SettingsScreen, SettingsSection, SettingsToggle, SETTINGS_CONTROL_CLASS} from '@/components/settings/primitives';
+import {LocalTranscription} from './LocalTranscription';
 import {Button} from '@/components/ui/button';
 import {Select} from '@/components/ui/select';
 import {useData} from '@/data';
 import {useConfirm, usePreferences, useTranslation} from '@/providers';
 import {AI_FEATURES, type FeatureVisibility} from '@/lib/aiFeatures';
-import {registerAiProviderFocus} from '@/lib/aiSettingsNav';
 import {cn} from '@/lib/utils';
-
-const fieldClass =
-  'w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-hidden focus:border-ring';
 
 /** Providers that carry connection settings (everything except off/mock). */
 const CONFIGURABLE: AiProvider[] = ['llama', 'mlx', 'openai', 'claude'];
@@ -24,11 +21,14 @@ const CONFIGURABLE: AiProvider[] = ['llama', 'mlx', 'openai', 'claude'];
  */
 function normalize(c: AiConfig): AiConfig {
   const providers: Partial<Record<AiProvider, AiProviderSettings>> = {...(c.providers ?? {})};
-  const hasLegacy = c.model !== undefined || c.baseUrl !== undefined || c.apiKey !== undefined || c.autoStart !== undefined;
+  const hasLegacy =
+    c.model !== undefined || c.baseUrl !== undefined || c.apiKey != null || c.apiKeySet !== undefined || c.autoStart !== undefined;
   if (hasLegacy && !providers[c.provider]) {
-    providers[c.provider] = {model: c.model, baseUrl: c.baseUrl, apiKey: c.apiKey, autoStart: c.autoStart};
+    // The status config is redacted, so `apiKey` is never a real value here; carry
+    // the `apiKeySet` signal so the form knows a key is stored without holding it.
+    providers[c.provider] = {model: c.model, baseUrl: c.baseUrl, apiKeySet: c.apiKeySet, autoStart: c.autoStart};
   }
-  return {provider: c.provider, providers, effort: c.effort, thinking: c.thinking};
+  return {provider: c.provider, providers, effort: c.effort, thinking: c.thinking, transcription: c.transcription};
 }
 
 /**
@@ -45,15 +45,20 @@ export default function AiSettings() {
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [draft, setDraft] = useState<AiConfig | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saving = useRef(false);
+  const lastGoodConfig = useRef<AiConfig | null>(null);
+  const transcriptionPicker = useRef<HTMLButtonElement>(null);
   const [indexing, setIndexing] = useState(false);
   const [skills, setSkills] = useState<AiSkill[]>([]);
-  // Which provider accordions are expanded. The nav rail's sub-items expand and
-  // scroll to one via the aiSettingsNav bridge.
+  // Which provider accordions are expanded. The default provider's opens
+  // automatically once the config loads (see below).
   const [openProviders, setOpenProviders] = useState<Record<string, boolean>>({});
 
   const refresh = useCallback(async () => {
     try {
       const next = await client.aiStatus();
+      lastGoodConfig.current = normalize(next.config);
       setStatus(next);
       setDraft((d) => d ?? normalize(next.config));
     } catch {
@@ -82,38 +87,41 @@ export default function AiSettings() {
     }
   }, [draft]);
 
-  // Let the settings nav's per-provider sub-items expand + scroll to a provider.
-  useEffect(() => {
-    registerAiProviderFocus((p) => {
-      setOpenProviders((o) => ({...o, [p]: true}));
-      requestAnimationFrame(() => {
-        document.getElementById(`ai-section-${p}`)?.scrollIntoView({behavior: 'smooth', block: 'start'});
-      });
-    });
-    return () => registerAiProviderFocus(null);
-  }, []);
-
   // Poll while a model download is in flight.
   useEffect(() => {
-    if (!status?.download || status.download.done || status.download.error) return;
+    const provisioning = Object.values(status?.transcription?.runtime?.tools ?? {}).some((tool) => tool.status === 'provisioning');
+    if (!provisioning && (!status?.download || status.download.done || status.download.error)) return;
     const timer = setTimeout(() => void refresh(), 1000);
     return () => clearTimeout(timer);
   }, [status, refresh]);
 
   const apply = async (config: AiConfig): Promise<void> => {
+    if (saving.current) return;
+    saving.current = true;
     setBusy(true);
+    setSaveError(null);
     try {
       await client.aiSetConfig(config);
-      setDraft(config);
-      await refresh();
+      // Re-read the redacted config: neither new keys nor explicit-clear nulls
+      // should be replayed by a later save in the other settings section.
+      const next = await client.aiStatus();
+      lastGoodConfig.current = normalize(next.config);
+      setStatus(next);
+      setDraft(lastGoodConfig.current);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+      // Roll back rejected edits and scrub typed keys even when the post-save
+      // status read fails. Only server-redacted, last-known-good state survives.
+      setDraft(lastGoodConfig.current);
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   };
 
   if (!draft) {
     return (
-      <SettingsScreen title={t('settings.tab.ai')}>
+      <SettingsScreen title={t('ai.title')} scope="library">
         <p className="text-sm text-muted-foreground">…</p>
       </SettingsScreen>
     );
@@ -138,10 +146,16 @@ export default function AiSettings() {
     ...draft,
     providers: {...draft.providers, [p]: {...providerSettings(draft, p), ...patch}},
   });
+  const audio: AiTranscriptionConfig = draft.transcription ?? {provider: 'local'};
+  const setAudio = (patch: Partial<AiTranscriptionConfig>): AiConfig => ({
+    ...draft,
+    transcription: {...audio, ...patch},
+  });
+  const showAudioKeySet = Boolean(audio.apiKeySet) && audio.apiKey == null;
   const modelInput = (p: AiProvider, placeholder: string, hint: string) => (
     <SettingsField label={t('ai.modelName')} hint={hint}>
       <input
-        className={fieldClass}
+        className={SETTINGS_CONTROL_CLASS}
         value={providerSettings(draft, p).model ?? ''}
         placeholder={placeholder}
         onChange={(e) => setDraft(set(p, {model: e.target.value}))}
@@ -166,7 +180,7 @@ export default function AiSettings() {
           <>
             <SettingsField label={t('ai.modelFile')} hint={t('ai.modelFileHint')}>
               <input
-                className={fieldClass}
+                className={SETTINGS_CONTROL_CLASS}
                 value={s.model ?? ''}
                 placeholder="qwen2.5-1.5b-instruct-q4_k_m.gguf"
                 onChange={(e) => setDraft(set(p, {model: e.target.value}))}
@@ -190,7 +204,7 @@ export default function AiSettings() {
           <>
             <SettingsField label={t('ai.baseUrl')} hint={t('ai.mlxUrlHint')}>
               <input
-                className={fieldClass}
+                className={SETTINGS_CONTROL_CLASS}
                 value={s.baseUrl ?? ''}
                 placeholder="http://127.0.0.1:8080"
                 onChange={(e) => setDraft(set(p, {baseUrl: e.target.value}))}
@@ -204,7 +218,7 @@ export default function AiSettings() {
           <>
             <SettingsField label={t('ai.baseUrl')} hint={t('ai.openaiUrlHint')}>
               <input
-                className={fieldClass}
+                className={SETTINGS_CONTROL_CLASS}
                 value={s.baseUrl ?? ''}
                 placeholder="http://127.0.0.1:11434"
                 onChange={(e) => setDraft(set(p, {baseUrl: e.target.value}))}
@@ -214,28 +228,134 @@ export default function AiSettings() {
             {modelInput(p, 'qwen2.5:1.5b', t('ai.openaiModelHint'))}
           </>
         )}
-        {p === 'claude' && (
-          <>
-            <SettingsField label={t('ai.apiKey')} hint={t('ai.apiKeyHint')}>
-              <input
-                type="password"
-                autoComplete="off"
-                className={fieldClass}
-                value={s.apiKey ?? ''}
-                placeholder="sk-ant-…"
-                onChange={(e) => setDraft(set(p, {apiKey: e.target.value}))}
-                onBlur={() => void apply(draft)}
-              />
-            </SettingsField>
-            {modelInput(p, 'claude-sonnet-4-6', t('ai.claudeModelHint'))}
-          </>
-        )}
+        {p === 'claude' && (() => {
+          // Write-only key field. The server never returns the stored key, so
+          // `s.apiKey` is only ever the NEW key being typed (or null on clear); a
+          // stored key surfaces as a masked "key set" placeholder over an EMPTY
+          // input — the input `value` is never bound to a real key string.
+          const typed = typeof s.apiKey === 'string' ? s.apiKey : '';
+          const showKeySet = Boolean(s.apiKeySet) && s.apiKey == null;
+          const keyFieldId = 'ai-claude-apikey';
+          const keyStatusId = 'ai-claude-apikey-status';
+          return (
+            <>
+              <SettingsField label={t('ai.apiKey')} hint={t('ai.apiKeyHint')} htmlFor={keyFieldId}>
+                <div className="flex items-center gap-2">
+                  <input
+                    id={keyFieldId}
+                    type="password"
+                    autoComplete="off"
+                    aria-label={t('ai.apiKey')}
+                    aria-describedby={showKeySet ? keyStatusId : undefined}
+                    className={SETTINGS_CONTROL_CLASS}
+                    value={typed}
+                    placeholder={showKeySet ? t('ai.apiKeySet') : 'sk-ant-…'}
+                    onChange={(e) => setDraft(set(p, {apiKey: e.target.value}))}
+                    onBlur={() => void apply(draft)}
+                  />
+                  {showKeySet && (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={busy}
+                      onClick={() => void apply(set(p, {apiKey: null, apiKeySet: false}))}
+                    >
+                      {t('ai.apiKeyClear')}
+                    </Button>
+                  )}
+                </div>
+                {/* A real, always-rendered status node (not just the placeholder, which drops
+                    on focus + is low-contrast) so a screen reader announces the stored-key state
+                    and the blank-to-keep affordance. Referenced by the input's aria-describedby. */}
+                {showKeySet && (
+                  <p id={keyStatusId} className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{t('ai.apiKeySetStatus')}</span> · {t('ai.apiKeyKeepHint')}
+                  </p>
+                )}
+              </SettingsField>
+              {modelInput(p, 'claude-opus-4-8', t('ai.claudeModelHint'))}
+            </>
+          );
+        })()}
       </ProviderAccordion>
     );
   };
 
   return (
-    <SettingsScreen title={t('settings.tab.ai')} description={t('ai.description')}>
+    <SettingsScreen title={t('ai.title')} description={t('ai.description')} scope="library">
+      <SettingsSection title={t('ai.transcription.title')} description={t('ai.transcription.description')} aria-busy={busy}>
+        <SettingsField label={t('ai.transcription.provider')} htmlFor="ai-transcription-provider">
+          <Select
+            id="ai-transcription-provider"
+            ref={transcriptionPicker}
+            value={audio.provider}
+            onChange={(e) => {
+              transcriptionPicker.current?.focus();
+              void apply(setAudio({provider: e.target.value as AiTranscriptionConfig['provider']}));
+            }}
+          >
+            <option value="local">{t('ai.transcription.local')}</option>
+            <option value="off">{t('ai.provider.off')}</option>
+            <option value="openai-compat">{t('ai.transcription.cloud')}</option>
+          </Select>
+        </SettingsField>
+        {audio.provider === 'openai-compat' && (
+          <>
+            <p className="text-sm text-muted-foreground">{t('ai.transcription.privacy')}</p>
+            <SettingsField label={t('ai.baseUrl')} htmlFor="ai-transcription-url">
+              <input
+                id="ai-transcription-url"
+                className={SETTINGS_CONTROL_CLASS}
+                value={audio.baseUrl ?? ''}
+                placeholder="https://api.openai.com"
+                onChange={(e) => setDraft(setAudio({baseUrl: e.target.value}))}
+                onBlur={() => void apply(draft)}
+              />
+            </SettingsField>
+            <SettingsField label={t('ai.modelName')} htmlFor="ai-transcription-model">
+              <input
+                id="ai-transcription-model"
+                className={SETTINGS_CONTROL_CLASS}
+                value={audio.model ?? ''}
+                placeholder="whisper-1"
+                onChange={(e) => setDraft(setAudio({model: e.target.value}))}
+                onBlur={() => void apply(draft)}
+              />
+            </SettingsField>
+            <SettingsField label={t('ai.apiKey')} hint={t('ai.apiKeyHint')} htmlFor="ai-transcription-apikey">
+              <div className="flex items-center gap-2">
+                <input
+                  id="ai-transcription-apikey"
+                  type="password"
+                  autoComplete="off"
+                  aria-label={t('ai.apiKey')}
+                  aria-describedby={showAudioKeySet ? 'ai-transcription-apikey-status' : undefined}
+                  className={SETTINGS_CONTROL_CLASS}
+                  value={typeof audio.apiKey === 'string' ? audio.apiKey : ''}
+                  placeholder={showAudioKeySet ? t('ai.apiKeySet') : 'sk-…'}
+                  onChange={(e) => setDraft(setAudio({apiKey: e.target.value}))}
+                  onBlur={() => void apply(draft)}
+                />
+                {showAudioKeySet && (
+                  <Button size="xs" variant="outline" className="shrink-0" disabled={busy}
+                    onClick={() => void apply(setAudio({apiKey: null, apiKeySet: false}))}>
+                    {t('ai.apiKeyClear')}
+                  </Button>
+                )}
+              </div>
+              {showAudioKeySet && (
+                <p id="ai-transcription-apikey-status" className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{t('ai.apiKeySetStatus')}</span> · {t('ai.apiKeyKeepHint')}
+                </p>
+              )}
+            </SettingsField>
+          </>
+        )}
+        {audio.provider === 'local' && status?.transcription && <LocalTranscription status={status} refresh={refresh} />}
+        {audio.provider !== 'local' && <p className="text-xs text-muted-foreground">{t('ai.transcription.localInactive')}</p>}
+        {saveError && <p role="alert" className="text-xs text-destructive">{saveError}</p>}
+      </SettingsSection>
       <SettingsSection title={t('ai.defaultEngine')} description={t('ai.defaultEngineHint')}>
         <div className="flex flex-col gap-1.5" role="radiogroup" aria-label={t('ai.providerLabel')}>
           {providers.map((p) => (
@@ -278,6 +398,7 @@ export default function AiSettings() {
         <SettingsSection title={t('ai.assistant')} description={t('ai.assistantHint')}>
           <SettingsField label={t('ai.effort')} hint={t('ai.effortHint')}>
             <Select
+              inputSize="sm"
               value={draft.effort ?? 'med'}
               wrapperClassName="w-[180px]"
               data-ai-effort
@@ -300,11 +421,15 @@ export default function AiSettings() {
       )}
 
       <SettingsSection title={t('ai.features')} description={t('ai.featuresHint')}>
+        {/* Feature visibility is stored locally, so it's a per-device exception
+            to this otherwise library-scoped screen. */}
+        <ScopeChip scope="device" />
         <div className="flex flex-col gap-2">
           {AI_FEATURES.map((f) => (
             <div key={f.id} className="flex items-center justify-between gap-4">
               <span className="text-sm">{t(f.labelKey)}</span>
               <Select
+                inputSize="sm"
                 value={preferences.features[f.id] ?? 'recommended'}
                 wrapperClassName="w-[160px]"
                 onChange={(e) => updatePreferences({features: {[f.id]: e.target.value as FeatureVisibility}})}
@@ -408,11 +533,11 @@ function SkillsEditor({
       {adding ? (
         <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-3">
           <SettingsField label={t('ai.skillName')}>
-            <input className={fieldClass} value={name} placeholder={t('ai.skillNamePlaceholder')} onChange={(e) => setName(e.target.value)} />
+            <input className={SETTINGS_CONTROL_CLASS} value={name} placeholder={t('ai.skillNamePlaceholder')} onChange={(e) => setName(e.target.value)} />
           </SettingsField>
           <SettingsField label={t('ai.skillDescription')}>
             <input
-              className={fieldClass}
+              className={SETTINGS_CONTROL_CLASS}
               value={description}
               placeholder={t('ai.skillDescriptionPlaceholder')}
               onChange={(e) => setDescription(e.target.value)}
@@ -420,7 +545,7 @@ function SkillsEditor({
           </SettingsField>
           <SettingsField label={t('ai.skillInstructions')}>
             <textarea
-              className={cn(fieldClass, 'min-h-24 resize-y')}
+              className={cn(SETTINGS_CONTROL_CLASS, '!h-auto min-h-24 resize-y')}
               value={instructions}
               placeholder={t('ai.skillInstructionsPlaceholder')}
               onChange={(e) => setInstructions(e.target.value)}
@@ -444,8 +569,8 @@ function SkillsEditor({
   );
 }
 
-/** A collapsible per-provider settings panel. `id` is the scroll anchor the
- *  settings nav's provider sub-items target (`ai-section-<provider>`). */
+/** A collapsible per-provider settings panel. `id` (`ai-section-<provider>`) is
+ *  a stable scroll anchor for the section. */
 function ProviderAccordion({
   id,
   title,

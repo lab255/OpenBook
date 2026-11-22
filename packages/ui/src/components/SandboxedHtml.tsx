@@ -140,7 +140,7 @@ export function SandboxedHtml({
     );
   }
 
-  const srcDoc = wrapSandboxDocument(html, {csp: csp ?? ambientCsp});
+  const srcDoc = wrapSandboxDocument(html, {csp: csp ?? ambientCsp, defaultLightBackground: true});
 
   return (
     <div className={cn('relative overflow-hidden rounded-md border border-border bg-background', fill && 'h-full', className)}>

@@ -1,0 +1,36 @@
+{
+  "label": "Chromium synthetic/local, Canvas2d; rAF raster-availability estimate, not physical presentation",
+  "inputBoundary": "Both input classes use synthetic mouse PointerEvents. Trackpad-class denotes the browser pointer path, not a physical trackpad measurement.",
+  "time": "2026-11-17T02:27:46.074Z",
+  "immediacy": [],
+  "cacheFidelity": {
+    "rows": [
+      {
+        "step": "initial",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "move overlapping shape",
+        "maxChannelDelta": 45
+      },
+      {
+        "step": "reorder",
+        "maxChannelDelta": 23
+      },
+      {
+        "step": "erase",
+        "maxChannelDelta": 23
+      },
+      {
+        "step": "zoom invalidation",
+        "maxChannelDelta": 0
+      },
+      {
+        "step": "stroke style",
+        "maxChannelDelta": 18
+      }
+    ],
+    "negativeControl": 253
+  },
+  "failure": "Error: Committed raster differs from ordered reference"
+}

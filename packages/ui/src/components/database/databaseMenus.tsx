@@ -1,38 +1,43 @@
-import React, {useState} from 'react';
+import {sectionLabel} from './databaseRecipes';
+import React, {useImperativeHandle, useMemo, useState} from 'react';
 import {Select} from '@/components/ui/select';
 import {
+  ArrowDown,
   ArrowDownAZ,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   ArrowUpAZ,
+  ArrowUpDown,
   BarChart3,
   Calendar,
   ChevronDown,
   Columns3,
-  Copy,
-  Download,
-  EyeOff,
+  ClipboardList,
+  Eye,
   Filter,
   GanttChartSquare,
   GripVertical,
+  Layers,
   LayoutGrid,
   Link2,
   List,
   ListFilter,
   MapPin,
   MoreHorizontal,
+  Pencil,
   PieChart,
   Plus,
   Settings2,
   Sigma,
   Table2,
   Trash2,
-  Upload,
   Workflow,
   X,
 } from 'lucide-react';
 import {
   isFilterGroup,
+  isFormWritablePropertyType,
   PARENT_GROUP_ID,
   RELATIVE_DATE_OPS,
   relationSides,
@@ -62,20 +67,35 @@ import {
   type StoredDatabase,
   type SummaryType,
 } from '@book.dev/sdk';
-import {useNavigation} from '@/providers';
-import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
+import {useNavigation, useTranslation} from '@/providers';
+import type {TKey} from '@/i18n';
+import {Popover, PopoverAnchor, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {
+  menuItemClass,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {IconButton} from '@/components/ui/icon-button';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import {inputVariants} from '@/components/ui/input';
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip';
+import {IconButton, iconButtonVariants} from '@/components/ui/icon-button';
+import {MENU_WIDTH_SM} from '@/components/ui/menu-components';
+import {EmptyState} from '@/components/ui/empty-state';
 import {cn} from '@/lib/utils';
-import {downloadText, safeFilename} from '@/lib/download';
-import {SWATCH_HEX} from './databaseColors';
-import {rowsToCsv} from './databaseCells';
-import type {NewPropertyInput, UseDatabase} from './useDatabase';
+import {DEFAULT_SWATCH, swatchColor} from './databaseColors';
+import {NEW_PROPERTY_VALUE, setupPropertyInput} from './ViewSetupCard';
+import {canDeleteDatabaseView, type NewPropertyInput, type UseDatabase} from './useDatabase';
+import {ColumnMenuItems, popoverColumnComponents} from './databaseMenuItems';
 
 const PROPERTY_TYPES: {value: DatabasePropertyType; label: string}[] = [
   {value: 'text', label: 'Text'},
@@ -226,6 +246,7 @@ export const VIEW_TYPES: {value: DatabaseViewType; label: string; Icon: React.Co
   {value: 'timeline', label: 'Timeline', Icon: GanttChartSquare},
   {value: 'map', label: 'Map', Icon: MapPin},
   {value: 'graph', label: 'Graph', Icon: Workflow},
+  {value: 'form', label: 'Form', Icon: ClipboardList},
   {value: 'bar', label: 'Bar chart', Icon: BarChart3},
   {value: 'pie', label: 'Pie chart', Icon: PieChart},
 ];
@@ -233,8 +254,9 @@ export const VIEW_TYPES: {value: DatabaseViewType; label: string; Icon: React.Co
 export const viewIcon = (type: DatabaseViewType): React.ComponentType<{className?: string}> =>
   VIEW_TYPES.find((v) => v.value === type)?.Icon ?? Table2;
 
-/** Open a file picker and feed the chosen CSV's text to `importCsv`. */
-function importCsvFile(importCsv: (text: string) => Promise<number>): void {
+/** Open a file picker and feed the chosen CSV's text to `importCsv`.
+ *  Used by the database context menu ("Import CSV"). */
+export function importCsvFile(importCsv: (text: string) => Promise<number>): void {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.csv,text/csv';
@@ -245,10 +267,8 @@ function importCsvFile(importCsv: (text: string) => Promise<number>): void {
   input.click();
 }
 
-const fieldClass = 'rounded border border-border bg-background px-1.5 py-1 text-sm outline-hidden';
-const toolButtonClass =
-  'flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground';
-const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70';
+const fieldClass = inputVariants({inputSize: 'sm'});
+
 
 /** The `+` column header: add a new property to the database. */
 /** Relation cardinality choices (forward-side perspective). */
@@ -270,7 +290,7 @@ const RelationConfigFields: React.FC<{
   const databases = pages.filter((p) => p.hostedDatabaseId);
   return (
     <>
-      <Select unstyled aria-label="Related database" value={databaseId ?? ''} disabled={lockDatabase} onChange={(e) => onDatabase(e.target.value)} className={cn(fieldClass, 'w-full')}>
+      <Select inputSize="sm" aria-label="Related database" value={databaseId ?? ''} disabled={lockDatabase} onChange={(e) => onDatabase(e.target.value)} className="w-full">
         <option value="">Pick a database…</option>
         {databases.map((p) => (
           <option key={p.hostedDatabaseId!} value={p.hostedDatabaseId!}>
@@ -278,7 +298,7 @@ const RelationConfigFields: React.FC<{
           </option>
         ))}
       </Select>
-      <Select unstyled aria-label="Relation cardinality" value={cardinality} onChange={(e) => onCardinality(e.target.value as RelationCardinality)} className={cn(fieldClass, 'w-full')}>
+      <Select inputSize="sm" aria-label="Relation cardinality" value={cardinality} onChange={(e) => onCardinality(e.target.value as RelationCardinality)} className="w-full">
         {CARDINALITIES.map((c) => (
           <option key={c.value} value={c.value}>
             {c.label}
@@ -352,7 +372,7 @@ export const AddPropertyMenu: React.FC<{onAdd: (input: NewPropertyInput) => void
           placeholder="Property name"
           className={cn(fieldClass, 'w-full')}
         />
-        <Select unstyled aria-label="Property type" value={type} onChange={(e) => setType(e.target.value as DatabasePropertyType)} className={cn(fieldClass, 'w-full')}>
+        <Select inputSize="sm" aria-label="Property type" value={type} onChange={(e) => setType(e.target.value as DatabasePropertyType)} className="w-full">
           {PROPERTY_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
               {t.label}
@@ -391,7 +411,7 @@ export const AddPropertyMenu: React.FC<{onAdd: (input: NewPropertyInput) => void
           </>
         )}
         {numeric && (
-          <Select unstyled aria-label="Number format" value={numberFormat} onChange={(e) => setNumberFormat(e.target.value as NumberFormat)} className={cn(fieldClass, 'w-full')}>
+          <Select inputSize="sm" aria-label="Number format" value={numberFormat} onChange={(e) => setNumberFormat(e.target.value as NumberFormat)} className="w-full">
             {NUMBER_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
@@ -423,7 +443,7 @@ export const AddPropertyMenu: React.FC<{onAdd: (input: NewPropertyInput) => void
 };
 
 const FormulaHint: React.FC = () => (
-  <div className="rounded bg-muted/50 px-2 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
+  <div className="rounded bg-muted/50 px-2 py-1.5 text-xs leading-relaxed text-muted-foreground">
     Reference other columns by name: <code>prop(&quot;Name&quot;)</code> or a bare word. Use <code>+ - * /</code>,{' '}
     <code>if(c, a, b)</code>, <code>round</code>, <code>concat</code>, <code>min</code>, <code>max</code>.
   </div>
@@ -435,8 +455,8 @@ const ColorSwatch: React.FC<{value?: string; onChange: (color: string) => void}>
     <PopoverTrigger asChild>
       <button
         type="button"
-        className="h-5 w-5 shrink-0 rounded-full border border-black/10 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 dark:border-white/15"
-        style={{backgroundColor: SWATCH_HEX[value ?? 'gray']}}
+        className="h-5 w-5 shrink-0 rounded-full border border-foreground/10 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 dark:border-foreground/20"
+        style={{backgroundColor: swatchColor(value ?? 'gray')}}
         aria-label="Option color"
         title={value ?? 'gray'}
       />
@@ -451,10 +471,10 @@ const ColorSwatch: React.FC<{value?: string; onChange: (color: string) => void}>
             title={c}
             aria-label={c}
             className={cn(
-              'h-5 w-5 rounded-full border border-black/10 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 dark:border-white/15',
+              'h-5 w-5 rounded-full border border-foreground/10 transition-shadow hover:ring-2 hover:ring-foreground/30 hover:ring-offset-1 dark:border-foreground/20',
               (value ?? 'gray') === c && 'ring-2 ring-foreground/50 ring-offset-1',
             )}
-            style={{backgroundColor: SWATCH_HEX[c]}}
+            style={{backgroundColor: swatchColor(c)}}
           />
         ))}
       </div>
@@ -526,7 +546,7 @@ const OptionsEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = (
               setDragId(null);
               setOverId(null);
             }}
-            className="shrink-0 cursor-grab text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing"
+            className="shrink-0 cursor-grab text-muted-foreground/80 transition-colors hover:text-muted-foreground active:cursor-grabbing"
             aria-label="Reorder option"
           >
             <GripVertical className="h-3.5 w-3.5" />
@@ -538,10 +558,10 @@ const OptionsEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = (
             className={cn(fieldClass, 'min-w-0 flex-1')}
           />
           {isStatus && (
-            <Select unstyled
+            <Select inputSize="sm"
               value={option.group ?? 'todo'}
               onChange={(e) => setOption(option.id, {group: e.target.value as StatusGroup})}
-              className={cn(fieldClass, 'w-24')}
+              className="w-24"
               aria-label="Status group"
             >
               {STATUS_GROUPS.map((g) => (
@@ -585,7 +605,7 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
       <div className={sectionLabel}>Rollup</div>
       <label className="block">
         <span className="text-xs text-muted-foreground">Relation</span>
-        <Select unstyled value={cfg.relationPropertyId} onChange={(e) => set({relationPropertyId: e.target.value})} className={cn(fieldClass, 'mt-0.5 w-full')}>
+        <Select inputSize="sm" value={cfg.relationPropertyId} onChange={(e) => set({relationPropertyId: e.target.value})} className="mt-0.5 w-full">
           <option value="">—</option>
           {relations.map((p) => (
             <option key={p.id} value={p.id}>
@@ -596,7 +616,7 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
       </label>
       <label className="block">
         <span className="text-xs text-muted-foreground">Property</span>
-        <Select unstyled value={cfg.targetPropertyId} onChange={(e) => set({targetPropertyId: e.target.value})} className={cn(fieldClass, 'mt-0.5 w-full')}>
+        <Select inputSize="sm" value={cfg.targetPropertyId} onChange={(e) => set({targetPropertyId: e.target.value})} className="mt-0.5 w-full">
           <option value={TITLE_PROPERTY_ID}>Title</option>
           {targets.map((p) => (
             <option key={p.id} value={p.id}>
@@ -607,7 +627,7 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
       </label>
       <label className="block">
         <span className="text-xs text-muted-foreground">Calculate</span>
-        <Select unstyled value={cfg.function} onChange={(e) => set({function: e.target.value as RollupFunction})} className={cn(fieldClass, 'mt-0.5 w-full')}>
+        <Select inputSize="sm" value={cfg.function} onChange={(e) => set({function: e.target.value as RollupFunction})} className="mt-0.5 w-full">
           {ROLLUP_FUNCTIONS.map((f) => (
             <option key={f.value} value={f.value}>
               {f.label}
@@ -619,41 +639,75 @@ const RollupEditor: React.FC<{property: DatabaseProperty; db: UseDatabase}> = ({
   );
 };
 
+/** Imperative handle so a column header can open its PropertyMenu on right-click. */
+export interface PropertyMenuHandle {
+  /** Open the menu anchored at the pointer (right-click parity with the `⋯` click). */
+  openAtPointer: (e: {clientX: number; clientY: number}) => void;
+}
+
 /**
  * Per-column header editor: rename, change type, edit select options / formula /
  * number format, reorder, and delete the property. Opens from the `⋯` in a
- * column header.
+ * column header (left-click), or by right-clicking the column header — both
+ * routes drive the same menu (see {@link PropertyMenuHandle}).
  */
-export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase; index: number; count: number}> = ({
-  property,
-  db,
-  index,
-  count,
-}) => {
+export const PropertyMenu = React.forwardRef<
+  PropertyMenuHandle,
+  {property: DatabaseProperty; db: UseDatabase; index: number; count: number}
+>(({property, db, index, count}, ref) => {
   const [open, setOpen] = useState(false);
+  // When set, the menu anchors here (a right-click point) instead of the `⋯`
+  // trigger button. Cleared on close so a later `⋯` click re-anchors normally.
+  const [pointer, setPointer] = useState<{x: number; y: number} | null>(null);
   const numeric = property.type === 'number' || property.type === 'formula' || property.type === 'expr' || property.type === 'rollup';
+  // The shared column items rendered as a popover button stack; any action
+  // closes the popover (the same UX as picking a menu item).
+  const popoverComponents = useMemo(() => popoverColumnComponents(() => setOpen(false)), []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openAtPointer: (e) => {
+        setPointer({x: e.clientX, y: e.clientY});
+        setOpen(true);
+      },
+    }),
+    [],
+  );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setPointer(null);
+      }}
+    >
       <PopoverTrigger asChild>
-        <button
-          className="rounded p-0.5 text-muted-foreground/60 opacity-0 transition hover:bg-hover hover:text-foreground group-hover:opacity-100 data-[state=open]:opacity-100"
+        <IconButton
+          size="inline"
+          className="text-muted-foreground/80 opacity-0 transition-[opacity,background-color,color] group-hover:opacity-100 data-[state=open]:opacity-100"
           aria-label="Property options"
         >
           <MoreHorizontal className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 space-y-2 p-2.5">
+      {pointer && (
+        <PopoverAnchor asChild>
+          <div style={{position: 'fixed', left: pointer.x, top: pointer.y}} aria-hidden />
+        </PopoverAnchor>
+      )}
+      <PopoverContent align="start" className="w-64 space-y-1.5 p-2">
         <input
           defaultValue={property.name}
           onBlur={(e) => e.target.value.trim() !== property.name && db.updateProperty(property.id, {name: e.target.value})}
           className={cn(fieldClass, 'w-full font-medium')}
           aria-label="Property name"
         />
-        <Select unstyled
+        <Select inputSize="sm"
           value={property.type}
           onChange={(e) => void db.updateProperty(property.id, {type: e.target.value as DatabasePropertyType})}
-          className={cn(fieldClass, 'w-full')}
+          className="w-full"
         >
           {PROPERTY_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -680,7 +734,7 @@ export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase
               }
             />
             {property.reversePropertyId ? (
-              <p className="text-[11px] text-muted-foreground">Two-way link — edits sync to the related database.</p>
+              <p className="text-xs text-muted-foreground">Two-way link — edits sync to the related database.</p>
             ) : (
               <button
                 type="button"
@@ -738,10 +792,10 @@ export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase
             </label>
             <label className="block">
               <span className={sectionLabel}>Display</span>
-              <Select unstyled
+              <Select inputSize="sm"
                 value={property.dateDisplay ?? 'absolute'}
                 onChange={(e) => void db.updateProperty(property.id, {dateDisplay: e.target.value as 'absolute' | 'relative'})}
-                className={cn(fieldClass, 'mt-1 w-full')}
+                className="mt-1 w-full"
                 aria-label="Date display"
               >
                 <option value="absolute">Absolute (Jun 12, 2026)</option>
@@ -762,11 +816,11 @@ export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase
         )}
 
         {numeric && (
-          <Select unstyled
+          <Select inputSize="sm"
             aria-label="Number format"
             value={property.numberFormat ?? 'plain'}
             onChange={(e) => void db.updateProperty(property.id, {numberFormat: e.target.value as NumberFormat})}
-            className={cn(fieldClass, 'w-full')}
+            className="w-full"
           >
             {NUMBER_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -778,10 +832,10 @@ export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase
 
         {property.type === 'number' && (
           <div className="flex items-center gap-1.5">
-            <Select unstyled
+            <Select inputSize="sm"
               value={property.numberDisplay ?? 'number'}
               onChange={(e) => void db.updateProperty(property.id, {numberDisplay: e.target.value as NumberDisplay})}
-              className={cn(fieldClass, 'flex-1')}
+              className="flex-1"
               aria-label="Show number as"
             >
               {NUMBER_DISPLAYS.map((d) => (
@@ -830,7 +884,7 @@ export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase
           ) : (
             <button
               onClick={() => void db.makeDependencyTwoWay(property.id)}
-              className={cn(toolButtonClass, 'w-full justify-center')}
+              className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}
             >
               <Link2 className="h-3.5 w-3.5" /> Make two-way
             </button>
@@ -840,88 +894,52 @@ export const PropertyMenu: React.FC<{property: DatabaseProperty; db: UseDatabase
           defaultValue={property.description ?? ''}
           onBlur={(e) => e.target.value !== (property.description ?? '') && db.updateProperty(property.id, {description: e.target.value})}
           placeholder="Description"
-          className={cn(fieldClass, 'w-full text-xs')}
+          className={cn(fieldClass, 'w-full')}
         />
-
-        {db.activeView && (
-          <div className="flex items-center gap-1 border-t border-border pt-2">
-            <button
-              onClick={() => {
-                setOpen(false);
-                void db.updateView(db.activeView!.id, {sorts: [{propertyId: property.id, direction: 'asc'}]});
-              }}
-              className={cn(toolButtonClass, 'flex-1 justify-center')}
-            >
-              <ArrowDownAZ className="h-3.5 w-3.5" /> Sort asc
-            </button>
-            <button
-              onClick={() => {
-                setOpen(false);
-                void db.updateView(db.activeView!.id, {sorts: [{propertyId: property.id, direction: 'desc'}]});
-              }}
-              className={cn(toolButtonClass, 'flex-1 justify-center')}
-            >
-              <ArrowUpAZ className="h-3.5 w-3.5" /> Sort desc
-            </button>
-          </div>
-        )}
 
         <div className="flex items-center gap-1 border-t border-border pt-2">
           <button
             disabled={index <= 0}
             onClick={() => void db.moveProperty(property.id, -1)}
-            className={cn(toolButtonClass, 'flex-1 justify-center disabled:opacity-30')}
+            className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center disabled:opacity-30')}
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Left
           </button>
           <button
             disabled={index >= count - 1}
             onClick={() => void db.moveProperty(property.id, 1)}
-            className={cn(toolButtonClass, 'flex-1 justify-center disabled:opacity-30')}
+            className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center disabled:opacity-30')}
           >
             Right <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
-        <button
-          onClick={() => {
-            setOpen(false);
-            void db.duplicateProperty(property.id);
-          }}
-          className={cn(toolButtonClass, 'w-full justify-center')}
-        >
-          <Copy className="h-3.5 w-3.5" /> Duplicate property
-        </button>
+        {/* The shared column action list (sort / filter / group / hide / insert /
+            duplicate / delete) — the same items as the header's right-click
+            ColumnContextMenu, rendered as a button stack (TBL-9, single source).
+            No "Edit property…" here: this popover IS the editor. */}
         {db.activeView && (
-          <button
-            onClick={() => {
-              setOpen(false);
-              const all = (db.database?.schema.properties ?? []).map((p) => p.id);
-              const current = db.activeView!.visiblePropertyIds?.length ? db.activeView!.visiblePropertyIds : all;
-              void db.updateView(db.activeView!.id, {visiblePropertyIds: current.filter((id) => id !== property.id)});
-            }}
-            className={cn(toolButtonClass, 'w-full justify-center')}
-          >
-            <EyeOff className="h-3.5 w-3.5" /> Hide in view
-          </button>
+          <div className="border-t border-border pt-1.5">
+            <ColumnMenuItems
+              db={db}
+              view={db.activeView}
+              property={property}
+              components={popoverComponents}
+            />
+          </div>
         )}
-        <button
-          onClick={() => {
-            setOpen(false);
-            void db.deleteProperty(property.id);
-          }}
-          className={cn(toolButtonClass, 'w-full justify-center text-destructive hover:text-destructive')}
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Delete property
-        </button>
       </PopoverContent>
     </Popover>
   );
-};
+});
+PropertyMenu.displayName = 'PropertyMenu';
 
 interface MenuProps {
   database: StoredDatabase;
   view: DatabaseView;
   onChange: (patch: Partial<DatabaseView>) => void;
+  /** Optional controlled state lets a chip's Edit action open this toolbar popover. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /** Property picker options including the reserved Title pseudo-property. */
@@ -951,14 +969,14 @@ const ConditionRow: React.FC<{
 
   return (
     <div className="flex items-center gap-1">
-      <Select unstyled
+      <Select inputSize="sm"
         value={filter.propertyId}
         onChange={(e) => {
           const nextProp = database.schema.properties.find((p) => p.id === e.target.value);
           const nextOps = operatorsFor(e.target.value === TITLE_PROPERTY_ID ? undefined : nextProp?.type);
           onChange({propertyId: e.target.value, operator: nextOps[0], value: ''});
         }}
-        className={cn(fieldClass, 'min-w-0 flex-1')}
+        className="min-w-0 flex-1"
       >
         {choices.map((c) => (
           <option key={c.id} value={c.id}>
@@ -966,7 +984,7 @@ const ConditionRow: React.FC<{
           </option>
         ))}
       </Select>
-      <Select unstyled value={operator} onChange={(e) => onChange({operator: e.target.value as FilterOperator})} className={cn(fieldClass, 'min-w-0 flex-1')}>
+      <Select inputSize="sm" value={operator} onChange={(e) => onChange({operator: e.target.value as FilterOperator})} className="min-w-0 flex-1">
         {ops.map((op) => (
           <option key={op} value={op}>
             {OPERATOR_LABEL[op]}
@@ -975,10 +993,10 @@ const ConditionRow: React.FC<{
       </Select>
       {!VALUELESS.has(operator) &&
         (isChoice ? (
-          <Select unstyled
+          <Select inputSize="sm"
             value={typeof filter.value === 'string' ? filter.value : ''}
             onChange={(e) => onChange({value: e.target.value})}
-            className={cn(fieldClass, 'w-24')}
+            className="w-24"
           >
             <option value="">—</option>
             {options.map((o) => (
@@ -1011,6 +1029,7 @@ const GroupEditor: React.FC<{
   onRemove?: () => void;
   depth: number;
 }> = ({database, group, onChange, onRemove, depth}) => {
+  const {t} = useTranslation();
   const choices = propertyChoices(database);
   const setChild = (i: number, node: FilterNode) => onChange({...group, filters: group.filters.map((f, idx) => (idx === i ? node : f))});
   const removeChild = (i: number) => onChange({...group, filters: group.filters.filter((_, idx) => idx !== i)});
@@ -1027,7 +1046,7 @@ const GroupEditor: React.FC<{
             <button
               key={c}
               onClick={() => onChange({...group, conjunction: c})}
-              className={cn('px-2 py-0.5 transition-colors', group.conjunction === c ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:bg-hover')}
+              className={cn('px-2 py-0.5 transition-colors', group.conjunction === c ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-hover')}
             >
               {c === 'and' ? 'All' : 'Any'}
             </button>
@@ -1040,7 +1059,9 @@ const GroupEditor: React.FC<{
         )}
       </div>
       <div className="space-y-1.5">
-        {group.filters.length === 0 && <div className="text-xs text-muted-foreground">No conditions yet.</div>}
+        {group.filters.length === 0 && (
+          <EmptyState variant="overlay" className="py-1" title={t('database.empty.noConditions')} />
+        )}
         {group.filters.map((node, i) =>
           isFilterGroup(node) ? (
             <GroupEditor key={node.id} database={database} group={node} onChange={(n) => setChild(i, n)} onRemove={() => removeChild(i)} depth={depth + 1} />
@@ -1050,11 +1071,11 @@ const GroupEditor: React.FC<{
         )}
       </div>
       <div className="mt-1.5 flex gap-1">
-        <button onClick={addCondition} className={cn(toolButtonClass, 'flex-1 justify-center border border-dashed border-border')}>
+        <button onClick={addCondition} className={cn(menuItemClass, 'text-muted-foreground w-auto')}>
           <Plus className="h-3.5 w-3.5" /> Condition
         </button>
         {depth === 0 && (
-          <button onClick={addGroup} className={cn(toolButtonClass, 'flex-1 justify-center border border-dashed border-border')}>
+          <button onClick={addGroup} className={cn(menuItemClass, 'text-muted-foreground w-auto')}>
             <Plus className="h-3.5 w-3.5" /> Group
           </button>
         )}
@@ -1064,19 +1085,26 @@ const GroupEditor: React.FC<{
 };
 
 /** Filter editor: a nested and/or tree of conditions applied to the current view. */
-export const FilterMenu: React.FC<MenuProps> = ({database, view, onChange}) => {
+export const FilterMenu: React.FC<MenuProps> = ({database, view, onChange, open, onOpenChange}) => {
   const root = view.filterRoot ?? {id: 'root', conjunction: 'and' as const, filters: view.filters ?? []};
   const count = countConditions(root);
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className={cn(toolButtonClass, count > 0 && 'text-foreground')}>
-          <Filter className="h-3.5 w-3.5" />
-          Filter{count > 0 ? ` (${count})` : ''}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[24rem] p-3">
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), count > 0 && 'text-foreground', count > 0 && 'w-auto gap-1 px-1.5')} aria-label={`Filter${count > 0 ? ` (${count})` : ''}`}>
+                <Filter className="h-4 w-4" />
+                {count > 0 && <span className="text-xs tabular-nums">{count}</span>}
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Filter</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent align="end" className="w-[24rem] p-3">
         <GroupEditor
           database={database}
           group={root}
@@ -1090,7 +1118,8 @@ export const FilterMenu: React.FC<MenuProps> = ({database, view, onChange}) => {
 };
 
 /** Sort editor: ordered sort keys applied to the current view. */
-export const SortMenu: React.FC<MenuProps> = ({database, view, onChange}) => {
+export const SortMenu: React.FC<MenuProps> = ({database, view, onChange, open, onOpenChange}) => {
+  const {t} = useTranslation();
   const choices = propertyChoices(database);
   const sorts = view.sorts ?? [];
 
@@ -1100,18 +1129,27 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange}) => {
   const removeSort = (index: number) => onChange({sorts: sorts.filter((_, i) => i !== index)});
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className={cn(toolButtonClass, sorts.length > 0 && 'text-foreground')}>
-          <ListFilter className="h-3.5 w-3.5" />
-          Sort{sorts.length > 0 ? ` (${sorts.length})` : ''}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 space-y-2 p-3">
-        {sorts.length === 0 && <div className="text-xs text-muted-foreground">No sorts yet.</div>}
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), sorts.length > 0 && 'text-foreground', sorts.length > 0 && 'w-auto gap-1 px-1.5')} aria-label={`Sort${sorts.length > 0 ? ` (${sorts.length})` : ''}`}>
+                <ArrowUpDown className="h-4 w-4" />
+                {sorts.length > 0 && <span className="text-xs tabular-nums">{sorts.length}</span>}
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Sort</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent align="end" className="w-80 space-y-2 p-3">
+        {sorts.length === 0 && (
+          <EmptyState variant="overlay" className="py-1" title={t('database.empty.noSorts')} />
+        )}
         {sorts.map((sort, index) => (
           <div key={index} className="flex items-center gap-1">
-            <Select unstyled value={sort.propertyId} onChange={(e) => setSort(index, {propertyId: e.target.value})} className={cn(fieldClass, 'min-w-0 flex-1')}>
+            <Select inputSize="sm" value={sort.propertyId} onChange={(e) => setSort(index, {propertyId: e.target.value})} className="min-w-0 flex-1">
               {choices.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -1130,7 +1168,7 @@ export const SortMenu: React.FC<MenuProps> = ({database, view, onChange}) => {
             </IconButton>
           </div>
         ))}
-        <button onClick={addSort} className={cn(toolButtonClass, 'w-full justify-center border border-dashed border-border')}>
+        <button onClick={addSort} className={cn(menuItemClass, 'text-muted-foreground w-full')}>
           <Plus className="h-3.5 w-3.5" /> Add sort
         </button>
       </PopoverContent>
@@ -1174,7 +1212,7 @@ export const SummaryPicker: React.FC<{current: SummaryType; display: string; onC
           </span>
         ) : (
           <span className="flex items-center gap-1 tabular-nums">
-            <span className="text-muted-foreground/60">{SUMMARY_TYPES.find((s) => s.value === current)?.label}</span>
+            <span className="text-muted-foreground/80">{SUMMARY_TYPES.find((s) => s.value === current)?.label}</span>
             <span className="font-medium text-foreground/80">{display}</span>
             <ChevronDown className="h-3 w-3 opacity-0 transition-opacity group-hover/sum:opacity-100" />
           </span>
@@ -1182,11 +1220,13 @@ export const SummaryPicker: React.FC<{current: SummaryType; display: string; onC
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="max-h-72 w-44 overflow-y-auto">
-      {SUMMARY_TYPES.map((s) => (
-        <DropdownMenuItem key={s.value} onClick={() => onChange(s.value)} className={cn(s.value === current && 'font-medium')}>
-          {s.label}
-        </DropdownMenuItem>
-      ))}
+      <DropdownMenuRadioGroup value={current} onValueChange={(value) => onChange(value as SummaryType)}>
+        {SUMMARY_TYPES.map((s) => (
+          <DropdownMenuRadioItem key={s.value} value={s.value}>
+            {s.label}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
     </DropdownMenuContent>
   </DropdownMenu>
 );
@@ -1204,14 +1244,14 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
 
   return (
     <div className="flex items-center gap-1">
-      <span className="h-4 w-1.5 shrink-0 rounded-full" style={{backgroundColor: SWATCH_HEX[rule.color] ?? '#9ca3af'}} />
-      <Select unstyled
+      <span className="h-4 w-1.5 shrink-0 rounded-full" style={{backgroundColor: swatchColor(rule.color) ?? DEFAULT_SWATCH}} />
+      <Select inputSize="sm"
         value={rule.propertyId}
         onChange={(e) => {
           const next = properties.find((p) => p.id === e.target.value);
           update({propertyId: e.target.value, operator: operatorsFor(next?.type)[0], value: undefined});
         }}
-        className={cn(fieldClass, 'min-w-0 flex-1')}
+        className="min-w-0 flex-1"
         aria-label="Rule property"
       >
         {properties.map((p) => (
@@ -1220,7 +1260,7 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
           </option>
         ))}
       </Select>
-      <Select unstyled value={rule.operator} onChange={(e) => update({operator: e.target.value as FilterOperator})} className={cn(fieldClass, 'min-w-0')} aria-label="Rule operator">
+      <Select inputSize="sm" value={rule.operator} onChange={(e) => update({operator: e.target.value as FilterOperator})} className="min-w-0" aria-label="Rule operator">
         {ops.map((o) => (
           <option key={o} value={o}>
             {OPERATOR_LABEL[o]}
@@ -1229,7 +1269,7 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
       </Select>
       {!VALUELESS.has(rule.operator) &&
         (isSelect ? (
-          <Select unstyled value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => update({value: e.target.value})} className={cn(fieldClass, 'min-w-0 flex-1')} aria-label="Rule value">
+          <Select inputSize="sm" value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => update({value: e.target.value})} className="min-w-0 flex-1" aria-label="Rule value">
             <option value="">—</option>
             {(prop?.options ?? []).map((o) => (
               <option key={o.id} value={o.id}>
@@ -1246,16 +1286,16 @@ const ColorRuleRow: React.FC<{db: UseDatabase; view: DatabaseView; rule: ColorRu
             aria-label="Rule value"
           />
         ))}
-      <Select unstyled value={rule.color} onChange={(e) => update({color: e.target.value})} className={cn(fieldClass, 'w-16')} aria-label="Rule colour">
+      <Select inputSize="sm" value={rule.color} onChange={(e) => update({color: e.target.value})} className="w-16" aria-label="Rule colour">
         {SELECT_COLORS.map((c) => (
           <option key={c} value={c}>
             {c}
           </option>
         ))}
       </Select>
-      <button onClick={remove} aria-label="Remove rule" className="shrink-0 rounded p-0.5 text-muted-foreground/70 transition-colors hover:bg-hover hover:text-foreground">
+      <IconButton size="inline" onClick={remove} aria-label="Remove rule" className="text-muted-foreground">
         <X className="h-3.5 w-3.5" />
-      </button>
+      </IconButton>
     </div>
   );
 };
@@ -1277,7 +1317,7 @@ export const ColorRulesEditor: React.FC<{db: UseDatabase; view: DatabaseView}> =
       {rules.map((rule) => (
         <ColorRuleRow key={rule.id} db={db} view={view} rule={rule} properties={properties} />
       ))}
-      <button onClick={add} className={cn(toolButtonClass, 'w-full justify-center')}>
+      <button onClick={add} className={cn(menuItemClass, 'text-muted-foreground w-full')}>
         <Plus className="h-3.5 w-3.5" /> Add rule
       </button>
     </div>
@@ -1295,7 +1335,8 @@ function metricLabel(metric: DatabaseMetric, properties: DatabaseProperty[]): st
 const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: DatabaseMetric}> = ({db, view, metric}) => {
   const properties = db.database!.schema.properties;
   const prop = metric.propertyId === TITLE_PROPERTY_ID ? TITLE_PROPERTY_ID : properties.find((p) => p.id === metric.propertyId);
-  const value = prop ? summarizeColumn(db.visibleRows, prop, metric.type, properties) : '—';
+  // Metrics over a cross-database rollup fold real foreign rows (matches the cells).
+  const value = prop ? summarizeColumn(db.visibleRows, prop, metric.type, db.rollupProperties, db.rollupRows) : '—';
   // Parse the formatted value back to a number for the optional progress bar
   // (tolerates thousands separators, currency symbols and a trailing %).
   const numeric = Number(value.replace(/[^0-9.-]/g, ''));
@@ -1310,7 +1351,7 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
     <Popover>
       <PopoverTrigger asChild>
         <button className="min-w-[110px] rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-foreground/25">
-          <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground" title={metricLabel(metric, properties)}>
+          <div className="truncate text-[10px] font-medium text-muted-foreground" title={metricLabel(metric, properties)}>
             {metricLabel(metric, properties)}
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -1319,7 +1360,10 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
           </div>
           {pct !== null && (
             <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-brand transition-all" style={{width: `${pct}%`}} />
+              <div
+                className="h-full w-full origin-left bg-brand"
+                style={{transform: `scaleX(${pct / 100})`, transition: 'transform var(--motion-fast) var(--ease-out-soft)'}}
+              />
             </div>
           )}
         </button>
@@ -1327,10 +1371,10 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
       <PopoverContent align="start" className="w-56 space-y-2 p-2.5">
         <label className="block">
           <span className={sectionLabel}>Property</span>
-          <Select unstyled
+          <Select inputSize="sm"
             value={metric.propertyId}
             onChange={(e) => patch({propertyId: e.target.value})}
-            className={cn(fieldClass, 'mt-1 w-full')}
+            className="mt-1 w-full"
           >
             <option value={TITLE_PROPERTY_ID}>Rows (count)</option>
             {properties.map((p) => (
@@ -1342,7 +1386,7 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
         </label>
         <label className="block">
           <span className={sectionLabel}>Calculate</span>
-          <Select unstyled value={metric.type} onChange={(e) => patch({type: e.target.value as SummaryType})} className={cn(fieldClass, 'mt-1 w-full')}>
+          <Select inputSize="sm" value={metric.type} onChange={(e) => patch({type: e.target.value as SummaryType})} className="mt-1 w-full">
             {METRIC_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -1368,7 +1412,7 @@ const MetricCard: React.FC<{db: UseDatabase; view: DatabaseView; metric: Databas
           className={cn(fieldClass, 'w-full')}
           aria-label="Metric target"
         />
-        <button onClick={remove} className={cn(toolButtonClass, 'w-full justify-center text-destructive hover:text-destructive')}>
+        <button onClick={remove} className={cn(menuItemClass, 'text-muted-foreground w-full justify-center text-destructive hover:text-destructive')}>
           <Trash2 className="h-3.5 w-3.5" /> Remove metric
         </button>
       </PopoverContent>
@@ -1422,13 +1466,64 @@ function filterChipText(filter: DatabaseFilter, properties: DatabaseProperty[]):
   return `${name} ${op} ${value ?? ''}`.trim();
 }
 
+/** The shared right-click actions every active filter/sort/group chip exposes. */
+const ChipContextMenu: React.FC<{
+  onEdit: () => void;
+  onRemove: () => void;
+  reorder?: {
+    canMoveUp: boolean;
+    canMoveDown: boolean;
+    onMoveUp: () => void;
+    onMoveDown: () => void;
+  };
+  children: React.ReactNode;
+}> = ({onEdit, onRemove, reorder, children}) => {
+  const {t} = useTranslation();
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild onContextMenu={(e) => e.stopPropagation()}>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent className={MENU_WIDTH_SM}>
+        <ContextMenuItem
+          onSelect={() => {
+            // Let the ContextMenu dismiss before opening the toolbar Popover;
+            // opening both primitives in the same event races their focus traps.
+            setTimeout(onEdit, 0);
+          }}
+        >
+          <Pencil className="mr-2 h-4 w-4" />
+          {t('database.chipMenu.edit')}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onRemove}>
+          <X className="mr-2 h-4 w-4" />
+          {t('database.chipMenu.remove')}
+        </ContextMenuItem>
+        {reorder && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem disabled={!reorder.canMoveUp} onSelect={reorder.onMoveUp}>
+              <ArrowUp className="mr-2 h-4 w-4" />
+              {t('menu.block.moveUp')}
+            </ContextMenuItem>
+            <ContextMenuItem disabled={!reorder.canMoveDown} onSelect={reorder.onMoveDown}>
+              <ArrowDown className="mr-2 h-4 w-4" />
+              {t('menu.block.moveDown')}
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+};
+
 /**
  * Active-filter chips: each top-level condition of the view's filter as a small
  * removable pill, so the filters added from the toolbar or a cell's right-click
  * menu are visible at a glance and one click to drop. Nested filter groups stay
  * managed in the Filter menu (a single "advanced" pill stands in for them).
  */
-export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, view}) => {
+export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit: () => void}> = ({db, view, onEdit}) => {
   const properties = db.database!.schema.properties;
   const root = view.filterRoot ?? {id: 'root', conjunction: 'and' as const, filters: view.filters ?? []};
   const leaves = root.filters.filter((n): n is DatabaseFilter => !isFilterGroup(n));
@@ -1437,26 +1532,32 @@ export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db
 
   const removeLeaf = (id: string): void =>
     void db.updateView(view.id, {filterRoot: {...root, filters: root.filters.filter((n) => isFilterGroup(n) || n.id !== id)}, filters: []});
+  const removeGroups = (): void =>
+    void db.updateView(view.id, {filterRoot: {...root, filters: root.filters.filter((n) => !isFilterGroup(n))}, filters: []});
   const clearAll = (): void => void db.updateView(view.id, {filterRoot: {...root, filters: []}, filters: []});
 
   return (
     <div className="mb-2 flex flex-wrap items-center gap-1.5">
       {leaves.map((f, i) => (
         <React.Fragment key={f.id}>
-          {i > 0 && <span className="text-[11px] uppercase text-muted-foreground/60">{root.conjunction}</span>}
-          <span className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-2 pr-1 text-xs">
-            <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[16rem] truncate text-muted-foreground" title={filterChipText(f, properties)}>
-              {filterChipText(f, properties)}
+          {i > 0 && <span className="text-xs font-semibold text-muted-foreground">{root.conjunction === 'and' ? 'And' : 'Or'}</span>}
+          <ChipContextMenu onEdit={onEdit} onRemove={() => removeLeaf(f.id)}>
+            <span className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-2 pr-1 text-xs">
+              <Filter className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <span className="max-w-[16rem] truncate text-muted-foreground" title={filterChipText(f, properties)}>
+                {filterChipText(f, properties)}
+              </span>
+              <button onClick={() => removeLeaf(f.id)} aria-label="Remove filter" className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
             </span>
-            <button onClick={() => removeLeaf(f.id)} aria-label="Remove filter" className="rounded-full p-0.5 text-muted-foreground/70 transition-colors hover:bg-hover hover:text-foreground">
-              <X className="h-3 w-3" />
-            </button>
-          </span>
+          </ChipContextMenu>
         </React.Fragment>
       ))}
       {groups > 0 && (
-        <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">+{groups} advanced</span>
+        <ChipContextMenu onEdit={onEdit} onRemove={removeGroups}>
+          <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">+{groups} advanced</span>
+        </ChipContextMenu>
       )}
       {leaves.length + groups > 1 && (
         <button onClick={clearAll} className="ml-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
@@ -1472,7 +1573,7 @@ export const FilterChips: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db
  * its direction, the × to drop it. Mirrors {@link FilterChips} so the otherwise
  * hidden sort state is visible and editable at a glance.
  */
-export const SortChips: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, view}) => {
+export const SortChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit: () => void}> = ({db, view, onEdit}) => {
   const properties = db.database!.schema.properties;
   const sorts = view.sorts ?? [];
   if (sorts.length === 0) return null;
@@ -1480,42 +1581,110 @@ export const SortChips: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, 
   const flip = (i: number): void =>
     void db.updateView(view.id, {sorts: sorts.map((s, j) => (j === i ? {...s, direction: s.direction === 'asc' ? 'desc' : 'asc'} : s))});
   const remove = (i: number): void => void db.updateView(view.id, {sorts: sorts.filter((_, j) => j !== i)});
+  const move = (i: number, delta: -1 | 1): void => {
+    if (i + delta < 0 || i + delta >= sorts.length) return;
+    const next = [...sorts];
+    const [moved] = next.splice(i, 1);
+    next.splice(i + delta, 0, moved);
+    void db.updateView(view.id, {sorts: next});
+  };
 
   return (
     <div className="mb-2 flex flex-wrap items-center gap-1.5">
       {sorts.map((sort, i) => (
-        <span key={i} className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-1.5 pr-1 text-xs text-muted-foreground">
-          <button onClick={() => flip(i)} className="flex items-center gap-1 transition-colors hover:text-foreground" title="Flip sort direction">
-            <span className="max-w-[12rem] truncate">{name(sort.propertyId)}</span>
-            {sort.direction === 'asc' ? <ArrowDownAZ className="h-3 w-3 shrink-0" /> : <ArrowUpAZ className="h-3 w-3 shrink-0" />}
-          </button>
-          <button onClick={() => remove(i)} aria-label="Remove sort" className="rounded-full p-0.5 text-muted-foreground/70 transition-colors hover:bg-hover hover:text-foreground">
-            <X className="h-3 w-3" />
-          </button>
-        </span>
+        <ChipContextMenu
+          key={i}
+          onEdit={onEdit}
+          onRemove={() => remove(i)}
+          reorder={
+            sorts.length >= 2
+              ? {
+                canMoveUp: i > 0,
+                canMoveDown: i < sorts.length - 1,
+                onMoveUp: () => move(i, -1),
+                onMoveDown: () => move(i, 1),
+              }
+              : undefined
+          }
+        >
+          <span className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-1.5 pr-1 text-xs text-muted-foreground">
+            <button onClick={() => flip(i)} className="flex items-center gap-1 transition-colors hover:text-foreground" title="Flip sort direction">
+              <span className="max-w-[12rem] truncate">{name(sort.propertyId)}</span>
+              {sort.direction === 'asc' ? <ArrowDownAZ className="h-3 w-3 shrink-0" /> : <ArrowUpAZ className="h-3 w-3 shrink-0" />}
+            </button>
+            <button onClick={() => remove(i)} aria-label="Remove sort" className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        </ChipContextMenu>
       ))}
     </div>
   );
 };
 
-/** The `+` next to the view tabs: add a new view of a chosen layout. */
-export const AddViewMenu: React.FC<{onAdd: (type: DatabaseViewType) => void}> = ({onAdd}) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button className="flex items-center gap-1 rounded px-1.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-hover hover:text-foreground" aria-label="Add view">
-        <Plus className="h-3.5 w-3.5" />
-      </button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" className="w-44">
-      {VIEW_TYPES.map(({value, label, Icon}) => (
-        <DropdownMenuItem key={value} onClick={() => onAdd(value)}>
-          <Icon className="mr-2 h-4 w-4" />
-          {label}
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
+/** Per-layout one-liner for the add-view menu (mirrors the slash menu's hints). */
+export const VIEW_TYPE_HINT_KEY: Record<DatabaseViewType, TKey> = {
+  table: 'database.addView.hints.table',
+  board: 'database.addView.hints.board',
+  gallery: 'database.addView.hints.gallery',
+  list: 'database.addView.hints.list',
+  calendar: 'database.addView.hints.calendar',
+  timeline: 'database.addView.hints.timeline',
+  map: 'database.addView.hints.map',
+  graph: 'database.addView.hints.graph',
+  form: 'database.addView.hints.form',
+  bar: 'database.addView.hints.bar',
+  pie: 'database.addView.hints.pie',
+};
+
+/** Layouts that need a property before they can lay rows out (the add-view
+ *  menu annotates these; adding one renders an in-body setup card to fix it). */
+export const VIEW_TYPE_NEEDS_KEY: Partial<Record<DatabaseViewType, TKey>> = {
+  calendar: 'database.addView.needs.date',
+  timeline: 'database.addView.needs.date',
+  map: 'database.addView.needs.location',
+  graph: 'database.addView.needs.dependency',
+  form: 'database.addView.needs.form',
+  bar: 'database.addView.needs.group',
+  pie: 'database.addView.needs.group',
+};
+
+/** The `+` next to the view tabs: add a new view of a chosen layout. Items are
+ *  two lines — the layout name plus a hint (and, for layouts that need a
+ *  property, what they need). The hint is decorative: `aria-label` pins each
+ *  item's accessible name to exactly the layout name. */
+export const AddViewMenu: React.FC<{onAdd: (type: DatabaseViewType) => void}> = ({onAdd}) => {
+  const {t} = useTranslation();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-1 rounded px-1.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-hover hover:text-foreground" aria-label="Add view">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
+      >
+        {VIEW_TYPES.map(({value, label, Icon}) => (
+          <DropdownMenuItem key={value} aria-label={label} onClick={() => onAdd(value)} className="items-start">
+            <Icon className="mr-2 mt-0.5 h-4 w-4 shrink-0" />
+            <span className="flex min-w-0 flex-col">
+              <span>{label}</span>
+              {/* Let the requirement note wrap onto its own line rather than share
+                  the hint's truncated line — clipping it away was hiding the most
+                  useful part ("Needs a … property"). */}
+              <span className="text-xs text-muted-foreground">
+                {t(VIEW_TYPE_HINT_KEY[value])}
+                {VIEW_TYPE_NEEDS_KEY[value] && <span className="text-muted-foreground"> · {t(VIEW_TYPE_NEEDS_KEY[value])}</span>}
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
 /**
  * A property picker for a grouping dimension: the shared "Group by" /
@@ -1527,10 +1696,20 @@ const GroupByPicker: React.FC<{
   value: string | undefined;
   properties: DatabaseProperty[];
   onChange: (id: string | undefined) => void;
-}> = ({label, value, properties, onChange}) => (
+  /** Optional "+ New select property" sentinel: creates the property and groups by it in one step. */
+  onCreate?: {label: string; run: () => void};
+}> = ({label, value, properties, onChange, onCreate}) => (
   <label className="block">
     <span className={sectionLabel}>{label}</span>
-    <Select unstyled value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)} className={cn(fieldClass, 'mt-1 w-full')}>
+    <Select
+      inputSize="sm"
+      value={value ?? ''}
+      onChange={(e) => {
+        if (onCreate && e.target.value === NEW_PROPERTY_VALUE) onCreate.run();
+        else onChange(e.target.value || undefined);
+      }}
+      className="mt-1 w-full"
+    >
       <option value="">—</option>
       <option value={PARENT_GROUP_ID}>Sub-items (parent)</option>
       {properties.map((p) => (
@@ -1538,39 +1717,202 @@ const GroupByPicker: React.FC<{
           {p.name}
         </option>
       ))}
+      {onCreate && <option value={NEW_PROPERTY_VALUE}>{onCreate.label}</option>}
     </Select>
   </label>
 );
 
-/**
- * The active view's settings: rename, switch layout, configure layout-specific
- * options (board/chart grouping, chart aggregation, calendar date, visible
- * columns), duplicate, and delete.
- */
-export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, view}) => {
-  const properties = db.database!.schema.properties;
-  const groupable = properties; // any property can group
-  const numericProps = properties.filter((p) => p.type === 'number' || p.type === 'formula' || p.type === 'expr');
-  const dateProps = properties.filter((p) => p.type === 'date' || p.type === 'created_time' || p.type === 'last_edited_time');
-  const aggregate: ChartAggregate = view.aggregate ?? {type: 'count'};
-  const visible = view.visiblePropertyIds && view.visiblePropertyIds.length > 0 ? view.visiblePropertyIds : null;
+/** The view layouts whose rows can be grouped (the ViewOptionsMenu "Group by"
+ *  set — calendars group by day and graphs by edges, so they're excluded). */
+export const GROUPABLE_VIEW_TYPES = new Set<DatabaseViewType>(['board', 'bar', 'pie', 'table', 'list', 'gallery', 'map', 'timeline']);
+/** The view layouts with a configurable visible-property set. */
+export const FIELDABLE_VIEW_TYPES = new Set<DatabaseViewType>(['table', 'list', 'gallery', 'board', 'calendar', 'timeline', 'map']);
 
+/**
+ * Toolbar "Group" control: the active view's grouping one popover away — a
+ * peer of Filter/Sort rather than a setting buried in View options. Reuses
+ * {@link GroupByPicker} (including its "+ New select property" sentinel, which
+ * closes the popover once the property is created and wired). Boards get the
+ * swimlane sub-group here too, mirroring the View options.
+ */
+export const GroupMenu: React.FC<{db: UseDatabase; view: DatabaseView; open?: boolean; onOpenChange?: (open: boolean) => void}> = ({
+  db,
+  view,
+  open,
+  onOpenChange,
+}) => {
+  const {t} = useTranslation();
+  const [internalOpen, setInternalOpen] = useState(false);
+  const menuOpen = open ?? internalOpen;
+  const setMenuOpen = (next: boolean): void => {
+    setInternalOpen(next);
+    onOpenChange?.(next);
+  };
+  if (!GROUPABLE_VIEW_TYPES.has(view.type)) return null;
+  const properties = db.database!.schema.properties;
+  const createFor = (field: 'groupByPropertyId' | 'subGroupByPropertyId'): void => {
+    void db.addPropertyForView(view.id, setupPropertyInput('select', properties, t), field).then((id) => {
+      if (id) setMenuOpen(false);
+    });
+  };
+  return (
+    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), view.groupByPropertyId && 'text-foreground')} aria-label="Group">
+                <Layers className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{t('database.toolbar.group')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent align="end" className="w-72 space-y-2.5 p-3">
+        <GroupByPicker
+          label="Group by"
+          value={view.groupByPropertyId}
+          properties={properties}
+          onChange={(id) => void db.updateView(view.id, {groupByPropertyId: id})}
+          onCreate={{label: t('database.setup.newProperty.select'), run: () => createFor('groupByPropertyId')}}
+        />
+        {view.type === 'board' && view.groupByPropertyId && (
+          <GroupByPicker
+            label="Sub-group by"
+            value={view.subGroupByPropertyId}
+            properties={properties.filter((p) => p.id !== view.groupByPropertyId)}
+            onChange={(id) => void db.updateView(view.id, {subGroupByPropertyId: id})}
+            onCreate={{label: t('database.setup.newProperty.select'), run: () => createFor('subGroupByPropertyId')}}
+          />
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/**
+ * Which properties the current view shows — the checklist shared by the View
+ * options panel and the toolbar {@link FieldsMenu}. An unset
+ * `visiblePropertyIds` means "all".
+ */
+export const PropertyVisibilityList: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, view}) => {
+  const properties = db.database!.schema.properties;
+  const visible = view.visiblePropertyIds && view.visiblePropertyIds.length > 0 ? view.visiblePropertyIds : null;
   const isVisible = (id: string): boolean => (visible ? visible.includes(id) : true);
   const toggleVisible = (id: string): void => {
     const shown = properties.filter((p) => (visible ? visible.includes(p.id) : true)).map((p) => p.id);
     const next = shown.includes(id) ? shown.filter((x) => x !== id) : [...shown, id];
     db.updateView(view.id, {visiblePropertyIds: next});
   };
+  return (
+    <div className="max-h-40 space-y-0.5 overflow-y-auto">
+      {properties.map((p) => (
+        <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-hover">
+          <input type="checkbox" checked={isVisible(p.id)} onChange={() => toggleVisible(p.id)} className="h-3.5 w-3.5 accent-primary" />
+          <span className="truncate">{p.name}</span>
+        </label>
+      ))}
+    </div>
+  );
+};
 
-  const showGroup =
-    view.type === 'board' ||
-    view.type === 'bar' ||
-    view.type === 'pie' ||
-    view.type === 'table' ||
-    view.type === 'list' ||
-    view.type === 'gallery' ||
-    view.type === 'map' ||
-    view.type === 'timeline';
+/**
+ * Toolbar "Fields" control: toggle the view's visible properties without a
+ * trip into View options. Lit up once the view has an explicit property set.
+ */
+export const FieldsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = ({db, view}) => {
+  const {t} = useTranslation();
+  if (!FIELDABLE_VIEW_TYPES.has(view.type) || db.database!.schema.properties.length === 0) return null;
+  const customized = Boolean(view.visiblePropertyIds && view.visiblePropertyIds.length > 0);
+  return (
+    <Popover>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}), customized && 'text-foreground')} aria-label="Fields">
+                <Eye className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>{t('database.toolbar.fields')}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <PopoverContent align="end" className="w-64 space-y-1.5 p-3">
+        <div className={sectionLabel}>Properties</div>
+        <PropertyVisibilityList db={db} view={view} />
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+/**
+ * Active-grouping chip: the view's group-by property as a removable pill, so
+ * the otherwise invisible grouping state reads at a glance and is one click to
+ * drop. Mirrors {@link FilterChips}/{@link SortChips}; clearing it also drops
+ * a board's sub-group (swimlanes make no sense without the primary group).
+ */
+export const GroupChips: React.FC<{db: UseDatabase; view: DatabaseView; onEdit: () => void}> = ({db, view, onEdit}) => {
+  const {t} = useTranslation();
+  const properties = db.database!.schema.properties;
+  const id = view.groupByPropertyId;
+  // Mirror GroupMenu's gate: switching a grouped board to a non-groupable
+  // layout (calendar/graph) must not leave a stray, inert grouping chip.
+  if (!id || !GROUPABLE_VIEW_TYPES.has(view.type)) return null;
+  const name =
+    id === PARENT_GROUP_ID ? 'Sub-items' : id === TITLE_PROPERTY_ID ? 'Name' : properties.find((p) => p.id === id)?.name ?? 'Property';
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+      <ChipContextMenu
+        onEdit={onEdit}
+        onRemove={() => void db.updateView(view.id, {groupByPropertyId: undefined, subGroupByPropertyId: undefined})}
+      >
+        <span className="flex items-center gap-1 rounded-full border border-border bg-muted/50 py-0.5 pl-2 pr-1 text-xs text-muted-foreground">
+          <Layers className="h-3 w-3 shrink-0" />
+          <span className="max-w-[12rem] truncate" title={name}>
+            {name}
+          </span>
+          <button
+            onClick={() => void db.updateView(view.id, {groupByPropertyId: undefined, subGroupByPropertyId: undefined})}
+            aria-label={t('database.toolbar.removeGrouping')}
+            className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      </ChipContextMenu>
+    </div>
+  );
+};
+
+/**
+ * The active view's settings: rename, switch layout, configure layout-specific
+ * options (board/chart grouping, chart aggregation, calendar date, visible
+ * columns), duplicate, and delete.
+ */
+export const ViewOptionsMenu: React.FC<{
+  db: UseDatabase;
+  view: DatabaseView;
+}> = ({db, view}) => {
+  const {t} = useTranslation();
+  const [isOpen, setOpen] = useState(false);
+  const properties = db.database!.schema.properties;
+  /** One-click "+ New … property" sentinel action: create the typed property
+   *  and point this view's `field` at it, atomically (see addPropertyForView).
+   *  On success the popover closes to reveal the freshly-configured view (and
+   *  sidesteps Escape being flaky right after the schema-save re-render). */
+  const createFor = (kind: Parameters<typeof setupPropertyInput>[0], field: Parameters<UseDatabase['addPropertyForView']>[2], opts?: {range?: boolean}): void => {
+    void db.addPropertyForView(view.id, setupPropertyInput(kind, properties, t, opts), field).then((id) => {
+      if (id) setOpen(false);
+    });
+  };
+  const groupable = properties; // any property can group
+  const numericProps = properties.filter((p) => p.type === 'number' || p.type === 'formula' || p.type === 'expr');
+  const dateProps = properties.filter((p) => p.type === 'date' || p.type === 'created_time' || p.type === 'last_edited_time');
+  const aggregate: ChartAggregate = view.aggregate ?? {type: 'count'};
+
+  const showGroup = GROUPABLE_VIEW_TYPES.has(view.type);
   // A second grouping dimension: board swimlanes (shown once the primary group is set).
   const showSubGroup = view.type === 'board';
   const showMap = view.type === 'map';
@@ -1591,26 +1933,32 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
     view.type === 'table' ||
     view.type === 'list';
   const colorProps = properties.filter((p) => p.type === 'select' || p.type === 'status');
-  const showColumns =
-    view.type === 'table' ||
-    view.type === 'list' ||
-    view.type === 'gallery' ||
-    view.type === 'board' ||
-    view.type === 'calendar' ||
-    view.type === 'timeline' ||
-    view.type === 'map';
+  const showColumns = FIELDABLE_VIEW_TYPES.has(view.type);
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className={toolButtonClass} aria-label="View options">
-          <Settings2 className="h-3.5 w-3.5" />
-          View
-        </button>
-      </PopoverTrigger>
+    <Popover open={isOpen} onOpenChange={setOpen}>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button className={cn(iconButtonVariants({size: 'sm'}))} aria-label="View options">
+                <Settings2 className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>View options</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       {/* The panel can outgrow short windows (layout grid + grouping + colour
-          rules + metrics) — scroll inside rather than cutting off the tail. */}
-      <PopoverContent align="end" className="max-h-[min(34rem,80vh)] w-72 space-y-2.5 overflow-y-auto p-3">
+          rules + metrics) — scroll inside rather than cutting off the tail.
+          Cap to the collision-measured available height (like the base
+          PopoverContent, which this class would otherwise override away):
+          a plain vh cap ignores the anchor offset, so the panel's tail could
+          land below the viewport with no way to scroll it into reach. */}
+      <PopoverContent
+        align="end"
+        className="max-h-[min(34rem,var(--radix-popover-content-available-height))] w-72 space-y-2.5 overflow-y-auto p-3"
+      >
         <input
           defaultValue={view.name}
           onBlur={(e) => e.target.value.trim() && e.target.value.trim() !== view.name && db.renameView(view.id, e.target.value)}
@@ -1625,9 +1973,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
               <button
                 key={value}
                 onClick={() => db.updateView(view.id, viewTypePatch(value, view, properties))}
+                disabled={value === 'form' && !canDeleteDatabaseView(db.database!.schema.views, view.id)}
                 title={label}
                 className={cn(
-                  'flex flex-col items-center gap-1 rounded border px-1 py-1.5 text-[10px] transition-colors',
+                  'flex flex-col items-center gap-1 rounded border px-1 py-1.5 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-30',
                   view.type === value ? 'border-brand/50 bg-accent text-foreground' : 'border-border text-muted-foreground hover:bg-hover',
                 )}
               >
@@ -1644,6 +1993,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
             value={view.groupByPropertyId}
             properties={groupable}
             onChange={(id) => db.updateView(view.id, {groupByPropertyId: id})}
+            onCreate={{label: t('database.setup.newProperty.select'), run: () => createFor('select', 'groupByPropertyId')}}
           />
         )}
 
@@ -1655,6 +2005,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
             value={view.subGroupByPropertyId}
             properties={groupable.filter((p) => p.id !== view.groupByPropertyId)}
             onChange={(id) => db.updateView(view.id, {subGroupByPropertyId: id})}
+            onCreate={{label: t('database.setup.newProperty.select'), run: () => createFor('select', 'subGroupByPropertyId')}}
           />
         )}
 
@@ -1673,10 +2024,13 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showMap && (
           <label className="block">
             <span className={sectionLabel}>Location property</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.geoPropertyId ?? ''}
-              onChange={(e) => db.updateView(view.id, {geoPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              onChange={(e) => {
+                if (e.target.value === NEW_PROPERTY_VALUE) createFor('location', 'geoPropertyId');
+                else db.updateView(view.id, {geoPropertyId: e.target.value || undefined});
+              }}
+              className="mt-1 w-full"
             >
               <option value="">—</option>
               {locationProps.map((p) => (
@@ -1684,6 +2038,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
                   {p.name}
                 </option>
               ))}
+              <option value={NEW_PROPERTY_VALUE}>{t('database.setup.newProperty.location')}</option>
             </Select>
           </label>
         )}
@@ -1691,10 +2046,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showMap && (
           <label className="block">
             <span className={sectionLabel}>Geocode address (optional)</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.addressPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {addressPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {addressProps.map((p) => (
@@ -1703,7 +2058,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
                 </option>
               ))}
             </Select>
-            <span className="mt-1 block text-[11px] text-muted-foreground/70">
+            <span className="mt-1 block text-xs text-muted-foreground">
               Lets you look up coordinates from an address column on demand (a network call).
             </span>
           </label>
@@ -1725,10 +2080,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
           <div className="flex gap-1">
             <label className="flex-1">
               <span className={sectionLabel}>Measure</span>
-              <Select unstyled
+              <Select inputSize="sm"
                 value={aggregate.type}
                 onChange={(e) => db.updateView(view.id, {aggregate: {...aggregate, type: e.target.value as ChartAggregate['type']}})}
-                className={cn(fieldClass, 'mt-1 w-full')}
+                className="mt-1 w-full"
               >
                 {(['count', 'sum', 'avg', 'min', 'max'] as const).map((t) => (
                   <option key={t} value={t}>
@@ -1740,10 +2095,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
             {aggregate.type !== 'count' && (
               <label className="flex-1">
                 <span className={sectionLabel}>Of</span>
-                <Select unstyled
+                <Select inputSize="sm"
                   value={aggregate.propertyId ?? ''}
                   onChange={(e) => db.updateView(view.id, {aggregate: {...aggregate, propertyId: e.target.value || undefined}})}
-                  className={cn(fieldClass, 'mt-1 w-full')}
+                  className="mt-1 w-full"
                 >
                   <option value="">—</option>
                   {numericProps.map((p) => (
@@ -1760,10 +2115,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showChart && (
           <label className="block">
             <span className={sectionLabel}>Break down by</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.breakdownPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {breakdownPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {view.groupByPropertyId !== PARENT_GROUP_ID && <option value={PARENT_GROUP_ID}>Sub-items (parent)</option>}
@@ -1793,10 +2148,15 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showDate && (
           <label className="block">
             <span className={sectionLabel}>{showTimeline ? 'Start date' : 'Date property'}</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.datePropertyId ?? ''}
-              onChange={(e) => db.updateView(view.id, {datePropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              onChange={(e) => {
+                // A timeline's created date is a start→end range (bars get width
+                // and edge-resize out of the box); a calendar's is a plain day.
+                if (e.target.value === NEW_PROPERTY_VALUE) createFor('date', 'datePropertyId', {range: showTimeline});
+                else db.updateView(view.id, {datePropertyId: e.target.value || undefined});
+              }}
+              className="mt-1 w-full"
             >
               <option value="">—</option>
               {dateProps.map((p) => (
@@ -1804,6 +2164,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
                   {p.name}
                 </option>
               ))}
+              <option value={NEW_PROPERTY_VALUE}>{t('database.setup.newProperty.date')}</option>
             </Select>
           </label>
         )}
@@ -1811,10 +2172,13 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showTimeline && (
           <label className="block">
             <span className={sectionLabel}>End date</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.endDatePropertyId ?? ''}
-              onChange={(e) => db.updateView(view.id, {endDatePropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              onChange={(e) => {
+                if (e.target.value === NEW_PROPERTY_VALUE) createFor('endDate', 'endDatePropertyId');
+                else db.updateView(view.id, {endDatePropertyId: e.target.value || undefined});
+              }}
+              className="mt-1 w-full"
             >
               <option value="">Same as start (or range end)</option>
               {dateProps
@@ -1824,6 +2188,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
                     {p.name}
                   </option>
                 ))}
+              <option value={NEW_PROPERTY_VALUE}>{t('database.setup.newProperty.date')}</option>
             </Select>
           </label>
         )}
@@ -1831,10 +2196,13 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showDependency && (
           <label className="block">
             <span className={sectionLabel}>Dependencies</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.dependencyPropertyId ?? ''}
-              onChange={(e) => db.updateView(view.id, {dependencyPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              onChange={(e) => {
+                if (e.target.value === NEW_PROPERTY_VALUE) createFor('dependency', 'dependencyPropertyId');
+                else db.updateView(view.id, {dependencyPropertyId: e.target.value || undefined});
+              }}
+              className="mt-1 w-full"
             >
               <option value="">—</option>
               {dependencyProps.map((p) => (
@@ -1842,6 +2210,7 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
                   {p.name}
                 </option>
               ))}
+              <option value={NEW_PROPERTY_VALUE}>{t('database.setup.newProperty.dependency')}</option>
             </Select>
           </label>
         )}
@@ -1849,10 +2218,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showCover && (
           <label className="block">
             <span className={sectionLabel}>Card cover</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.coverPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {coverPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {coverProps.map((p) => (
@@ -1867,10 +2236,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showCover && (
           <label className="block">
             <span className={sectionLabel}>Card size</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.cardSize ?? 'medium'}
               onChange={(e) => db.updateView(view.id, {cardSize: e.target.value as 'small' | 'medium' | 'large'})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
               aria-label="Card size"
             >
               <option value="small">Small</option>
@@ -1883,10 +2252,10 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showCardColor && colorProps.length > 0 && (
           <label className="block">
             <span className={sectionLabel}>Color by</span>
-            <Select unstyled
+            <Select inputSize="sm"
               value={view.cardColorPropertyId ?? ''}
               onChange={(e) => db.updateView(view.id, {cardColorPropertyId: e.target.value || undefined})}
-              className={cn(fieldClass, 'mt-1 w-full')}
+              className="mt-1 w-full"
             >
               <option value="">None</option>
               {colorProps.map((p) => (
@@ -1903,53 +2272,34 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
         {showColumns && properties.length > 0 && (
           <div>
             <div className={cn(sectionLabel, 'mb-1')}>Properties</div>
-            <div className="max-h-40 space-y-0.5 overflow-y-auto">
-              {properties.map((p) => (
-                <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-hover">
-                  <input type="checkbox" checked={isVisible(p.id)} onChange={() => toggleVisible(p.id)} className="h-3.5 w-3.5 accent-primary" />
-                  <span className="truncate">{p.name}</span>
-                </label>
-              ))}
-            </div>
+            <PropertyVisibilityList db={db} view={view} />
           </div>
         )}
 
-        <div className="space-y-1.5 border-t border-border pt-2">
-          <button onClick={() => addFirstMetric(db, view)} className={cn(toolButtonClass, 'w-full justify-center')}>
-            <Sigma className="h-3.5 w-3.5" /> Add metric card
-          </button>
-          {((view.sorts?.length ?? 0) > 0 || (view.filters?.length ?? 0) > 0 || (view.filterRoot?.filters.length ?? 0) > 0) && (
-            <button
-              onClick={() => void db.updateView(view.id, {filterRoot: undefined, filters: [], sorts: []})}
-              className={cn(toolButtonClass, 'w-full justify-center')}
-            >
-              <ListFilter className="h-3.5 w-3.5" /> Clear filters & sorts
+        {view.type !== 'form' && (
+          <div className="space-y-1.5 border-t border-border pt-2">
+            <button onClick={() => addFirstMetric(db, view)} className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}>
+              <Sigma className="h-3.5 w-3.5" /> Add metric card
             </button>
-          )}
-        </div>
+            {((view.sorts?.length ?? 0) > 0 || (view.filters?.length ?? 0) > 0 || (view.filterRoot?.filters.length ?? 0) > 0) && (
+              <button
+                onClick={() => void db.updateView(view.id, {filterRoot: undefined, filters: [], sorts: []})}
+                className={cn(menuItemClass, 'text-muted-foreground w-full justify-center')}
+              >
+                <ListFilter className="h-3.5 w-3.5" /> Clear filters & sorts
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-1 border-t border-border pt-2">
-          <button
-            onClick={() =>
-              downloadText(`${safeFilename(view.name, 'database')}.csv`, rowsToCsv(db.visibleRows, properties, properties), 'text/csv')
-            }
-            className={cn(toolButtonClass, 'flex-1 justify-center')}
-          >
-            <Download className="h-3.5 w-3.5" /> Export CSV
-          </button>
-          <button onClick={() => importCsvFile(db.importCsv)} className={cn(toolButtonClass, 'flex-1 justify-center')}>
-            <Upload className="h-3.5 w-3.5" /> Import CSV
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1 border-t border-border pt-2">
-          <button onClick={() => void db.duplicateView(view.id)} className={cn(toolButtonClass, 'flex-1 justify-center')}>
+          <button onClick={() => void db.duplicateView(view.id)} className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center')}>
             Duplicate
           </button>
           <button
             onClick={() => void db.deleteView(view.id)}
-            disabled={db.database!.schema.views.length <= 1}
-            className={cn(toolButtonClass, 'flex-1 justify-center text-destructive hover:text-destructive disabled:opacity-30')}
+            disabled={!canDeleteDatabaseView(db.database!.schema.views, view.id)}
+            className={cn(menuItemClass, 'text-muted-foreground flex-1 justify-center text-destructive hover:text-destructive disabled:opacity-30')}
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>
@@ -1960,11 +2310,27 @@ export const ViewOptionsMenu: React.FC<{db: UseDatabase; view: DatabaseView}> = 
 };
 
 /** Build the patch for switching a view's layout, defaulting layout-specific config. */
-function viewTypePatch(type: DatabaseViewType, view: DatabaseView, properties: DatabaseProperty[]): Partial<DatabaseView> {
+export function viewTypePatch(type: DatabaseViewType, view: DatabaseView, properties: DatabaseProperty[]): Partial<DatabaseView> {
   const patch: Partial<DatabaseView> = {type};
+  if (type === 'form' && view.formConfig === undefined) {
+    patch.visiblePropertyIds = [
+      TITLE_PROPERTY_ID,
+      ...properties
+        .filter((property) =>
+          property.id !== TITLE_PROPERTY_ID
+          && !property.id.startsWith('sys_')
+          && isFormWritablePropertyType(property.type))
+        .map((property) => property.id),
+    ];
+    patch.formFields = {};
+    patch.formConfig = {acceptingResponses: true};
+  }
   if ((type === 'board' || type === 'bar' || type === 'pie') && !view.groupByPropertyId) {
-    const select = properties.find((p) => p.type === 'select');
-    patch.groupByPropertyId = (select ?? properties[0])?.id;
+    // Mirror defaultView: only a categorical property (select/status/relation)
+    // makes a sensible default grouping; otherwise stay ungrouped (one "All"
+    // group) rather than splintering by an arbitrary text/number column.
+    const categorical = properties.find((p) => p.type === 'select' || p.type === 'status' || p.type === 'relation');
+    if (categorical) patch.groupByPropertyId = categorical.id;
   }
   if ((type === 'calendar' || type === 'timeline') && !view.datePropertyId) {
     patch.datePropertyId = properties.find((p) => p.type === 'date' || p.type === 'created_time' || p.type === 'last_edited_time')?.id;

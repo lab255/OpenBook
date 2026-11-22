@@ -1,0 +1,52 @@
+
+ RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_yr3pisy978-1/OpenBook/packages/ui
+
+ ❯ src/blockeditor/registryCatalogue.test.tsx (8 tests | 1 failed) 10ms
+     × the runtime registry and the catalogue kit entries match exactly 3ms
+ ❯ src/blockeditor/canvas/CanvasBlock.test.tsx (44 tests | 1 failed) 775ms
+   × full-page integration: native property Delete does not delete a previously selected canvas block 19ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/blockeditor/registryCatalogue.test.tsx > registry ↔ catalogue drift guard > the runtime registry and the catalogue kit entries match exactly
+AssertionError: expected [ 'canvas' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "canvas",
++ ]
+
+ ❯ src/blockeditor/registryCatalogue.test.tsx:47:63
+     45|     // Registered but not catalogued → the agent/MCP would REJECT a bl…
+     46|     // editor renders fine (the exact coverage bug API-2 fixes).
+     47|     expect([...registered].filter((t) => !catalogued.has(t))).toEqual(…
+       |                                                               ^
+     48|     // Catalogued but never registered → the agent/MCP would ACCEPT a …
+     49|     // editor renders as an "Unsupported block" placeholder.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/blockeditor/canvas/CanvasBlock.test.tsx > full-page integration: native property Delete does not delete a previously selected canvas block
+AssertionError: expected null not to be null
+ ❯ src/blockeditor/canvas/CanvasBlock.test.tsx:206:41
+    204|     const region=screen.getByRole('region',{name:/Canvas, 0 objects/})…
+    205|     const field=screen.getByLabelText('Canvas height');act(()=>field.f…
+    206|     expect(findBlock(doc,'canvas')).not.toBeNull();
+       |                                         ^
+    207|   } finally {cleanup();unregisterBlock();}
+    208| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  2 failed | 54 passed (56)
+   Start at  11:00:59
+   Duration  1.93s (transform 1.79s, setup 0ms, import 3.03s, tests 845ms, environment 317ms)
+
+undefined
+/Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_yr3pisy978-1/OpenBook/packages/ui:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/blockeditor/registryCatalogue.test.tsx src/blockeditor/__tests__/SlashMenu.test.tsx src/blockeditor/canvas/CanvasBlock.test.tsx

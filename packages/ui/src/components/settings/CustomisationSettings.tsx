@@ -1,7 +1,8 @@
-import {useHud, useTranslation} from '@/providers';
+import {useTranslation} from '@/providers';
 import type {TKey} from '@/i18n';
-import {SettingsScreen, SettingsSection, SettingsToggle} from '@/components/settings/primitives';
+import {SettingsScreen, SettingsSection} from '@/components/settings/primitives';
 import {formatShortcut, isMacPlatform, SHORTCUTS, type ShortcutCombo} from '@/lib/shortcuts';
+import {SETTINGS_SECTION_CUST_BLOCKS, SETTINGS_SECTION_CUST_SHORTCUTS} from '@/lib/settingsIndex';
 
 /** A keystroke rendered as a <kbd> chip. */
 function Keys({label}: {label: string}) {
@@ -12,10 +13,12 @@ function Keys({label}: {label: string}) {
   );
 }
 
-/** Layout toggles (backed by the live HUD) + a reference list of shortcuts. */
+/** A read-only reference of the app's keyboard shortcuts (SET2-7). The lone
+ *  layout toggle that used to live here (auto-hide sidebar) moved to Appearance,
+ *  so this tab is now shortcuts-only and its rail label reads "Shortcuts" — no
+ *  longer colliding with the per-page Customise pane. */
 export default function CustomisationSettings() {
   const {t} = useTranslation();
-  const {hud, setHud} = useHud();
 
   // The settings panel is client-only (a modal), so reading the platform
   // directly is safe — no SSR render to mismatch.
@@ -36,16 +39,16 @@ export default function CustomisationSettings() {
     {key: 'customisation.shortcut.closeOverlay', label: 'Esc'},
   ];
 
-  // Block-editor keys (they act on the selected block, so they live in the
-  // editor's key handler, not SHORTCUTS — listed here so the reference is
-  // complete rather than global-shortcuts-only).
+  // Block-editor keys act on the selected block in the editor's key handler;
+  // their display combos still come from SHORTCUTS so this reference and the
+  // block menu stay aligned.
   const blockShortcuts: Array<{key: TKey; label: string}> = [
-    {key: 'customisation.shortcut.duplicateBlock', label: fmt({key: 'd', mod: true})},
+    {key: 'customisation.shortcut.duplicateBlock', label: fmt(SHORTCUTS.duplicateBlock)},
     {
       key: 'customisation.shortcut.moveBlock',
-      label: `${fmt({key: 'arrowup', mod: true, shift: true})} / ${fmt({key: 'arrowdown', mod: true, shift: true})}`,
+      label: `${fmt(SHORTCUTS.moveBlockUp)} / ${fmt(SHORTCUTS.moveBlockDown)}`,
     },
-    {key: 'customisation.shortcut.deleteBlock', label: fmt({key: 'backspace'})},
+    {key: 'customisation.shortcut.deleteBlock', label: fmt(SHORTCUTS.deleteBlock)},
     {
       key: 'customisation.shortcut.extendSelection',
       label: `${fmt({key: 'arrowup', shift: true})} / ${fmt({key: 'arrowdown', shift: true})}`,
@@ -58,26 +61,12 @@ export default function CustomisationSettings() {
   ];
 
   return (
-    <SettingsScreen title={t('customisation.title')} description={t('customisation.description')}>
-      <SettingsSection title={t('customisation.layout')}>
-        {/* Full width is now a per-page choice (page "…" menu / ⌘. / the page's
-            customise pane), so it's no longer a global switch here. */}
-        <SettingsToggle
-          label={t('customisation.autoHideSidebar')}
-          hint={t('customisation.autoHideSidebarHint')}
-          // The sidebar auto-hides when it's *not* docked.
-          checked={!hud.sideNav.docked}
-          onCheckedChange={(v) =>
-            setHud((draft) => {
-              draft.sideNav.docked = !v;
-              if (!draft.sideNav.docked) draft.sideNav.open = false;
-              return draft;
-            })
-          }
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t('customisation.shortcuts')} description={t('customisation.shortcutsHint')}>
+    <SettingsScreen title={t('customisation.title')} description={t('customisation.description')} scope="device">
+      <SettingsSection
+        id={SETTINGS_SECTION_CUST_SHORTCUTS}
+        title={t('customisation.shortcuts')}
+        description={t('customisation.shortcutsHint')}
+      >
         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
           {shortcuts.map((s) => (
             <li key={s.key} className="flex items-center justify-between px-3.5 py-2.5 text-sm">
@@ -88,7 +77,11 @@ export default function CustomisationSettings() {
         </ul>
       </SettingsSection>
 
-      <SettingsSection title={t('customisation.blockShortcuts')} description={t('customisation.blockShortcutsHint')}>
+      <SettingsSection
+        id={SETTINGS_SECTION_CUST_BLOCKS}
+        title={t('customisation.blockShortcuts')}
+        description={t('customisation.blockShortcutsHint')}
+      >
         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
           {blockShortcuts.map((s) => (
             <li key={s.key} className="flex items-center justify-between px-3.5 py-2.5 text-sm">

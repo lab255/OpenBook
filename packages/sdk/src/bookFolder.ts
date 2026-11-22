@@ -2,11 +2,12 @@ import type {StoredPage, PageSnapshot} from './types';
 import type {StoredDatabase} from './database';
 import {pageToBookHtml, bookHtmlToPage, slugify, BOOK_RUNTIME_FILE} from './bookfile';
 import {islandScript, readIsland} from './island';
+import type {LedgerExportSection} from './ledgerExportSection';
 
 /**
  * Whole-space → folder-of-files serialisation, shared by every "dump my books
  * to a folder" surface: the desktop's native folder export and the web app's
- * File System Access export both call {@link spaceToBookFiles}, and the layout
+ * File System Access export both call {@link libraryToBookFiles}, and the layout
  * is byte-compatible with the server's on-disk {@link BookMirror} (OB-134) so a
  * folder written by one can be re-imported by the other.
  *
@@ -24,47 +25,145 @@ export interface BookFolderFile {
   contents: string;
 }
 
-/** Everything in a space, as returned by `DataClient.exportSpace`. */
-export interface SpaceSnapshot {
+/** Everything in a space, as returned by `DataClient.exportLibrary`. */
+export interface LibrarySnapshot {
   pages: StoredPage[];
   databases: StoredDatabase[];
 }
 
-/** Lossless structured sidecar, parsed back by {@link parseBookFolder}. */
-export const SPACE_BUNDLE_FILE = 'openbook.space.json';
+/**
+ * Lossless structured sidecar filename that NEW exports write, parsed back by
+ * {@link parseBookFolder}. Renamed from the legacy `openbook.space.json`
+ * (LIB-4): the writer emits only this, while the reader also accepts
+ * {@link LEGACY_SPACE_BUNDLE_FILE} so folders exported before the rename still
+ * re-import losslessly.
+ */
+export const SPACE_BUNDLE_FILE = 'openbook.library.json';
+
+/**
+ * The pre-LIB-4 sidecar filename. READ-ONLY back-compat: {@link parseBookFolder}
+ * falls back to it so already-exported book folders keep importing. The writer
+ * never emits it.
+ */
+export const LEGACY_SPACE_BUNDLE_FILE = 'openbook.space.json';
 
 /**
  * The whole-space **source-island** payload embedded in a standalone *site* HTML
- * export: the full {@link SpaceSnapshot} (pages + databases + nesting via each
+ * export: the full {@link LibrarySnapshot} (pages + databases + nesting via each
  * page's `parentId`/`databaseId`) plus the root id shown first. Same structure as
  * {@link SPACE_BUNDLE_FILE}, so a site export re-imports with structure intact.
  */
-export interface SpaceIsland {
+export interface LibraryIsland {
   version: 1;
   rootId: string;
-  space: SpaceSnapshot;
+  space: LibrarySnapshot;
+  /** LX-2: the embedded ledger records, when the export opted in (see
+   *  {@link LedgerExportSection} for the shape + authorization contract). */
+  ledger?: LedgerExportSection;
 }
 
-/** Wrap a whole-space bundle as its source-island `<script>` (versioned, escaped). */
-export function spaceIslandScript(
+/**
+ * The serialized island wire shape. NEW exports carry the bundle under the
+ * `library` key (LIB-4); `space` is the legacy key {@link readLibraryIsland}
+ * still reads so already-published `.book.html` / site bundles round-trip.
+ */
+interface LibraryIslandWire {
+  version?: number;
+  rootId?: string;
+  /** Current key (LIB-4+). */
+  library?: Partial<LibrarySnapshot>;
+  /** @deprecated legacy key (pre-LIB-4). Read-only fallback — never written. */
+  space?: Partial<LibrarySnapshot>;
+  /** LX-2: ledger records (additive — absent on older exports and whenever the
+   *  exporter opted out or could not read the books). */
+  ledger?: LedgerExportSection;
+}
+
+/** Wrap a whole-space bundle as its source-island `<script>` (versioned, escaped).
+ *  `opts.ledger` additionally embeds the LX-2 ledger records — pass it ONLY with
+ *  a section captured through the exporting principal's own read paths
+ *  ({@link gatherLedgerExportSection}). */
+export function libraryIslandScript(
   rootId: string,
-  space: SpaceSnapshot,
-  opts: {attrs?: string; indent?: string} = {},
+  space: LibrarySnapshot,
+  opts: {attrs?: string; indent?: string; ledger?: LedgerExportSection} = {},
 ): string {
-  return islandScript({version: 1, rootId, space}, opts);
+  // Writer emits ONLY the new `library` key; the reader dual-reads for back-compat.
+  return islandScript({version: 1, rootId, library: space, ...(opts.ledger ? {ledger: opts.ledger} : {})}, opts);
 }
 
-/** Read a site export's space island back, or `null` when absent/corrupt. */
-export function readSpaceIsland(html: string): SpaceIsland | null {
-  const parsed = readIsland<Partial<SpaceIsland>>(html);
-  if (!parsed || !parsed.space || !Array.isArray(parsed.space.pages)) return null;
+/** Keys that must never survive a parse of untrusted island JSON: an own
+ *  `__proto__`/`constructor`/`prototype` data property (JSON.parse creates them
+ *  as plain own properties) becomes a prototype-pollution gadget the moment a
+ *  consumer deep-merges or `Object.assign`s the settings into a live object. */
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Deep-copy a JSON value, dropping every {@link UNSAFE_KEYS} property. */
+function stripUnsafeKeys<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((v) => stripUnsafeKeys(v)) as unknown as T;
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value)) {
+      if (UNSAFE_KEYS.has(key)) continue;
+      out[key] = stripUnsafeKeys((value as Record<string, unknown>)[key]);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * Deep-validate the LX-2 `ledger` island key (the parse boundary LX-4's import
+ * inherits — island text is UNTRUSTED input): `settings` a plain object (with
+ * `__proto__`/`constructor`/`prototype` keys stripped, recursively), `library`
+ * a real {@link LibrarySnapshot} (pages[] of records with a string `id`,
+ * databases[] of records with string `id` + `pageId`), and `auditHead` either
+ * `null` or `{seq: number, hash: string}`. Any mismatch drops the whole key
+ * (returns `null`) — never a throw, and never a section import code can't trust.
+ */
+function readLedgerSection(raw: unknown): LedgerExportSection | null {
+  if (!isPlainObject(raw)) return null;
+  const {settings, library, auditHead} = raw as Partial<LedgerExportSection>;
+  if (!isPlainObject(settings)) return null;
+  if (!isPlainObject(library) || !Array.isArray(library.pages) || !Array.isArray(library.databases)) return null;
+  if (!library.pages.every((p: unknown) => isPlainObject(p) && typeof p.id === 'string')) return null;
+  if (!library.databases.every((d: unknown) => isPlainObject(d) && typeof d.id === 'string' && typeof d.pageId === 'string')) return null;
+  let head: LedgerExportSection['auditHead'] = null;
+  if (auditHead !== null && auditHead !== undefined) {
+    if (!isPlainObject(auditHead) || typeof auditHead.seq !== 'number' || !Number.isFinite(auditHead.seq) || typeof auditHead.hash !== 'string') return null;
+    head = {seq: auditHead.seq, hash: auditHead.hash};
+  }
+  return {
+    settings: stripUnsafeKeys(settings),
+    library: {pages: library.pages, databases: library.databases},
+    auditHead: head,
+  };
+}
+
+/**
+ * Read a site export's space island back, or `null` when absent/corrupt.
+ * Dual-read: prefer the new `library` key, fall back to the legacy `space` key
+ * so bundles published before LIB-4 still import.
+ */
+export function readLibraryIsland(html: string): LibraryIsland | null {
+  const parsed = readIsland<LibraryIslandWire>(html);
+  const bundle = parsed?.library ?? parsed?.space;
+  if (!bundle || !Array.isArray(bundle.pages)) return null;
+  // Deep-validate the LX-2 ledger key (island text is untrusted input): carry
+  // it only when it IS a real section, so import code can trust the type — a
+  // malformed/hostile key is dropped, never thrown on (see readLedgerSection).
+  const ledger = readLedgerSection(parsed?.ledger);
   return {
     version: 1,
-    rootId: parsed.rootId ?? '',
+    rootId: parsed?.rootId ?? '',
     space: {
-      pages: parsed.space.pages,
-      databases: Array.isArray(parsed.space.databases) ? parsed.space.databases : [],
+      pages: bundle.pages,
+      databases: Array.isArray(bundle.databases) ? bundle.databases : [],
     },
+    ...(ledger ? {ledger} : {}),
   };
 }
 
@@ -96,8 +195,8 @@ function rootOf(
   return root;
 }
 
-/** Options for {@link spaceToBookFiles}. */
-export interface SpaceToBookFilesOptions {
+/** Options for {@link libraryToBookFiles}. */
+export interface LibraryToBookFilesOptions {
   /** Include the lossless {@link SPACE_BUNDLE_FILE} sidecar. Default true. */
   includeBundle?: boolean;
   /**
@@ -116,9 +215,9 @@ export interface SpaceToBookFilesOptions {
  * Serialise a space to its on-disk files. By default includes the lossless
  * {@link SPACE_BUNDLE_FILE}; pass `includeBundle: false` for the human-readable
  * HTML files only. Pass `runtime` (the viewer bundle source) to make the folder
- * self-hydrating — see {@link SpaceToBookFilesOptions.runtime}.
+ * self-hydrating — see {@link LibraryToBookFilesOptions.runtime}.
  */
-export function spaceToBookFiles(snapshot: SpaceSnapshot, opts: SpaceToBookFilesOptions = {}): BookFolderFile[] {
+export function libraryToBookFiles(snapshot: LibrarySnapshot, opts: LibraryToBookFilesOptions = {}): BookFolderFile[] {
   const {pages, databases} = snapshot;
   const byId = new Map(pages.map((p) => [p.id, p]));
   const dbHost = new Map(databases.map((d) => [d.id, d.pageId]));
@@ -147,18 +246,26 @@ export function spaceToBookFiles(snapshot: SpaceSnapshot, opts: SpaceToBookFiles
   return files;
 }
 
+/** Match a sidecar file by basename — the new name first, then the legacy one. */
+const isSpaceBundleFile = (path: string): boolean =>
+  path === SPACE_BUNDLE_FILE ||
+  path.endsWith(`/${SPACE_BUNDLE_FILE}`) ||
+  path === LEGACY_SPACE_BUNDLE_FILE ||
+  path.endsWith(`/${LEGACY_SPACE_BUNDLE_FILE}`);
+
 /**
- * Reconstruct a space from a folder's files. Prefers the lossless
- * {@link SPACE_BUNDLE_FILE} when present; otherwise falls back to parsing the
- * `.html` files into a flat list of pages (no databases, no nesting — the most
- * a human-readable folder can recover). Returns `null` if nothing parseable was
- * found, so the caller can surface "not an OpenBook folder".
+ * Reconstruct a space from a folder's files. Prefers the lossless structured
+ * sidecar ({@link SPACE_BUNDLE_FILE}, or the legacy {@link LEGACY_SPACE_BUNDLE_FILE}
+ * for folders exported before LIB-4) when present; otherwise falls back to
+ * parsing the `.html` files into a flat list of pages (no databases, no nesting
+ * — the most a human-readable folder can recover). Returns `null` if nothing
+ * parseable was found, so the caller can surface "not an OpenBook folder".
  */
-export function parseBookFolder(files: BookFolderFile[]): SpaceSnapshot | null {
-  const bundle = files.find((f) => f.path === SPACE_BUNDLE_FILE || f.path.endsWith(`/${SPACE_BUNDLE_FILE}`));
+export function parseBookFolder(files: BookFolderFile[]): LibrarySnapshot | null {
+  const bundle = files.find((f) => isSpaceBundleFile(f.path));
   if (bundle) {
     try {
-      const parsed = JSON.parse(bundle.contents) as Partial<SpaceSnapshot>;
+      const parsed = JSON.parse(bundle.contents) as Partial<LibrarySnapshot>;
       if (Array.isArray(parsed.pages)) {
         return {pages: parsed.pages, databases: Array.isArray(parsed.databases) ? parsed.databases : []};
       }

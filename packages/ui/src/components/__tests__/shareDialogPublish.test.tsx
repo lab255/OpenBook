@@ -1,0 +1,393 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
+import {describe, it, expect, afterEach, beforeEach, vi} from 'vitest';
+import {render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
+import type {DataClient, InstanceInfo, PageVisibility, PageVisibilityUpdate, SiteVisibility} from '@book.dev/sdk';
+import {guestPrincipal} from '@book.dev/sdk';
+import ShareDialog from '../ShareDialog';
+import {DataProvider} from '@/data/DataProvider';
+import {I18nProvider} from '@/providers';
+import {closeKitPanel, getKitPanel} from '@/blockeditor/kit/kitPanel';
+
+// Drive the published address + its audience scope per-test (GATE-6): the Publish
+// affordance and the "Published" indicator only make sense while the library is
+// actually reachable at a *.book.cloud address.
+let mockHost: string | null = null;
+let mockSiteVisibility: SiteVisibility | null = null;
+const setSiteVisibility = vi.fn(async () => undefined);
+vi.mock('@/providers', async (orig) => {
+  const actual = await orig<typeof import('@/providers')>();
+  return {
+    ...actual,
+    useForwarding: () =>
+      ({
+        ...actual.useForwarding(),
+        supported: true,
+        publishedHost: mockHost,
+        siteVisibility: mockSiteVisibility,
+        siteVisibilityBusy: false,
+        setSiteVisibility,
+      }) as ReturnType<typeof actual.useForwarding>,
+  };
+});
+
+const info = (over: Partial<InstanceInfo> = {}): InstanceInfo => ({
+  guestAccess: 'write',
+  ownerSubject: null,
+  trustedIssuers: [],
+  audience: null,
+  you: guestPrincipal('Rae'),
+  ...over,
+});
+
+type VisibilityFixture = PageVisibility | {visibility: PageVisibility; listed: boolean};
+
+const wrap = (fixture: VisibilityFixture, over: Partial<DataClient> = {}, instance: Partial<InstanceInfo> = {}) => {
+  const initial = typeof fixture === 'string' ? {visibility: fixture, listed: true} : fixture;
+  return render(
+    <I18nProvider>
+      <DataProvider
+        client={
+          {
+            getPage: async () => null,
+            getPageVisibility: async () => initial,
+            listPageAcl: async () => [],
+            getInstanceInfo: async () => info(instance),
+            setPageVisibility: vi.fn(async (_id: string, update: PageVisibilityUpdate) => ({
+              visibility: update.visibility ?? initial.visibility,
+              listed: update.listed ?? initial.listed,
+            })),
+            ...over,
+          } as unknown as DataClient
+        }
+      >
+        <ShareDialog pageId="p1" />
+      </DataProvider>
+    </I18nProvider>,
+  );
+};
+
+const open = () => fireEvent.click(screen.getByLabelText('Share'));
+
+const formPage = (over: {
+  enabled?: boolean;
+  submissionKey?: string;
+  databaseId?: string | null;
+  fields?: Array<Record<string, unknown>>;
+} = {}) => {
+  const databaseId = over.databaseId === undefined ? 'responses-db' : over.databaseId;
+  const fields = over.fields ?? [{id: 'name', kind: 'text', columnId: 'name-column'}];
+  return {
+    id: 'p1',
+    data: {
+      editorjs: {blocks: []},
+      values: [],
+      names: [],
+      blockdoc: {
+        blocks: [{
+          id: 'form-block',
+          type: 'form',
+          props: {
+            enabled: over.enabled ?? true,
+            submissionKey: over.submissionKey ?? 'private-capability-never-rendered',
+            ...(databaseId ? {databaseId} : {}),
+            schema: {
+              ...(databaseId ? {databaseId} : {}),
+              fields,
+            },
+          },
+        }],
+      },
+    },
+  } as unknown as NonNullable<Awaited<ReturnType<DataClient['getPage']>>>;
+};
+
+beforeEach(() => {
+  mockHost = 'rae.book.cloud';
+  mockSiteVisibility = 'published';
+  setSiteVisibility.mockClear();
+});
+afterEach(() => {
+  cleanup();
+  closeKitPanel({keepPane: true});
+});
+
+describe('ShareDialog — page discovery (UP-3)', () => {
+  it('focuses the first real control without opening an info tip', async () => {
+    wrap('inherit');
+    open();
+
+    const toggle = await screen.findByRole('switch', {name: 'Hide from navigation and search'});
+    await waitFor(() => expect(document.activeElement).toBe(toggle));
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(document.activeElement?.getAttribute('aria-label')).not.toBe('More info');
+  });
+
+  it('portals tooltip content outside the dialog', async () => {
+    wrap('inherit');
+    open();
+
+    const toggle = await screen.findByRole('switch', {name: 'Hide from navigation and search'});
+    const tip = toggle.parentElement?.querySelector<HTMLButtonElement>('button[aria-label="More info"]');
+    fireEvent.focus(tip!);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip.closest('[role="dialog"]')).toBeNull();
+  });
+
+  it('uses the compact w-44 scope select width', async () => {
+    wrap('inherit');
+    open();
+
+    const select = await screen.findByRole('combobox', {name: 'Who can access'});
+    expect(select.parentElement?.className).toContain('w-44');
+  });
+
+  it('keeps the inherit trigger compact and exposes the resolved claimed default in its title and option description', async () => {
+    wrap('inherit', {}, {ownerSubject: 'acct#rae', defaultVisibility: 'members'});
+    open();
+
+    const select = await screen.findByRole('combobox', {name: 'Who can access'});
+    await waitFor(() => {
+      expect(select.textContent).toBe('Library default');
+      expect(select.getAttribute('title')).toBe('Library default (library members)');
+    });
+    fireEvent.click(select);
+    const inheritOption = await screen.findByRole('option', {name: /Library default/});
+    expect(inheritOption.textContent).toContain('library members');
+  });
+
+  it.each([
+    ['inherit', false],
+    ['public', false],
+    ['authenticated', false],
+    ['members', false],
+    ['restricted', true],
+  ] as const)('renders the hidden-page toggle for %s scope (disabled: %s)', async (visibility, disabled) => {
+    wrap(visibility);
+    open();
+
+    const toggle = await screen.findByRole('switch', {name: 'Hide from navigation and search'});
+    await waitFor(() => expect(toggle.hasAttribute('disabled')).toBe(disabled));
+  });
+
+  it('keeps the restricted explanation at full muted-text contrast while only the control is disabled', async () => {
+    wrap('restricted');
+    open();
+
+    const toggle = await screen.findByRole('switch', {name: 'Hide from navigation and search'});
+    const hint = toggle.parentElement?.querySelector<HTMLButtonElement>('button[aria-label="More info"]');
+    expect(hint?.closest('div')?.className).not.toContain('opacity');
+    expect(screen.getByRole('switch', {name: 'Hide from navigation and search'}).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('explains that an inherited page keeps library access while discovery applies only to the page', async () => {
+    wrap('inherit');
+    open();
+
+    const toggle = await screen.findByRole('switch', {name: 'Hide from navigation and search'});
+    const tip = toggle.parentElement?.querySelector<HTMLButtonElement>('button[aria-label="More info"]');
+    fireEvent.focus(tip!);
+    expect((await screen.findByRole('tooltip')).textContent).toContain('Applies only to this page; access still follows the library default.');
+  });
+
+  it('persists a hidden flip through the SDK client and rehydrates it on reopen', async () => {
+    let settings: {visibility: PageVisibility; listed: boolean} = {visibility: 'public', listed: true};
+    const setPageVisibility = vi.fn(async (_id: string, update: PageVisibilityUpdate) => {
+      settings = {
+        visibility: update.visibility ?? settings.visibility,
+        listed: update.listed ?? settings.listed,
+      };
+      return settings;
+    });
+    const client = {
+      getPageVisibility: vi.fn(async () => settings),
+      setPageVisibility,
+    };
+
+    wrap(settings, client);
+    open();
+    const toggle = await screen.findByRole('switch', {name: 'Hide from navigation and search'});
+    await waitFor(() => expect(toggle.hasAttribute('disabled')).toBe(false));
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(setPageVisibility).toHaveBeenCalledWith('p1', {listed: false}));
+    expect(toggle.getAttribute('data-state')).toBe('checked');
+    const tip = screen.getAllByRole('button', {name: 'More info'})[0];
+    fireEvent.focus(tip);
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/Keep this page out of navigation and search/);
+
+    cleanup();
+    wrap(settings, client);
+    open();
+    expect((await screen.findByRole('switch', {name: 'Hide from navigation and search'})).getAttribute('data-state'))
+      .toBe('checked');
+  });
+
+  it('renders a listing-save error outside the switch label so clicking it does not retry the toggle', async () => {
+    const setPageVisibility = vi.fn(async () => {
+      throw new Error('failed to fetch');
+    });
+    wrap('public', {setPageVisibility});
+    open();
+
+    fireEvent.click(await screen.findByRole('switch', {name: 'Hide from navigation and search'}));
+    const error = await screen.findByRole('alert');
+    expect(error.closest('label')).toBeNull();
+    fireEvent.click(error);
+    expect(setPageVisibility).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ShareDialog — per-page Publish affordance (GATE-6)', () => {
+  it('shows a "Published" indicator with the address when the page is public on a serving address', async () => {
+    wrap('public');
+    open();
+    const published = await screen.findByText('Published at');
+    expect(published.parentElement?.textContent).toContain('rae.book.cloud');
+  });
+
+  it('lets the published address break mid-token so it cannot overflow the panel', async () => {
+    mockHost = 'a-very-long-library-slug-for-overflow.book.cloud';
+    wrap('public');
+    open();
+    const published = await screen.findByText('Published at');
+    const host = published.parentElement?.querySelector('a');
+    expect(host?.className).toContain('truncate');
+    expect(host?.textContent).toBe(mockHost);
+  });
+
+  it('lets the unpublished address hint break mid-token so it cannot overflow the panel', async () => {
+    mockHost = 'a-very-long-library-slug-for-overflow.book.cloud';
+    wrap('restricted');
+    open();
+    expect(await screen.findByText('Not published')).toBeTruthy();
+  });
+
+  it('offers a one-click "Publish page" that sets the page public when it is not yet', async () => {
+    const setPageVisibility = vi.fn(async (_id: string, update: PageVisibilityUpdate) => ({
+      visibility: update.visibility ?? 'restricted',
+      listed: update.listed ?? true,
+    }));
+    wrap('restricted', {setPageVisibility});
+    open();
+    const btn = await screen.findByRole('button', {name: 'Publish page'});
+    fireEvent.click(btn);
+    await waitFor(() => expect(setPageVisibility).toHaveBeenCalledWith('p1', {visibility: 'public'}));
+  });
+
+  it('does not claim "Published" when the address does not serve public pages — it prompts the address fix instead', async () => {
+    mockSiteVisibility = 'restricted';
+    wrap('public');
+    open();
+    // The reworked honesty warning offers the recommended address fix…
+    expect(await screen.findByRole('button', {name: 'Serve published pages'})).toBeTruthy();
+    // …and the page is NOT advertised as live.
+    expect(screen.queryByText('Published at')).toBeNull();
+  });
+
+  it('clicking the address fix turns on published-pages (not full public)', async () => {
+    mockSiteVisibility = 'restricted';
+    wrap('public');
+    open();
+    fireEvent.click(await screen.findByRole('button', {name: 'Serve published pages'}));
+    await waitFor(() => expect(setSiteVisibility).toHaveBeenCalledWith('published'));
+  });
+
+  it('does NOT claim "Published" when the guest gate is off — it shows the guest-off caveat instead', async () => {
+    // Public page + serving address, but signed-out reads are denied by the guest
+    // gate: the page isn't actually reachable, so the live indicator must not show.
+    wrap('public', {}, {guestAccess: 'off'});
+    open();
+    // The guest-off caveat explains why the page isn't reachable. It appears in the
+    // Publish row (this fix) alongside the SiteVisibilityControl's own copy of the
+    // same caveat, so there is at least one — assert on all matches.
+    expect((await screen.findAllByText(/guest access is off/i)).length).toBeGreaterThanOrEqual(1);
+    // …and the page is NOT advertised as live.
+    expect(screen.queryByText('Published at')).toBeNull();
+  });
+
+  it('shows "Published" when the guest gate admits signed-out reads (read)', async () => {
+    wrap('public', {}, {guestAccess: 'read'});
+    open();
+    const published = await screen.findByText('Published at');
+    expect(published.parentElement?.textContent).toContain('rae.book.cloud');
+    expect(screen.queryByText(/Guest access is off/)).toBeNull();
+  });
+
+  it('shows "Published" when the guest gate admits signed-out reads (write)', async () => {
+    wrap('public', {}, {guestAccess: 'write'});
+    open();
+    expect(await screen.findByText('Published at')).toBeTruthy();
+    expect(screen.queryByText(/Guest access is off/)).toBeNull();
+  });
+});
+
+describe('ShareDialog — enabled form reachability (FORM-8)', () => {
+  it('surfaces an enabled form and its effective public address without exposing the key', async () => {
+    wrap('public', {getPage: async () => formPage()});
+    open();
+
+    await screen.findByText('This page accepts public submissions');
+    const tip = screen.getByText('This page accepts public submissions').closest('[data-form-public-submissions]')?.querySelector('button[aria-label="More info"]');
+    fireEvent.focus(tip!);
+    expect((await screen.findByRole('tooltip')).textContent).toContain('Signed-out visitors can submit at rae.book.cloud.');
+    expect(screen.getByRole('button', {name: 'Form settings'})).toBeTruthy();
+    expect(document.body.textContent).not.toContain('private-capability-never-rendered');
+  });
+
+  it('opens the enabled form block settings from the disclosure', async () => {
+    wrap('public', {getPage: async () => formPage()});
+    open();
+
+    fireEvent.click(await screen.findByRole('button', {name: 'Form settings'}));
+    await waitFor(() => expect(getKitPanel()).toEqual({blockId: 'form-block', title: 'Form'}));
+  });
+
+  it('reports when page access prevents signed-out visitors from reaching an enabled form', async () => {
+    wrap('restricted', {getPage: async () => formPage()});
+    open();
+
+    expect(await screen.findByText('This page accepts public submissions')).toBeTruthy();
+    const tip = screen.getByText('This page accepts public submissions').closest('[data-form-public-submissions]')?.querySelector('button[aria-label="More info"]');
+    fireEvent.focus(tip!);
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/signed-out visitors cannot reach it until this page is public/i);
+  });
+
+  it('mirrors the guest-off 404 caveat at an otherwise public form address', async () => {
+    wrap('public', {getPage: async () => formPage()}, {guestAccess: 'off'});
+    open();
+
+    expect(await screen.findByText('This page accepts public submissions')).toBeTruthy();
+    expect(screen.getAllByText('Blocked')).toHaveLength(1);
+    const tips = screen.getByText('This page accepts public submissions').closest('[data-form-public-submissions]')?.querySelectorAll('button[aria-label="More info"]');
+    fireEvent.focus(tips![1]);
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/signed-out visitors get a "page not found" \(404\) error even at this public address/i);
+    expect(screen.getAllByRole('button', {name: 'Manage guest access'}).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it.each([
+    ['no database', {databaseId: null}],
+    ['no bound field', {fields: [{id: 'name', kind: 'text'}]}],
+  ])('shows an amber not-ready state, not an affirmative signal, with %s', async (_name, over) => {
+    wrap('public', {getPage: async () => formPage(over)});
+    open();
+
+    const message = await screen.findByText('This form isn\'t ready — bind a database to accept responses');
+    expect(message.closest('[data-form-not-ready]')?.className).toContain(STATUS_INK_CLASS.warn);
+    expect(screen.queryByText('This page accepts public submissions')).toBeNull();
+    expect(screen.queryByText(/Signed-out visitors can submit at/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', {name: 'Form settings'}));
+    await waitFor(() => expect(getKitPanel()).toEqual({blockId: 'form-block', title: 'Form'}));
+  });
+
+  it.each([
+    ['disabled', {enabled: false}],
+    ['keyless', {submissionKey: ''}],
+  ])('does not surface a %s form', async (_name, over) => {
+    wrap('public', {getPage: async () => formPage(over)});
+    open();
+
+    expect(await screen.findByText('Published at')).toBeTruthy();
+    expect(screen.queryByText('This page accepts public submissions')).toBeNull();
+  });
+});

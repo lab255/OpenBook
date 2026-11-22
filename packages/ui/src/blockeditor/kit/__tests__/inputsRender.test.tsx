@@ -13,7 +13,7 @@ function renderInput(type: string, props: Record<string, unknown>) {
   const def = INPUT_BLOCKS.find((d) => d.type === type)!;
   const Comp = def.render;
   const editor = {doc, readOnly: false} as unknown as BlockEditorController;
-  return render(<Comp block={block} editor={editor} />);
+  return render(<Comp block={block} editor={editor} pageReadOnly={false} />);
 }
 
 afterEach(() => cleanup());
@@ -27,6 +27,12 @@ describe('kit input rendering', () => {
     const group = screen.getByRole('radiogroup');
     expect(within(group).getByText('One')).toBeTruthy();
     expect(within(group).getByText('Two')).toBeTruthy();
+  });
+
+  it.each([false, true])('sizes the dropdown wrapper for compact=%s', (compact) => {
+    const {container} = renderInput('dropdown', {compact, opts: [{label: 'One'}]});
+    const trigger = container.querySelector('.obe-kit-dropdown-select')!;
+    expect(trigger.parentElement!.classList.contains('w-full')).toBe(!compact);
   });
 
   it('opts into the compact layout when asked', () => {

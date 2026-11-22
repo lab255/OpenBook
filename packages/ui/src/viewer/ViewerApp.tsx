@@ -1,10 +1,15 @@
+import {ToastHost} from '@/components/ui/toast';
+import {ConfirmProvider} from '@/providers/ConfirmProvider';
 import React, {useEffect, useMemo, useState} from 'react';
 import {PresentBlocks} from '@/blockeditor/PresentBlocks';
+import {FormOriginContext, formOriginUrl} from '@/blockeditor/FormBlockView';
 import {decodeSnapshot, rootBlocks, type BlockDocSnapshot} from '@/blockeditor/model';
 import {KitPageLockContext} from '@/blockeditor/kit/lock';
+import {StaticKeepContext, type StaticKeepNodes} from '@/blockeditor/staticKeep';
 import {SandboxCspContext} from '@/components/SandboxedHtml';
 import {EXPORT_ARTIFACT_CSP} from '@/lib/srcdoc';
-import type {SpaceBundleJson, SpaceBundlePage, ViewerPage, ViewerSource} from './types';
+import {DataSchemeProvider, readGlobalDataScheme} from '@/lib/dataScheme';
+import type {LibraryBundleJson, LibraryBundlePage, ViewerPage, ViewerSource} from './types';
 
 /**
  * The viewer's React shell: locked-but-interactive rendering of one page (a
@@ -20,7 +25,7 @@ import type {SpaceBundleJson, SpaceBundlePage, ViewerPage, ViewerSource} from '.
  * makes sliders/charts live), but nothing is ever persisted anywhere.
  */
 
-const pageIcon = (page: SpaceBundlePage): string | null => {
+const pageIcon = (page: LibraryBundlePage): string | null => {
   const icon = page.properties?.sys_icon;
   return typeof icon === 'string' ? icon : null;
 };
@@ -28,7 +33,9 @@ const pageIcon = (page: SpaceBundlePage): string | null => {
 /** Normalise either source shape to a flat page list. */
 export function pagesOf(source: ViewerSource): ViewerPage[] {
   if ('pages' in source && Array.isArray(source.pages)) {
-    return (source as SpaceBundleJson).pages
+    // TRUST BOUNDARY (UP-4): do not filter `listed` here. Exporters must emit a
+    // clean bundle; a viewer faithfully renders every page it is handed.
+    return (source as LibraryBundleJson).pages
       .filter((p) => p && typeof p.id === 'string')
       .map((p) => ({id: p.id, name: p.name ?? null, icon: pageIcon(p), data: p.data ?? {}}));
   }
@@ -49,7 +56,7 @@ const hashPageId = (): string | null => {
 };
 
 /** One page, rendered read-only with live widgets. */
-const PageView: React.FC<{page: ViewerPage}> = ({page}) => {
+const PageView: React.FC<{page: ViewerPage; originUrl?: string}> = ({page, originUrl}) => {
   // The Y.Doc is rebuilt per page from the island snapshot (base64 update,
   // falling back to the JSON blocks projection) and lives only in memory.
   const doc = useMemo(() => decodeSnapshot(blockdocOf(page.data)), [page]);
@@ -65,12 +72,24 @@ const PageView: React.FC<{page: ViewerPage}> = ({page}) => {
         )}
         {title}
       </h1>
-      <PresentBlocks doc={doc} blocks={blocks} />
+      <FormOriginContext.Provider value={originUrl ?? formOriginUrl(page.id)}>
+        <PresentBlocks doc={doc} blocks={blocks} />
+      </FormOriginContext.Provider>
     </article>
   );
 };
 
-export const ViewerApp: React.FC<{source: ViewerSource; initialPage?: string}> = ({source, initialPage}) => {
+export const ViewerApp: React.FC<{
+  source: ViewerSource;
+  initialPage?: string;
+  staticBlocks?: StaticKeepNodes;
+  formOrigins?: Record<string, string>;
+}> = ({
+  source,
+  initialPage,
+  staticBlocks,
+  formOrigins,
+}) => {
   const pages = useMemo(() => pagesOf(source), [source]);
 
   const resolve = (ref: string | null | undefined): ViewerPage | undefined =>
@@ -114,31 +133,43 @@ export const ViewerApp: React.FC<{source: ViewerSource; initialPage?: string}> =
   if (!active) return <div className="ob-viewer-empty">Nothing to show.</div>;
 
   return (
-    <KitPageLockContext.Provider value={true}>
-      {/* Standalone exports stay quiet on open: artifacts get the sub-resource-
-          off CSP on top of the opaque-origin sandbox (closes fetch/img/media/
-          font/form loads; frame self-navigation is the documented residual —
-          see EXPORT_ARTIFACT_CSP). */}
-      <SandboxCspContext.Provider value={EXPORT_ARTIFACT_CSP}>
-        <div className="ob-viewer" onClick={onClick}>
-          {pages.length > 1 && (
-            <nav className="ob-viewer-nav" aria-label="Pages">
-              {pages.map((p) => (
-                <a
-                  key={p.id}
-                  href={`#page=${encodeURIComponent(p.id)}`}
-                  className={`ob-viewer-nav-link${p.id === active.id ? ' ob-viewer-nav-on' : ''}`}
-                  aria-current={p.id === active.id ? 'page' : undefined}
-                >
-                  {p.icon ? `${p.icon} ` : ''}
-                  {(p.name ?? '').trim() || 'Untitled'}
-                </a>
-              ))}
-            </nav>
-          )}
-          <PageView key={active.id} page={active} />
-        </div>
-      </SandboxCspContext.Provider>
-    </KitPageLockContext.Provider>
+    // The concrete-hex chart/map surfaces (kit charts) resolve the scheme the
+    // export baked in, matching the CSS-var surfaces applyDataColors set (OB-379).
+    <ConfirmProvider>
+      <ToastHost />
+      <DataSchemeProvider value={readGlobalDataScheme()}>
+        {/* Static renders the host document carried for blocks this bundle has no
+        renderer for (ledger report tables, LX-5) — replanted rather than
+        replaced by a missing-plugin card. */}
+        <StaticKeepContext.Provider value={staticBlocks ?? null}>
+          <KitPageLockContext.Provider value={true}>
+            {/* Standalone exports stay quiet on open: artifacts get the sub-resource-
+            off CSP on top of the opaque-origin sandbox (closes fetch/img/media/
+            font/form loads; frame self-navigation is the documented residual —
+            see EXPORT_ARTIFACT_CSP). */}
+            <SandboxCspContext.Provider value={EXPORT_ARTIFACT_CSP}>
+              <div className="ob-viewer" onClick={onClick}>
+                {pages.length > 1 && (
+                  <nav className="ob-viewer-nav" aria-label="Pages">
+                    {pages.map((p) => (
+                      <a
+                        key={p.id}
+                        href={`#page=${encodeURIComponent(p.id)}`}
+                        className={`ob-viewer-nav-link${p.id === active.id ? ' ob-viewer-nav-on' : ''}`}
+                        aria-current={p.id === active.id ? 'page' : undefined}
+                      >
+                        {p.icon ? `${p.icon} ` : ''}
+                        {(p.name ?? '').trim() || 'Untitled'}
+                      </a>
+                    ))}
+                  </nav>
+                )}
+                <PageView key={active.id} page={active} originUrl={formOrigins?.[active.id]} />
+              </div>
+            </SandboxCspContext.Provider>
+          </KitPageLockContext.Provider>
+        </StaticKeepContext.Provider>
+      </DataSchemeProvider>
+    </ConfirmProvider>
   );
 };

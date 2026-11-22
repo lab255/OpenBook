@@ -33,7 +33,7 @@ export default function ProfileSettings() {
   const {name: shownName, profile: shownProfile} = useSelfIdentity();
 
   return (
-    <SettingsScreen title={t('profile.title')} description={t('profile.description')}>
+    <SettingsScreen title={t('profile.title')} description={t('profile.description')} scope="account">
       <SettingsSection title={t('profile.identity')}>
         {/* The avatar: initials by default (derived from the name), or an
             emoji, or an uploaded image — pick one, reset any time. */}
@@ -79,6 +79,7 @@ export default function ProfileSettings() {
 
         <SettingsField label={t('profile.name')} hint={t('profile.nameHint')} htmlFor="ob-profile-name">
           <Input
+            inputSize="sm"
             id="ob-profile-name"
             value={name}
             placeholder={t('profile.namePlaceholder')}
@@ -89,6 +90,7 @@ export default function ProfileSettings() {
 
         <SettingsField label={t('profile.displayName')} hint={t('profile.displayNameHint')} htmlFor="ob-profile-display">
           <Input
+            inputSize="sm"
             id="ob-profile-display"
             value={displayName}
             placeholder={t('profile.displayNamePlaceholder')}
@@ -103,7 +105,7 @@ export default function ProfileSettings() {
             value={bio}
             rows={3}
             placeholder={t('profile.bioPlaceholder')}
-            className={cn(inputVariants(), 'min-h-[72px] resize-y px-3 py-2')}
+            className={cn(inputVariants({inputSize: 'sm'}), '!h-auto min-h-[72px] resize-y')}
             onChange={(e) => update({profile: {bio: e.target.value}})}
           />
         </SettingsField>

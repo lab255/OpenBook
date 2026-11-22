@@ -1,3 +1,873 @@
+## 3.29.0 (2026-11-11)
+
+### 🚀 Features
+
+- **ui:** production ≤50ms gate for command-dialog open (FF-IMMEDIACY) ([#439](https://github.com/lab255/OpenBook/pull/439))
+- **ui:** command palette continuity and precision polish (CARD-9/POL-1) ([#442](https://github.com/lab255/OpenBook/pull/442))
+- **ui:** carry the full plain-CSS token list into the export mirror (FF-6) ([#443](https://github.com/lab255/OpenBook/pull/443))
+- **ui:** polish slash insert palette continuity and precision (FF-7d/CARD-10) ([#441](https://github.com/lab255/OpenBook/pull/441))
+- **ui:** shared gutter handle prototype behind opt-in (FF-GUTTER-HANDLE) ([#444](https://github.com/lab255/OpenBook/pull/444))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.28.0 (2026-11-10)
+
+### 🚀 Features
+
+- **ui:** ship InterVariable as an app-only variable face (FF-5) ([#432](https://github.com/lab255/OpenBook/pull/432))
+- **ui:** sentence-case eyebrow labels (FF-7e, rebased) ([#436](https://github.com/lab255/OpenBook/pull/436))
+- **ui:** pixel-neutral FF control ladder tokens (FF-7a, Option A) ([#435](https://github.com/lab255/OpenBook/pull/435))
+- **ui:** FF-4b fluid hover in chrome — sidebar rows + settings rail ([#430](https://github.com/lab255/OpenBook/pull/430))
+- **ui:** control consumers and exported kit onto the FF ladder (FF-7c) ([#437](https://github.com/lab255/OpenBook/pull/437))
+- **ui:** menu, select and command rows on the 28px ladder step (FF-7b) ([#438](https://github.com/lab255/OpenBook/pull/438))
+
+### 🩹 Fixes
+
+- **ui:** bound non-motion drift at the viewer ledger endpoint (CARD-13) ([#434](https://github.com/lab255/OpenBook/pull/434))
+- **ui:** size the ledger endpoint window from both measured non-motion changes ([9924500d](https://github.com/lab255/OpenBook/commit/9924500d))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 5.5
+- Eliot Lim @eliotlim
+
+## 3.27.0 (2026-10-31)
+
+### 🚀 Features
+
+- **ui:** FF-4 fluid hover — one highlight glides across chrome surfaces ([#426](https://github.com/lab255/OpenBook/pull/426))
+- **ui:** FF-6 export/viewer motion infrastructure — per-bundle runtime, feature ledger, hydration gates ([#427](https://github.com/lab255/OpenBook/pull/427))
+
+### 🩹 Fixes
+
+- **ui:** ledger the fluid-hover motion features in the viewer graph (FF-4×FF-6 seam) ([#428](https://github.com/lab255/OpenBook/pull/428))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.26.0 (2026-10-28)
+
+### 🚀 Features
+
+- **ui:** recording survives navigation — app-level meeting sessions + floating status bubble (MTG-7) ([#419](https://github.com/lab255/OpenBook/pull/419))
+- **ui:** meeting management menu — secondary actions off the canvas (MTG-5) ([#420](https://github.com/lab255/OpenBook/pull/420))
+- **ui:** FF-1 design-system prerequisites — rulings record, manifest amendments, enforced G1 guard ([#422](https://github.com/lab255/OpenBook/pull/422))
+- **ui:** FF-3 motion unification — two-lane doctrine, retimed tokens, enforced spring+mirror parity ([#425](https://github.com/lab255/OpenBook/pull/425))
+
+### 🩹 Fixes
+
+- **server,ui:** CRDT-delta path for off-page stored writes — stop clobbering concurrent edits (MTG-8) ([#421](https://github.com/lab255/OpenBook/pull/421))
+- **ui:** animate metric progress with scale transform (FF-0) ([#423](https://github.com/lab255/OpenBook/pull/423))
+- **ui:** simplify select group heading typography (FF-0b) ([#424](https://github.com/lab255/OpenBook/pull/424))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.25.0 (2026-10-19)
+
+### 🚀 Features
+
+- **ui:** meeting block v2 shell — header + Summary | Notes | Transcript tabs (MTG-1) ([#415](https://github.com/lab255/OpenBook/pull/415))
+- **ui:** meeting block unified player — one timeline across chunks (MTG-2) ([#416](https://github.com/lab255/OpenBook/pull/416))
+- **ui:** meeting summary as editable blocks — container contract + confirm-replace (MTG-4) ([#417](https://github.com/lab255/OpenBook/pull/417))
+- **ui:** interactive meeting transcript — click-to-seek, now-playing highlight, auto-follow (MTG-3) ([#418](https://github.com/lab255/OpenBook/pull/418))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.24.0 (2026-10-15)
+
+### 🚀 Features
+
+- **ui:** togglelist block — disclosure lists with reference shortcut parity (DSX-10) ([#412](https://github.com/lab255/OpenBook/pull/412))
+
+### 🩹 Fixes
+
+- **ui:** export polish — Lucide callout slots, responsive kit charts, design-system export ink (DSX-11 + DSX-6e) ([#413](https://github.com/lab255/OpenBook/pull/413))
+- **ui:** default unstyled HTML artifacts to a light document in dark mode (DSX-12) ([#411](https://github.com/lab255/OpenBook/pull/411))
+- **ui:** palette pass — primary contrast at the token source, chip-tint balance, rail hues, primary rating stars (DSX-13) ([#410](https://github.com/lab255/OpenBook/pull/410))
+- **ui:** converge light ring/brand on primary + blue-straggler sweep; export AA documented (DSX-14 + DSX-15) ([#414](https://github.com/lab255/OpenBook/pull/414))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.23.0 (2026-10-12)
+
+### 🚀 Features
+
+- **ui:** public plugin UI surface + ledger read-only family on the design system (DSX-9a) ([#406](https://github.com/lab255/OpenBook/pull/406))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.22.1 (2026-10-11)
+
+### 🩹 Fixes
+
+- **ui:** kit chart ink + static export parity — funnel contrast, chart tokens, export primary (DSX-6c) ([#403](https://github.com/lab255/OpenBook/pull/403))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.22.0 (2026-10-11)
+
+### 🚀 Features
+
+- **server:** activate signed runtime-binaries-v1 manifest pins — macOS managed installs go live (WSP-7) ([#396](https://github.com/lab255/OpenBook/pull/396))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.21.0 (2026-10-10)
+
+### 🚀 Features
+
+- **server:** runtime provisioning — whisper-cli/ffmpeg auto-install with the model (WSP-2) ([#385](https://github.com/lab255/OpenBook/pull/385))
+- **ui:** one-click local transcription — Enable/Update with staged progress (WSP-3) ([#386](https://github.com/lab255/OpenBook/pull/386))
+- **ui:** design-system foundation — motion/type/radius/colour tokens + lint guards (DSX-1) ([#387](https://github.com/lab255/OpenBook/pull/387))
+- **ui:** text-block family on the design system — todo, lists, callout, quote, notes, hints (DSX-2) ([#393](https://github.com/lab255/OpenBook/pull/393))
+- **ui:** media family — unified hover chrome, code wrap control, lightbox + read-only fixes (DSX-4) ([#394](https://github.com/lab255/OpenBook/pull/394))
+
+### 🩹 Fixes
+
+- **ci:** add signing keychain to the user search list (runtime-binaries macOS legs) ([#389](https://github.com/lab255/OpenBook/pull/389))
+- **desktop:** macOS sidecar PATH fallback + managed-runtime precedence tests (WSP-4) ([#390](https://github.com/lab255/OpenBook/pull/390))
+- **server:** drain scheduled backups before closing the store ([#391](https://github.com/lab255/OpenBook/pull/391))
+- **ui:** block chrome — precise handle, overlay selection, 32px rhythm, even margins (DSX-7) ([#388](https://github.com/lab255/OpenBook/pull/388))
+- **ui:** unified container chrome — shared inset, unclipped frames, system headers, export parity (DSX-3) ([#392](https://github.com/lab255/OpenBook/pull/392))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 5.5 (1M context)
+- Eliot Lim @eliotlim
+
+## 3.20.0 (2026-10-09)
+
+### 🚀 Features
+
+- **server:** checksum-verified downloads + pinned whisper runtime/model manifest (WSP-1) ([#381](https://github.com/lab255/OpenBook/pull/381))
+- **ui:** cloud transcription opt-in in Settings → AI (MEET-12) ([#378](https://github.com/lab255/OpenBook/pull/378))
+
+### 🩹 Fixes
+
+- **desktop:** restrict loopback origins to debug builds (MEET-11) ([#379](https://github.com/lab255/OpenBook/pull/379))
+- **sdk,mcp,ui:** type meeting transcriptionCompleted keys (MEET-10) ([#377](https://github.com/lab255/OpenBook/pull/377))
+- **ui:** palette contrast + export parity + warn-callout export tint (DSX-P) ([#382](https://github.com/lab255/OpenBook/pull/382))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.19.0 (2026-10-06)
+
+### 🚀 Features
+
+- **sdk,mcp,server,ui,web,desktop:** meeting block — recorder, local whisper, summary, audio export, e2e (MEET-3..MEET-9) ([#376](https://github.com/lab255/OpenBook/pull/376))
+- **server,sdk:** audio assets + transcription service (MEET-1, MEET-2) ([#366](https://github.com/lab255/OpenBook/pull/366), [#367](https://github.com/lab255/OpenBook/issues/367))
+
+### 🩹 Fixes
+
+- **web:** settle sidebar selection color assertions (INF-4) ([#375](https://github.com/lab255/OpenBook/pull/375))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.18.1 (2026-09-15)
+
+### 🩹 Fixes
+
+- **server,sdk:** fail-closed roster mutations on unclaimed instances + enum validation + ACL audit (SEC-3) ([#365](https://github.com/lab255/OpenBook/pull/365))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.18.0 (2026-09-12)
+
+### 🚀 Features
+
+- **server,ui:** whitelabel OIDC sign-in via account.able.online (ABLE-1) ([#361](https://github.com/lab255/OpenBook/pull/361))
+- **server,ui:** able sign-in follow-ups — whitelabel copy/i18n + assertion renewal (ABLE-2) ([#362](https://github.com/lab255/OpenBook/pull/362))
+
+### 🩹 Fixes
+
+- **ci,server:** nightly libs cache includes mcp; able oidc test clock-independent (OPS-2) ([#364](https://github.com/lab255/OpenBook/pull/364))
+- **server:** fail-closed owner-only settings on unclaimed instances (SEC-1) ([#363](https://github.com/lab255/OpenBook/pull/363))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.17.0 (2026-09-07)
+
+### 🚀 Features
+
+- **mcp,sdk,server:** database tools — describe/create/update db, properties, update/delete row (API-9) ([#356](https://github.com/lab255/OpenBook/pull/356))
+- **mcp,sdk,server,ui:** page tools on MCP — set_page_appearance, move_page, get/set_page_properties with policy parity (API-10) ([#359](https://github.com/lab255/OpenBook/pull/359))
+- **mcp,sdk,ui:** move_block + insert_blocks tools; generic block ops lifted into sdk/blockSnapshot.ts (API-7) ([#355](https://github.com/lab255/OpenBook/pull/355))
+- **mcp,server,sdk:** upload_asset tool — images and asset-backed blocks via MCP + in-app agent (API-5) ([#354](https://github.com/lab255/OpenBook/pull/354))
+- **sdk,mcp,server:** typed prop schemas for every block type — list_block_types returns propsSchema; block prop + expression reference (API-11) ([#358](https://github.com/lab255/OpenBook/pull/358))
+- **sdk,mcp,server,ui:** rich text over MCP — mini-markdown and explicit runs on text writes (API-8) ([#357](https://github.com/lab255/OpenBook/pull/357))
+- **ui:** paste fills the selected cell range, growing the table (TBL-13) ([#348](https://github.com/lab255/OpenBook/pull/348))
+- **ui:** table grips open row/column menus on click and right-click (TBL-7) ([#349](https://github.com/lab255/OpenBook/pull/349))
+- **ui:** table column width resize — drag the boundary, widths persisted per colId (TBL-12) ([#350](https://github.com/lab255/OpenBook/pull/350))
+- **ui:** table range menu parity — count-aware inserts, clipboard group, swatch i18n, tinted range clipboard (TBL-10) ([#351](https://github.com/lab255/OpenBook/pull/351))
+- **ui:** floating toolbar over a selected table cell range (TBL-14) ([#353](https://github.com/lab255/OpenBook/pull/353))
+
+### 🩹 Fixes
+
+- **ui:** table row grip sits fully outside the table — never over cell content (TABLE-2) ([#347](https://github.com/lab255/OpenBook/pull/347))
+- **ui:** database cell-menu quick block through i18n — filter labels + date presets ×4 locales (TBL-11) ([#352](https://github.com/lab255/OpenBook/pull/352))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.16.0 (2026-08-28)
+
+### 🚀 Features
+
+- **ui:** compact share dialog — one line per row, InfoTips, −33% height (SHARE-1) ([#346](https://github.com/lab255/OpenBook/pull/346))
+
+### 🩹 Fixes
+
+- **sdk,ui:** page renames reach viewers live — title ordering + list metadata propagation (LIVE-1) ([#345](https://github.com/lab255/OpenBook/pull/345))
+- **ui:** kit inline label/name fields swallow spaces in WYSIWYG (KITFIX-1) ([#342](https://github.com/lab255/OpenBook/pull/342))
+- **ui:** kit inputs derive aria-label from the display label (KITFIX-3) ([#343](https://github.com/lab255/OpenBook/pull/343))
+- **ui:** table row grip overhangs the gutter instead of indenting the table (TABLE-1) ([#344](https://github.com/lab255/OpenBook/pull/344))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.15.2 (2026-08-27)
+
+### 🩹 Fixes
+
+- **app:** sidecar socket-liveness feedback into supervision; Dead state escapable (IPC-1) ([#338](https://github.com/lab255/OpenBook/pull/338))
+- **ui:** durable unpublish — audience unbind survives a dead sidecar (IPC-3) ([#339](https://github.com/lab255/OpenBook/pull/339))
+- **ui:** error-class-aware publish guidance — no more 'sign out' for a dead local service (IPC-4) ([#341](https://github.com/lab255/OpenBook/pull/341))
+- **ui,app:** surface sidecar state — degraded banner, Diagnostics, Restart (IPC-2) ([#340](https://github.com/lab255/OpenBook/pull/340))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.15.1 (2026-08-25)
+
+### 🩹 Fixes
+
+- **ui:** surface remote-library load failures — error panel + retry (TUN-10) ([#334](https://github.com/lab255/OpenBook/pull/334))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.15.0 (2026-08-24)
+
+### 🚀 Features
+
+- **sdk,ui:** Recipe scaler template — reactive servings→quantities; gallery reorder (RELAUNCH-1) ([#332](https://github.com/lab255/OpenBook/pull/332))
+
+### 🩹 Fixes
+
+- **sdk:** tunnel client keepalive — detect half-open sockets, auto-reconnect (TUN-13) ([#336](https://github.com/lab255/OpenBook/pull/336))
+- **ui:** emoji picker no longer dismisses its parent popover (UIX-3) ([#333](https://github.com/lab255/OpenBook/pull/333))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.14.1 (2026-08-23)
+
+### 🩹 Fixes
+
+- **ui:** design polish — motion, overlays, selection, dark theme (APPFIT-2/3) ([#329](https://github.com/lab255/OpenBook/pull/329))
+- **ui:** restore accent-sidebar contrast + stale e2e assertions (APPFIT follow-up) ([#331](https://github.com/lab255/OpenBook/pull/331), [#329](https://github.com/lab255/OpenBook/issues/329))
+- **ui,web,app:** scope document scroll lock to OpenBook shells via ob-app marker (UIFIX-1) ([#328](https://github.com/lab255/OpenBook/pull/328))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.14.0 (2026-08-15)
+
+### 🚀 Features
+
+- **server:** Idempotency-Key — response-capture ledger, replay, capability flag (CWD-5) ([#325](https://github.com/lab255/OpenBook/pull/325))
+
+### 🩹 Fixes
+
+- **server:** extend persister quiesce fence to snapshot writes — merge, don't clobber (CWD-4) ([#324](https://github.com/lab255/OpenBook/pull/324))
+- **server:** updateRow per-key merge + updateInstanceConfig transaction (CWD-3) ([#322](https://github.com/lab255/OpenBook/pull/322))
+- **ui:** silent save-loss — snapshot cursor advanced before persist resolved (CWD-9) ([#320](https://github.com/lab255/OpenBook/pull/320))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.13.0 (2026-08-14)
+
+### 🚀 Features
+
+- **forms:** form publication — isolated public fill surface (F-5) ([#317](https://github.com/lab255/OpenBook/pull/317))
+- **sdk:** freeze the database form contract (F-1) ([#313](https://github.com/lab255/OpenBook/pull/313))
+- **sdk,server:** page listing posture — persisted listed/unlisted flag (UP-1) ([#309](https://github.com/lab255/OpenBook/pull/309))
+- **sdk,ui:** embeddable database form block (F-3) ([#315](https://github.com/lab255/OpenBook/pull/315))
+- **server:** enforce unlisted enumeration privacy + close live-stream leaks (UP-2) ([#310](https://github.com/lab255/OpenBook/pull/310))
+- **server:** public database fill capabilities (F-4) ([#316](https://github.com/lab255/OpenBook/pull/316))
+- **ui:** database form view builder (F-2) ([#314](https://github.com/lab255/OpenBook/pull/314))
+- **ui:** surface unlisted pages to owners — badges + Share toggle (UP-3) ([#311](https://github.com/lab255/OpenBook/pull/311))
+
+### 🩹 Fixes
+
+- **app:** suppress native context menu in production (BB-5) ([#304](https://github.com/lab255/OpenBook/pull/304))
+- **forms:** forms hardening — lifecycle, limits, notices (F-6) ([#318](https://github.com/lab255/OpenBook/pull/318))
+- **ui:** stabilize database editor focus layout (BB-1) ([#300](https://github.com/lab255/OpenBook/pull/300))
+- **ui:** lock the document scroller (BB-4) ([#303](https://github.com/lab255/OpenBook/pull/303))
+- **ui:** HTTP transport + localized guidance for the local MCP connector card (BB-9) ([#308](https://github.com/lab255/OpenBook/pull/308))
+- **ui:** reserve space for hover reveals (BB-3) ([#302](https://github.com/lab255/OpenBook/pull/302))
+- **ui:** pane-aware block gutter + hidden-gutter hit testing (BB-6) ([#305](https://github.com/lab255/OpenBook/pull/305))
+- **ui:** metric-stable active states — no font-weight layout shifts (BB-2) ([#301](https://github.com/lab255/OpenBook/pull/301))
+- **ui:** prevent unlisted site-export leaks (UP-4) ([#312](https://github.com/lab255/OpenBook/pull/312))
+- **ui:** cascade column resizing across layouts (BB-7) ([#306](https://github.com/lab255/OpenBook/pull/306))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.12.0 (2026-08-12)
+
+### 🚀 Features
+
+- **lint,ci,web:** spacing enforcement — Chromatic fails on diffs, @visual coverage, no-arbitrary-spacing rule (SPC-6) ([#297](https://github.com/lab255/OpenBook/pull/297))
+- **mcp:** form management tools — list/get/update on the write-policy pattern (FORM-7) ([#295](https://github.com/lab255/OpenBook/pull/295))
+- **sdk:** FormSchema model + pure validation engine + row projection (FORM-2) ([#280](https://github.com/lab255/OpenBook/pull/280))
+- **sdk,server,ui,web:** live public form submissions — locked-mode runtime, validation UX, idempotent submit (FORM-5) ([#296](https://github.com/lab255/OpenBook/pull/296))
+- **sdk,server,ui,web:** file-upload fields + abuse controls — staged carve-out, rate limits, retention (FORM-6) ([#298](https://github.com/lab255/OpenBook/pull/298))
+- **sdk,ui:** form block end-to-end — catalogue, frozen renders, key-sanitized exports (FORM-3) ([#286](https://github.com/lab255/OpenBook/pull/286))
+- **server,sdk:** anonymous form-submission capability route — oracle-safe, idempotent, ceiling-capped (FORM-1) ([#284](https://github.com/lab255/OpenBook/pull/284))
+- **ui:** configurable menu density + menu infra dedup, width tokens, shortcut table (CTX-1) ([#279](https://github.com/lab255/OpenBook/pull/279))
+- **ui:** EmptyState primitive + 10-site adoption + i18n (SPC-5) ([#281](https://github.com/lab255/OpenBook/pull/281))
+- **ui:** page context menus on breadcrumbs, home, backlinks, trash + chrome suppression (CTX-2) ([#282](https://github.com/lab255/OpenBook/pull/282))
+- **ui:** one input canon — panel/dense variants, Button xs, settings + AgentPanel sweep (SPC-3) ([#285](https://github.com/lab255/OpenBook/pull/285))
+- **ui:** media + link context menus — images, links, mentions, cover, icon (CTX-4) ([#293](https://github.com/lab255/OpenBook/pull/293))
+- **ui:** panel context menus — graph, history, review, agent messages (CTX-7) ([#294](https://github.com/lab255/OpenBook/pull/294))
+- **ui:** titlebar tab context menu + window-chrome suppression (CTX-3) ([#290](https://github.com/lab255/OpenBook/pull/290))
+- **ui:** native-menu passthrough + multi-block bulk context menu (CTX-5) ([#291](https://github.com/lab255/OpenBook/pull/291))
+- **ui,docs:** spacing scale tokens + spacing manifest + audit baseline (SPC-1) ([#278](https://github.com/lab255/OpenBook/pull/278))
+- **ui,web:** native-menu suppression sweep + editable guard + e2e proof (CTX-8) ([#289](https://github.com/lab255/OpenBook/pull/289))
+- **ui,web,docs:** drag-and-drop form builder + publish surfacing + epic close-out (FORM-4 + FORM-8) ([#299](https://github.com/lab255/OpenBook/pull/299))
+
+### 🩹 Fixes
+
+- **ui:** zero layout shift on hover — opacity reveals + no-hover-geometry lint (HOV-1) ([#277](https://github.com/lab255/OpenBook/pull/277))
+- **ui:** database menu targeting — scoped view-tab menus, chip menus, chart copy (CTX-6) ([#288](https://github.com/lab255/OpenBook/pull/288))
+- **ui:** migrate form block CSS onto the spacing grid (post-merge stylelint gate) ([#292](https://github.com/lab255/OpenBook/pull/292))
+
+### ❤️ Thank You
+
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+## 3.11.1 (2026-08-11)
+
+### 🩹 Fixes
+
+- **app:** sidecar supervision — bounded respawn + surfaced state (BOOT-4) ([#275](https://github.com/lab255/OpenBook/pull/275))
+- **server,app:** reclaim stale PGlite dir locks from dead processes (BOOT-7) ([#272](https://github.com/lab255/OpenBook/pull/272))
+- **server,sdk,ui:** backup boot-path, streaming, and skip+record hardening (BOOT-1/2/3) ([#273](https://github.com/lab255/OpenBook/pull/273))
+- **ui:** responsive collapse for page-header controls (UIX-1) ([#274](https://github.com/lab255/OpenBook/pull/274))
+- **ui,sdk:** forwarding self-healing — retries, stalled surfacing, intent preservation (TUN-1/2/3/4) ([#276](https://github.com/lab255/OpenBook/pull/276))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.11.0 (2026-08-11)
+
+### 🚀 Features
+
+- **server,sdk:** lossless backup bundle v3 — assets + page ACLs (BAK-1) ([#265](https://github.com/lab255/OpenBook/pull/265))
+- **ui:** desktop security-advisory warning — update / snooze / typed-ack dismiss (LNCH-9) ([#267](https://github.com/lab255/OpenBook/pull/267))
+- **ui:** resident QuickJS sandbox for document eval — closes the desktop RCE chain (SBX-2) ([#270](https://github.com/lab255/OpenBook/pull/270))
+
+### 🩹 Fixes
+
+- **export:** remove new Function from exported HTML runtime + page CSP (SBX-3) ([#268](https://github.com/lab255/OpenBook/pull/268))
+- **server:** owner-gate host-sensitive mutations + bind stdio MCP to local owner (SBX-5) ([#264](https://github.com/lab255/OpenBook/pull/264))
+- **ui:** normalize bundled plugin paths on Windows — restores the Windows release leg (LNCH-6) ([#261](https://github.com/lab255/OpenBook/pull/261))
+- **ui:** defer evalCache dispose — restore initial-load reactive eval (main hotfix) ([#269](https://github.com/lab255/OpenBook/pull/269), [#266](https://github.com/lab255/OpenBook/issues/266))
+- **ui:** guest-safe owner gating in instance settings — no more enabled controls that always 403 (PUB-5) ([#271](https://github.com/lab255/OpenBook/pull/271))
+
+### 🔥 Performance
+
+- **ui:** memo reactive scope by editor version + eval guard (SBX-0) ([#263](https://github.com/lab255/OpenBook/pull/263))
+
+### ❤️ Thank You
+
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+## 3.10.0 (2026-08-09)
+
+### 🚀 Features
+
+- **sdk:** pin the production registry public key (ST-13, ceremony step 3) ([#244](https://github.com/eliotlim/OpenBook/pull/244))
+- **ui:** overlay primitives — dialog size scale, nowrap buttons, toast tokens, one tooltip clock (POL-2) ([#248](https://github.com/eliotlim/OpenBook/pull/248))
+- **ui:** i18n parity report + localize stray strings + locale scope fixes (POL-7) ([#247](https://github.com/eliotlim/OpenBook/pull/247))
+
+### 🩹 Fixes
+
+- **ui:** share dialog overflow seam, copy-link wrap, single mount (POL-1) ([#246](https://github.com/eliotlim/OpenBook/pull/246))
+- **ui:** rebuild LinkPicker on popover conventions + focus fix (POL-3) ([#250](https://github.com/eliotlim/OpenBook/pull/250))
+- **ui:** muted-foreground WCAG AA contrast across the canvas family (DS-1) ([#252](https://github.com/eliotlim/OpenBook/pull/252))
+- **ui:** editor alignment — code gutter, merged-table grips (POL-8) ([#253](https://github.com/eliotlim/OpenBook/pull/253))
+- **ui:** dark overlay elevation, strong muted tier, z-scale completion (POL-9a) ([#255](https://github.com/eliotlim/OpenBook/pull/255))
+- **ui:** QA-sweep fixes — template i18n keys, LinkPicker anchor, timeline labels ([#256](https://github.com/eliotlim/OpenBook/pull/256))
+- **ui:** narrow-width usability — drawer sidebar, settings stacking, toolbar overflow (POL-10) ([#257](https://github.com/eliotlim/OpenBook/pull/257))
+- **ui:** accessible placeholder contrast + unified dark elevation (A11Y-1) ([#258](https://github.com/eliotlim/OpenBook/pull/258))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 3.9.0 (2026-08-09)
+
+### 🚀 Features
+
+- **build:** registry signing-key rotation + signed first-party bundles (ST-1) ([#236](https://github.com/eliotlim/OpenBook/pull/236), [#8](https://github.com/eliotlim/OpenBook/issues/8), [#1](https://github.com/eliotlim/OpenBook/issues/1))
+- **export:** consent-gated ledger records in HTML site exports (LX-2) ([#231](https://github.com/eliotlim/OpenBook/pull/231), [#1](https://github.com/eliotlim/OpenBook/issues/1), [#2](https://github.com/eliotlim/OpenBook/issues/2))
+- **export:** static ledger report tables in exported HTML (LX-3) ([#232](https://github.com/eliotlim/OpenBook/pull/232))
+- **export:** hydrated viewer preserves the static ledger report tables (LX-5) ([#233](https://github.com/eliotlim/OpenBook/pull/233))
+- **import:** ledger round-trip import + recovery surfacing (LX-4) ([#237](https://github.com/eliotlim/OpenBook/pull/237))
+- **sdk,mcp:** registry-derived block validation — retire the allowlists (API-1/2/3/4) ([#234](https://github.com/eliotlim/OpenBook/pull/234), [#30](https://github.com/eliotlim/OpenBook/issues/30))
+- **sdk,ui,server:** client registry integration — browse, verified installs, upgrades, revocations (ST-6) ([#243](https://github.com/eliotlim/OpenBook/pull/243))
+- **ui:** publish selected pages only — fourth default-access state (PUB-1) ([#230](https://github.com/eliotlim/OpenBook/pull/230))
+- **ui:** database-grid row/column context menus — parity with block tables (TBL-9) ([#239](https://github.com/eliotlim/OpenBook/pull/239))
+- **ui:** range-aware table cell menu + per-cell tint (TBL-6) ([#240](https://github.com/eliotlim/OpenBook/pull/240))
+- **ui:** merge / split table cells — colspan + rowspan (TBL-8) ([#242](https://github.com/eliotlim/OpenBook/pull/242))
+
+### 🩹 Fixes
+
+- **app:** stable forwarding names — narrowed reattach + per-account keystore (NAME-1/2) ([#235](https://github.com/eliotlim/OpenBook/pull/235))
+- **ui:** deterministic reconcile Amend focus handoff (LGR-22 CI flake — real component race) ([#241](https://github.com/eliotlim/OpenBook/pull/241))
+- **web:** bump typecheck target to ES2020 — sdk BigInt literals (LX-4 follow-up) ([#238](https://github.com/eliotlim/OpenBook/pull/238))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.8.0 (2026-08-04)
+
+### 🚀 Features
+
+- **ui:** unsupported ledger blocks — install prompt + bundled plugin ([#229](https://github.com/eliotlim/OpenBook/pull/229))
+
+### ❤️ Thank You
+
+- Claude Opus 4.6
+- Eliot Lim @eliotlim
+
+## 3.7.0 (2026-08-03)
+
+### 🚀 Features
+
+- **sdk:** add Simple Budget and Startup Books ledger templates ([#228](https://github.com/eliotlim/OpenBook/pull/228))
+
+### ❤️ Thank You
+
+- Claude Opus 4.6
+- Eliot Lim @eliotlim
+
+## 3.6.0 (2026-08-03)
+
+### 🚀 Features
+
+- Ledger — trustworthy double-entry books (epic LGR, review by commit) ([#227](https://github.com/eliotlim/OpenBook/pull/227), [#2](https://github.com/eliotlim/OpenBook/issues/2))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 5
+- Eliot Lim @eliotlim
+
+## 3.5.1 (2026-07-28)
+
+### 🩹 Fixes
+
+- **server:** Host-header allowlist on loopback TCP binds — close the DNS-rebinding hole (STAB-10, OB-571) ([#225](https://github.com/eliotlim/OpenBook/pull/225))
+- **ui,web:** hide sign-in chrome + relabel library on the LAN-served UI (STAB-9) ([#226](https://github.com/eliotlim/OpenBook/pull/226))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+## 3.5.0 (2026-07-27)
+
+### 🚀 Features
+
+- **blockeditor:** [[wikilink]] autocompletion with create-as-subpage (OB-35) ([#221](https://github.com/eliotlim/OpenBook/pull/221))
+- **server,sdk,mcp,ui:** agent direct edits — library setting + per-page override, policy-enforced across MCP, remote PATs and built-in AI (OB-564) ([#222](https://github.com/eliotlim/OpenBook/pull/222))
+- **ui:** persistent Linked-references side-pane — backlinks + unlinked mentions (OB-32) ([#218](https://github.com/eliotlim/OpenBook/pull/218))
+- **ui,sdk:** publish UI — 'Only published pages' site scope + per-page Publish action & indicator (OB-522/OB-523) ([#224](https://github.com/eliotlim/OpenBook/pull/224))
+- **ui,server,sdk:** whole-library page link graph — on-the-fly edges, read-gated, React Flow pane (OB-33) ([#219](https://github.com/eliotlim/OpenBook/pull/219))
+
+### 🩹 Fixes
+
+- **server:** gate four metadata routes off the anonymous surface (GATE-7, OB-517) ([#223](https://github.com/eliotlim/OpenBook/pull/223))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+## 3.4.3 (2026-07-25)
+
+### 🩹 Fixes
+
+- **ui:** button icon↔text spacing — gap in the Button primitive + call-site margin sweep (UX-B1) ([#217](https://github.com/eliotlim/OpenBook/pull/217))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.4.2 (2026-07-24)
+
+### 🩹 Fixes
+
+- **build:** spawn pnpm through a shell on Windows in the release build scripts ([#216](https://github.com/eliotlim/OpenBook/pull/216))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.4.1 (2026-07-24)
+
+### 🩹 Fixes
+
+- **app,build:** unbreak release beforeBuildCommand — build:web-ui is a workspace-root script ([#215](https://github.com/eliotlim/OpenBook/pull/215), [#204](https://github.com/eliotlim/OpenBook/issues/204), [#205](https://github.com/eliotlim/OpenBook/issues/205))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.4.0 (2026-07-24)
+
+### 🚀 Features
+
+- **blockeditor:** image lightbox — fullscreen embedded images & GIFs (LBX-1) ([#206](https://github.com/eliotlim/OpenBook/pull/206))
+- **blockeditor:** table order contract — fractional keys + column identity (TBL-1) ([#207](https://github.com/eliotlim/OpenBook/pull/207))
+- **blockeditor:** marquee rectangle select + shift-click extension (SEL-1) ([#208](https://github.com/eliotlim/OpenBook/pull/208))
+- **blockeditor:** multi-block drag — move the whole selection in one drop (SEL-2) ([#211](https://github.com/eliotlim/OpenBook/pull/211))
+- **blockeditor:** per-cell table context menus + duplicate row (TBL-3) ([#209](https://github.com/eliotlim/OpenBook/pull/209))
+- **blockeditor:** table drag-reorder — row/column grips + keyboard moves (TBL-2) ([#212](https://github.com/eliotlim/OpenBook/pull/212))
+- **blockeditor:** table row & column colouring — tint tokens, menu pickers, export fidelity (TBL-4) ([#213](https://github.com/eliotlim/OpenBook/pull/213))
+- **blockeditor:** multi-cell table selection — drag/shift range, copy, clear (TBL-5) ([#214](https://github.com/eliotlim/OpenBook/pull/214))
+- **server,web,desktop:** serve the LAN web UI from the sidecar — tokenless, guest-gated (STAB-7) ([#205](https://github.com/eliotlim/OpenBook/pull/205))
+- **ui:** lightbox zoom & pan — wheel/pinch, drag, fit↔100%, keyboard (LBX-2) ([#210](https://github.com/eliotlim/OpenBook/pull/210))
+
+### 🩹 Fixes
+
+- **server,sdk:** app-origin CORS allowlist + guest-write header gate — close the drive-by loopback hole (STAB-8) ([#204](https://github.com/eliotlim/OpenBook/pull/204))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.3.3 (2026-07-23)
+
+### 🩹 Fixes
+
+- **app,ui:** desktop error boundary + poison-page crash-loop recovery (STAB-3) ([#199](https://github.com/eliotlim/OpenBook/pull/199))
+- **blockeditor:** Notion table paste normalization + render guards — end the white-screen crash loop (STAB-1/2) ([#203](https://github.com/eliotlim/OpenBook/pull/203))
+- **desktop:** hide window on close and drain the sidecar off the main thread (STAB-6) ([#202](https://github.com/eliotlim/OpenBook/pull/202))
+- **mcp,desktop,server:** unify the local MCP endpoint — loopback bind on toggle + instance verification (STAB-5) ([#201](https://github.com/eliotlim/OpenBook/pull/201))
+- **ui,desktop:** stop file drops hijacking the webview; origin-guard navigation (STAB-4) ([#200](https://github.com/eliotlim/OpenBook/pull/200))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.3.2 (2026-07-18)
+
+### 🚀 Features
+
+- **search:** local lexical content search on the in-webview transport (Epic 3) ([#198](https://github.com/eliotlim/OpenBook/pull/198), [#197](https://github.com/eliotlim/OpenBook/issues/197))
+
+### ❤️ Thank You
+
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+## 3.3.1 (2026-07-17)
+
+### 🩹 Fixes
+
+- **ui:** align active titlebar-tab label with inactive tabs ([#197](https://github.com/eliotlim/OpenBook/pull/197))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.3.0 (2026-07-17)
+
+### 🚀 Features
+
+- **ui:** web browser Back/Forward navigates page history (IA-2) ([#182](https://github.com/eliotlim/OpenBook/pull/182))
+- **ui:** expose interactive toHtml/toSlideDeck/toHtmlSite from public API ([#180](https://github.com/eliotlim/OpenBook/pull/180))
+- **ui:** Settings V2 Wave 1 — 4-rail regroup, fold Connection into Libraries, control unification, advanced-section primitive ([#181](https://github.com/eliotlim/OpenBook/pull/181))
+- **ui:** Settings V2 Wave 2a — AI-tab split, in-panel search, Backups rebuild ([#193](https://github.com/eliotlim/OpenBook/pull/193))
+- **ui:** Settings V2 Wave 2b — Shortcuts rename, admin-gate consistency, copy/i18n truth pass ([#194](https://github.com/eliotlim/OpenBook/pull/194))
+- **ui:** SHR-7 — one "Default access" control (retire raw guest-gate) ([#196](https://github.com/eliotlim/OpenBook/pull/196))
+
+### 🩹 Fixes
+
+- **ci:** cache packages/mcp/dist for e2e + raise server hook timeout ([#195](https://github.com/eliotlim/OpenBook/pull/195))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.2.0 (2026-07-14)
+
+### 🚀 Features
+
+- **ui:** database views full-width by default + switch control for full width ([#178](https://github.com/eliotlim/OpenBook/pull/178))
+
+### 🩹 Fixes
+
+- **identity:** keep remote-reader content credential alive (cross-server blank pages) ([#179](https://github.com/eliotlim/OpenBook/pull/179))
+- **mcp:** local MCP over LAN — loopback-owner gate + owner-subject binding ([#177](https://github.com/eliotlim/OpenBook/pull/177))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 3.1.0 (2026-07-14)
+
+### 🚀 Features
+
+- **database:** active DB view in the URL (?view=) with shareable deep links (DL-1) ([#163](https://github.com/eliotlim/OpenBook/pull/163))
+- **server:** capture per-page version history on save (PVH-1) ([#171](https://github.com/eliotlim/OpenBook/pull/171))
+- **server:** retention/pruning for page versions (PVH-2) ([#172](https://github.com/eliotlim/OpenBook/pull/172))
+- **server:** page version list/get/restore routes + SDK, non-destructive restore (PVH-3) ([#173](https://github.com/eliotlim/OpenBook/pull/173))
+- **server:** reseed canonical collab doc on restore + quiesce to close the clobber race (PVH-8) ([#175](https://github.com/eliotlim/OpenBook/pull/175))
+- **ui:** Library Manager — management settings screen + switcher Manage/status (LM-1/LM-2) ([#165](https://github.com/eliotlim/OpenBook/pull/165))
+- **ui:** unify page context menus (click + right-click) behind one shared action list (CM-2) ([#164](https://github.com/eliotlim/OpenBook/pull/164))
+- **ui:** enrich DB row context menu — open in tab/window + copy link (CM-3) ([#166](https://github.com/eliotlim/OpenBook/pull/166))
+- **ui:** persist side-pane target page in the URL (DL-3) ([#167](https://github.com/eliotlim/OpenBook/pull/167))
+- **ui:** Library Manager — desktop connect + signed-in discovery (LM-3/LM-4) ([#168](https://github.com/eliotlim/OpenBook/pull/168))
+- **ui:** addressable DB rows & groups in the URL + copy-link anchors (DL-2) ([#169](https://github.com/eliotlim/OpenBook/pull/169))
+- **ui:** right-click column header keeps quick actions + adds Edit property (CM-4) ([#170](https://github.com/eliotlim/OpenBook/pull/170))
+- **ui:** Version History pane — list, read-only preview, restore (PVH-4/5/7) ([#174](https://github.com/eliotlim/OpenBook/pull/174))
+- **ui:** Version History block/word-level diff (Compare) (PVH-6) ([#176](https://github.com/eliotlim/OpenBook/pull/176))
+
+### 🩹 Fixes
+
+- **db:** group-header context menu (rename/colour/collapse/delete) — fixes group right-click (CM-1) ([#162](https://github.com/eliotlim/OpenBook/pull/162))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+# 3.0.0 (2026-07-14)
+
+### 🚀 Features
+
+- **backups:** scheduled backups on by default (opt-out) with opt-out-preserving migration (B3) ([#156](https://github.com/eliotlim/OpenBook/pull/156))
+- ⚠️  **server:** remote MCP origin — conjunctive forwarded-guard + remote_ok tokens + R2/R4/R5/R6 (AGENT-10) ([#157](https://github.com/eliotlim/OpenBook/pull/157))
+- **ui:** dual-read/write `libraries`↔`workspaces` account-sync key (LIB-6) ([#158](https://github.com/eliotlim/OpenBook/pull/158))
+- **ui:** Library-folder relabel + Export to folder/backup actions with in-place feedback (B1/B2) ([#159](https://github.com/eliotlim/OpenBook/pull/159))
+
+### ⚠️  Breaking Changes
+
+- **server:** remote MCP origin — conjunctive forwarded-guard + remote_ok tokens + R2/R4/R5/R6 (AGENT-10)  ([#157](https://github.com/eliotlim/OpenBook/pull/157))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 2.2.0 (2026-07-13)
+
+### 🚀 Features
+
+- **ui:** dashboard cross-filter for DB-source charts (DASH-7) ([#153](https://github.com/eliotlim/OpenBook/pull/153))
+
+### 🩹 Fixes
+
+- **release:** build @book.dev/mcp before the desktop sidecar so bun can resolve it ([#152](https://github.com/eliotlim/OpenBook/pull/152))
+- **ui:** curve dependency arrows + paint desktop cover tint behind the titlebar glass ([#154](https://github.com/eliotlim/OpenBook/pull/154))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 2.1.0 (2026-07-13)
+
+### 🚀 Features
+
+- **ai:** model + thinking currency — Opus 4.8 default, adaptive thinking (AGENT-1) ([#140](https://github.com/eliotlim/OpenBook/pull/140))
+- **ai:** harden agent tool schemas + error feedback, raise maxSteps ([#144](https://github.com/eliotlim/OpenBook/pull/144))
+- **ai:** MCP client — in-app agent consumes external MCP servers (AGENT-3) ([#145](https://github.com/eliotlim/OpenBook/pull/145))
+- **mcp:** route writes through the suggestion-review layer ([#142](https://github.com/eliotlim/OpenBook/pull/142))
+- **server:** agent PAT credential — dark/default-off (AGENT-6) ([#148](https://github.com/eliotlim/OpenBook/pull/148))
+- **server:** remote HTTP MCP transport — dark/default-off (AGENT-5) ([#150](https://github.com/eliotlim/OpenBook/pull/150))
+- **ui:** database data source for kit charts (DASH-3) ([#143](https://github.com/eliotlim/OpenBook/pull/143))
+- **ui:** interactive kit charts — hover, highlight, context menu (DASH-2) ([#146](https://github.com/eliotlim/OpenBook/pull/146))
+- **ui:** KPI, heatmap, combo chart kinds (DASH-5) ([#149](https://github.com/eliotlim/OpenBook/pull/149), [#233246](https://github.com/eliotlim/OpenBook/issues/233246))
+- **ui:** dashboard template + build-flow + chart-view polish (DASH-6) ([#151](https://github.com/eliotlim/OpenBook/pull/151))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+# 2.0.0 (2026-07-13)
+
+### 🚀 Features
+
+- **app:** migrate localStorage openbook.workspaces -> openbook.libraries (LIB-3) ([#136](https://github.com/eliotlim/OpenBook/pull/136))
+- ⚠️  **app:** LIB-5 wire rename — roster v2 signer + dual-read consumer (workspaceId→libraryId) ([#138](https://github.com/eliotlim/OpenBook/pull/138))
+- **sdk:** export-format openbook.space.json → openbook.library.json + dual-read (LIB-4) ([#137](https://github.com/eliotlim/OpenBook/pull/137))
+- **settings:** merge Members into the Sharing tab ([#127](https://github.com/eliotlim/OpenBook/pull/127))
+- **share:** honest + simplified Share dialog ([#125](https://github.com/eliotlim/OpenBook/pull/125))
+- **templates:** showcase content — Pitch deck, calendar view, sample doc ([#126](https://github.com/eliotlim/OpenBook/pull/126))
+- **templates:** Team status dashboard + Product HQ showcase templates ([#128](https://github.com/eliotlim/OpenBook/pull/128))
+- **templates:** seed valid reading-list gallery covers ([#129](https://github.com/eliotlim/OpenBook/pull/129))
+- **templates:** guidance callouts + cross-DB rollup residuals ([#132](https://github.com/eliotlim/OpenBook/pull/132))
+
+### 🩹 Fixes
+
+- **sharing:** honest published-address visibility bridge (SHR-8/SHR-10) ([#131](https://github.com/eliotlim/OpenBook/pull/131))
+
+### ⚠️  Breaking Changes
+
+- **app:** LIB-5 wire rename — roster v2 signer + dual-read consumer (workspaceId→libraryId)  ([#138](https://github.com/eliotlim/OpenBook/pull/138))
+
+### ❤️ Thank You
+
+- Claude Opus 4.8
+- Eliot Lim @eliotlim
+
+## 1.76.2 (2026-07-12)
+
+### 🚀 Features
+
+- **database:** actionable view setup cards + new-property sentinels ([#121](https://github.com/eliotlim/OpenBook/pull/121))
+- **database:** view creation & customisation polish ([#123](https://github.com/eliotlim/OpenBook/pull/123))
+- **settings:** command-palette deep links + scope chips + cleanup ([#122](https://github.com/eliotlim/OpenBook/pull/122))
+- **templates:** gallery badges + section grouping ([#124](https://github.com/eliotlim/OpenBook/pull/124))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
+## 1.76.1 (2026-07-11)
+
+### 🩹 Fixes
+
+- **updater:** name macOS updater archives per-arch so the manifest can serve them ([#119](https://github.com/eliotlim/OpenBook/pull/119))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 1.76.0 (2026-07-10)
+
+### 🚀 Features
+
+- **ai:** usage + cost attribution to an admin-only, tamper-locked database ([#113](https://github.com/eliotlim/OpenBook/pull/113))
+- **db:** generalisable database auto-expiry (TTL) ([#112](https://github.com/eliotlim/OpenBook/pull/112))
+- **ui:** admin-only AI usage viewer + pricing/retention editor ([#115](https://github.com/eliotlim/OpenBook/pull/115))
+
+### 🩹 Fixes
+
+- **ai:** server-only provider API key + write-only settings entry ([#111](https://github.com/eliotlim/OpenBook/pull/111))
+- **ai:** lazily seed the usage DB on first AI use (no phantom page in fresh workspaces) ([#114](https://github.com/eliotlim/OpenBook/pull/114))
+- **e2e:** green main — retarget stale specs + fix update-preferences flake ([#116](https://github.com/eliotlim/OpenBook/pull/116), [#111](https://github.com/eliotlim/OpenBook/issues/111))
+- **ui:** titlebar tabs connect into the page + unify desk tint ([#117](https://github.com/eliotlim/OpenBook/pull/117))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Claude Opus 4.8 (1M context)
+- Eliot Lim @eliotlim
+
+## 1.75.0 (2026-07-06)
+
+### 🚀 Features
+
+- **ui:** kind-less reactive chart export uses the canonical data palette (OB-380) ([#110](https://github.com/eliotlim/OpenBook/pull/110), [#3](https://github.com/eliotlim/OpenBook/issues/3))
+
+### ❤️ Thank You
+
+- Claude Opus 4.8 (1M context)
+- Eliot Lim @eliotlim
+
+## 1.74.0 (2026-07-06)
+
+### 🚀 Features
+
+- **ui,sdk:** colour epic — full-accent sidebar option + soft-pastel data colours (integration) ([#107](https://github.com/eliotlim/OpenBook/pull/107), [#104](https://github.com/eliotlim/OpenBook/issues/104), [#105](https://github.com/eliotlim/OpenBook/issues/105))
+- **ui,sdk:** Data colours scheme control — Pastel/Vivid/Muted (OB-379) ([#109](https://github.com/eliotlim/OpenBook/pull/109), [#70](https://github.com/eliotlim/OpenBook/issues/70))
+
+### 🩹 Fixes
+
+- **ui:** buttons no longer shift or resize on click (colour-only press) ([#103](https://github.com/eliotlim/OpenBook/pull/103))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
+## 1.73.0 (2026-07-05)
+
+### 🚀 Features
+
+- **ui:** land the background update scheduler + one-click install button ([#101](https://github.com/eliotlim/OpenBook/pull/101), [#86](https://github.com/eliotlim/OpenBook/issues/86))
+- **ui,sdk,server,mcp:** retire EditorJS — de-name export IR to block-native, creators emit blockdoc ([#100](https://github.com/eliotlim/OpenBook/pull/100))
+
+### ❤️ Thank You
+
+- Claude Fable 5
+- Eliot Lim @eliotlim
+
 ## 1.72.0 (2026-07-05)
 
 ### 🚀 Features

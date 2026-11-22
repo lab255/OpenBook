@@ -177,7 +177,7 @@ test('inline toolbar formats a selection as bold rich-text runs', {tag: ['@edito
   await expect(page.locator('.obe-text strong')).toHaveCount(0);
 });
 
-test('drag a block beside another to create columns; mobile stays stacked', {tag: ['@editor']}, async ({page}) => {
+test('drag a block beside another to create columns; a narrow editor container stays stacked', {tag: ['@editor']}, async ({page}) => {
   await freshLab(page);
   const heading = page.locator('[data-block-row][data-block-type=todo]');
   const target = page.locator('[data-block-row][data-block-type=paragraph]').first();
@@ -191,11 +191,22 @@ test('drag a block beside another to create columns; mobile stays stacked', {tag
   await expect(page.locator('.obe-columns')).toBeVisible();
   await expect(page.locator('.obe-columns .obe-column')).toHaveCount(2);
 
-  // Mobile: the grid collapses to a stack (flex column).
-  await page.setViewportSize({width: 420, height: 800});
+  // Container query: a narrow pane stacks even while the browser window is wide.
+  await page.setViewportSize({width: 1280, height: 800});
+  await page.locator('.obe-root').evaluate((element) => { (element as HTMLElement).style.width = '420px'; });
   const direction = await page.locator('.obe-columns').evaluate((el) => getComputedStyle(el).flexDirection);
   expect(direction).toBe('column');
 });
+
+async function crossGutterClearance(page: import('@playwright/test').Page, row: import('@playwright/test').Locator): Promise<void> {
+  const text = (await row.locator('.obe-text').boundingBox())!;
+  const handle = (await row.locator('.obe-handle').boundingBox())!;
+  const centerY = handle.y + handle.height / 2;
+  await page.mouse.move(text.x + 2, centerY);
+  await expect(row.locator('.obe-gutter')).toHaveCSS('opacity', '1');
+  await page.mouse.move(handle.x + handle.width / 2, centerY, {steps: 20});
+  await expect(row.locator('.obe-gutter')).toHaveCSS('opacity', '1');
+}
 
 test('REAL mouse drag: handle drags a block beside another into columns', {tag: ['@editor']}, async ({page}) => {
   // Regression guard: making the handle a Radix menu trigger killed genuine
@@ -203,7 +214,7 @@ test('REAL mouse drag: handle drags a block beside another into columns', {tag: 
   // dragstart/drop dispatches kept passing. This test drags for real.
   await freshLab(page);
   const row = page.locator('[data-block-row][data-block-type=todo]');
-  await row.hover();
+  await crossGutterClearance(page, row);
   const target = page.locator('[data-block-row][data-block-type=paragraph]').first();
   const box = (await target.boundingBox())!;
   await row.locator('.obe-handle').dragTo(target, {targetPosition: {x: box.width * 0.95, y: box.height / 2}});
@@ -214,7 +225,7 @@ test('REAL mouse drag: handle drags a block beside another into columns', {tag: 
   // drag handle (the gutter only rendered at the top level) — once a block
   // entered a column it could never leave. Drag it back out below a root row.
   const inColumn = page.locator('.obe-columns [data-block-row][data-block-type=todo]');
-  await inColumn.hover();
+  await crossGutterClearance(page, inColumn);
   await expect(inColumn.locator('.obe-handle')).toBeVisible();
   const lastRoot = page.locator('.obe-root > [data-block-row]').last();
   const rootBox = (await lastRoot.boundingBox())!;
@@ -229,6 +240,17 @@ test('block selection: Escape selects, Backspace deletes, undo restores', {tag: 
   await caretAtEnd(page, 1);
   await page.keyboard.press('Escape');
   await expect(page.locator('.obe-row-selected')).toHaveCount(1);
+  for (const dark of [false, true]) {
+    await page.evaluate((enabled) => document.documentElement.classList.toggle('dark', enabled), dark);
+    const alpha = await page.locator('.obe-row-selected').evaluate((row) => {
+      const background = getComputedStyle(row, '::before').backgroundColor;
+      const match = background.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/);
+      return match ? Number(match[1]) : 1;
+    });
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThanOrEqual(0.2);
+  }
+  await page.evaluate(() => document.documentElement.classList.remove('dark'));
 
   await page.keyboard.press('Backspace');
   await expect(page.locator('[data-block-type=paragraph]')).toHaveCount(0);
@@ -237,6 +259,29 @@ test('block selection: Escape selects, Backspace deletes, undo restores', {tag: 
   await expect(page.locator('[data-block-type=paragraph]')).toHaveCount(1);
   await expect(page.locator('.obe-text').nth(1)).toContainText('A scratch document');
 });
+
+for (const level of [1, 2, 3]) {
+  test(`block selection: H${level} wash covers the heading line box`, {tag: ['@editor']}, async ({page}) => {
+    await freshLab(page);
+    // A non-first heading retains the space above that must not inset the wash's bottom.
+    await caretAtEnd(page, 1);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(`${'#'.repeat(level)} Heading wash`);
+    const heading = page.locator(`[data-block-row][data-block-type=heading][data-block-level="${level}"]`).last();
+    await expect(heading.locator('.obe-text')).toHaveText('Heading wash');
+    await page.keyboard.press('Escape');
+    await expect(heading).toHaveClass(/obe-row-selected/);
+
+    const geometry = await heading.evaluate((row) => ({
+      spaceAbove: parseFloat(getComputedStyle(row).paddingTop),
+      washHeight: parseFloat(getComputedStyle(row, '::before').height),
+      lineHeight: parseFloat(getComputedStyle(row.querySelector('.obe-text')!).lineHeight),
+    }));
+    expect(geometry.spaceAbove).toBeGreaterThan(0);
+    expect(geometry.lineHeight).toBeGreaterThan(0);
+    expect(geometry.washHeight).toBeGreaterThanOrEqual(geometry.lineHeight);
+  });
+}
 
 test('todo checkbox toggles and persists through reload', {tag: ['@editor']}, async ({page}) => {
   await freshLab(page);
@@ -374,6 +419,42 @@ test('reactive plugins: a slider drives live code (and legacy formulas still ren
   await expect(page.locator('.obe-formula-out')).toHaveText('15');
 });
 
+test('code block gutter centers on the first code line below its actions', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/code');
+  await page.keyboard.press('Enter');
+
+  const row = page.locator('[data-block-type="code"]').last();
+  const code = row.locator('.obe-codeblock .obe-text');
+  await code.click();
+  await page.keyboard.type('const total = 42;');
+
+  // A Range rect follows the first rendered glyph even when syntax highlighting
+  // wraps it in a token span; the editor/container rect would include padding.
+  const centerDelta = await row.evaluate((el) => {
+    const handle = el.querySelector<HTMLElement>('.obe-handle')!;
+    const text = el.querySelector<HTMLElement>('.obe-codeblock .obe-text')!;
+    const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT);
+    let first: Text | null = null;
+    while (!first) {
+      const node = walker.nextNode();
+      if (!node) break;
+      if ((node.textContent?.length ?? 0) > 0) first = node as Text;
+    }
+    if (!first) throw new Error('Code block has no rendered text node');
+    const range = document.createRange();
+    range.setStart(first, 0);
+    range.setEnd(first, 1);
+    const lineRect = range.getClientRects()[0];
+    const handleRect = handle.getBoundingClientRect();
+    return handleRect.top + handleRect.height / 2 - (lineRect.top + lineRect.height / 2);
+  });
+
+  expect(Math.abs(centerDelta)).toBeLessThanOrEqual(3);
+});
+
 test('block page: interactive HTML export stays live offline', {tag: ['@editor']}, async ({page, request, context}) => {
   // A legacy reactive page, migrated into the block editor on open.
   const res = await request.post(`${SERVER}/api/pages`, {
@@ -412,9 +493,13 @@ test('block page: interactive HTML export stays live offline', {tag: ['@editor']
   const viewer = await context.newPage();
   await viewer.route('**/*', (route) => route.abort());
   await viewer.setContent(html, {waitUntil: 'load'});
-  const out = viewer.locator('.expr [data-val]').first();
+  // The export hydrates the island-mounted OpenBookViewer over the static body;
+  // wait for its locked-but-interactive surface (only present post-hydration) so
+  // we don't read the pre-hydration static projection.
+  await expect(viewer.locator('.obe-present-blocks')).toBeVisible();
+  const out = viewer.locator('.obe-formula-out').first();
   await expect(out).toHaveText('6');
-  const input = viewer.locator('.slider input').first();
+  const input = viewer.locator('.obe-kit-slider input[type=range]').first();
   await input.fill('9');
   await input.dispatchEvent('input');
   await expect(out).toHaveText('18');
@@ -449,6 +534,278 @@ test('table cells are a grid: Enter moves down, Tab walks cells, Backspace never
   await page.locator('.obe-table .obe-text').nth(6).click();
   await page.keyboard.press('Enter');
   expect(await cellCounts()).toEqual([3, 3, 3, 3]);
+});
+
+test('table drag-reorder: row + column grips, menu moves, single undo', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.obe-table')).toBeVisible();
+
+  const rows = page.locator('.obe-table tbody > tr');
+  await expect(rows).toHaveCount(3);
+  // The slash table is born empty — type a marker into each row's first cell so
+  // a row reorder is observable by content (no select-all needed; cells blank).
+  for (let i = 0; i < 3; i += 1) {
+    await rows.nth(i).locator('.obe-text').first().click();
+    await page.keyboard.type(`R${i}`);
+  }
+  const firstCol = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.obe-table tbody > tr')].map((tr) => tr.querySelector('td .obe-text')!.textContent),
+    );
+  const headRow = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.obe-table tbody > tr')[0].querySelectorAll('td .obe-text')].map((e) => e.textContent),
+    );
+  expect(await firstCol()).toEqual(['R0', 'R1', 'R2']);
+  await page.waitForTimeout(600); // let the label edits settle into their own undo step
+
+  // Drag row 3 (index 2) above row 1 (index 0) — cell contents follow the grip.
+  // row grips are hover-revealed (TABLE-2) — reveal the grip as a real user would
+  await rows.nth(2).hover();
+  await rows.nth(2).locator('.obe-table-row-grip').dragTo(rows.nth(0), {targetPosition: {x: 4, y: 2}});
+  expect(await firstCol()).toEqual(['R2', 'R0', 'R1']);
+
+  // A single undo restores the original order (the move is one transact).
+  await page.locator('.obe-table .obe-text').first().click();
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await firstCol()).toEqual(['R0', 'R1', 'R2']);
+
+  // The context-menu move path (keyboard/a11y): move the top row down one.
+  await rows.nth(0).locator('.obe-text').first().click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Move row down'}).click();
+  expect(await firstCol()).toEqual(['R1', 'R0', 'R2']);
+
+  // Column drag: mark the top row's other two cells (still blank), then drag
+  // column 3 (index 2) to column 1 (index 0). Header content follows the grip.
+  await rows.nth(0).locator('td').nth(1).locator('.obe-text').click();
+  await page.keyboard.type('X');
+  await rows.nth(0).locator('td').nth(2).locator('.obe-text').click();
+  await page.keyboard.type('Y');
+  const headCells = rows.nth(0).locator('td');
+  expect(await headRow()).toEqual(['R1', 'X', 'Y']);
+  await headCells.nth(2).locator('.obe-table-col-grip').dragTo(headCells.nth(0), {targetPosition: {x: 20, y: 12}});
+  expect(await headRow()).toEqual(['Y', 'R1', 'X']);
+});
+
+test('table drag-reorder: after-last boundary — drop into bottom/right half lands last', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.obe-table')).toBeVisible();
+
+  const rows = page.locator('.obe-table tbody > tr');
+  await expect(rows).toHaveCount(3);
+  for (let i = 0; i < 3; i += 1) {
+    await rows.nth(i).locator('.obe-text').first().click();
+    await page.keyboard.type(`R${i}`);
+  }
+  const firstCol = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.obe-table tbody > tr')].map((tr) => tr.querySelector('td .obe-text')!.textContent),
+    );
+  const headRow = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('.obe-table tbody > tr')[0].querySelectorAll('td .obe-text')].map((e) => e.textContent),
+    );
+  expect(await firstCol()).toEqual(['R0', 'R1', 'R2']);
+  await page.waitForTimeout(600); // let the label edits settle into their own undo step
+
+  // Drag row 0 into the BOTTOM half of the LAST row (y near its bottom edge). This
+  // drives overRow's midpoint true-branch → dropIndex === rows.length (after-last),
+  // so the row must land LAST.
+  const lastRow = rows.nth(2);
+  const lastRowBox = (await lastRow.boundingBox())!;
+  // row grips are hover-revealed (TABLE-2) — reveal the grip as a real user would
+  await rows.nth(0).hover();
+  await rows.nth(0).locator('.obe-table-row-grip').dragTo(lastRow, {targetPosition: {x: 4, y: lastRowBox.height - 2}});
+  expect(await firstCol()).toEqual(['R1', 'R2', 'R0']);
+
+  // Column: mark the header row's other two cells, then drag column 0 into the
+  // RIGHT half of the LAST column (x near its right edge) → dropIndex === cols
+  // (after-last), so the column must land LAST.
+  const header = rows.nth(0);
+  await header.locator('td').nth(1).locator('.obe-text').click();
+  await page.keyboard.type('X');
+  await header.locator('td').nth(2).locator('.obe-text').click();
+  await page.keyboard.type('Y');
+  const headCells = header.locator('td');
+  expect(await headRow()).toEqual(['R1', 'X', 'Y']);
+  const lastColBox = (await headCells.nth(2).boundingBox())!;
+  await headCells.nth(0).locator('.obe-table-col-grip').dragTo(headCells.nth(2), {targetPosition: {x: lastColBox.width - 2, y: 12}});
+  expect(await headRow()).toEqual(['X', 'Y', 'R1']);
+});
+
+test('multi-cell selection: no-cell-focused paste still makes a new table, delete clears + undo restores', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.obe-table')).toBeVisible();
+
+  // Fill the top-left 2×2 of the (3-col) slash table: cell indices 0,1,3,4.
+  const cellText = page.locator('.obe-table .obe-text');
+  const vals: Record<number, string> = {0: 'A1', 1: 'B1', 3: 'A2', 4: 'B2'};
+  for (const [i, v] of Object.entries(vals)) {
+    await cellText.nth(Number(i)).click();
+    await page.keyboard.type(v);
+  }
+  await page.waitForTimeout(500); // let the fills settle into their own undo step
+
+  // REAL mouse drag from cell (0,0) to cell (1,1) → a live 2×2 rectangle.
+  const td = page.locator('.obe-table td');
+  const dragCells = async (fromIdx: number, toIdx: number) => {
+    const a = (await td.nth(fromIdx).boundingBox())!;
+    const b = (await td.nth(toIdx).boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, {steps: 10});
+    await page.mouse.up();
+  };
+  await dragCells(0, 4);
+  await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(4);
+
+  // Copy the range, then paste into a fresh empty paragraph → a NEW table.
+  await page.keyboard.press('ControlOrMeta+c');
+  await page.locator('.obe-text').first().click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter'); // empty paragraph, outside any table
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect(page.locator('.obe-table')).toHaveCount(2);
+  // The pasted table (inserted near the top) carries the same 2×2 grid.
+  const pastedGrid = await page.evaluate(() => {
+    const t = document.querySelectorAll('.obe-table')[0];
+    return [...t.querySelectorAll('tbody > tr')].map((tr) => [...tr.querySelectorAll('td .obe-text')].map((c) => c.textContent));
+  });
+  expect(pastedGrid).toEqual([
+    ['A1', 'B1'],
+    ['A2', 'B2'],
+  ]);
+
+  // Re-select the ORIGINAL table's 2×2 (now the second table), clear it, undo it.
+  const orig = page.locator('.obe-table').nth(1).locator('td');
+  const dragOrig = async (fromIdx: number, toIdx: number) => {
+    const a = (await orig.nth(fromIdx).boundingBox())!;
+    const b = (await orig.nth(toIdx).boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, {steps: 10});
+    await page.mouse.up();
+  };
+  await page.waitForTimeout(500);
+  await dragOrig(0, 4);
+  await expect(page.locator('.obe-table').nth(1).locator('td.obe-cell-selected')).toHaveCount(4);
+  const origTexts = () =>
+    page.evaluate(() =>
+      [0, 1, 3, 4].map((i) => document.querySelectorAll('.obe-table')[1].querySelectorAll('td .obe-text')[i].textContent),
+    );
+  await page.keyboard.press('Delete');
+  expect(await origTexts()).toEqual(['', '', '', '']);
+  await page.keyboard.press('ControlOrMeta+z'); // one undo restores all four
+  expect(await origTexts()).toEqual(['A1', 'B1', 'A2', 'B2']);
+});
+
+for (const trigger of ['More cell actions', 'Cell colour']) {
+  test(`table range toolbar opens ${trigger} on mouse click`, {tag: ['@editor', '@p1']}, async ({page}) => {
+    await freshLab(page);
+    await caretAtEnd(page, 2);
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/table');
+    await page.keyboard.press('Enter');
+
+    const cells = page.locator('.obe-table td');
+    const first = (await cells.nth(0).boundingBox())!;
+    const last = (await cells.nth(4).boundingBox())!;
+    await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, {steps: 10});
+    await page.mouse.up();
+    await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(4);
+
+    const toolbar = page.getByRole('toolbar', {name: 'Cell selection actions'});
+    await toolbar.getByRole('button', {name: trigger}).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    if (trigger === 'More cell actions') {
+      await expect(page.getByRole('menu').getByRole('menuitem', {name: 'Insert 2 rows above'})).toBeVisible();
+    }
+  });
+}
+
+test('table range toolbar clears a dragged 2x2 selection', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+
+  const textCells = page.locator('.obe-table .obe-text');
+  for (const index of [0, 1, 3, 4]) {
+    await textCells.nth(index).click();
+    await page.keyboard.type(`value-${index}`);
+  }
+  const cells = page.locator('.obe-table td');
+  const first = (await cells.nth(0).boundingBox())!;
+  const last = (await cells.nth(4).boundingBox())!;
+  await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, {steps: 10});
+  await page.mouse.up();
+
+  await expect(page.getByRole('toolbar', {name: 'Cell selection actions'})).toBeVisible();
+  await page.getByRole('toolbar', {name: 'Cell selection actions'}).getByRole('button', {name: 'Clear contents'}).click();
+  await expect.poll(() => textCells.evaluateAll((elements) => [0, 1, 3, 4].map((index) => elements[index].textContent))).toEqual(['', '', '', '']);
+});
+
+test('table paste: a copied 2x2 range fills the selected 2x2 cells', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await page.locator('.obe-table-add-row').click();
+  await page.locator('.obe-table-add-col').click();
+
+  const cellText = page.locator('.obe-table .obe-text');
+  for (const [index, value] of [[0, 'A1'], [1, 'B1'], [4, 'A2'], [5, 'B2']] as const) {
+    await cellText.nth(index).click();
+    await page.keyboard.type(value);
+  }
+  const cells = page.locator('.obe-table td');
+  const dragCells = async (from: number, to: number) => {
+    const a = (await cells.nth(from).boundingBox())!;
+    const b = (await cells.nth(to).boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, {steps: 10});
+    await page.mouse.up();
+  };
+
+  await dragCells(0, 5);
+  const clipboard = await page.evaluate(() => {
+    const dt = new DataTransfer();
+    document.dispatchEvent(new ClipboardEvent('copy', {clipboardData: dt, bubbles: true, cancelable: true}));
+    return {html: dt.getData('text/html'), text: dt.getData('text/plain')};
+  });
+  await dragCells(10, 15);
+  await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(4);
+  await page.evaluate(({html, text}) => {
+    const dt = new DataTransfer();
+    dt.setData('text/html', html);
+    dt.setData('text/plain', text);
+    document.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));
+  }, clipboard);
+
+  await expect(cellText.nth(10)).toHaveText('A1');
+  await expect(cellText.nth(11)).toHaveText('B1');
+  await expect(cellText.nth(14)).toHaveText('A2');
+  await expect(cellText.nth(15)).toHaveText('B2');
 });
 
 test('cross-block selection becomes block selection and deletes cleanly', {tag: ['@editor']}, async ({page}) => {
@@ -630,4 +987,330 @@ test('table editing: type in cells, add a row and a column', {tag: ['@editor']},
   await expect(page.locator('.obe-table tr')).toHaveCount(4);
   await page.locator('.obe-table-add-col').click();
   await expect(page.locator('.obe-table tr').first().locator('td')).toHaveCount(4);
+});
+
+// TBL-3: right-click inside a cell opens the table's Row/Column menu (not the
+// generic block menu), and its positional ops mutate the grid.
+test('table cell context menu: insert row, delete column, toggle header', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.obe-table')).toBeVisible();
+  await expect(page.locator('.obe-table tr')).toHaveCount(3);
+  await expect(page.locator('.obe-table tr').first().locator('td')).toHaveCount(3);
+
+  // Right-click the first cell → the table cell menu, not the block menu.
+  await page.locator('.obe-table td').first().click({button: 'right'});
+  await expect(page.getByRole('menuitem', {name: 'Insert row below'})).toBeVisible();
+  await page.getByRole('menuitem', {name: 'Insert row below'}).click();
+  await expect(page.locator('.obe-table tr')).toHaveCount(4);
+
+  // Delete a column via the menu.
+  await page.locator('.obe-table td').first().click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Delete column'}).click();
+  await expect(page.locator('.obe-table tr').first().locator('td')).toHaveCount(2);
+
+  // Toggle the header row off.
+  await expect(page.locator('.obe-table-header')).toHaveCount(1);
+  await page.locator('.obe-table td').first().click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Toggle header row'}).click();
+  await expect(page.locator('.obe-table-header')).toHaveCount(0);
+});
+
+test('table colours: tint a row and a column via the menu; row wins (TBL-4)', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.obe-table')).toBeVisible();
+  await expect(page.locator('.obe-table tr')).toHaveCount(3);
+
+  const rows = page.locator('.obe-table tr');
+  // Tint row 1 (a body row) green via the "Row colour" submenu.
+  await rows.nth(1).locator('td').first().click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Row colour'}).hover();
+  await page.getByRole('menuitem', {name: 'Green'}).click();
+  await expect(rows.nth(1).locator('td.obe-bg-green')).toHaveCount(3);
+
+  // Tint column 0 blue via the "Column colour" submenu.
+  await rows.nth(0).locator('td').first().click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Column colour'}).hover();
+  await page.getByRole('menuitem', {name: 'Blue'}).click();
+  // Column 0 is blue in the untinted rows; the row-1 cell stays green (row wins).
+  await expect(rows.nth(0).locator('td').first()).toHaveClass(/obe-bg-blue/);
+  await expect(rows.nth(2).locator('td').first()).toHaveClass(/obe-bg-blue/);
+  await expect(rows.nth(1).locator('td').first()).toHaveClass(/obe-bg-green/);
+
+  // Clear the row tint; column blue then shows through at the intersection.
+  await rows.nth(1).locator('td').first().click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Row colour'}).hover();
+  await page.getByRole('menuitem', {name: 'Default'}).click();
+  await expect(rows.nth(1).locator('td').first()).toHaveClass(/obe-bg-blue/);
+  await expect(rows.nth(1).locator('td.obe-bg-green')).toHaveCount(0);
+});
+
+test('range-aware cell menu: right-click inside a selection tints/deletes the whole range (TBL-6)', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.obe-table')).toBeVisible();
+  await expect(page.locator('.obe-table tr')).toHaveCount(3);
+
+  // REAL mouse drag over the top two rows of the 3-column table → a 2×3 range.
+  const td = page.locator('.obe-table td');
+  const dragCells = async (fromIdx: number, toIdx: number) => {
+    const a = (await td.nth(fromIdx).boundingBox())!;
+    const b = (await td.nth(toIdx).boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, {steps: 10});
+    await page.mouse.up();
+  };
+  await dragCells(0, 5);
+  await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(6);
+
+  // Right-click a cell INSIDE the rectangle → the RANGE variant, with the exact
+  // selected counts and none of the single-cell row/column items.
+  await td.nth(1).click({button: 'right'});
+  await expect(page.getByText('Selection · 2 × 3')).toBeVisible();
+  await expect(page.getByRole('menuitem', {name: 'Clear contents'})).toBeVisible();
+  await expect(page.getByRole('menuitem', {name: 'Delete 2 rows'})).toBeVisible();
+  await expect(page.getByRole('menuitem', {name: 'Delete table'})).toBeVisible();
+  await expect(page.getByRole('menuitem', {name: 'Duplicate row'})).toHaveCount(0);
+
+  // Tint every selected cell green in one step.
+  await page.getByRole('menuitem', {name: 'Cell colour'}).hover();
+  await page.getByRole('menuitem', {name: 'Green'}).click();
+  await expect(page.locator('.obe-table td.obe-bg-green')).toHaveCount(6);
+  await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(6);
+  await expect(page.locator('.obe-table tr').nth(2).locator('td.obe-bg-green')).toHaveCount(0);
+  // Paint-level guard: the selected cell must compute to the SAME green as a
+  // plain palette cell while the ring + wash remain layered above it. The old
+  // high-specificity `background:` selection shorthand made these differ even
+  // though the td carried both classes, so class assertions alone missed P1.
+  const selectedPaint = await page.locator('.obe-table td.obe-bg-green.obe-cell-selected').first().evaluate((cell) => {
+    const probe = document.createElement('div');
+    probe.className = 'obe-bg-green';
+    document.body.append(probe);
+    const expectedBackground = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const computed = getComputedStyle(cell);
+    return {background: computed.backgroundColor, expectedBackground, shadow: computed.boxShadow};
+  });
+  expect(selectedPaint.background).toBe(selectedPaint.expectedBackground);
+  expect(selectedPaint.shadow.match(/inset/g)).toHaveLength(1);
+  const outline = page.locator('.obe-table-range');
+  await expect(outline).toHaveCount(1);
+  await expect(outline).toBeVisible();
+  const union = await page.locator('.obe-table td.obe-cell-selected').evaluateAll((cells) => {
+    const boxes = cells.map((cell) => cell.getBoundingClientRect());
+    const left = Math.min(...boxes.map((box) => box.left));
+    const top = Math.min(...boxes.map((box) => box.top));
+    return {x: left, y: top, width: Math.max(...boxes.map((box) => box.right)) - left, height: Math.max(...boxes.map((box) => box.bottom)) - top};
+  });
+  const outlineBox = (await outline.boundingBox())!;
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
+    expect(Math.abs(outlineBox[key] - union[key])).toBeLessThanOrEqual(1.5);
+  }
+
+  const toolbarBox = (await page.getByRole('toolbar', {name: 'Cell selection actions'}).boundingBox())!;
+  expect(Math.abs(toolbarBox.x - union.x)).toBeLessThanOrEqual(1.5);
+  expect(toolbarBox.width).toBe(128);
+
+  // Use the rightmost outside cell, clear of the range's left-aligned toolbar.
+  // A right-click OUTSIDE the rectangle still opens the single-cell menu.
+  await td.nth(8).click({button: 'right'});
+  await expect(page.getByRole('menuitem', {name: 'Duplicate row'})).toBeVisible();
+  await expect(page.getByRole('menuitem', {name: 'Clear contents'})).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Delete the selected rows: exactly two go, and the stale highlight is dropped.
+  await dragCells(0, 5);
+  await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(6);
+  await td.nth(0).click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Delete 2 rows'}).click();
+  await expect(page.locator('.obe-table tr')).toHaveCount(1);
+  await expect(page.locator('.obe-table td.obe-cell-selected')).toHaveCount(0);
+});
+
+test('range menu inserts the selected row count below (TBL-10)', {tag: ['@editor', '@p1']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 2);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/table');
+  await page.keyboard.press('Enter');
+  const table = page.locator('.obe-table');
+  await expect(table.locator('tr')).toHaveCount(3);
+  const cells = table.locator('td');
+  const first = (await cells.nth(0).boundingBox())!;
+  const last = (await cells.nth(4).boundingBox())!;
+  await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(last.x + last.width / 2, last.y + last.height / 2, {steps: 10});
+  await page.mouse.up();
+  await expect(table.locator('td.obe-cell-selected')).toHaveCount(4);
+  await cells.nth(0).click({button: 'right'});
+  await page.getByRole('menuitem', {name: 'Insert 2 rows below'}).click();
+  await expect(table.locator('tr')).toHaveCount(5);
+});
+
+// ── Marquee (rubber-band) select + shift-click extension (SEL-1) ─────────────
+
+/** Grow the lab from its 3 seeded blocks to 5 top-level blocks. */
+async function fiveBlocks(page: import('@playwright/test').Page): Promise<void> {
+  const rows = page.locator('.obe-root > [data-block-row]');
+  // freshLab only waits for the FIRST block — wait for the whole seed (3 rows)
+  // before driving the caret, or a click can miss a not-yet-rendered row.
+  await expect(rows).toHaveCount(3);
+  await page.locator('.obe-text').nth(2).click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('four');
+  await expect(rows).toHaveCount(4);
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('five');
+  await expect(rows).toHaveCount(5);
+}
+
+test('marquee: drag over empty space selects the intersected blocks', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await fiveBlocks(page);
+  // The UndoManager coalesces edits within 400ms — pause so the later delete
+  // is its own undo step (one undo restores the five blocks, not the typing).
+  await page.waitForTimeout(500);
+
+  const rows = page.locator('.obe-root > [data-block-row]');
+  const r2 = (await rows.nth(2).boundingBox())!;
+  const r4 = (await rows.nth(4).boundingBox())!;
+  // Start in the empty page space below the last block and drag diagonally up
+  // into row 2 — the rectangle sweeps the last three rows (2, 3, 4). A diagonal
+  // (not straight-up) drag gives the rect real width so the overlay is visible.
+  await page.mouse.move(r4.x + r4.width * 0.75, r4.y + r4.height + 24);
+  await page.mouse.down();
+  await page.mouse.move(r4.x + r4.width * 0.5, r4.y, {steps: 6});
+  await page.mouse.move(r4.x + r4.width * 0.25, r2.y + r2.height / 2, {steps: 6});
+  // The marquee overlay is visible while dragging.
+  await expect(page.locator('.obe-marquee')).toBeVisible();
+  await page.mouse.up();
+
+  await expect(page.locator('.obe-row-selected')).toHaveCount(3);
+  // Release keeps the selection; the overlay is gone.
+  await expect(page.locator('.obe-marquee')).toHaveCount(0);
+
+  // Backspace deletes the three; undo restores all five.
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('.obe-root > [data-block-row]')).toHaveCount(2);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(page.locator('.obe-root > [data-block-row]')).toHaveCount(5);
+});
+
+test('marquee: right-click bulk delete removes three blocks and one undo restores them', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await fiveBlocks(page);
+  // Guard captureTimeout=400 merging: isolate the bulk command from fiveBlocks' typing.
+  await page.waitForTimeout(500);
+
+  const rows = page.locator('.obe-root > [data-block-row]');
+  const r2 = (await rows.nth(2).boundingBox())!;
+  const r4 = (await rows.nth(4).boundingBox())!;
+  await page.mouse.move(r4.x + r4.width * 0.75, r4.y + r4.height + 24);
+  await page.mouse.down();
+  await page.mouse.move(r4.x + r4.width * 0.5, r4.y, {steps: 6});
+  await page.mouse.move(r4.x + r4.width * 0.25, r2.y + r2.height / 2, {steps: 6});
+  await page.mouse.up();
+  await expect(page.locator('.obe-row-selected')).toHaveCount(3);
+
+  // A selected row scopes the context menu to the whole marquee selection.
+  await rows.nth(3).click({button: 'right', position: {x: r2.width / 2, y: r2.height / 2}});
+  await expect(page.getByText('3 blocks selected', {exact: true})).toBeVisible();
+  await expect(page.getByRole('menuitem', {name: 'Duplicate 3'})).toBeVisible();
+  await page.getByRole('menuitem', {name: 'Delete 3'}).click();
+  await expect(rows).toHaveCount(2);
+
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(rows).toHaveCount(5);
+});
+
+test('marquee: a plain click on empty space still clears the selection', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await caretAtEnd(page, 1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.obe-row-selected')).toHaveCount(1);
+
+  // A click (no drag) on the empty area below the blocks clears — no marquee.
+  const root = (await page.locator('.obe-root').boundingBox())!;
+  await page.mouse.click(root.x + root.width / 2, root.y + root.height - 20);
+  await expect(page.locator('.obe-row-selected')).toHaveCount(0);
+  await expect(page.locator('.obe-marquee')).toHaveCount(0);
+});
+
+test('shift-click extends the block selection contiguously', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await fiveBlocks(page);
+
+  // Select the second block (index 1) via the existing Escape path.
+  await caretAtEnd(page, 1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.obe-row-selected')).toHaveCount(1);
+
+  // Shift-click the fourth block (index 3) → contiguous range 1..3.
+  const rows = page.locator('.obe-root > [data-block-row]');
+  await rows.nth(3).click({modifiers: ['Shift'], position: {x: 40, y: 8}});
+  await expect(page.locator('.obe-row-selected')).toHaveCount(3);
+  await expect(rows.nth(1)).toHaveClass(/obe-row-selected/);
+  await expect(rows.nth(3)).toHaveClass(/obe-row-selected/);
+  await expect(rows.nth(0)).not.toHaveClass(/obe-row-selected/);
+});
+
+// ── Multi-block drag (SEL-2) ────────────────────────────────────────────────
+
+/** Text of each top-level row, in document order. */
+const rowOrder = (page: import('@playwright/test').Page): Promise<string[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.obe-root > [data-block-row]')].map(
+      (row) => row.querySelector('.obe-text')?.textContent ?? '',
+    ),
+  );
+
+test('SEL-2 multi-drag: marquee 3 blocks, group-drag to the top, one undo restores', {tag: ['@editor']}, async ({page}) => {
+  await freshLab(page);
+  await fiveBlocks(page);
+  // Let the typing settle into its own undo step (400ms coalesce window), so the
+  // later group-move is a distinct, single undo.
+  await page.waitForTimeout(500);
+
+  const rows = page.locator('.obe-root > [data-block-row]');
+  const before = await rowOrder(page); // [s0, s1, s2, four, five]
+
+  // Marquee-select the last three rows (2, 3, 4) — same sweep the marquee test uses.
+  const r2 = (await rows.nth(2).boundingBox())!;
+  const r4 = (await rows.nth(4).boundingBox())!;
+  await page.mouse.move(r4.x + r4.width * 0.75, r4.y + r4.height + 24);
+  await page.mouse.down();
+  await page.mouse.move(r4.x + r4.width * 0.5, r4.y, {steps: 6});
+  await page.mouse.move(r4.x + r4.width * 0.25, r2.y + r2.height / 2, {steps: 6});
+  await page.mouse.up();
+  await expect(page.locator('.obe-row-selected')).toHaveCount(3);
+  const moved = before.slice(2); // [s2, four, five]
+
+  // Grab a SELECTED row's handle and drop above the first row: the whole
+  // selection moves to the top as one block, in its original relative order.
+  await rows.nth(2).hover();
+  const target = rows.nth(0);
+  const tb = (await target.boundingBox())!;
+  await rows.nth(2).locator('.obe-handle').dragTo(target, {targetPosition: {x: tb.width / 2, y: tb.height * 0.15}});
+
+  await expect(rows).toHaveCount(5);
+  await expect.poll(() => rowOrder(page)).toEqual([...moved, before[0], before[1]]);
+
+  // A single undo restores the original order (one transaction). Focus a text
+  // block first — the undo shortcut lives on the focused block.
+  await rows.nth(0).locator('.obe-text').click();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => rowOrder(page)).toEqual(before);
 });

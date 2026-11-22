@@ -1,0 +1,653 @@
+{
+  "method": "Native Chromium Canvas2d, DPR 1, same machine; 500 settled strokes plus >1000 active points. Synthetic mouse input, per-rAF changed-pixel availability, not physical presentation. Active samples are unsimplified; pointerup decimates storage at the unchanged 0.5-world-unit bound.",
+  "conditions": [
+    {
+      "condition": "desktop mouse synthetic/local",
+      "presence": null,
+      "n": 12,
+      "median": 1.7500000596046448,
+      "worst": 2.799999952316284,
+      "samples": [
+        {
+          "run": 1,
+          "activePointsBeforeSample": 1001,
+          "ms": 1.8000000715255737,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 2,
+          "activePointsBeforeSample": 1002,
+          "ms": 2.200000047683716,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 3,
+          "activePointsBeforeSample": 1003,
+          "ms": 2.799999952316284,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 4,
+          "activePointsBeforeSample": 1004,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 5,
+          "activePointsBeforeSample": 1005,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 6,
+          "activePointsBeforeSample": 1006,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 7,
+          "activePointsBeforeSample": 1007,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 8,
+          "activePointsBeforeSample": 1008,
+          "ms": 2.0999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 9,
+          "activePointsBeforeSample": 1009,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 10,
+          "activePointsBeforeSample": 1010,
+          "ms": 2.200000047683716,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 11,
+          "activePointsBeforeSample": 1011,
+          "ms": 2.399999976158142,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 12,
+          "activePointsBeforeSample": 1012,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        }
+      ],
+      "beforeUp": 500,
+      "persistence": {
+        "shapes": 501,
+        "longestPoints": 126,
+        "reloadEquivalent": true
+      }
+    },
+    {
+      "condition": "trackpad-class mouse pointer synthetic/local",
+      "presence": null,
+      "n": 12,
+      "median": 1.7000000476837158,
+      "worst": 4.100000023841858,
+      "samples": [
+        {
+          "run": 1,
+          "activePointsBeforeSample": 1003,
+          "ms": 1.7999999523162842,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 2,
+          "activePointsBeforeSample": 1006,
+          "ms": 1.5999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 3,
+          "activePointsBeforeSample": 1009,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 4,
+          "activePointsBeforeSample": 1012,
+          "ms": 2,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 5,
+          "activePointsBeforeSample": 1015,
+          "ms": 1.8000000715255737,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 6,
+          "activePointsBeforeSample": 1018,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 7,
+          "activePointsBeforeSample": 1021,
+          "ms": 4.100000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 8,
+          "activePointsBeforeSample": 1024,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 9,
+          "activePointsBeforeSample": 1027,
+          "ms": 1.5999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 10,
+          "activePointsBeforeSample": 1030,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 11,
+          "activePointsBeforeSample": 1033,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 12,
+          "activePointsBeforeSample": 1036,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        }
+      ],
+      "beforeUp": 500,
+      "persistence": {
+        "shapes": 501,
+        "longestPoints": 127,
+        "reloadEquivalent": true
+      }
+    },
+    {
+      "condition": "desktop mouse synthetic/peer positions at 10Hz",
+      "presence": {
+        "emitted": 10,
+        "at": [
+          755.3000000715256,
+          860.3999999761581,
+          963.7000000476837,
+          1065.5,
+          1168.1000000238419,
+          1270.5,
+          1376.7000000476837,
+          1479,
+          1581.7000000476837,
+          1685.5
+        ],
+        "visible": true
+      },
+      "n": 60,
+      "median": 1.6999999284744263,
+      "worst": 3,
+      "samples": [
+        {
+          "run": 1,
+          "activePointsBeforeSample": 1001,
+          "ms": 1.7999999523162842,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 2,
+          "activePointsBeforeSample": 1002,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 3,
+          "activePointsBeforeSample": 1003,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 4,
+          "activePointsBeforeSample": 1004,
+          "ms": 1.5,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 5,
+          "activePointsBeforeSample": 1005,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 6,
+          "activePointsBeforeSample": 1006,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 7,
+          "activePointsBeforeSample": 1007,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 8,
+          "activePointsBeforeSample": 1008,
+          "ms": 2.0999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 9,
+          "activePointsBeforeSample": 1009,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 10,
+          "activePointsBeforeSample": 1010,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 11,
+          "activePointsBeforeSample": 1011,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 12,
+          "activePointsBeforeSample": 1012,
+          "ms": 2.200000047683716,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 13,
+          "activePointsBeforeSample": 1013,
+          "ms": 1.5,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 14,
+          "activePointsBeforeSample": 1014,
+          "ms": 1.5999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 15,
+          "activePointsBeforeSample": 1015,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 16,
+          "activePointsBeforeSample": 1016,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 17,
+          "activePointsBeforeSample": 1017,
+          "ms": 2.100000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 18,
+          "activePointsBeforeSample": 1018,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 19,
+          "activePointsBeforeSample": 1019,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 20,
+          "activePointsBeforeSample": 1020,
+          "ms": 1.7999999523162842,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 21,
+          "activePointsBeforeSample": 1021,
+          "ms": 2.399999976158142,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 22,
+          "activePointsBeforeSample": 1022,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 23,
+          "activePointsBeforeSample": 1023,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 24,
+          "activePointsBeforeSample": 1024,
+          "ms": 2.0999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 25,
+          "activePointsBeforeSample": 1025,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 26,
+          "activePointsBeforeSample": 1026,
+          "ms": 1.8000000715255737,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 27,
+          "activePointsBeforeSample": 1027,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 28,
+          "activePointsBeforeSample": 1028,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 29,
+          "activePointsBeforeSample": 1029,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 30,
+          "activePointsBeforeSample": 1030,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 31,
+          "activePointsBeforeSample": 1031,
+          "ms": 1.5999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 32,
+          "activePointsBeforeSample": 1032,
+          "ms": 1.5999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 33,
+          "activePointsBeforeSample": 1033,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 34,
+          "activePointsBeforeSample": 1034,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 35,
+          "activePointsBeforeSample": 1035,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 36,
+          "activePointsBeforeSample": 1036,
+          "ms": 1.7999999523162842,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 37,
+          "activePointsBeforeSample": 1037,
+          "ms": 1.8000000715255737,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 38,
+          "activePointsBeforeSample": 1038,
+          "ms": 1.8000000715255737,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 39,
+          "activePointsBeforeSample": 1039,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 40,
+          "activePointsBeforeSample": 1040,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 41,
+          "activePointsBeforeSample": 1041,
+          "ms": 1.5999999046325684,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 42,
+          "activePointsBeforeSample": 1042,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 43,
+          "activePointsBeforeSample": 1043,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 44,
+          "activePointsBeforeSample": 1044,
+          "ms": 1.7999999523162842,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 45,
+          "activePointsBeforeSample": 1045,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 46,
+          "activePointsBeforeSample": 1046,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 47,
+          "activePointsBeforeSample": 1047,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 48,
+          "activePointsBeforeSample": 1048,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 49,
+          "activePointsBeforeSample": 1049,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 50,
+          "activePointsBeforeSample": 1050,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 51,
+          "activePointsBeforeSample": 1051,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 52,
+          "activePointsBeforeSample": 1052,
+          "ms": 1.899999976158142,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 53,
+          "activePointsBeforeSample": 1053,
+          "ms": 1.600000023841858,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 54,
+          "activePointsBeforeSample": 1054,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 55,
+          "activePointsBeforeSample": 1055,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 56,
+          "activePointsBeforeSample": 1056,
+          "ms": 3,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 57,
+          "activePointsBeforeSample": 1057,
+          "ms": 2.1999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 58,
+          "activePointsBeforeSample": 1058,
+          "ms": 1.6999999284744263,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 59,
+          "activePointsBeforeSample": 1059,
+          "ms": 1.7000000476837158,
+          "frames": 1,
+          "changed": true
+        },
+        {
+          "run": 60,
+          "activePointsBeforeSample": 1060,
+          "ms": 2.9000000953674316,
+          "frames": 1,
+          "changed": true
+        }
+      ],
+      "beforeUp": 500,
+      "persistence": {
+        "shapes": 501,
+        "longestPoints": 127,
+        "reloadEquivalent": true
+      }
+    }
+  ]
+}

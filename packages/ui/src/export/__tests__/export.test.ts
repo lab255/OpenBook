@@ -1,5 +1,9 @@
 import {describe, it, expect} from 'vitest';
-import type {PageSnapshot} from '@book.dev/sdk';
+import pdfSource from '../toPdf.ts?raw';
+import {DATA_PALETTE, type PageSnapshot} from '@book.dev/sdk';
+import {COLOR_EXPORT_HEX, COLOR_EXPORT_HEX_DARK, KIT_EXPORT_PRIMARY} from '../../blockeditor/colors';
+import {blocksToMarkdown, projectBlocksForExport} from '../../blockeditor/exportBlocks';
+import type {BlockJSON} from '../../blockeditor/model';
 import {buildDocumentModel, parseInline, runsToText} from '../documentModel';
 import {toMarkdown} from '../toMarkdown';
 import {toHtml, toHtmlSite, toSlideDeck} from '../toHtml';
@@ -97,6 +101,73 @@ describe('toMarkdown', () => {
     expect(md).toContain('```\nconst x = 1\n```');
     expect(md).toContain('**months** = 120');
   });
+
+  it('keeps compact merged-table cells in their rendered columns through both Markdown paths', () => {
+    const blocks: BlockJSON[] = [
+      {
+        id: 'table',
+        type: 'table',
+        children: [
+          {
+            id: 'row0',
+            type: 'row',
+            children: [
+              {id: 'r0c0', type: 'cell', text: [{t: 'wide'}], props: {colspan: 2, rowspan: 2}},
+              {id: 'r0c2', type: 'cell', text: [{t: 'r0c2'}]},
+            ],
+          },
+          {id: 'row1', type: 'row', children: [{id: 'r1c2', type: 'cell', text: [{t: 'r1c2'}]}]},
+          {
+            id: 'row2',
+            type: 'row',
+            children: [
+              {id: 'r2c0', type: 'cell', text: [{t: 'r2c0'}]},
+              {id: 'r2c1', type: 'cell', text: [{t: 'r2c1'}]},
+              {id: 'r2c2', type: 'cell', text: [{t: 'r2c2'}]},
+            ],
+          },
+        ],
+      },
+    ];
+    const projected = projectBlocksForExport(blocks);
+    const markdownPaths = [
+      blocksToMarkdown(blocks),
+      toMarkdown(
+        buildDocumentModel({title: 'T', icon: '', snapshot: snapshot(projected.blocks, projected.values, projected.names)}),
+      ),
+    ];
+    const cells = (line: string): string[] => line.split('|').slice(1, -1).map((value) => value.trim());
+    for (const markdown of markdownPaths) {
+      const tableRows = markdown.split('\n').filter((line) => line.startsWith('| ') && !line.includes('---'));
+      expect(tableRows.map(cells)).toEqual([
+        ['wide', '', 'r0c2'],
+        ['', '', 'r1c2'],
+        ['r2c0', 'r2c1', 'r2c2'],
+      ]);
+    }
+  });
+});
+
+describe('stored callout variants', () => {
+  it.each([
+    ['info', 'hsl(40 9% 96%)', '💡'],
+    ['warn', 'hsl(45 90% 52% / 0.15)', '⚠️'],
+    ['warning', 'hsl(45 90% 52% / 0.15)', '⚠️'],
+    ['success', 'hsl(140 55% 45% / 0.13)', '✅'],
+    ['danger', 'hsl(0 72% 55% / 0.12)', '🛑'],
+  ])('exports %s with its matching tint and icon', (variant, tint, icon) => {
+    const blocks: BlockJSON[] = [{id: 'callout', type: 'callout', text: [{t: 'Notice'}], props: {variant}}];
+    const html = toHtml(snapshot(projectBlocksForExport(blocks).blocks), 'T', '');
+    expect(html).toContain(`data-variant="${variant}"`);
+    const selector = variant === 'info' ? '.callout' : `.callout[data-variant=${variant}]`;
+    const tintSelector = variant === 'warn' || variant === 'warning'
+      ? '.callout[data-variant=warn], .callout[data-variant=warning]' : selector;
+    expect(html).toContain(`${tintSelector} { background: ${tint};`);
+    const iconSelector = variant === 'warn' || variant === 'warning'
+      ? '.callout[data-variant=warn]::before, .callout[data-variant=warning]::before' : `${selector}::before`;
+    expect(html).toContain(`${iconSelector} { content: "${icon}"; }`);
+    expect(html).toContain('.callout[data-variant=warn], .callout[data-variant=warning] {');
+  });
 });
 
 describe('new block types', () => {
@@ -146,6 +217,8 @@ describe('new block types', () => {
     expect(html).toContain('<table class="block-table">');
     expect(html).toContain('<th>Name</th>');
     expect(html).toContain('<td>Ada</td>');
+    expect(html).toContain('padding: 6px 8px; text-align: left; vertical-align: top;');
+    expect(html).toContain('background: var(--obe-x-head, hsl(40 9% 96% / 0.5)); font-weight: 600;');
     expect(html).toContain('data-variant="warning"');
     expect(html).toContain('<details class="accordion"');
     expect(html).toContain('<ul class="checklist">');
@@ -155,6 +228,36 @@ describe('new block types', () => {
     expect(html).toContain('<nav class="toc">');
     expect(html).toContain('href="#h-0"'); // ToC links to the first heading anchor
     expect(html).toContain('id="h-0"');
+  });
+
+  it('renders table tints with light fallbacks and dark scheme values', () => {
+    const tokens = Object.keys(COLOR_EXPORT_HEX);
+    const html = toHtml(snapshot([{
+      type: 'table',
+      data: {content: [tokens], cellColors: [tokens]},
+    }]), 'T', '');
+    for (const token of tokens) {
+      expect(html).toContain(`style="background:var(--obtb-${token}, ${COLOR_EXPORT_HEX[token].bg})"`);
+      expect(html).toContain(`--obtb-${token}: ${COLOR_EXPORT_HEX_DARK[token].bg};`);
+    }
+  });
+
+  it('renders projected table cell spans in interactive HTML', () => {
+    const html = toHtml(
+      snapshot([
+        {
+          type: 'table',
+          data: {
+            withHeadings: false,
+            content: [['wide', 'right'], ['below']],
+            cellSpans: [[{colspan: 2, rowspan: 2}, {colspan: 1, rowspan: 1}], [{colspan: 1, rowspan: 1}]],
+          },
+        },
+      ]),
+      'T',
+      '',
+    );
+    expect(html).toContain('<td colspan="2" rowspan="2">wide</td>');
   });
 });
 
@@ -225,6 +328,25 @@ describe('toHtmlSite', () => {
     expect(html).toContain('class="db-row" href="#r1" data-page-id="r1"');
     expect(html).toContain('Task one');
     expect(html).toContain('Done'); // the select option label as a tag
+    // The tag inlines the canonical soft-pastel green chip colours (OB-378),
+    // matching the in-app SelectChip — not the old fill@20%-alpha wash.
+    expect(html).toContain('style="background:var(--data-green-chip-bg, #dbeddb);color:var(--data-green-chip-fg, #1e761e)">Done</span>');
+  });
+
+  it('exports select/multi-select corners, status pills, and active-scheme dark chips', () => {
+    for (const type of ['select', 'multi_select', 'status'] as const) {
+      const fixture = structuredClone(bundle);
+      const database = fixture.pages.find((page) => page.database)!.database!;
+      database.schema.properties[0].type = type;
+      database.rows[0].properties.p_status = type === 'multi_select' ? ['s_done'] : 's_done';
+      const output = toHtmlSite(fixture);
+      expect(output).toContain(`class="tag" data-kind="${type === 'status' ? 'status' : 'select'}"`);
+      expect(output).toContain('.tag { display: inline-block; padding: 1px 8px; border-radius: 4px;');
+      expect(output).toContain('.tag[data-kind=status] { border-radius:9999px; }');
+      const dark = output.slice(output.indexOf('@media (prefers-color-scheme: dark)'));
+      expect(dark).toContain(`--data-green-chip-bg: ${DATA_PALETTE.pastel.green.chip.dark.bg}`);
+      expect(dark).toContain(`--data-green-chip-fg: ${DATA_PALETTE.pastel.green.chip.dark.fg}`);
+    }
   });
 
   it('embeds the navigation runtime', () => {
@@ -271,5 +393,45 @@ describe('toSlideDeck', () => {
     );
     expect(html.match(/class="slide"/g) ?? []).toHaveLength(2);
     expect(html).toContain('id="ob-data"'); // reactive runtime data seeded
+  });
+});
+
+describe('authored callout appearance', () => {
+  it.each(['lucide:Star', 'lucide:Unknown'])('suppresses the danger fallback for authored %s', (icon) => {
+    const blocks: BlockJSON[] = [{id: 'c', type: 'callout', props: {variant: 'danger', icon}}];
+    const html = toHtml(snapshot(projectBlocksForExport(blocks).blocks), 'T', '');
+    const callout = new DOMParser().parseFromString(html, 'text/html').querySelector('.callout');
+    expect(callout?.getAttribute('data-variant')).toBe('danger');
+    expect(callout?.querySelector('.callout__icon')?.textContent).toBe('');
+    expect(html).toContain('.callout:has(.callout__icon)::before { content: none; }');
+    expect(html).toContain('.callout__icon:empty { display: none; }');
+  });
+
+  it.each(['🌱', 'lucide:Star', '<img src=x onerror=alert(1)>'])('round-trips icon %s and bg through projection', (icon) => {
+    const blocks: BlockJSON[] = [{id: 'c', type: 'callout', props: {variant: 'warn', icon, bg: 'purple'}}];
+    const projected = projectBlocksForExport(blocks).blocks;
+    expect(projected[0].data).toMatchObject({icon, bg: 'purple', variant: 'warn'});
+    const html = toHtml(snapshot(projected), 'T', '');
+    expect(html).toContain('data-bg="purple"');
+    if (icon === '🌱') expect(html).toContain('<span class="callout__icon">🌱</span>');
+    if (icon.startsWith('lucide:')) expect(html).toContain('<span class="callout__icon"></span>');
+    if (icon.startsWith('<')) {
+      expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+      expect(new DOMParser().parseFromString(html, 'text/html').querySelector('.callout img')).toBeNull();
+    }
+  });
+});
+
+
+describe('kit export ink', () => {
+  it('uses export primary for buttons and inherited foreground for expression text', () => {
+    const html = toHtml(snapshot([]), 'T', '');
+    expect(html).toContain(`a.button { display: inline-block; background: ${KIT_EXPORT_PRIMARY};`);
+    expect(html).toContain('.expr code { color: inherit; }');
+    const styles = new DOMParser().parseFromString(html, 'text/html').querySelector('style')!.textContent!;
+    expect(styles).not.toContain('#4f46e5');
+    expect(styles).not.toContain('#6366f1');
+    expect(pdfSource).not.toContain('#4f46e5');
+    expect(pdfSource).not.toContain('#6366f1');
   });
 });

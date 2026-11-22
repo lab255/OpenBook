@@ -4,13 +4,17 @@ import {ScrollArea} from '@/components/ui/scroll-area';
 import {IconButton} from '@/components/ui/icon-button';
 import PageActionsCluster from '@/components/PageActionsCluster';
 import {ConnectedPageDocument, DataflowView, HomeScreen} from '@/screens';
-import {AGENT_PANE_ID, CONFIG_PANE_ID, CUSTOMISE_PANE_ID, FLOW_PANE_ID, HOME_PAGE_ID, REVIEW_PANE_ID} from '@/lib/homePage';
+import {AGENT_PANE_ID, CONFIG_PANE_ID, CUSTOMISE_PANE_ID, FLOW_PANE_ID, GRAPH_PANE_ID, HISTORY_PANE_ID, HOME_PAGE_ID, LINKS_PANE_ID, REVIEW_PANE_ID} from '@/lib/homePage';
 import {closeKitPanel, getKitPanel, setKitPanelHost, subscribeKitPanel} from '@/blockeditor/kit/kitPanel';
 import {PageCustomiseBody} from '@/components/appearance/PageCustomiseBody';
 import {ReviewPaneBody} from '@/components/review/ReviewPaneBody';
+import {LinksPaneBody} from '@/components/links/LinksPaneBody';
+import {GraphPaneBody} from '@/components/graph/GraphPaneBody';
+import {HistoryPaneBody} from '@/components/history/HistoryPaneBody';
 import {AgentPanel} from '@/components/AgentPanel';
 import {useNavigation, useTranslation} from '@/providers';
 import {cn} from '@/lib/utils';
+import {suppressContextMenu} from '@/lib/suppressContextMenu';
 
 /**
  * The expanded block-settings pane: a host element the interactive block's live
@@ -93,8 +97,11 @@ export function SplitPane() {
   const isConfig = pane.pageId === CONFIG_PANE_ID;
   const isCustomise = pane.pageId === CUSTOMISE_PANE_ID;
   const isReview = pane.pageId === REVIEW_PANE_ID;
+  const isLinks = pane.pageId === LINKS_PANE_ID;
+  const isGraph = pane.pageId === GRAPH_PANE_ID;
   const isAgent = pane.pageId === AGENT_PANE_ID;
-  const isPage = !isFlow && !isConfig && !isCustomise && !isReview && !isAgent; // a real document — gets make-main + the actions cluster
+  const isHistory = pane.pageId === HISTORY_PANE_ID;
+  const isPage = !isFlow && !isConfig && !isCustomise && !isReview && !isLinks && !isGraph && !isAgent && !isHistory; // a real document — gets make-main + the actions cluster
 
   return (
     <aside
@@ -104,7 +111,7 @@ export function SplitPane() {
       onMouseDownCapture={() => focusPane(pane.id)}
       className={cn(
         'ob-sheet relative flex shrink-0 flex-col',
-        'animate-in fade-in slide-in-from-right-4 duration-200 print:hidden',
+        'animate-in fade-in slide-in-from-right-4 duration-(--motion-slow) print:hidden',
         focused && 'ring-1 ring-inset ring-primary/15',
       )}
     >
@@ -114,6 +121,7 @@ export function SplitPane() {
         onPointerMove={onDividerMove}
         onPointerUp={onDividerUp}
         onPointerCancel={onDividerUp}
+        onContextMenu={suppressContextMenu}
         role="separator"
         aria-orientation="vertical"
         className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize transition-colors hover:bg-primary/30"
@@ -146,6 +154,11 @@ export function SplitPane() {
         <div className="min-h-0 flex-1">
           <DataflowView />
         </div>
+      ) : isGraph ? (
+        // The page-link graph also owns its own react-flow viewport.
+        <div className="min-h-0 flex-1">
+          <GraphPaneBody />
+        </div>
       ) : isConfig ? (
         <div className="min-h-0 flex-1">
           <KitConfigPaneBody />
@@ -157,6 +170,14 @@ export function SplitPane() {
       ) : isReview ? (
         <div className="min-h-0 flex-1">
           <ReviewPaneBody />
+        </div>
+      ) : isLinks ? (
+        <div className="min-h-0 flex-1">
+          <LinksPaneBody />
+        </div>
+      ) : isHistory ? (
+        <div className="min-h-0 flex-1">
+          <HistoryPaneBody />
         </div>
       ) : isAgent ? (
         <div className="min-h-0 flex-1">

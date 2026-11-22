@@ -1,10 +1,10 @@
-import {describe, it, expect, afterEach} from 'vitest';
+import {describe, it, expect, afterEach, vi} from 'vitest';
 import {render, screen, cleanup, fireEvent, waitFor} from '@testing-library/react';
 import {createDoc, decodeSnapshot, docToJSON, encodeSnapshot, rootBlocks} from '../model';
 import {BlockEditor} from '../BlockEditor';
 import {PresentBlocks} from '../PresentBlocks';
 import {SLASH_ITEMS} from '../SlashMenu';
-import {blocksToEditorJs, blocksToHtml, blocksToMarkdown} from '../exportBlocks';
+import {projectBlocksForExport, blocksToHtml, blocksToMarkdown} from '../exportBlocks';
 import {
   IMAGE_BLOCK_TYPE,
   MAX_IMAGE_DATA_URL_BYTES,
@@ -14,8 +14,16 @@ import {
   type ImageBlockProps,
 } from '../imageBlock';
 import {editorFilesFromTransfer} from '../htmlArtifactBlock';
+import {copyRenderedImage} from '../ImageBlockView';
+import * as pageActions from '@/lib/pageActions';
+import {setLocale, t, type Locale} from '@/i18n';
 
-afterEach(() => cleanup());
+afterEach(() => {
+  setLocale('en');
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  cleanup();
+});
 
 // A minimal valid 1×1 transparent PNG as a data URL (kept small so the render
 // tests don't lean on the size cap).
@@ -24,6 +32,47 @@ const TINY_PNG =
 
 const imgFile = (name = 'sunset_photo.png', type = 'image/png', body = 'hello'): File =>
   new File([body], name, {type});
+
+describe('image block — copy rendered image', () => {
+  it('copies the source URL as text when ClipboardItem is unavailable', async () => {
+    vi.stubGlobal('ClipboardItem', undefined);
+    const copyText = vi.spyOn(pageActions, 'copyText').mockResolvedValue(true);
+    const image = document.createElement('img');
+
+    await expect(copyRenderedImage(image, 'https://images.test/cat.png')).resolves.toBe('url');
+    expect(copyText).toHaveBeenCalledWith('https://images.test/cat.png');
+  });
+
+  it('falls back to copying the source URL when canvas.toBlob throws', async () => {
+    vi.stubGlobal('ClipboardItem', class ClipboardItem {});
+    vi.stubGlobal('navigator', {clipboard: {write: vi.fn()}});
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(() => {
+      throw new Error('encoding failed');
+    });
+    const copyText = vi.spyOn(pageActions, 'copyText').mockResolvedValue(true);
+
+    await expect(copyRenderedImage(document.createElement('img'), 'https://images.test/cat.png')).resolves.toBe(
+      'url',
+    );
+    expect(copyText).toHaveBeenCalledWith('https://images.test/cat.png');
+  });
+
+  it('refuses blob and oversized data URL fallbacks but uses an original URL when available', async () => {
+    vi.stubGlobal('ClipboardItem', undefined);
+    const copyText = vi.spyOn(pageActions, 'copyText').mockResolvedValue(true);
+    const image = document.createElement('img');
+    const hugeDataUrl = `data:image/png;base64,${'a'.repeat(MAX_IMAGE_DATA_URL_BYTES)}`;
+
+    await expect(copyRenderedImage(image, 'blob:temporary')).resolves.toBe('failed');
+    await expect(copyRenderedImage(image, hugeDataUrl)).resolves.toBe('failed');
+    await expect(copyRenderedImage(image, 'blob:temporary', 'https://images.test/original.png')).resolves.toBe('url');
+    expect(copyText).toHaveBeenCalledTimes(1);
+    expect(copyText).toHaveBeenCalledWith('https://images.test/original.png');
+  });
+});
 
 /**
  * Native image block (Assets A0, data-URL phase-1): model round-trip, the three
@@ -135,7 +184,7 @@ describe('image block — size cap', () => {
 });
 
 describe('image block — render, resize, alt/caption', () => {
-  it('shows the image with editable alt, caption, size presets and a resize handle when writable', () => {
+  it('shows caption, two resize handles and menu-only alt and size editing', async () => {
     const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG, alt: 'A cat'}}]);
     const {container} = render(<BlockEditor doc={doc} />);
 
@@ -143,24 +192,77 @@ describe('image block — render, resize, alt/caption', () => {
     expect(img).toBeTruthy();
     expect(img.getAttribute('src')).toBe(TINY_PNG);
     expect(img.getAttribute('alt')).toBe('A cat');
+    expect((container.querySelector('.obe-image-frame') as HTMLElement).style.width).toBe('100%');
+    expect((screen.getByLabelText('Image caption') as HTMLElement).style.width).toBe('100%');
 
     // Editable alt + caption.
-    expect(screen.getByLabelText('Alt text')).toBeTruthy();
+    expect(screen.queryByLabelText('Alt text')).toBeNull();
     expect(screen.getByLabelText('Image caption')).toBeTruthy();
 
     // Resize handle + size presets.
     expect(screen.getByLabelText('Resize image')).toBeTruthy();
-    expect(screen.getByLabelText('Small')).toBeTruthy();
-    expect(screen.getByLabelText('Medium')).toBeTruthy();
-    expect(screen.getByLabelText('Full width')).toBeTruthy();
+    expect(screen.getByLabelText('Resize image from left')).toBeTruthy();
+    fireEvent.keyDown(screen.getByLabelText('Image actions'), {key: 'Enter'});
+    fireEvent.click(await screen.findByText('Set alt text…'));
+    expect(screen.getByLabelText('Alt text')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Alt text')));
+    fireEvent.blur(screen.getByLabelText('Alt text'));
+    expect(screen.queryByLabelText('Alt text')).toBeNull();
   });
 
-  it('a size preset persists width to props', () => {
-    const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG}}]);
-    render(<BlockEditor doc={doc} />);
-    fireEvent.click(screen.getByLabelText('Small'));
-    const block = docToJSON(doc).find((b) => b.id === 'img');
-    expect(block!.props?.width).toBe('30%');
+  it('all size presets in the menu persist width to props', async () => {
+    for (const [label, width] of [['Small', '30%'], ['Medium', '60%'], ['Full width', undefined]]) {
+      const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG}}]);
+      const {container} = render(<BlockEditor doc={doc} />);
+      fireEvent.contextMenu(container.querySelector('img.obe-image-img')!);
+      const trigger = screen.getByText('Image size').closest('[role="menuitem"]') as HTMLElement;
+      trigger.focus();
+      fireEvent.keyDown(trigger, {key: 'ArrowRight'});
+      fireEvent.click(await screen.findByRole('menuitemcheckbox', {name: label}));
+      expect(docToJSON(doc).find((b) => b.id === 'img')!.props?.width).toBe(width);
+      expect((container.querySelector('.obe-image-frame') as HTMLElement).style.width).toBe(width ?? '100%');
+      expect((screen.getByLabelText('Image caption') as HTMLElement).style.width).toBe(width ?? '100%');
+      await waitFor(() => expect(screen.queryByRole('menuitemcheckbox', {name: label})).toBeNull());
+      cleanup();
+    }
+  });
+
+  it('localizes every size preset label', () => {
+    const labels: Record<Locale, string[]> = {
+      en: ['Small', 'Medium', 'Full width'],
+      de: ['Klein', 'Mittel', 'Volle Breite'],
+      ja: ['小', '中', '全幅'],
+      zh: ['小', '中', '全宽'],
+    };
+    for (const [locale, expected] of Object.entries(labels) as Array<[Locale, string[]]>) {
+      setLocale(locale);
+      expect([
+        t('blocks.image.sizeSmall'),
+        t('blocks.image.sizeMedium'),
+        t('blocks.image.sizeFull'),
+      ]).toEqual(expected);
+    }
+  });
+
+  it('resizes symmetrically around the fixed frame centre and clamps both edges', () => {
+    const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG, width: '60%'}}]);
+    const {container} = render(<BlockEditor doc={doc} />);
+    const figure = container.querySelector('.obe-image')!;
+    const frame = container.querySelector('.obe-image-frame')!;
+    vi.spyOn(figure, 'getBoundingClientRect').mockReturnValue({width: 1000} as DOMRect);
+    vi.spyOn(frame, 'getBoundingClientRect').mockReturnValue({left: 200, width: 600} as DOMRect);
+    for (const [edge, clientX] of [['left', 250], ['right', 750]] as const) {
+      fireEvent.pointerDown(container.querySelector(`[data-edge="${edge}"]`)!);
+      fireEvent.pointerMove(window, {clientX});
+      expect(docToJSON(doc)[0].props?.width).toBe('50%');
+      fireEvent.pointerMove(window, {clientX: 500});
+      expect(docToJSON(doc)[0].props?.width).toBe('15%');
+      fireEvent.pointerMove(window, {clientX: 2000});
+      expect(docToJSON(doc)[0].props?.width).toBe('100%');
+      fireEvent.pointerUp(window);
+      fireEvent.pointerMove(window, {clientX: 500});
+      expect(docToJSON(doc)[0].props?.width).toBe('100%');
+    }
   });
 
   it('editing the caption persists it to props', () => {
@@ -169,6 +271,53 @@ describe('image block — render, resize, alt/caption', () => {
     fireEvent.change(screen.getByLabelText('Image caption'), {target: {value: 'Hello caption'}});
     const block = docToJSON(doc).find((b) => b.id === 'img');
     expect(block!.props?.caption).toBe('Hello caption');
+  });
+
+  it('right-clicking the image opens its item-specific menu with an accessible active size', async () => {
+    const doc = createDoc([{id: 'img', type: 'image', props: {src: TINY_PNG, alt: 'A cat'}}]);
+    const {container} = render(<BlockEditor doc={doc} />);
+    fireEvent.contextMenu(container.querySelector('img.obe-image-img')!);
+
+    expect(screen.getByText('Copy image').closest('[role="menu"]')?.classList.contains('w-52')).toBe(true);
+
+    for (const label of [
+      'Copy image',
+      'Save image as…',
+      'Open original',
+      'Replace image…',
+      'Set alt text…',
+      'Image size',
+      'Delete block',
+    ]) {
+      expect(screen.getByText(label), label).toBeTruthy();
+    }
+
+    const sizeTrigger = screen.getByText('Image size').closest('[role="menuitem"]') as HTMLElement;
+    sizeTrigger.focus();
+    fireEvent.keyDown(sizeTrigger, {key: 'ArrowRight'});
+    expect((await screen.findByRole('menuitemcheckbox', {name: 'Small'})).getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('menuitemcheckbox', {name: 'Full width'}).getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('the image menu delete action removes that block', () => {
+    const doc = createDoc([
+      {id: 'img', type: 'image', props: {src: TINY_PNG}},
+      {id: 'p', type: 'paragraph', text: [{t: 'Keep me'}]},
+    ]);
+    const {container} = render(<BlockEditor doc={doc} />);
+    fireEvent.contextMenu(container.querySelector('img.obe-image-img')!);
+    fireEvent.click(screen.getByText('Delete block'));
+
+    expect(docToJSON(doc).map((block) => block.id)).toEqual(['p']);
+  });
+
+  it('does not expose the image menu on a non-image block', () => {
+    const doc = createDoc([{id: 'p', type: 'paragraph', text: [{t: 'Plain text'}]}]);
+    const {container} = render(<BlockEditor doc={doc} />);
+    fireEvent.contextMenu(container.querySelector('[data-block-text="p"]')!);
+
+    expect(screen.queryByText('Copy image')).toBeNull();
+    expect(screen.queryByText('Open original')).toBeNull();
   });
 });
 
@@ -221,7 +370,7 @@ describe('image block — export is crash-safe (real image export is Assets A3)'
   it('HTML / Markdown / EditorJS exporters do not throw on an image block', () => {
     expect(() => blocksToHtml(blocks)).not.toThrow();
     expect(() => blocksToMarkdown(blocks)).not.toThrow();
-    expect(() => blocksToEditorJs(blocks)).not.toThrow();
+    expect(() => projectBlocksForExport(blocks)).not.toThrow();
     // The surrounding blocks still export.
     expect(blocksToHtml(blocks)).toContain('Title');
     expect(blocksToMarkdown(blocks)).toContain('After');
@@ -288,4 +437,21 @@ describe('image block — paste / drop event integration (regression guard)', ()
     expect(notPrevented).toBe(false);
     expect(hasImageBlock(doc)).toBe(false);
   });
+});
+
+
+it('keeps caption and file-input identities distinct when an image becomes unavailable',()=>{
+  const errors=vi.spyOn(console,'error').mockImplementation(()=>{});
+  const assertQuiet=()=>expect(errors.mock.calls).toEqual([]);
+  console.error('A component is changing a controlled input to be uncontrolled.');
+  expect(assertQuiet).toThrow();errors.mockClear();
+  const doc=createDoc([{id:'img',type:'image',props:{src:TINY_PNG,caption:'Caption'}}]);
+  const {container}=render(<BlockEditor doc={doc}/>);
+  const caption=screen.getByLabelText('Image caption');
+  const file=screen.getByLabelText('Choose an image file');
+  fireEvent.error(container.querySelector('img.obe-image-img')!);
+  expect(screen.queryByLabelText('Image caption')).toBeNull();
+  expect(screen.getByLabelText('Choose an image file')).toBe(file);
+  expect(screen.getByLabelText('Choose an image file')).not.toBe(caption);
+  assertQuiet();
 });

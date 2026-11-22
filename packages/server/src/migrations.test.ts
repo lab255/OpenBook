@@ -87,6 +87,149 @@ describe('migration 0011 — fresh database', () => {
   });
 });
 
+describe('migration 0024 — staged form uploads', () => {
+  it('creates the token table and orphan-sweep indexes', async () => {
+    const db = await freshDb();
+    const applied = await db.query<{name: string}>(
+      'SELECT name FROM _migrations WHERE name = \'0024_form_uploads\'',
+    );
+    expect(applied).toHaveLength(1);
+    const tables = await db.query<{table_name: string}>(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'form_uploads'`,
+    );
+    expect(tables).toHaveLength(1);
+    const indexes = await db.query<{indexname: string}>(
+      'SELECT indexname FROM pg_indexes WHERE tablename = \'form_uploads\'',
+    );
+    expect(indexes.map((row) => row.indexname)).toEqual(expect.arrayContaining([
+      'form_uploads_form_idx',
+      'form_uploads_expiry_idx',
+      'form_uploads_asset_idx',
+    ]));
+    await db.close();
+  });
+});
+
+describe('migration 0025 — page listing posture', () => {
+  it('adds listed=true to an existing database and is re-run safe without resetting data', async () => {
+    const db = await freshDb();
+    const id = await newPage(db);
+
+    // Recreate the pre-0025 shape while retaining an existing page row.
+    await db.query('ALTER TABLE pages DROP COLUMN listed');
+    await db.query('DELETE FROM _migrations WHERE name = \'0025_page_listed\'');
+    await runMigrations(db);
+    expect((await db.query<{listed: boolean}>('SELECT listed FROM pages WHERE id = $1', [id]))[0].listed).toBe(true);
+
+    // Force the idempotent statement to execute again; it must preserve the flip.
+    await db.query('UPDATE pages SET listed = false WHERE id = $1', [id]);
+    await db.query('DELETE FROM _migrations WHERE name = \'0025_page_listed\'');
+    await runMigrations(db);
+    expect((await db.query<{listed: boolean}>('SELECT listed FROM pages WHERE id = $1', [id]))[0].listed).toBe(false);
+    expect(await db.query('SELECT name FROM _migrations WHERE name = \'0025_page_listed\'')).toHaveLength(1);
+    await db.close();
+  });
+});
+
+describe('migration 0026 — database form capabilities', () => {
+  it('creates the digest-only publication table and lifecycle index', async () => {
+    const db = await freshDb();
+    const applied = await db.query<{name: string}>(
+      'SELECT name FROM _migrations WHERE name = \'0026_database_form_capabilities\'',
+    );
+    expect(applied).toHaveLength(1);
+    const columns = await db.query<{column_name: string}>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'database_form_capabilities'`,
+    );
+    expect(columns.map((row) => row.column_name)).toEqual(expect.arrayContaining([
+      'database_id',
+      'view_id',
+      'capability_hash',
+      'created_at',
+      'updated_at',
+    ]));
+    const uploadColumns = await db.query<{column_name: string}>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'form_uploads'`,
+    );
+    expect(uploadColumns.map((row) => row.column_name)).toContain('capability_hash');
+    const indexes = await db.query<{indexname: string}>(
+      'SELECT indexname FROM pg_indexes WHERE tablename = \'database_form_capabilities\'',
+    );
+    expect(indexes.map((row) => row.indexname)).toContain('database_form_capabilities_updated_idx');
+    const uploadIndexes = await db.query<{indexname: string}>(
+      'SELECT indexname FROM pg_indexes WHERE tablename = \'form_uploads\'',
+    );
+    expect(uploadIndexes.map((row) => row.indexname)).toContain('form_uploads_capability_idx');
+    await db.close();
+  });
+});
+
+describe('migration 0028 — byte-exact idempotency responses', () => {
+  it('creates the text response table and replaces a previously applied JSONB ledger', async () => {
+    const db = await freshDb();
+    expect(await db.query('SELECT name FROM _migrations WHERE name = \'0028_idempotency_response_bytes\''))
+      .toHaveLength(1);
+    const columns = await db.query<{column_name: string; data_type: string; is_nullable: string}>(
+      `SELECT column_name, data_type, is_nullable FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'idempotency_responses'`,
+    );
+    expect(columns.map((row) => row.column_name)).toEqual(expect.arrayContaining([
+      'actor_scope',
+      'idempotency_key',
+      'fingerprint',
+      'method',
+      'normalized_target',
+      'status',
+      'response_body',
+      'content_type',
+      'location',
+      'completed_at',
+    ]));
+    expect(columns.find((row) => row.column_name === 'response_body')).toMatchObject({
+      data_type: 'text',
+      is_nullable: 'NO',
+    });
+    const indexes = await db.query<{indexname: string}>(
+      'SELECT indexname FROM pg_indexes WHERE tablename = \'idempotency_responses\'',
+    );
+    expect(indexes.map((row) => row.indexname)).toContain('idempotency_responses_completed_at_idx');
+
+    // Recreate the brief feature-branch 0027 state and prove 0028 repairs a
+    // persistent database that already recorded it, discarding its unreleased rows.
+    await db.query('DELETE FROM _migrations WHERE name = \'0028_idempotency_response_bytes\'');
+    await db.query('DROP TABLE idempotency_responses');
+    await db.query('CREATE TABLE idempotency_responses (actor_scope TEXT, response_body JSONB)');
+    await db.query('INSERT INTO idempotency_responses VALUES ($1, $2)', ['actor', {ok: true}]);
+    await runMigrations(db);
+    const repaired = await db.query<{data_type: string; is_nullable: string}>(
+      `SELECT data_type, is_nullable FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'idempotency_responses' AND column_name = 'response_body'`,
+    );
+    expect(repaired[0]).toMatchObject({data_type: 'text', is_nullable: 'NO'});
+    expect(await db.query('SELECT * FROM idempotency_responses')).toHaveLength(0);
+    expect(await db.query('SELECT name FROM _migrations WHERE name = \'0028_idempotency_response_bytes\''))
+      .toHaveLength(1);
+    await db.close();
+  });
+});
+
+describe('migration 0030 — able assertion binding', () => {
+  it('adds the assertion JTI to refresh tokens', async () => {
+    const db = await freshDb();
+    expect(await db.query('SELECT name FROM _migrations WHERE name = \'0030_able_oidc_assertion_jti\''))
+      .toHaveLength(1);
+    const columns = await db.query<{column_name: string}>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'able_oidc_refresh_tokens'`,
+    );
+    expect(columns.map((row) => row.column_name)).toContain('assertion_jti');
+    await db.close();
+  });
+});
+
 describe('migration 0011 — existing database with data', () => {
   it('back-fills visibility=inherit on pre-existing pages and is idempotent', async () => {
     // Simulate a pre-0011 workspace: a real pages table with a row, with 0001..0010
@@ -94,11 +237,18 @@ describe('migration 0011 — existing database with data', () => {
     const db = await PgliteDb.create('memory://');
     await db.query('CREATE TABLE _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())');
     // deleted_at is part of the simulated baseline (0004 would have added it);
-    // later migrations (0015's partial name index) reference the column.
+    // later migrations (0015's partial name index) reference the column. Same
+    // for database_id (0002) and position (0005): 0023's composite row-append
+    // index is built over both.
     await db.query(`CREATE TABLE pages (
       id UUID PRIMARY KEY, name TEXT, data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      database_id UUID, position DOUBLE PRECISION NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       deleted_at TIMESTAMPTZ)`);
+    await db.query(`CREATE TABLE databases (
+      id UUID PRIMARY KEY, page_id UUID NOT NULL, name TEXT,
+      schema JSONB NOT NULL DEFAULT '{"properties":[],"views":[]}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
     for (const n of [
       '0001_init', '0002_databases', '0003_page_nesting', '0004_soft_delete', '0005_page_order',
       '0006_settings', '0007_plugins', '0008_suggestions', '0009_provenance', '0010_review_authors',

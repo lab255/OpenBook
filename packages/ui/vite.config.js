@@ -1,4 +1,6 @@
 //vite.config.js
+import {motionBoundary} from "./scripts/motionBoundary.mjs";
+import { realpathSync } from "fs";
 import { resolve, isAbsolute } from "path";
 import { fileURLToPath, URL } from "url";
 import { defineConfig } from "vite";
@@ -10,8 +12,13 @@ import { defineConfig } from "vite";
 // build in place while watching (overwrite in place); still clean for one-shot
 // production builds.
 const isWatch = process.argv.includes("--watch");
+const quickJSPackageRoot = realpathSync(resolve(__dirname, "node_modules/@jitl/quickjs-wasmfile-release-sync"));
 
 export default defineConfig ({
+  plugins: [motionBoundary("app")],
+  define: {
+    __OB_SAFE_EXPORT_VIEWER__: 'false',
+  },
   build: {
     emptyOutDir: !isWatch,
     lib: {
@@ -42,8 +49,16 @@ export default defineConfig ({
     ],
     dedupe: ['react', 'react-dom'],
   },
+  server: {
+    // pnpm worktrees may link dependencies from the primary checkout. Vitest
+    // must be allowed to transform the inlined QuickJS WASM at its real path.
+    fs: {allow: [quickJSPackageRoot]},
+  },
   test: {
     environment: 'happy-dom',
     globals: true,
+    // Export CSS is a raw string payload. Vitest otherwise stubs CSS imports
+    // to an empty string, hiding missing token transport in emitted-HTML tests.
+    css: {include: [/exportTokens(?:Dark)?\.css/]},
   },
 });

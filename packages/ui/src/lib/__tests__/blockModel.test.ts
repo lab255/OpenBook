@@ -1,16 +1,21 @@
 import {describe, expect, it} from 'vitest';
 import * as Y from 'yjs';
 import {
+  blockType,
   createDoc,
   decodeSnapshot,
   docToJSON,
   dropBeside,
+  enclosingBlock,
   encodeSnapshot,
   insertBlock,
   makeTable,
   mergeWithPrevious,
-  migrateEditorJs,
+  migrateLegacyBlocks,
   moveBlock,
+  moveBlocks,
+  orderedTopMost,
+  type NewBlock,
   removeBlock,
   rootBlocks,
   splitBlock,
@@ -84,6 +89,122 @@ describe('block model basics', () => {
     expect(texts(doc)).toEqual(['c', 'a', 'b']);
     moveBlock(doc, docToJSON(doc)[0].id, null, 3);
     expect(texts(doc)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('moveBlocks (multi-block move)', () => {
+  const five = () =>
+    createDoc([
+      {type: 'paragraph', text: 'a'},
+      {type: 'paragraph', text: 'b'},
+      {type: 'paragraph', text: 'c'},
+      {type: 'paragraph', text: 'd'},
+      {type: 'paragraph', text: 'e'},
+    ]);
+  const ids = (doc: Y.Doc): Record<string, string> =>
+    Object.fromEntries(docToJSON(doc).map((b) => [(b.text ?? []).map((r) => r.t).join(''), b.id]));
+
+  it('moves an adjacent selection forward, preserving order (toIndex is a current-doc index)', () => {
+    const doc = five();
+    const {a, b} = ids(doc);
+    // Select a,b; drop below d (d.index 3 → below ⇒ toIndex 4).
+    moveBlocks(doc, [a, b], null, 4);
+    expect(texts(doc)).toEqual(['c', 'd', 'a', 'b', 'e']);
+  });
+
+  it('moves a selection backward, preserving order', () => {
+    const doc = five();
+    const {d, e} = ids(doc);
+    // Select d,e; drop above b (b.index 1 → above ⇒ toIndex 1).
+    moveBlocks(doc, [d, e], null, 1);
+    expect(texts(doc)).toEqual(['a', 'd', 'e', 'b', 'c']);
+  });
+
+  it('gathers a NON-contiguous selection contiguously at the drop point', () => {
+    const doc = five();
+    const {a, c} = ids(doc);
+    // Select a,c; drop below e (e.index 4 → below ⇒ toIndex 5).
+    moveBlocks(doc, [a, c], null, 5);
+    expect(texts(doc)).toEqual(['b', 'd', 'e', 'a', 'c']);
+  });
+
+  it('passes ids in any order but always lands in document order', () => {
+    const doc = five();
+    const {a, b, c} = ids(doc);
+    moveBlocks(doc, [c, a, b], null, 5); // reversed / shuffled input
+    expect(texts(doc)).toEqual(['d', 'e', 'a', 'b', 'c']);
+  });
+
+  it('one undo restores everything (single transaction)', () => {
+    const doc = five();
+    const undo = new Y.UndoManager(rootBlocks(doc), {trackedOrigins: new Set(['local'])});
+    const {a, b} = ids(doc);
+    moveBlocks(doc, [a, b], null, 4);
+    expect(texts(doc)).toEqual(['c', 'd', 'a', 'b', 'e']);
+    undo.undo();
+    expect(texts(doc)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('orderedTopMost dedupes descendants to the top-most, in document order', () => {
+    const doc = five();
+    const {a, b} = ids(doc);
+    dropBeside(doc, b, a, 'right'); // wraps a|b into a columns layout at index 0
+    const columns = docToJSON(doc)[0];
+    const innerA = columns.children![0].children![0].id;
+    // The columns block plus one of its descendants collapses to just columns.
+    expect(orderedTopMost(doc, [innerA, columns.id])).toEqual([columns.id]);
+  });
+
+  it('moving a selection that includes a descendant does not duplicate the child', () => {
+    const doc = createDoc([
+      {type: 'paragraph', text: 'a'},
+      {type: 'paragraph', text: 'b'},
+      {type: 'paragraph', text: 'c'},
+    ]);
+    const [a, b] = docToJSON(doc);
+    dropBeside(doc, b.id, a.id, 'right'); // root: [columns(a|b), c]
+    const columns = docToJSON(doc)[0];
+    const innerA = columns.children![0].children![0].id;
+    // Select columns AND its descendant a; drop below c (c.index 1 → toIndex 2).
+    moveBlocks(doc, [columns.id, innerA], null, 2);
+    const json = docToJSON(doc);
+    expect(json.map((x) => x.type)).toEqual(['paragraph', 'columns']);
+    expect(json[0].text![0].t).toBe('c');
+    // a survives exactly once, still inside the columns layout.
+    const cols = json[1].children!;
+    expect(cols[0].children![0].text![0].t).toBe('a');
+    expect(cols[1].children![0].text![0].t).toBe('b');
+  });
+
+  it('moves selected blocks into a column', () => {
+    const doc = createDoc([
+      {type: 'paragraph', text: 'a'},
+      {type: 'paragraph', text: 'b'},
+      {type: 'paragraph', text: 'c'},
+    ]);
+    const [a, b] = docToJSON(doc);
+    dropBeside(doc, b.id, a.id, 'right'); // root: [columns(a|b), c]
+    const col0 = docToJSON(doc)[0].children![0].id;
+    const c = docToJSON(doc)[1].id;
+    moveBlocks(doc, [c], col0, 1); // into column 0, after a
+    const cols = docToJSON(doc)[0].children!;
+    expect(cols[0].children!.map((x) => x.text![0].t)).toEqual(['a', 'c']);
+    expect(cols[1].children!.map((x) => x.text![0].t)).toEqual(['b']);
+    expect(docToJSON(doc)).toHaveLength(1); // c left the root
+  });
+
+  it('refuses to drop a container into its own subtree (whole move is a no-op)', () => {
+    const doc = createDoc([
+      {type: 'paragraph', text: 'a'},
+      {type: 'paragraph', text: 'b'},
+    ]);
+    const [a, b] = docToJSON(doc);
+    dropBeside(doc, b.id, a.id, 'right');
+    const columns = docToJSON(doc)[0];
+    const col0 = columns.children![0].id;
+    moveBlocks(doc, [columns.id], col0, 0); // would nest columns in its own column
+    expect(docToJSON(doc)[0].type).toBe('columns'); // unchanged, no crash
+    expect(docToJSON(doc)[0].children).toHaveLength(2);
   });
 });
 
@@ -216,9 +337,9 @@ describe('snapshots and CRDT merge', () => {
   });
 });
 
-describe('editorjs migration', () => {
+describe('legacy migration', () => {
   it('converts the common block types', () => {
-    const blocks = migrateEditorJs([
+    const blocks = migrateLegacyBlocks([
       {type: 'header', data: {text: 'Hi', level: 2}},
       {type: 'paragraph', data: {text: 'a <b>b</b> <a href="https://x.y">c</a>'}},
       {type: 'list', data: {style: 'ordered', items: ['one', 'two']}},
@@ -245,13 +366,26 @@ describe('editorjs migration', () => {
   });
 
   it('never returns an empty document', () => {
-    expect(migrateEditorJs([])).toEqual([{type: 'paragraph'}]);
+    expect(migrateLegacyBlocks([])).toEqual([{type: 'paragraph'}]);
   });
 });
 
-describe('editorjs migration — full app coverage', () => {
+describe('block-native creators (sdk textSnapshot) open without the migrator', () => {
+  it('decodes the created blockdoc straight through decodeSnapshot — never migrateLegacyBlocks', async () => {
+    const {textSnapshot} = await import('@book.dev/sdk');
+    const snap = textSnapshot('Alpha\nBeta', 'agent');
+    // BlockPageDocument's load path takes `decodeSnapshot(snap.blockdoc)` whenever a
+    // blockdoc is present; the migrator only runs for legacy snapshots lacking one.
+    expect(snap.blockdoc).toBeTruthy();
+    const json = docToJSON(decodeSnapshot(snap.blockdoc as never));
+    expect(json.map((b) => b.type)).toEqual(['paragraph', 'paragraph']);
+    expect(json.map((b) => b.text?.[0]?.t)).toEqual(['Alpha', 'Beta']);
+  });
+});
+
+describe('legacy migration — full app coverage', () => {
   it('migrates reactive, navigation, and layout-adjacent blocks', () => {
-    const blocks = migrateEditorJs(
+    const blocks = migrateLegacyBlocks(
       [
         {type: 'toc', data: {}},
         {type: 'accordion', data: {title: 'More', content: 'Hidden <b>body</b>'}},
@@ -265,20 +399,22 @@ describe('editorjs migration — full app coverage', () => {
       {values: [['c1', 7]], names: [['speed', 'c1']]},
     );
     const types = blocks.map((b) => b.type);
-    expect(types).toEqual(['heading', 'paragraph', 'paragraph', 'paragraph', 'dbview', 'slider', 'formula', 'callout']);
-    // toc skipped; accordion → heading + paragraph with formatting kept
-    expect(blocks[1].text).toEqual([{t: 'Hidden '}, {t: 'body', a: {b: true}}]);
+    expect(types).toEqual(['togglelist', 'paragraph', 'paragraph', 'dbview', 'slider', 'formula', 'callout']);
+    // toc skipped; accordion → togglelist with summary, state and rich child content
+    expect(blocks[0].children?.[0].text).toEqual([{t: 'Hidden '}, {t: 'body', a: {b: true}}]);
+    expect(blocks[0].text).toEqual([{t: 'More'}]);
+    expect(blocks[0].props).toEqual({collapsed: false});
     // button keeps its link; a subpage survives as a mention run; an inline
     // database becomes a live embedded view (dbview block).
-    expect(blocks[2].text).toEqual([{t: 'Visit', a: {a: 'https://x.y'}}]);
-    expect((blocks[3].text as {a?: {m?: string}}[])[0].a?.m).toBe('pg-1');
-    expect((blocks[4] as {props?: {pageId?: string}}).props?.pageId).toBe('pg-db');
+    expect(blocks[1].text).toEqual([{t: 'Visit', a: {a: 'https://x.y'}}]);
+    expect((blocks[2].text as {a?: {m?: string}}[])[0].a?.m).toBe('pg-1');
+    expect((blocks[3] as {props?: {pageId?: string}}).props?.pageId).toBe('pg-db');
     // slider carries the LIVE value (7), not the stale initial (3)
-    expect(blocks[5].props).toMatchObject({name: 'speed', min: 0, max: 10, value: 7});
+    expect(blocks[4].props).toMatchObject({name: 'speed', min: 0, max: 10, value: 7});
     // expr tokens and @refs resolve to plain names
-    expect(blocks[6].props).toEqual({source: 'speed * 2 + speed'});
+    expect(blocks[5].props).toEqual({source: 'speed * 2 + speed'});
     // chart leaves an honest marker
-    expect(blocks[7].props).toMatchObject({variant: 'warn'});
+    expect(blocks[6].props).toMatchObject({variant: 'warn'});
   });
 });
 
@@ -309,7 +445,7 @@ describe('htmlToBlocks (clipboard import)', () => {
     expect(blocks[1].text).toEqual([{t: 'plain '}, {t: 'bold', a: {b: true}}, {t: ' '}, {t: 'link', a: {a: 'https://x.y'}}]);
     expect(blocks[3].props).toEqual({checked: true});
     expect(blocks[4].props).toEqual({kind: 'number'});
-    expect(blocks[8].props).toEqual({header: true});
+    expect(blocks[8].props).toMatchObject({header: true}); // + col:* order-key registry (TBL-1)
     expect((blocks[8].children?.[1].children?.[1] as {text: {t: string}[]}).text[0].t).toBe('2');
   });
 
@@ -329,5 +465,106 @@ describe('htmlToBlocks (clipboard import)', () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0].type).toBe('paragraph');
     expect(blocks[0].text).toEqual([{t: 'A '}, {t: 'bold', a: {b: true}}, {t: ' cap'}]);
+  });
+});
+
+// The shape of a Notion clipboard table: nested tables inside cells, colspan/
+// rowspan, spacer/ragged/empty rows. Each must normalize to a rectangular
+// table → row → cell tree so render never throws (the v3.3.2 white-screen bug).
+describe('htmlToBlocks — Notion-shaped table normalization', () => {
+  // Read a parsed table block back as a plain grid of joined cell text.
+  const cellText = (text: NewBlock['text']): string =>
+    Array.isArray(text) ? text.map((r) => r.t).join('') : (text ?? '');
+  const grid = (block: NewBlock): string[][] =>
+    (block.children ?? []).map((row) => (row.children ?? []).map((cell) => cellText(cell.text)));
+
+  it('scopes to direct rows/cells — a table nested in a cell is flattened, not spliced into the outer grid', async () => {
+    const {htmlToBlocks} = await import('../../blockeditor/model');
+    const blocks = htmlToBlocks(
+      '<table><tbody>' +
+        '<tr><td>A</td><td>B</td></tr>' +
+        '<tr><td>C</td><td><table><tbody><tr><td>x</td><td>y</td></tr></tbody></table></td></tr>' +
+        '</tbody></table>',
+    );
+    const tables = blocks.filter((b) => b.type === 'table');
+    expect(tables).toHaveLength(1);
+    // Outer grid stays 2×2 — the nested table's cells are NOT pulled up as rows,
+    // and its text folds into the host cell.
+    expect(grid(tables[0])).toEqual([
+      ['A', 'B'],
+      ['C', 'x y'],
+    ]);
+  });
+
+  it('preserves colspan/rowspan as anchor props with null covered slots', async () => {
+    const {htmlToBlocks} = await import('../../blockeditor/model');
+    const blocks = htmlToBlocks(
+      '<table><tbody>' +
+        '<tr><td colspan="2">Wide</td></tr>' +
+        '<tr><td rowspan="2">Tall</td><td>b1</td></tr>' +
+        '<tr><td>c1</td></tr>' +
+        '</tbody></table>',
+    );
+    expect(grid(blocks[0])).toEqual([['Wide'], ['Tall', 'b1'], ['c1']]);
+    expect(blocks[0].children![0].children![0].props).toMatchObject({col: 'c0', colspan: 2});
+    expect(blocks[0].children![1].children![0].props).toMatchObject({col: 'c0', rowspan: 2});
+    expect(blocks[0].children![2].children![0].props).toMatchObject({col: 'c1'});
+  });
+
+  it('drops cell-less spacer rows, pads ragged rows, keeps blank-but-real cells, stays rectangular', async () => {
+    const {htmlToBlocks} = await import('../../blockeditor/model');
+    const blocks = htmlToBlocks(
+      '<table><tbody>' +
+        '<tr><td>h1</td><td>h2</td><td>h3</td></tr>' +
+        '<tr></tr>' + // structural spacer row — no direct cells → dropped
+        '<tr><td>only</td></tr>' + // ragged → padded to width
+        '<tr><td></td><td></td><td></td></tr>' + // real but blank cells → kept
+        '</tbody></table>',
+    );
+    expect(grid(blocks[0])).toEqual([
+      ['h1', 'h2', 'h3'],
+      ['only', '', ''],
+      ['', '', ''],
+    ]);
+  });
+
+  it('scopes header detection to the first direct row (thead > th), not a nested table', async () => {
+    const {htmlToBlocks} = await import('../../blockeditor/model');
+    const blocks = htmlToBlocks(
+      '<table><thead><tr><th>H1</th><th>H2</th></tr></thead>' +
+        '<tbody><tr><td>a</td><td>b</td></tr></tbody></table>',
+    );
+    expect(blocks[0].props).toMatchObject({header: true}); // + col:* order-key registry (TBL-1)
+    expect(grid(blocks[0])).toEqual([
+      ['H1', 'H2'],
+      ['a', 'b'],
+    ]);
+  });
+});
+
+describe('paste target — caret inside a table cell', () => {
+  it('redirects a pasted block to after the enclosing table, never as a cell sibling', () => {
+    const doc = createDoc([{type: 'paragraph', text: 'top'}, makeTable(2, 2)]);
+    const original = docToJSON(doc).find((b) => b.type === 'table')!;
+    const cellId = original.children![0].children![0].id!;
+
+    // The exact decision TextBlockView makes on `insertFromPaste`.
+    const enclosing = enclosingBlock(doc, cellId, new Set<'table'>(['table']));
+    expect(enclosing).not.toBeNull();
+    expect(blockType(enclosing!.block)).toBe('table');
+
+    insertBlock(doc, enclosing!.parent, enclosing!.index + 1, {
+      type: 'table',
+      children: [{type: 'row', children: [{type: 'cell', text: 'pasted'}]}],
+    });
+
+    const after = docToJSON(doc);
+    // Two sibling tables at the root — the pasted one landed AFTER, not inside.
+    expect(after.filter((b) => b.type === 'table')).toHaveLength(2);
+    // The original table's rows still contain only cells — nothing poisoned in.
+    const orig = after.find((b) => b.id === original.id)!;
+    for (const row of orig.children ?? []) {
+      expect((row.children ?? []).every((c) => c.type === 'cell')).toBe(true);
+    }
   });
 });

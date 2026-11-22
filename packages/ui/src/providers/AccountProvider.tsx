@@ -1,5 +1,6 @@
 import React, {createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  API,
   AccountClient,
   AccountError,
   decodeIdentity,
@@ -8,9 +9,9 @@ import {
   resolveAccountUrl,
   setIdentityToken,
 } from '@book.dev/sdk';
-import {usePlatformLibrary, type AccountSecretStore} from './PlatformLibraryProvider';
+import {usePlatformCapabilities, type AccountSecretStore} from './PlatformCapabilitiesProvider';
 import {usePreferences, mergePreferences, type Preferences, type DeepPartial} from './PreferencesProvider';
-import {useWorkspace, type Workspace} from './WorkspaceProvider';
+import {useLibrary, type Library} from './LibraryProvider';
 import {t} from '@/i18n';
 
 /**
@@ -25,7 +26,11 @@ import {t} from '@/i18n';
  * here. The token is then a bearer for `/api/settings`.
  *
  * Sync: pull on connect / app open (remote wins), then push the
- * `{preferences, workspaces}` blob on local change (debounced, last-writer-wins).
+ * `{preferences, libraries}` blob on local change (debounced, last-writer-wins).
+ * The library list is written under BOTH `libraries` (new wire key, LIB-6) and
+ * the legacy `workspaces` key, and read back as `libraries ?? workspaces`, so a
+ * client and an account server on either side of the rename interoperate with no
+ * data loss (the account service mirrors the two keys as well).
  *
  * Multi-account (OB-194): the client holds a **list** of connected accounts and
  * an **active** one. Sign-in *adds* an account rather than replacing the current
@@ -61,6 +66,8 @@ export interface ConnectedAccount {
   /** Connection status. The ACTIVE account tracks the live status; the others are
    *  dormant (reported as `connected` until they are made active). */
   status: AccountStatus;
+  /** This slot is an able-backed OpenBook identity, not a sync-account bearer. */
+  identityOnly: boolean;
 }
 
 interface AccountContextValue {
@@ -78,6 +85,9 @@ interface AccountContextValue {
   error: string | null;
   /** The active account's service base URL (for an "open dashboard" link). */
   accountUrl: string;
+  /** Whether this same-origin server exposes able delegated sign-in. The provider
+   * owns and caches the capability probe so settings copy never probes again. */
+  ableMode: boolean;
   /** Start the deep-link sign-in flow (additive — see {@link addAccount}). */
   signIn: () => void;
   /** Complete sign-in from a manually pasted code — the dev/fallback path for when
@@ -87,8 +97,8 @@ interface AccountContextValue {
   submitCode: (raw: string) => void;
   /** Abandon a pending sign-in (returns to disconnected when not yet connected). */
   cancel: () => void;
-  /** Forget the ACTIVE account's token (does not revoke it server-side — do that in
-   *  the dashboard). If other accounts remain, switches to one of them. */
+  /** Forget the ACTIVE account's token. Able-backed slots also remove their
+   * server-held refresh credential. If other accounts remain, switches to one. */
   signOut: () => void;
   /** Pull-then-push a reconciliation now (for the active account). */
   syncNow: () => void;
@@ -112,9 +122,37 @@ interface AccountContextValue {
   /** Whether the active account's service issues identities at all — see
    *  {@link IdentityIssuance}. `unconfigured` means a refresh can never succeed. */
   identityIssuance: IdentityIssuance;
+  /** A previously-verified identity has LAPSED and could not be refreshed (the JWS
+   *  expired with a failing re-mint, or the device token was revoked). Drives a
+   *  visible "reconnect / sign in again" affordance so a reader is never silently
+   *  dropped to anonymous behind a blank page. Cleared on a successful re-mint or a
+   *  deliberate sign-out. Distinct from `identityIssuance === 'unconfigured'`, the
+   *  expected named-guest mode, which never sets this. */
+  identityExpired: boolean;
+
+  // ── Signed-in library discovery (LM-4) ──────────────────────────────────────
+  /** The active account's synced library list — the libraries the user has
+   *  configured across their devices, as last pulled from / pushed to the account
+   *  service. Empty when signed out. MVP: read straight off the synced settings
+   *  blob (no dedicated account directory API). The switcher uses it to show a
+   *  "From your account" group and to connect a library that isn't local yet. */
+  syncedLibraries: Library[];
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null);
+
+/** Base backoff before retrying a FAILED identity refresh, so a transient outage
+ *  can't kill the refresh loop and let the JWS silently expire (cross-server blank
+ *  pages). Jittered per attempt — see {@link identityRetryDelay}. */
+const IDENTITY_RETRY_MS = 20_000;
+
+/** The retry backoff with ±30% random jitter per attempt, so a correlated mass
+ *  token-expiry (many clients whose tokens lapse together) doesn't retry the
+ *  account mint endpoint in lockstep and stampede it. */
+function identityRetryDelay(): number {
+  const jitter = (Math.random() * 2 - 1) * 0.3; // ∈ [-0.3, +0.3]
+  return Math.round(IDENTITY_RETRY_MS * (1 + jitter));
+}
 
 const DEVICE_ID_KEY = 'openbook.deviceId';
 /** The account list (non-secret metadata only). */
@@ -175,6 +213,10 @@ interface StoredIndexRow {
   accountUrl: string;
   connectedAt: number;
   lastServerUpdatedAt: string | null;
+  /** A server-bridged identity assertion, not an account-service device token.
+   * It authenticates data requests but deliberately does no settings sync or
+   * forwarding-account API work. */
+  identityOnly?: boolean;
 }
 
 /** Identity facts decoded from a freshly minted JWS (for labelling/dedup). */
@@ -184,6 +226,32 @@ interface Persona {
   name: string | null;
   /** The audience the issuer actually scoped the minted token to (OB-202), or null. */
   aud: string | null;
+}
+
+function bridgedIdentity(token: string): {persona: Persona; issuer: string; expiresAt: number} | null {
+  const decoded = decodeIdentity(token);
+  if (
+    !decoded ||
+    decoded.header.alg !== 'EdDSA' ||
+    typeof decoded.claims.exp !== 'number' ||
+    decoded.claims.exp * 1000 <= Date.now()
+  ) return null;
+  return {
+    issuer: decoded.claims.iss,
+    persona: {
+      subject: `${decoded.claims.iss}#${decoded.claims.sub}`,
+      email: decoded.claims.email?.trim().toLowerCase() || null,
+      name: decoded.claims.name ?? null,
+      aud: decoded.claims.aud ?? null,
+    },
+    expiresAt: decoded.claims.exp * 1000,
+  };
+}
+
+class AbleRefreshError extends Error {
+  constructor(readonly status: number) {
+    super('able identity refresh failed');
+  }
 }
 
 /**
@@ -267,6 +335,16 @@ function readActiveId(): string | null {
     return null;
   }
 }
+
+/**
+ * The persisted active account id, readable synchronously outside React. The
+ * desktop shell uses this to namespace per-account secret slots that are
+ * constructed before any provider mounts — e.g. the forwarding site-identity
+ * keychain slot (`forwarding.site-identity.<accountId>`, NAME-2), so an
+ * account switch selects that account's identity instead of clobbering the
+ * global slot. Null while signed out.
+ */
+export const readActiveAccountId = (): string | null => readActiveId();
 
 function writeActiveId(id: string | null): void {
   try {
@@ -357,10 +435,53 @@ function clearPendingState(): void {
   }
 }
 
-/** The blob mirrored to account.book.pub. */
+/** The blob mirrored to account.book.pub.
+ *
+ *  The library list is DUAL-WRITTEN under two wire keys that are mid-rename with
+ *  the account service (LIB-6): `libraries` (new canonical) and `workspaces`
+ *  (legacy). Both always hold the same value, so an old server — which stores the
+ *  blob verbatim — still exposes `workspaces` to an old client, and an old client
+ *  reading a new server's mirrored blob still finds its key. Incoming blobs are
+ *  read as `libraries ?? workspaces` (prefer new). */
 interface SyncBlob {
   preferences: Preferences;
-  workspaces: Workspace[];
+  libraries: Library[];
+  /**
+   * Legacy alias of {@link SyncBlob.libraries}; always kept equal for back-compat.
+   *
+   * @deprecated Wire/persisted residue — removal target **v3.0.0** (see
+   * `docs/wire-sunset.md`). Dual-written alongside `libraries` so an old account
+   * server/client still finds a key. Stop WRITING it (and reading it in
+   * {@link readIncomingLibraries}) only at v3.0.0, once no persisted account blob is
+   * `workspaces`-only. Use {@link SyncBlob.libraries}.
+   */
+  workspaces: Library[];
+}
+
+/** The library list carried by an incoming (possibly old- or new-keyed) blob:
+ *  prefer the new `libraries` key, fall back to the legacy `workspaces`. Returns
+ *  null when neither key carries an array (so the caller leaves locals as-is). */
+function readIncomingLibraries(settings: Record<string, unknown>): Library[] | null {
+  if (Array.isArray(settings.libraries)) return settings.libraries as Library[];
+  if (Array.isArray(settings.workspaces)) {
+    // Migration observability (dev only, NO telemetry): a blob that carries ONLY
+    // the legacy `workspaces` key means some producer hasn't adopted `libraries`
+    // yet. Surfacing it locally lets us confirm the v3.0.0 cutover is safe. See
+    // docs/wire-sunset.md.
+    const nodeEnv = (globalThis as {process?: {env?: {NODE_ENV?: string}}}).process?.env?.NODE_ENV;
+    if (nodeEnv !== 'production') {
+      console.warn(
+        '[wire-sunset] account sync blob carried the legacy `workspaces` key with no `libraries` (deprecated, removal v3.0.0)',
+      );
+    }
+    return settings.workspaces as Library[];
+  }
+  return null;
+}
+
+/** Build the outgoing blob, dual-writing the library list under both wire keys. */
+function makeSyncBlob(preferences: Preferences, libraries: Library[]): SyncBlob {
+  return {preferences, libraries, workspaces: libraries};
 }
 
 /**
@@ -380,16 +501,23 @@ function dataServerAudience(): string | undefined {
 }
 
 export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}) => {
-  const {account: platform} = usePlatformLibrary();
+  const {account: platform} = usePlatformCapabilities();
   const {preferences, update: updatePreferences} = usePreferences();
-  const {workspaces, replaceWorkspaces} = useWorkspace();
+  const {libraries, replaceLibraries} = useLibrary();
 
   const [status, setStatus] = useState<AccountStatus>('disconnected');
   const [token, setToken] = useState<string | null>(null);
+  const [identityOnly, setIdentityOnly] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<StoredIndexRow[]>(() => readIndex());
   const [activeAccountId, setActiveAccountId] = useState<string | null>(() => readActiveId());
+  const [ableMode, setAbleMode] = useState(false);
+  // The active account's synced library list (LM-4). Tracked separately from the
+  // live LibraryProvider list so the switcher can label which libraries are
+  // account-backed and offer to connect ones from another device. Reset on
+  // sign-out; refreshed on every reconcile/push of the active account.
+  const [syncedLibraries, setSyncedLibraries] = useState<Library[]>([]);
 
   const client = useMemo(() => new AccountClient(), []);
   const accountUrlDefault = useMemo(() => resolveAccountUrl(), []);
@@ -417,10 +545,40 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   // recursion. A ref (not state) so toggling it triggers no extra render.
   const activatingDepth = useRef(0);
 
-  // Latest preferences/workspaces, read inside async callbacks without re-binding.
-  const blobRef = useRef<SyncBlob>({preferences, workspaces});
-  blobRef.current = {preferences, workspaces};
-  const currentBlob = useCallback((): SyncBlob => ({preferences: blobRef.current.preferences, workspaces: blobRef.current.workspaces}), []);
+  // One shared capability probe for both copy selection and the sign-in action.
+  // Calling signIn while the mount probe is in flight awaits this same promise,
+  // so surfacing able mode in settings never adds duplicate network chatter.
+  const ableProbeRef = useRef<Promise<boolean> | null>(null);
+  const probeAbleMode = useCallback((): Promise<boolean> => {
+    if (ableProbeRef.current) return ableProbeRef.current;
+    ableProbeRef.current = (async () => {
+      if (platform?.redirectUri || typeof window === 'undefined') return false;
+      try {
+        const serverOverride = getServerUrlOverride();
+        const serverOrigin = serverOverride ? new URL(serverOverride).origin : window.location.origin;
+        if (serverOrigin !== window.location.origin) return false;
+        const probe = new URL(API.ableOauthAuthorize, `${serverOrigin}/`);
+        probe.searchParams.set('probe', '1');
+        const response = await fetch(probe, {cache: 'no-store'});
+        return response.status === 204;
+      } catch {
+        return false;
+      }
+    })().then((delegated) => {
+      setAbleMode(delegated);
+      return delegated;
+    });
+    return ableProbeRef.current;
+  }, [platform]);
+
+  useEffect(() => {
+    void probeAbleMode();
+  }, [probeAbleMode]);
+
+  // Latest preferences/libraries, read inside async callbacks without re-binding.
+  const blobRef = useRef<SyncBlob>(makeSyncBlob(preferences, libraries));
+  blobRef.current = makeSyncBlob(preferences, libraries);
+  const currentBlob = useCallback((): SyncBlob => makeSyncBlob(blobRef.current.preferences, blobRef.current.libraries), []);
 
   // ── The account index (metadata) + active id, mirrored to localStorage. ──────
   const indexRef = useRef<StoredIndexRow[]>(accounts);
@@ -449,15 +607,15 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   /** Adopt a pulled blob into the live providers. */
   const adopt = useCallback(
     (settings: Record<string, unknown>): SyncBlob => {
-      // Apply the server settings AND return the exact local {preferences, workspaces}
+      // Apply the server settings AND return the exact local {preferences, libraries}
       // shape they normalize to, so the caller can record it as the sync baseline
       // (ER-9). The debounced push compares JSON.stringify of the LOCAL state, which
       // adopt re-keys through updatePreferences (always {profile,general,features}
-      // merged over current) + replaceWorkspaces (filters, guarantees a local
-      // workspace, may synth one with a RANDOM id) — so the raw server blob rarely
+      // merged over current) + replaceLibraries (filters, guarantees a local
+      // library, may synth one with a RANDOM id) — so the raw server blob rarely
       // byte-matches it. blobRef still holds the pre-adopt values here (the setStates
       // below land on the next render), so derive the post-adopt blob from the same
-      // merge helper, and capture replaceWorkspaces' exact (non-deterministic) output
+      // merge helper, and capture replaceLibraries' exact (non-deterministic) output
       // from its return value rather than recomputing it.
       let preferences = blobRef.current.preferences;
       if (settings.preferences && typeof settings.preferences === 'object') {
@@ -465,13 +623,17 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         preferences = mergePreferences(preferences, patch);
         updatePreferences(patch);
       }
-      let workspaces = blobRef.current.workspaces;
-      if (Array.isArray(settings.workspaces)) {
-        workspaces = replaceWorkspaces(settings.workspaces as Workspace[]);
+      // Dual-read the library list: prefer the new `libraries` key, fall back to
+      // the legacy `workspaces` key (LIB-6). Either resolves through the same
+      // replaceLibraries normalization so the baseline matches a later push.
+      let libraries = blobRef.current.libraries;
+      const incoming = readIncomingLibraries(settings);
+      if (incoming) {
+        libraries = replaceLibraries(incoming);
       }
-      return {preferences, workspaces};
+      return makeSyncBlob(preferences, libraries);
     },
-    [updatePreferences, replaceWorkspaces],
+    [updatePreferences, replaceLibraries],
   );
 
   /** Pull-then-reconcile. With `seedFromLocal` (the genuine FIRST account only) an
@@ -481,12 +643,15 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   const reconcileSettings = useCallback(
     async (tok: string, seedFromLocal: boolean): Promise<string | null> => {
       const {settings, updatedAt} = await client.getSettings(tok); // 401 ⇒ AccountError
-      const remoteEmpty = updatedAt === null || (!settings.preferences && !settings.workspaces);
+      // Remote is "empty" only when it carries neither preferences nor a library
+      // list under EITHER wire key (`libraries` new / `workspaces` legacy, LIB-6).
+      const remoteEmpty =
+        updatedAt === null || (!settings.preferences && !settings.workspaces && !settings.libraries);
       if (remoteEmpty) {
         // Seed the server blob from the local providers ONLY for the genuine first
         // account ever connected — the "upload my pre-sign-in local state" path.
         // For any later account the live blob belongs to the *previously active*
-        // account; pushing it here would bleed account A's workspaces/preferences
+        // account; pushing it here would bleed account A's libraries/preferences
         // into account B (OB-194 review). Treat an empty remote as empty instead:
         // never push, and record the live blob as the synced baseline so the
         // debounced push stays a no-op (no later upload of A's blob to B either).
@@ -494,16 +659,23 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
           const blob = currentBlob();
           const res = await client.putSettings(tok, blob as unknown as Record<string, unknown>);
           lastSyncedBlob.current = JSON.stringify(blob);
+          // The account now holds our local list — it IS the synced set (LM-4).
+          setSyncedLibraries(blob.libraries);
           return res.updatedAt;
         }
         lastSyncedBlob.current = JSON.stringify(currentBlob());
+        // A truly empty remote carries no libraries to surface (LM-4).
+        setSyncedLibraries([]);
         return updatedAt;
       }
       // Baseline against the LOCAL shape adopt just applied (its return value), not
       // the raw server blob: adopt normalizes both sections, so the server JSON rarely
       // byte-matches the push's local serialization — a stale baseline fired one
       // redundant putSettings per activation (ER-9).
-      lastSyncedBlob.current = JSON.stringify(adopt(settings));
+      const adopted = adopt(settings);
+      lastSyncedBlob.current = JSON.stringify(adopted);
+      // Surface the account's library list for signed-in discovery (LM-4).
+      setSyncedLibraries(adopted.libraries);
       return updatedAt;
     },
     [client, currentBlob, adopt],
@@ -518,6 +690,15 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   // identities (501) we stay a named guest.
   const identityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [identityIssuance, setIdentityIssuance] = useState<IdentityIssuance>('unknown');
+  // Whether a previously-VERIFIED identity has lapsed and could not be refreshed
+  // (token expired with a failing re-mint, or the device token was revoked). Drives
+  // a VISIBLE "reconnect / sign in again" affordance instead of silently dropping a
+  // reader to anonymous and rendering blank content. NOT set for the legitimate
+  // named-guest mode (a 501 `unconfigured` issuer) — that's expected, not a lapse.
+  const [identityExpired, setIdentityExpired] = useState(false);
+  // Epoch-ms expiry of the identity JWS currently handed to the data client, so a
+  // failed refresh can tell "still valid, keep it" from "dead, stop presenting it".
+  const identityExpiryRef = useRef<number | null>(null);
   const refreshIdentity = useCallback(
     async (tok: string): Promise<Persona | null> => {
       try {
@@ -538,18 +719,25 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         }
         if (identityTimer.current) clearTimeout(identityTimer.current);
         if (res.status !== 'ok') {
-          // Terminal for this session: the account definitively answered that it
-          // mints no identity for us (501, or a still-rejected unscoped mint).
-          // Only such a definitive refusal clears the stored identity — transient
-          // network errors take the catch below and keep the previous token.
+          // A DEFINITIVE non-ok answer (a network blip throws and takes the catch
+          // below, keeping the previous token). `unconfigured` (501) is the
+          // legitimate named-guest mode — the account issues no identities, so
+          // acting as a guest is expected, NOT a lapse, and must not nag re-auth.
+          // Any other definitive refusal is a real loss of a verified identity we
+          // can't recover here → surface re-auth.
           setIdentityIssuance(res.status === 'unconfigured' ? 'unconfigured' : 'unknown');
           setIdentityToken(null);
+          identityExpiryRef.current = null;
+          setIdentityExpired(res.status !== 'unconfigured');
           return null;
         }
         setIdentityIssuance('ok');
         setIdentityToken(res.identity);
+        setIdentityExpired(false); // a verified identity is live again
+        const expiryMs = new Date(res.expiresAt).getTime();
+        identityExpiryRef.current = Number.isFinite(expiryMs) ? expiryMs : null;
         // Refresh a minute before expiry (but at least 30s out).
-        const ms = Math.max(30_000, new Date(res.expiresAt).getTime() - Date.now() - 60_000);
+        const ms = Math.max(30_000, expiryMs - Date.now() - 60_000);
         identityTimer.current = setTimeout(() => void refreshRef.current(tok), ms);
         const decoded = decodeIdentity(res.identity);
         if (!decoded) return null;
@@ -562,8 +750,34 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
           // only on a genuinely host-scoped token (OB-202).
           aud: decoded.claims.aud ?? null,
         };
-      } catch {
-        // Network/transient error — keep whatever we had; a later sync retries.
+      } catch (err) {
+        // A refresh FAILED before a definitive answer. NEVER let the refresh loop
+        // die here: a one-shot timer fired to get us in, so without rescheduling the
+        // still-attached JWS silently passes its expiry and every later one-shot
+        // content fetch 401s — while the already-open `/api/live` SSE (its identity
+        // baked into the URL at open) keeps streaming the stale nav list. That is
+        // the cross-server "titles show, content blank" divergence.
+        if (identityTimer.current) clearTimeout(identityTimer.current);
+        const revoked = err instanceof AccountError && (err.status === 401 || err.status === 403);
+        const expiry = identityExpiryRef.current;
+        const stillValid = !revoked && expiry != null && expiry - Date.now() > 30_000;
+        if (stillValid) {
+          // The current JWS is still comfortably within its window: keep presenting
+          // it and retry soon — a transient blip must not demote a verified user.
+          identityTimer.current = setTimeout(() => void refreshRef.current(tok), identityRetryDelay());
+          return null;
+        }
+        // The JWS is gone / expired / about to expire, or the device token itself was
+        // rejected. STOP presenting a dead assertion — a present-but-invalid JWS is a
+        // hard 401 on the data server even where a guest could read (so content would
+        // stay blank rather than degrade to guest-visible) — and raise a VISIBLE
+        // re-auth state instead of a silent blank page.
+        setIdentityToken(null);
+        identityExpiryRef.current = null;
+        setIdentityExpired(true);
+        // A revoked device token can't self-heal (it needs a fresh sign-in), so don't
+        // spin a retry on it; a transient failure whose token merely expired retries.
+        if (!revoked) identityTimer.current = setTimeout(() => void refreshRef.current(tok), identityRetryDelay());
         return null;
       }
     },
@@ -576,10 +790,96 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     if (identityTimer.current) clearTimeout(identityTimer.current);
     identityTimer.current = null;
     setIdentityToken(null);
+    identityExpiryRef.current = null;
+    // A deliberate sign-out/switch is not a lapse — drop any re-auth prompt.
+    setIdentityExpired(false);
     // Issuance is a fact about the ACTIVE account's service; a sign-out/switch
     // makes it unknown again until the next account's first mint answers.
     setIdentityIssuance('unknown');
   }, []);
+
+  const ableRefreshRef = useRef<(id: string, assertion: string) => Promise<boolean>>(async () => false);
+
+  /** Present a callback-bridged assertion directly to the data client. The data
+   * server remains the verifier; decoding here is only for expiry/labels and the
+   * same pre-expiry refresh cadence used by account-service identities. */
+  const presentBridgedIdentity = useCallback((id: string, assertion: string, expiresAt: number): void => {
+    if (identityTimer.current) clearTimeout(identityTimer.current);
+    setIdentityToken(assertion);
+    setIdentityIssuance('ok');
+    setIdentityExpired(false);
+    identityExpiryRef.current = expiresAt;
+    const ms = Math.max(30_000, expiresAt - Date.now() - 60_000);
+    identityTimer.current = setTimeout(() => void ableRefreshRef.current(id, assertion), ms);
+  }, []);
+
+  const refreshAbleIdentity = useCallback(
+    async (id: string, assertion: string): Promise<boolean> => {
+      try {
+        const response = await fetch(API.ableOauthRefresh, {
+          method: 'POST',
+          headers: {authorization: `Bearer ${assertion}`},
+        });
+        if (!response.ok) throw new AbleRefreshError(response.status);
+        const body = await response.json() as {identity?: unknown; expiresAt?: unknown};
+        if (typeof body.identity !== 'string' || typeof body.expiresAt !== 'string') {
+          throw new AbleRefreshError(502);
+        }
+        const renewed = bridgedIdentity(body.identity);
+        const row = indexRef.current.find((candidate) => candidate.id === id);
+        if (!renewed || !row?.identityOnly || renewed.persona.subject !== row.subject) {
+          throw new AbleRefreshError(502);
+        }
+        await secretStoreRef.current.set(id, body.identity);
+        tokensRef.current.set(id, body.identity);
+        patchRow(id, {
+          email: renewed.persona.email,
+          subject: renewed.persona.subject,
+          name: renewed.persona.email ?? renewed.persona.name ?? row.name,
+        });
+        if (activeIdRef.current === id) {
+          presentBridgedIdentity(id, body.identity, renewed.expiresAt);
+          setStatus('connected');
+          setError(null);
+        }
+        return true;
+      } catch (err) {
+        if (activeIdRef.current !== id) return false;
+        if (identityTimer.current) clearTimeout(identityTimer.current);
+        const rejected = err instanceof AbleRefreshError && (err.status === 401 || err.status === 403);
+        const decoded = decodeIdentity(assertion);
+        const assertedExpiry = typeof decoded?.claims.exp === 'number' ? decoded.claims.exp * 1000 : null;
+        const expiry = identityExpiryRef.current ?? assertedExpiry;
+        const stillValid = !rejected && expiry != null && expiry - Date.now() > 30_000;
+        if (stillValid) {
+          identityTimer.current = setTimeout(
+            () => void ableRefreshRef.current(id, assertion),
+            identityRetryDelay(),
+          );
+          return false;
+        }
+        setIdentityToken(null);
+        identityExpiryRef.current = null;
+        setIdentityExpired(true);
+        setStatus('error');
+        if (rejected) {
+          setError(t('account.error.rejectedReauth'));
+        } else {
+          identityTimer.current = setTimeout(
+            () => void ableRefreshRef.current(id, assertion),
+            identityRetryDelay(),
+          );
+        }
+        return false;
+      }
+    },
+    [patchRow, presentBridgedIdentity, t],
+  );
+  ableRefreshRef.current = refreshAbleIdentity;
+
+  // Never leak the identity-refresh timer past unmount: a queued retry that fired
+  // after teardown would call a stale refresh (and, in tests, a torn-down fetch).
+  useEffect(() => () => void (identityTimer.current && clearTimeout(identityTimer.current)), []);
 
   // Mutually-recursive async actions (activate ⇄ forget) bound through refs so
   // each can call the latest of the other without a declaration-order cycle.
@@ -596,6 +896,18 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       // fallback whose own activation fails to mint a replacement (OB-194, Sasha).
       const wasActive = activeIdRef.current === id;
       if (wasActive) clearIdentity();
+      const row = indexRef.current.find((candidate) => candidate.id === id);
+      const storedToken = tokensRef.current.get(id) ?? (await secretStoreRef.current.get(id));
+      if (row?.identityOnly && storedToken) {
+        try {
+          await fetch(API.ableOauthRefresh, {
+            method: 'DELETE',
+            headers: {authorization: `Bearer ${storedToken}`},
+          });
+        } catch {
+          /* best-effort cleanup: local sign-out must still complete while offline */
+        }
+      }
       try {
         await secretStoreRef.current.delete(id);
       } catch {
@@ -616,8 +928,10 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       // Nothing left to fall back to (identity already cleared above).
       lastSyncedBlob.current = null;
       setToken(null);
+      setIdentityOnly(false);
       setLastSyncedAt(null);
       commitActiveId(null);
+      setSyncedLibraries([]); // signed out — nothing to discover (LM-4)
       setStatus('disconnected');
     },
     [commitIndex, commitActiveId, clearIdentity],
@@ -633,9 +947,24 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       setStatus('syncing');
       setError(null);
       commitActiveId(id);
-      setToken(tok);
       tokensRef.current.set(id, tok);
       try {
+        const row = indexRef.current.find((candidate) => candidate.id === id);
+        const bridged = row?.identityOnly ? bridgedIdentity(tok) : null;
+        if (row?.identityOnly) {
+          setToken(null);
+          setIdentityOnly(true);
+          setLastSyncedAt(null);
+          if (!bridged) {
+            await ableRefreshRef.current(id, tok);
+            return;
+          }
+          presentBridgedIdentity(id, tok, bridged.expiresAt);
+          setStatus('connected');
+          return;
+        }
+        setIdentityOnly(false);
+        setToken(tok);
         // An already-stored account is never the genuine first connect, so never
         // seed its (possibly empty) remote from the current — previous account's —
         // blob; an empty remote is treated as empty (OB-194).
@@ -666,7 +995,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         activatingDepth.current = Math.max(0, activatingDepth.current - 1);
       }
     },
-    [commitActiveId, reconcileSettings, patchRow, accountUrlDefault],
+    [commitActiveId, reconcileSettings, patchRow, accountUrlDefault, clearIdentity, presentBridgedIdentity],
   );
   activateRef.current = activate;
 
@@ -686,6 +1015,32 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       setStatus('syncing');
       setError(null);
       try {
+        const bridged = bridgedIdentity(tok);
+        if (bridged) {
+          const existing = indexRef.current.find((row) => row.subject === bridged.persona.subject);
+          const id = existing?.id ?? newAccountId();
+          const row: StoredIndexRow = {
+            id,
+            name: bridged.persona.email ?? bridged.persona.name ?? existing?.name ?? 'Account',
+            email: bridged.persona.email,
+            subject: bridged.persona.subject,
+            accountUrl: bridged.issuer,
+            connectedAt: Date.now(),
+            lastServerUpdatedAt: null,
+            identityOnly: true,
+          };
+          await secretStore.set(id, tok);
+          tokensRef.current.set(id, tok);
+          upsertRow(row);
+          commitActiveId(id);
+          setToken(null);
+          setIdentityOnly(true);
+          setLastSyncedAt(null);
+          presentBridgedIdentity(id, tok, bridged.expiresAt);
+          setStatus('connected');
+          return;
+        }
+        setIdentityOnly(false);
         const updatedAt = await reconcileSettings(tok, firstAccount); // validates (401 ⇒ AccountError)
         const persona = await refreshRef.current(tok); // mints + sets the live identity
         // Dedupe a re-sign-in of the same account into the same slot. Prefer the
@@ -727,7 +1082,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         activatingDepth.current = Math.max(0, activatingDepth.current - 1);
       }
     },
-    [reconcileSettings, secretStore, upsertRow, commitActiveId, clearIdentity, accountUrlDefault],
+    [reconcileSettings, secretStore, upsertRow, commitActiveId, clearIdentity, accountUrlDefault, presentBridgedIdentity],
   );
 
   /**
@@ -851,7 +1206,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     // would upload A's blob under B's token (OB-194 switch-race). The reconcile
     // records the new account's synced baseline; the next real edit pushes cleanly.
     if (activatingDepth.current > 0) return;
-    const blob: SyncBlob = {preferences, workspaces};
+    const blob = makeSyncBlob(preferences, libraries);
     const json = JSON.stringify(blob);
     if (json === lastSyncedBlob.current) return;
     const id = setTimeout(() => {
@@ -867,6 +1222,8 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
           setLastSyncedAt(res.updatedAt);
           setStatus('connected');
           setError(null);
+          // Keep the discovery list in step with what the account now holds (LM-4).
+          setSyncedLibraries(blob.libraries);
           const aid = activeIdRef.current;
           if (aid) patchRow(aid, {lastServerUpdatedAt: res.updatedAt});
         })
@@ -876,7 +1233,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         });
     }, 1200);
     return () => clearTimeout(id);
-  }, [token, preferences, workspaces, client, patchRow]);
+  }, [token, preferences, libraries, client, patchRow]);
 
   const signIn = useCallback(() => {
     const state = rand();
@@ -884,18 +1241,35 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     writePendingState(state);
     setStatus('connecting');
     setError(null);
-    const redirectUri =
-      platform?.redirectUri ?? (typeof window !== 'undefined' ? `${window.location.origin}/account/callback` : '');
-    const url = client.connectUrl({redirectUri, state, name});
-    if (platform?.openSignIn) {
-      platform.openSignIn(url);
-    } else if (typeof window !== 'undefined') {
-      // Web: a popup keeps the app mounted to receive the handoff; fall back to a
-      // full navigation if the popup is blocked.
-      const popup = window.open(url, 'openbook-signin', 'width=520,height=720');
-      if (!popup) window.location.href = url;
-    }
-  }, [client, name, platform]);
+    // Reserve the popup synchronously while this call still has user activation;
+    // the capability probe below is async and browsers otherwise block it.
+    const pendingPopup = !platform?.openSignIn && typeof window !== 'undefined'
+      ? window.open('about:blank', 'openbook-signin', 'width=520,height=720')
+      : null;
+    void (async () => {
+      const redirectUri =
+        platform?.redirectUri ?? (typeof window !== 'undefined' ? `${window.location.origin}/account/callback` : '');
+      let url = client.connectUrl({redirectUri, state, name});
+
+      // The mount-time capability check is shared with settings copy. Await the
+      // cached promise here, so a fast click neither duplicates the probe nor races
+      // into the branded account-service flow.
+      if (await probeAbleMode()) {
+        const delegated = new URL(API.ableOauthAuthorize, window.location.origin);
+        delegated.searchParams.set('handoff_state', state);
+        url = delegated.toString();
+      }
+
+      if (platform?.openSignIn) {
+        platform.openSignIn(url);
+      } else if (typeof window !== 'undefined') {
+        // Web: a popup keeps the app mounted to receive the handoff; fall back to a
+        // full navigation if the popup is blocked.
+        if (pendingPopup) pendingPopup.location.replace(url);
+        else window.location.href = url;
+      }
+    })();
+  }, [client, name, platform, probeAbleMode]);
 
   /**
    * Sign in from a manually pasted code. Unlike {@link receive} this skips the
@@ -908,7 +1282,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     (raw: string) => {
       const tok = extractToken(raw);
       if (!tok) {
-        setStatus((s) => (token ? s : 'error'));
+        setStatus((s) => (token || identityOnly ? s : 'error'));
         setError(t('account.error.invalidCode'));
         return;
       }
@@ -918,15 +1292,15 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       setError(null);
       void addFromToken(tok);
     },
-    [addFromToken, token],
+    [addFromToken, token, identityOnly],
   );
 
   const cancel = useCallback(() => {
     pendingState.current = null;
     clearPendingState();
-    setStatus((s) => (token ? s : 'disconnected'));
+    setStatus((s) => (token || identityOnly ? s : 'disconnected'));
     setError(null);
-  }, [token]);
+  }, [token, identityOnly]);
 
   /** Sign out the ACTIVE account (forget its token; switch to another if any). */
   const signOut = useCallback(() => {
@@ -940,6 +1314,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
     } else {
       clearIdentity();
       setToken(null);
+      setIdentityOnly(false);
       setLastSyncedAt(null);
       setStatus('disconnected');
     }
@@ -947,8 +1322,16 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
 
   const syncNow = useCallback(() => {
     const id = activeIdRef.current;
-    if (id && token) void activateRef.current(id, token);
-  }, [token]);
+    if (!id) return;
+    if (token) {
+      void activateRef.current(id, token);
+      return;
+    }
+    if (identityOnly) {
+      const assertion = tokensRef.current.get(id);
+      if (assertion) void ableRefreshRef.current(id, assertion);
+    }
+  }, [token, identityOnly]);
 
   const setActiveAccount = useCallback(
     (id: string) => {
@@ -979,6 +1362,7 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
         email: r.email,
         accountUrl: r.accountUrl,
         status: r.id === activeAccountId ? status : 'connected',
+        identityOnly: r.identityOnly === true,
       })),
     [accounts, activeAccountId, status],
   );
@@ -998,12 +1382,13 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
   const value = useMemo<AccountContextValue>(
     () => ({
       status,
-      connected: !!token && (status === 'connected' || status === 'syncing'),
+      connected: (!!token || identityOnly) && (status === 'connected' || status === 'syncing'),
       token,
       deviceName: name,
       lastSyncedAt,
       error,
       accountUrl: activeAccountUrl,
+      ableMode,
       signIn,
       submitCode,
       cancel,
@@ -1016,14 +1401,18 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       removeAccount,
       remintIdentity,
       identityIssuance,
+      identityExpired,
+      syncedLibraries,
     }),
     [
       status,
       token,
+      identityOnly,
       name,
       lastSyncedAt,
       error,
       activeAccountUrl,
+      ableMode,
       signIn,
       submitCode,
       cancel,
@@ -1035,6 +1424,8 @@ export const AccountProvider: React.FC<PropsWithChildren<unknown>> = ({children}
       removeAccount,
       remintIdentity,
       identityIssuance,
+      identityExpired,
+      syncedLibraries,
     ],
   );
 

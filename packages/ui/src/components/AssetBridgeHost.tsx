@@ -14,6 +14,7 @@ export function AssetBridgeHost() {
     setAssetBridge({
       putAsset: (bytes, mime, pageId) => client.putAsset(bytes, mime, pageId),
       getAsset: (id) => client.getAsset(id),
+      transcribeAsset: client.supportsTranscription === false ? undefined : (id, pageId) => client.transcribeAsset(id, pageId),
     });
     return () => setAssetBridge(null);
   }, [client]);

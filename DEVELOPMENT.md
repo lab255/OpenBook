@@ -1,0 +1,66 @@
+# Development
+
+## Prerequisites
+
+- Node.js `^22.14.0 || >=24.10.0`. `.nvmrc` pins Node 24.
+- [pnpm](https://pnpm.io/installation). The repository pins the version.
+- Bun `1.3.14` for the server sidecar.
+- A [Rust toolchain](https://www.rust-lang.org/tools/install) for the desktop app.
+
+## Setup
+
+```sh
+corepack enable
+pnpm install
+pnpm dev
+```
+
+`pnpm dev` starts the SDK, server, UI, web, and desktop development loops.
+`pnpm build` is a full production build.
+
+## Storage and server
+
+OpenBook stores documents as pages: a UUID, an optional name, and JSON data in
+Postgres. The desktop and headless deployments use the same TypeScript server.
+The desktop bundles it as a Bun sidecar with embedded PGlite. Headless
+deployments use external Postgres.
+
+The web app, desktop app, and server share types and the HTTP client through
+[`@book.dev/sdk`](packages/sdk/README.md).
+
+- [`packages/sdk`](packages/sdk/README.md): shared types and `HttpDataClient`.
+- [`packages/server`](packages/server/README.md): Hono API and page store for
+  embedded or external Postgres.
+
+Run the headless server:
+
+```sh
+OPENBOOK_DATABASE_URL=postgres://user:pass@host:5432/openbook \
+  pnpm --filter @book.dev/server dev
+```
+
+Without `OPENBOOK_DATABASE_URL`, the development server uses embedded PGlite.
+
+### able OIDC sign-in delegation
+
+Set both `ABLE_OAUTH_CLIENT_ID` and `ABLE_OAUTH_CLIENT_SECRET` on the server to
+replace the default account-service sign-in entry point with the server-side
+able OAuth 2.1/OIDC flow. If either value is absent, the two able auth routes are
+not mounted. The confidential-client secret remains server-only and is never
+returned through the settings/API surface. Rotating it invalidates existing
+encrypted able OIDC state, refresh tokens, and bridge-key material.
+
+The production issuer defaults to `https://account.able.online/api/auth`.
+Self-hosted and test deployments may override it with `ABLE_OAUTH_ISSUER`, and
+may independently set `ABLE_OAUTH_DISCOVERY_URL`. The registered local callback
+is `http://localhost:4319/api/auth/oauth2/callback/able`.
+
+For local development, keep credentials in the git-ignored `.env.able.local`
+file and load it into the server process; never add that file to a commit.
+
+## Further reading
+
+- [Architecture](ARCHITECTURE.md)
+- [Plugins](PLUGINS.md)
+- [Release updates](docs/release-updates.md)
+- [Backup and restore](docs/ledger/backup-restore.md)

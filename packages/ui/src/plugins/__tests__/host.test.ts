@@ -1,11 +1,17 @@
-import {describe, expect, it} from 'vitest';
-import {OPENBOOK_REGISTRY, type DataClient, type StoredPlugin} from '@book.dev/sdk';
+import {describe, expect, it, vi} from 'vitest';
+// The REAL hello-openbook example, byte-for-byte (vite `?raw`): the loader
+// back-compat proof below runs the shipped sources, not a copy.
+import helloManifestJson from '../../../../../examples/plugins/hello-openbook/openbook.json?raw';
+import helloIndexTs from '../../../../../examples/plugins/hello-openbook/src/index.ts?raw';
+import helloBlockTsx from '../../../../../examples/plugins/hello-openbook/src/block.tsx?raw';
+import {OPENBOOK_REGISTRY, OPENBOOK_REGISTRY_KEYS, PLUGIN_API_VERSION, type DataClient, type PluginManifest, type PluginPackage, type StoredPlugin} from '@book.dev/sdk';
 import {syncPlugins, pluginStatuses, trustedRegistryKeys, addTrustedRegistry, removeTrustedRegistry} from '../host';
+import {BUNDLED_PLUGINS} from '../bundled.gen';
 import {pluginCommands} from '../commandRegistry';
 import {getCustomBlock} from '../../blockeditor/registry';
 
-const plugin = (id: string, entry: string, enabled = true): StoredPlugin => ({
-  manifest: {id, name: id, version: '1.0.0', main: 'src/index.ts'},
+const plugin = (id: string, entry: string, enabled = true, manifest?: Partial<PluginManifest>): StoredPlugin => ({
+  manifest: {id, name: id, version: '1.0.0', main: 'src/index.ts', ...manifest},
   files: {'src/index.ts': entry},
   enabled,
   installedAt: new Date(0).toISOString(),
@@ -62,22 +68,165 @@ describe('plugin host', () => {
     await syncPlugins(clientWith([]));
   });
 
-  it('manages the trusted-registry list around the pinned first-party key', () => {
-    expect(trustedRegistryKeys()).toEqual([OPENBOOK_REGISTRY]);
+  it('loads the unmodified hello-openbook example (back-compat: no apiVersion field)', async () => {
+    const hello: StoredPlugin = {
+      manifest: JSON.parse(helloManifestJson) as PluginManifest,
+      files: {'src/index.ts': helloIndexTs, 'src/block.tsx': helloBlockTsx},
+      enabled: true,
+      installedAt: new Date(0).toISOString(),
+    };
+    expect(hello.manifest.apiVersion).toBeUndefined();
+
+    await syncPlugins(clientWith([hello]));
+    expect(pluginStatuses().find((s) => s.plugin.manifest.id === 'openbook.hello')?.state).toBe('active');
+    expect(pluginCommands().some((c) => c.id === 'openbook.hello/new-greeting-page')).toBe(true);
+    expect(getCustomBlock('openbook.hello/hello')).toBeDefined();
+    await syncPlugins(clientWith([]));
+  });
+
+  it('gates activation on apiVersion: older/equal fine, newer refused with the plugin id', async () => {
+    const source = 'export default () => {};';
+    const older = plugin('acme.older', source, true, {apiVersion: 1});
+    const equal = plugin('acme.equal', source, true, {apiVersion: PLUGIN_API_VERSION});
+    const newer = plugin('acme.newer', source, true, {apiVersion: PLUGIN_API_VERSION + 1});
+    await syncPlugins(clientWith([older, equal, newer]));
+
+    const state = (id: string): {state?: string; error?: string} => pluginStatuses().find((s) => s.plugin.manifest.id === id) ?? {};
+    expect(state('acme.older').state).toBe('active');
+    expect(state('acme.equal').state).toBe('active');
+    expect(state('acme.newer').state).toBe('error');
+    expect(state('acme.newer').error).toContain('acme.newer');
+    expect(state('acme.newer').error).toContain(`v${PLUGIN_API_VERSION + 1}`);
+    await syncPlugins(clientWith([]));
+  });
+
+  it('tears down a plugin row subscription on deactivate', async () => {
+    const stop = vi.fn();
+    const client = {
+      listPlugins: async (): Promise<StoredPlugin[]> => list,
+      subscribeRows: vi.fn(() => stop),
+    } as unknown as DataClient;
+    let list = [
+      plugin('acme.live', 'import {api} from \'@book.dev/plugin-sdk\'; export default (a) => { a.databases.subscribeRows(\'db1\', () => {}); void api; };'),
+    ];
+
+    await syncPlugins(client);
+    expect(pluginStatuses().find((s) => s.plugin.manifest.id === 'acme.live')?.state).toBe('active');
+    expect(stop).not.toHaveBeenCalled();
+
+    // Disable → the host disposes the subscription; no leaked handlers.
+    list = [{...list[0], enabled: false}];
+    await syncPlugins(client);
+    expect(stop).toHaveBeenCalledTimes(1);
+    list = [];
+    await syncPlugins(client);
+  });
+
+  it('tears down a subscription made AFTER deactivate (retained plugin callback)', async () => {
+    const stop = vi.fn();
+    const client = {
+      listPlugins: async (): Promise<StoredPlugin[]> => list,
+      subscribeRows: vi.fn(() => stop),
+    } as unknown as DataClient;
+    // The plugin stashes a callback (as a retained setTimeout/event handler
+    // would) that only calls subscribeRows when invoked later.
+    let list = [
+      plugin('acme.retained', 'export default (a) => { globalThis.__lgr4Late = () => a.databases.subscribeRows(\'db1\', () => {}); };'),
+    ];
+    await syncPlugins(client);
+    const late = (globalThis as Record<string, unknown>).__lgr4Late as () => () => void;
+    expect(typeof late).toBe('function');
+    expect(client.subscribeRows).not.toHaveBeenCalled();
+
+    // Disable → dispose runs. Then the retained callback fires anyway.
+    list = [{...list[0], enabled: false}];
+    await syncPlugins(client);
+    expect(stop).not.toHaveBeenCalled();
+    late();
+
+    // The client subscription was created — and torn down synchronously; no
+    // live handler survives past the plugin's deactivation.
+    expect(client.subscribeRows).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledTimes(1);
+
+    delete (globalThis as Record<string, unknown>).__lgr4Late;
+    list = [];
+    await syncPlugins(client);
+  });
+
+  it('auto-installs the signed bundled plugins; a fresh install verifies once its registry key is trusted', async () => {
+    // A fresh library: no plugins installed. syncPlugins seeds the bundled
+    // first-party packages (signed at build by bundlePlugins.ts) through the
+    // normal install path.
+    const installed: StoredPlugin[] = [];
+    const client = {
+      listPlugins: async (): Promise<StoredPlugin[]> => [...installed],
+      installPlugin: async (pkg: PluginPackage): Promise<StoredPlugin> => {
+        const stored: StoredPlugin = {...pkg, enabled: true, installedAt: new Date(0).toISOString()};
+        installed.push(stored);
+        return stored;
+      },
+    } as unknown as DataClient;
+
+    await syncPlugins(client);
+    const ledger = (): {verifiedBy?: string} | undefined => pluginStatuses().find((s) => s.plugin.manifest.id === 'openbook.ledger');
+    expect(ledger()).toBeDefined();
+    expect(installed.some((p) => p.manifest.id === 'openbook.ledger' && p.signature)).toBe(true);
+
+    const sig = BUNDLED_PLUGINS.find((p) => p.manifest.id === 'openbook.ledger')!.signature!;
+    if (sig.publicKey !== OPENBOOK_REGISTRY.publicKey) {
+      // Dev/test tree: the bundle is signed by the (unpinned) test key, so it
+      // starts Unverified — provenance only appears once the key is trusted.
+      expect(ledger()!.verifiedBy).toBeUndefined();
+    }
+
+    // Trust the registry key that signed the bundle → Verified on the next
+    // sync. In production the pinned OPENBOOK_REGISTRY key plays this role
+    // and no user action is needed.
+    addTrustedRegistry(sig.registry, sig.publicKey);
+    await syncPlugins(client);
+    expect(ledger()!.verifiedBy).toBe(sig.registry);
+
+    removeTrustedRegistry(sig.publicKey);
+    await syncPlugins(clientWith([]));
+  });
+
+  it('manages the trusted-registry list around the pinned first-party keys', () => {
+    // The pinned anchor is the whole LIST (rotation can pin two keys), and
+    // the deprecated single-key alias is its first entry.
+    expect(trustedRegistryKeys()).toEqual(OPENBOOK_REGISTRY_KEYS);
+    expect(OPENBOOK_REGISTRY).toBe(OPENBOOK_REGISTRY_KEYS[0]);
 
     addTrustedRegistry('Acme Registry', 'a'.repeat(43) + '=');
-    expect(trustedRegistryKeys()).toHaveLength(2);
-    expect(trustedRegistryKeys()[1]).toEqual({name: 'Acme Registry', publicKey: 'a'.repeat(43) + '='});
+    expect(trustedRegistryKeys()).toHaveLength(OPENBOOK_REGISTRY_KEYS.length + 1);
+    expect(trustedRegistryKeys()[trustedRegistryKeys().length - 1]).toEqual({name: 'Acme Registry', publicKey: 'a'.repeat(43) + '='});
 
-    // Re-adding the same key and re-adding the pinned key are both no-ops.
+    // Re-adding the same key and re-adding any pinned key are both no-ops.
     addTrustedRegistry('Acme Again', 'a'.repeat(43) + '=');
-    addTrustedRegistry('Sneaky', OPENBOOK_REGISTRY.publicKey);
-    expect(trustedRegistryKeys()).toHaveLength(2);
+    for (const pinned of OPENBOOK_REGISTRY_KEYS) addTrustedRegistry('Sneaky', pinned.publicKey);
+    expect(trustedRegistryKeys()).toHaveLength(OPENBOOK_REGISTRY_KEYS.length + 1);
 
     removeTrustedRegistry('a'.repeat(43) + '=');
-    expect(trustedRegistryKeys()).toEqual([OPENBOOK_REGISTRY]);
-    // The pinned key survives any removal attempt.
-    removeTrustedRegistry(OPENBOOK_REGISTRY.publicKey);
-    expect(trustedRegistryKeys()).toEqual([OPENBOOK_REGISTRY]);
+    expect(trustedRegistryKeys()).toEqual(OPENBOOK_REGISTRY_KEYS);
+    // Every pinned key survives any removal attempt.
+    for (const pinned of OPENBOOK_REGISTRY_KEYS) removeTrustedRegistry(pinned.publicKey);
+    expect(trustedRegistryKeys()).toEqual(OPENBOOK_REGISTRY_KEYS);
+  });
+
+  it('rejects user-added registries whose name collides with a pinned registry name', () => {
+    // A pasted key named "OpenBook Registry" (any casing/padding) would render
+    // a "Verified by OpenBook Registry" badge indistinguishable from
+    // first-party provenance — refuse it outright.
+    expect(trustedRegistryKeys()).toEqual(OPENBOOK_REGISTRY_KEYS);
+    addTrustedRegistry('OpenBook Registry', 'b'.repeat(43) + '=');
+    addTrustedRegistry('  openbook REGISTRY  ', 'b'.repeat(43) + '=');
+    expect(trustedRegistryKeys()).toEqual(OPENBOOK_REGISTRY_KEYS);
+
+    // A non-colliding name with the same key still works (the key itself is
+    // not first-party, so it may be trusted under an honest name).
+    addTrustedRegistry('Acme Registry', 'b'.repeat(43) + '=');
+    expect(trustedRegistryKeys()[trustedRegistryKeys().length - 1]).toEqual({name: 'Acme Registry', publicKey: 'b'.repeat(43) + '='});
+    removeTrustedRegistry('b'.repeat(43) + '=');
+    expect(trustedRegistryKeys()).toEqual(OPENBOOK_REGISTRY_KEYS);
   });
 });

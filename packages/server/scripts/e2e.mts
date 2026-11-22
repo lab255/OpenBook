@@ -17,6 +17,8 @@ import {PGlite} from '@electric-sql/pglite';
 import {PGLiteSocketServer} from '@electric-sql/pglite-socket';
 import {
   API,
+  CLIENT_HEADER,
+  LOCAL_OWNER_HEADER,
   applyView,
   defaultDatabaseSchema,
   HttpDataClient,
@@ -32,6 +34,7 @@ import {startServer} from '../src/server';
 
 const ROOT = '/tmp/openbook-e2e';
 const EMBEDDED_DIR = `${ROOT}/embedded`;
+const LOCAL_OWNER_SECRET = 'openbook-server-e2e-local-owner';
 
 let passed = 0;
 function check(label: string, cond: boolean): void {
@@ -41,6 +44,31 @@ function check(label: string, cond: boolean): void {
 }
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Raw-`fetch` headers for the AI/plugin routes below. Unlike the `HttpDataClient`
+ * paths (which stamp it automatically), these hand-rolled requests must carry the
+ * first-party `X-OpenBook-Client` marker or the server's STAB-8 guest-write gate
+ * rejects them 403 (the e2e server runs guest — no identity provider / accessToken).
+ */
+const clientHeaders = (extra: Record<string, string> = {}): Record<string, string> => ({
+  [CLIENT_HEADER]: '1',
+  ...extra,
+});
+
+/** Host-authenticated headers for owner-only machine configuration mutations. */
+const localOwnerHeaders = (extra: Record<string, string> = {}): Record<string, string> =>
+  clientHeaders({[LOCAL_OWNER_HEADER]: LOCAL_OWNER_SECRET, ...extra});
+
+/** SDK client matching the desktop host's non-forwarded local-owner transport. */
+const localOwnerClient = (baseUrl: string): HttpDataClient =>
+  new HttpDataClient(baseUrl, undefined, {
+    fetchImpl: (input, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set(LOCAL_OWNER_HEADER, LOCAL_OWNER_SECRET);
+      return fetch(input, {...init, headers});
+    },
+  });
 
 const sampleSnapshot = (n: number): PageSnapshot => ({
   editorjs: {blocks: [{type: 'paragraph', data: {text: `hello ${n}`}}]},
@@ -184,24 +212,24 @@ async function exerciseBackup(client: HttpDataClient, mode: string): Promise<voi
   const parent = await client.savePage({name: `bk-parent-${mode}`, data: sampleSnapshot(1)});
   const child = await client.savePage({name: `bk-child-${mode}`, data: sampleSnapshot(2), parentId: parent.id});
 
-  const bundle = await client.exportSpace();
+  const bundle = await client.exportLibrary();
   check('export includes live pages with data', bundle.pages.some((p) => p.id === parent.id && p.data.values.length > 0));
   check('export includes nested pages', bundle.pages.some((p) => p.id === child.id && p.parentId === parent.id));
 
   // Copy-import the parent + child: new ids, names suffixed on clash, nesting kept.
   const subtree = bundle.pages.filter((p) => p.id === parent.id || p.id === child.id);
-  const copied = await client.importSpace({pages: subtree, databases: [], mode: 'copy'});
+  const copied = await client.importLibrary({pages: subtree, databases: [], mode: 'copy'});
   check('copy import creates new pages', copied.created === 2 && copied.overwritten === 0);
   check('copy import suffixes clashing names', copied.renamed === 2);
 
-  const afterCopy = await client.exportSpace();
+  const afterCopy = await client.exportLibrary();
   const importedParent = afterCopy.pages.find((p) => p.name === `bk-parent-${mode} (imported)`);
   const importedChild = afterCopy.pages.find((p) => p.name === `bk-child-${mode} (imported)`);
   check('copy import: parent copied under a fresh id', !!importedParent && importedParent.id !== parent.id);
   check('copy import: nesting preserved', !!importedChild && importedChild.parentId === importedParent?.id);
 
   // Overwrite-import the original parent (same id) with a new name → replace in place.
-  const overwritten = await client.importSpace({
+  const overwritten = await client.importLibrary({
     pages: [{...parent, name: `bk-parent-${mode}-edited`}],
     databases: [],
     mode: 'overwrite',
@@ -410,7 +438,7 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   await client.savePage({name: `ai-other-${mode}`, data: {editorjs: {blocks: [{type: 'paragraph', data: {text: 'Picnic plans for the weekend trip'}}]}, values: [], names: []}});
   let search = await fetch(`${baseUrl}${API.aiSearch}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: clientHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({query: 'budget forecast'}),
   }).then((r) => r.json());
   check('lexical search works with AI off', search.mode === 'lexical' && search.results.length > 0);
@@ -420,7 +448,7 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   // Configure the mock engine; config persists in the settings table.
   const put = await fetch(`${baseUrl}${API.aiConfig}`, {
     method: 'PUT',
-    headers: {'content-type': 'application/json'},
+    headers: localOwnerHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({provider: 'mock'}),
   }).then((r) => r.json());
   check('config accepts the mock provider', put.provider === 'mock');
@@ -430,7 +458,7 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   // Hybrid search engages once embeddings exist.
   search = await fetch(`${baseUrl}${API.aiSearch}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: clientHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({query: 'budget forecast'}),
   }).then((r) => r.json());
   check('search upgrades to hybrid with an embedding engine', search.mode === 'hybrid');
@@ -438,7 +466,7 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   // Task breakdown returns a clean list.
   const tasks = await fetch(`${baseUrl}${API.aiTasks}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: clientHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({goal: 'Plan the launch'}),
   }).then((r) => r.json());
   check('task breakdown returns parsed tasks', Array.isArray(tasks.tasks) && tasks.tasks.length >= 3);
@@ -447,7 +475,7 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   // Completion streams SSE tokens and finishes with done.
   const completion = await fetch(`${baseUrl}${API.aiComplete}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: clientHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({text: 'Meeting notes:'}),
   });
   const sse = await completion.text();
@@ -457,11 +485,11 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   check('completion stream closes with done', events.some((e) => e.done === true));
 
   // Reindex endpoint reports counts; unknown provider rejected.
-  const reindex = await fetch(`${baseUrl}${API.aiIndex}`, {method: 'POST'}).then((r) => r.json());
+  const reindex = await fetch(`${baseUrl}${API.aiIndex}`, {method: 'POST', headers: clientHeaders()}).then((r) => r.json());
   check('reindex counts pages', reindex.pages > 0);
   const bad = await fetch(`${baseUrl}${API.aiConfig}`, {
     method: 'PUT',
-    headers: {'content-type': 'application/json'},
+    headers: localOwnerHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({provider: 'nonsense'}),
   });
   check('unknown provider rejected (400)', bad.status === 400);
@@ -481,7 +509,7 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   // Bad requests are rejected before any engine work.
   const noMessages = await fetch(`${baseUrl}${API.agentChat}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: clientHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({messages: []}),
   });
   check('agent rejects an empty conversation (400)', noMessages.status === 400);
@@ -489,20 +517,20 @@ async function exerciseAi(baseUrl: string, client: HttpDataClient, mode: string)
   // Back off for the rest of the suite.
   await fetch(`${baseUrl}${API.aiConfig}`, {
     method: 'PUT',
-    headers: {'content-type': 'application/json'},
+    headers: localOwnerHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({provider: 'off'}),
   });
 }
 
 
-async function exercisePlugins(baseUrl: string, client: HttpDataClient, mode: string): Promise<void> {
+async function exercisePlugins(baseUrl: string, client: HttpDataClient, ownerClient: HttpDataClient, mode: string): Promise<void> {
   console.log(`\n[${mode}] extensions (plugins API)`);
 
   const manifest = {id: 'acme.hello', name: 'Hello', version: '1.0.0', main: 'src/index.ts'};
   const files = {'src/index.ts': 'export default function activate() {}'};
 
   // Install (unsigned), list, fetch round-trip.
-  const installed = await client.installPlugin({manifest, files});
+  const installed = await ownerClient.installPlugin({manifest, files});
   check('install returns the stored plugin', installed.manifest.id === 'acme.hello' && installed.enabled === true);
   const listed = await client.listPlugins();
   check('installed plugin is listed', listed.some((p) => p.manifest.id === 'acme.hello'));
@@ -510,7 +538,7 @@ async function exercisePlugins(baseUrl: string, client: HttpDataClient, mode: st
   // A signed package stores its signature verbatim and verifies client-side.
   const keys = await generateRegistryKeys();
   const signature = await signPlugin({manifest, files}, keys.privateKey, 'E2E Registry', keys.publicKey);
-  const signed = await client.installPlugin({manifest, files, signature});
+  const signed = await ownerClient.installPlugin({manifest, files, signature});
   check('signature survives the round-trip', signed.signature?.signature === signature.signature);
   const verdict = await verifyPlugin(signed, [{name: 'E2E Registry', publicKey: keys.publicKey}]);
   check('stored package verifies against the trusted key', verdict?.registry === 'E2E Registry');
@@ -518,21 +546,21 @@ async function exercisePlugins(baseUrl: string, client: HttpDataClient, mode: st
   // Validation: bad manifests and missing entries are rejected.
   const badManifest = await fetch(`${baseUrl}${API.plugins}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: localOwnerHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({manifest: {id: 'NoDots', name: 'x', version: '1', main: 'a.ts'}, files: {'a.ts': 'x'}}),
   });
   check('malformed id rejected (400)', badManifest.status === 400);
   const noEntry = await fetch(`${baseUrl}${API.plugins}`, {
     method: 'POST',
-    headers: {'content-type': 'application/json'},
+    headers: localOwnerHeaders({'content-type': 'application/json'}),
     body: JSON.stringify({manifest: {...manifest, main: 'missing.ts'}, files}),
   });
   check('missing entry file rejected (400)', noEntry.status === 400);
 
   // Enable toggle + removal.
-  const disabled = await client.setPluginEnabled('acme.hello', false);
+  const disabled = await ownerClient.setPluginEnabled('acme.hello', false);
   check('disable persists', disabled.enabled === false);
-  check('remove returns true', (await client.removePlugin('acme.hello')) === true);
+  check('remove returns true', (await ownerClient.removePlugin('acme.hello')) === true);
   check('removed plugin is gone', !(await client.listPlugins()).some((p) => p.manifest.id === 'acme.hello'));
 }
 
@@ -541,7 +569,12 @@ async function main(): Promise<void> {
 
   // ---- 1. Embedded mode (PGlite) ----
   console.log('\n=== 1. EMBEDDED MODE (embedded PGlite) ===');
-  let server = await startServer({dataDir: EMBEDDED_DIR, host: '127.0.0.1', port: 4401});
+  let server = await startServer({
+    dataDir: EMBEDDED_DIR,
+    host: '127.0.0.1',
+    port: 4401,
+    localOwnerSecret: LOCAL_OWNER_SECRET,
+  });
   console.log(`  server up at ${server.url}`);
   const embeddedClient = new HttpDataClient(server.url);
 
@@ -557,7 +590,7 @@ async function main(): Promise<void> {
   await exerciseBackup(embeddedClient, 'embedded');
   await exerciseTrash(embeddedClient, 'embedded');
   await exerciseAi(server.url, embeddedClient, 'embedded');
-  await exercisePlugins(server.url, embeddedClient, 'embedded');
+  await exercisePlugins(server.url, embeddedClient, localOwnerClient(server.url), 'embedded');
 
   // ---- 2. Persistence across restart ----
   console.log('\n=== 2. PERSISTENCE ACROSS RESTART ===');
@@ -571,7 +604,12 @@ async function main(): Promise<void> {
   await server.close();
   console.log('  server stopped');
 
-  server = await startServer({dataDir: EMBEDDED_DIR, host: '127.0.0.1', port: 4401});
+  server = await startServer({
+    dataDir: EMBEDDED_DIR,
+    host: '127.0.0.1',
+    port: 4401,
+    localOwnerSecret: LOCAL_OWNER_SECRET,
+  });
   console.log(`  server restarted at ${server.url}`);
   const restartedClient = new HttpDataClient(server.url);
   const survivor = await restartedClient.getPage(durable.id);
@@ -652,8 +690,35 @@ async function main(): Promise<void> {
   check('health stays open without a token', (await fetch(`${guarded.url}/health`).then((r) => r.text())) === 'ok');
   await guarded.close();
 
+  // ---- 6. Ledger: canonical export + independent invariant verifier (LGR-7) ----
+  console.log('\n=== 6. LEDGER EXPORT + VERIFY ===');
+  const bookkeeper = await startServer({dataDir: `${ROOT}/ledger`, host: '127.0.0.1', port: 4405});
+  const books = new HttpDataClient(bookkeeper.url);
+  await books.ledgerInit();
+  const cash = await books.ledgerCreateAccount({name: 'Assets:Cash', type: 'asset'});
+  const revenue = await books.ledgerCreateAccount({name: 'Revenue:Sales', type: 'revenue'});
+  const entry = await books.ledgerCreateDraft({
+    date: '2026-08-01',
+    description: 'E2E sale, "quoted"',
+    postings: [
+      {accountId: cash.id, amountMinor: 123_456},
+      {accountId: revenue.id, amountMinor: -123_456},
+    ],
+  });
+  const postedEntry = await books.ledgerPostTransaction(entry.id);
+  check('ledger: entry posted with entry number 1', postedEntry.entryNo === 1);
+  const csvA = await books.ledgerExportCsv();
+  const csvB = await books.ledgerExportCsv();
+  check('ledger: canonical CSV export is byte-stable', Buffer.from(csvA, 'utf8').equals(Buffer.from(csvB, 'utf8')));
+  check('ledger: CSV carries the posting rows', csvA.split('\n').length >= 3 && csvA.includes('123456'));
+  const verifyRes = await fetch(`${bookkeeper.url}${API.ledgerVerify}`, {headers: clientHeaders()});
+  check('ledger: verify route answers 200', verifyRes.status === 200);
+  const ledgerVerdict = (await verifyRes.json()) as {initialized: boolean; findings: unknown[]};
+  check('ledger: independent verifier reports a CLEAN book', ledgerVerdict.initialized === true && ledgerVerdict.findings.length === 0);
+  await bookkeeper.close();
+
   rmSync(ROOT, {recursive: true, force: true});
-  console.log(`\n✅ ALL ${passed} CHECKS PASSED — embedded, persistence, headless, trash-cleanup, and access-token flows verified.`);
+  console.log(`\n✅ ALL ${passed} CHECKS PASSED — embedded, persistence, headless, trash-cleanup, access-token, and ledger flows verified.`);
 }
 
 main().catch((err) => {

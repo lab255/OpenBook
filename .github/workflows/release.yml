@@ -168,6 +168,36 @@ jobs:
             exit 1
           fi
           echo "Updater pubkey present and not the placeholder — OK."
+      # Plugin-registry trust anchor (ST-1), same shape as the updater guard
+      # above: the pinned OPENBOOK_REGISTRY public key must NEVER be the
+      # committed TEST key (its private half is public — anyone could sign
+      # 'Verified' first-party plugins for every client that installs the
+      # build). Runs BEFORE nx release so nothing irreversible happens.
+      # NOTE: the CURRENT pinned key is a placeholder whose private half was
+      # destroyed — bundles show Unverified until the key ceremony
+      # (docs/plugin-signing.md) commits the production key; that degrade is
+      # deliberate and only warned about, never fatal.
+      - name: Guard — no pinned plugin-registry key may be the committed test key
+        run: |
+          # OPENBOOK_REGISTRY_KEYS is a LIST (rotation overlap) — every entry
+          # is a trust anchor, so every entry gets checked.
+          keys=$(node -p "
+            const src = require('fs').readFileSync('packages/sdk/src/plugins.ts','utf8');
+            const block = src.match(/export const OPENBOOK_REGISTRY_KEYS[\s\S]*?\n\];/)?.[0] ?? '';
+            [...block.matchAll(/publicKey: '([^']+)'/g)].map((m) => m[1]).join('\n');
+          ")
+          testkey=$(node -p "require('./scripts/test-registry-key.json').publicKey")
+          if [ -z "$keys" ]; then
+            echo "::error::could not read any OPENBOOK_REGISTRY_KEYS publicKey from packages/sdk/src/plugins.ts — the guard cannot vouch for the trust anchor. Refusing to release." >&2
+            exit 1
+          fi
+          while IFS= read -r key; do
+            if [ "$key" = "$testkey" ]; then
+              echo "::error::packages/sdk/src/plugins.ts pins the COMMITTED TEST registry key (scripts/test-registry-key.json) whose private half is public — every client would trust signatures anyone can mint. Run the key ceremony (docs/plugin-signing.md) before releasing." >&2
+              exit 1
+            fi
+          done <<< "$keys"
+          echo "No pinned plugin-registry key equals the committed test key — OK ($(echo "$keys" | wc -l | tr -d ' ') pinned key(s) checked)."
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
       - name: Setup Node.js
@@ -249,6 +279,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
+          # Authenticode + `bun --compile` corruption was fixed in 1.2.23; do not downgrade below it.
           bun-version: "1.3.14"
 
       - name: install Rust stable
@@ -326,6 +357,82 @@ jobs:
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "Updater signing key present and production pubkey configured — OK."
 
+      - name: Preflight — Windows Authenticode signing configuration
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          CONFIG_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          CONFIG_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          CONFIG_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          CONFIG_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          CONFIG_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          CONFIG_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          WINDOWS_SIGNING_REQUIRED: ${{ vars.WINDOWS_SIGNING_REQUIRED }}
+        run: |
+          present=0
+          missing=0
+          for name in CONFIG_TENANT_ID CONFIG_CLIENT_ID CONFIG_CLIENT_SECRET CONFIG_SIGNING_ENDPOINT CONFIG_SIGNING_ACCOUNT CONFIG_SIGNING_PROFILE; do
+            val="${!name}"
+            val="${val//[[:space:]]/}"
+            if [ -z "$val" ]; then
+              missing=$((missing + 1))
+            else
+              present=$((present + 1))
+            fi
+          done
+
+          if [ "$present" -gt 0 ] && [ "$missing" -gt 0 ]; then
+            echo "::error::Windows signing configuration is partial ($present of 6 values set); refusing to build unsigned." >&2
+            exit 1
+          fi
+          if [ "$missing" -eq 6 ]; then
+            signing_required="$(printf '%s' "$WINDOWS_SIGNING_REQUIRED" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if [ "$signing_required" = "1" ]; then
+              echo "::error::WINDOWS_SIGNING_REQUIRED=1 but Windows signing configuration is absent." >&2
+              exit 1
+            fi
+            echo "::warning::Windows build is UNSIGNED — Azure Trusted Signing secrets not configured"
+            echo "win_signing=0" >> "$GITHUB_ENV"
+          else
+            echo "Azure Trusted Signing configuration present — Windows binaries and installers will be signed."
+            echo "win_signing=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install Azure Trusted Signing CLI (windows only)
+        if: matrix.platform == 'windows-latest' && env.win_signing == '1'
+        shell: bash
+        run: |
+          # NOTE: upstream deprecated in favor of artifact-signing-cli (rename); pinned 0.9.0 flags verified. Follow-up tracked on the board.
+          cargo install --locked trusted-signing-cli --version 0.9.0
+
+      - name: Resolve Windows signing tools
+        if: matrix.platform == 'windows-latest' && env.win_signing == '1'
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Where-Object { $_.Directory.Parent.Name -match '^\d+(\.\d+)+$' } | Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+          if (-not $signtool) {
+            Write-Error "signtool.exe not found"
+            exit 1
+          }
+          "SIGNTOOL_PATH=$($signtool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Seed pinned Azure Trusted Signing dlib
+        if: matrix.platform == 'windows-latest' && env.win_signing == '1'
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "Microsoft.Trusted.Signing.Client.1.0.95.zip"
+          Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/1.0.95" -OutFile $package
+          # SHA-256 independently computed from the NuGet package on 2026-08-22.
+          $expectedSha256 = "3bfcf1e0a3cb42af1692f0a8ed45c15de070c2de86f28a59b2795d904d8a920f"
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 $package).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            Write-Error "Trusted Signing dlib SHA-256 mismatch: expected $expectedSha256, got $actualSha256"
+            exit 1
+          }
+          $destination = Join-Path $env:USERPROFILE ".trusted-signing-cli\lib"
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          Expand-Archive -LiteralPath $package -DestinationPath $destination -Force
+
       # `tauri build` runs its beforeBuildCommand first, which builds the sdk,
       # ui, server sidecar (for SIDECAR_TARGET, set below), and frontend before
       # bundling. (Same as the local `build:desktop` script, plus an explicit
@@ -384,18 +491,47 @@ jobs:
           # post-build .sig guard below is the backstop for a bad key/password.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # First-party plugin-registry signing (ST-1): the ui build's
+          # gen:bundled-plugins step (run via beforeBuildCommand) signs the
+          # bundled PluginPackages with this Ed25519 PKCS#8 key so fresh
+          # installs verify against the pinned OPENBOOK_REGISTRY public key.
+          # UNSET until the owner performs the key ceremony
+          # (docs/plugin-signing.md): the build then falls back — with a loud
+          # log warning — to the committed TEST key, and the bundled plugins
+          # show Unverified, exactly like pre-signing builds.
+          OPENBOOK_REGISTRY_PRIVATE_KEY: ${{ secrets.OPENBOOK_REGISTRY_PRIVATE_KEY }}
+          # Windows Authenticode signing via Azure Trusted Signing. The wrapper
+          # configured in tauri.conf.json degrades to an unsigned build when any
+          # value is absent, while a configured signing command fails the build
+          # if Azure or signtool rejects any main binary, sidecar, MSI, or NSIS.
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          AZURE_CONFIG_DIR: ${{ runner.temp }}\azure-signing
+          # Ceremony step 6 (docs/plugin-signing.md): once the secret above is
+          # stored, uncomment so a later loss of the secret FAILS the build
+          # instead of silently degrading to the TEST-signed fallback.
+          # OPENBOOK_REGISTRY_REQUIRE_KEY: "1"
         # `tauri build --target <triple>` puts bundles under
         # target/<triple>/release/bundle. pnpm forwards the trailing args to the
         # app's `tauri` script.
         #
-        # `--verbose` ONLY on the ubuntu leg: Tauri's bundler swallows
+        # `--verbose` on the ubuntu and Windows legs: Tauri's bundler swallows
         # linuxdeploy's own stdout/stderr unless verbose is on, so a failing
         # AppImage step only ever prints the generic `failed to run linuxdeploy`
         # wrapper (see the ubuntu-22.04 AppImage failures). Verbose surfaces the
         # real linuxdeploy / linuxdeploy-plugin-gtk error (the failing sub-step +
-        # file) directly in the CI log. macOS/Windows legs evaluate to '' and are
-        # byte-for-byte unchanged.
-        run: pnpm --filter @book.dev/app run tauri build --target ${{ matrix.target }}${{ matrix.platform == 'ubuntu-22.04' && ' --verbose' || '' }}
+        # file) directly in the CI log, and Windows needs stdout visibility for
+        # signing diagnostics. macOS legs evaluate to ''.
+        run: pnpm --filter @book.dev/app run tauri build --target ${{ matrix.target }}${{ (matrix.platform == 'ubuntu-22.04' || matrix.platform == 'windows-latest') && ' --verbose' || '' }}
+
+      - name: Remove Azure signing credentials
+        if: always() && matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: Remove-Item -LiteralPath "${{ runner.temp }}\azure-signing" -Recurse -Force -ErrorAction SilentlyContinue
 
       # Fail loudly if signing was configured but produced no signatures. With
       # TAURI_SIGNING_PRIVATE_KEY set, `createUpdaterArtifacts` writes a detached
@@ -438,6 +574,55 @@ jobs:
           fi
           echo "Found ${#sigs[@]} updater signature(s):"; printf '  %s\n' "${sigs[@]}"
 
+      - name: Guard — Windows installers have Authenticode signatures
+        if: matrix.platform == 'windows-latest' && env.win_signing == '1'
+        shell: pwsh
+        run: |
+          $signtoolPath = $env:SIGNTOOL_PATH
+          if (-not $signtoolPath) {
+            $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Where-Object { $_.Directory.Parent.Name -match '^\d+(\.\d+)+$' } | Sort-Object { [version]$_.Directory.Parent.Name } -Descending | Select-Object -First 1
+            if (-not $signtool) {
+              Write-Error "signtool.exe not found"
+              exit 1
+            }
+            $signtoolPath = $signtool.FullName
+          }
+
+          $base = "packages/app/src-tauri/target/${{ matrix.target }}/release/bundle"
+          $msiInstallers = @(Get-ChildItem "$base/msi" -Filter "*.msi" -File -ErrorAction SilentlyContinue)
+          $nsisInstallers = @(Get-ChildItem "$base/nsis" -Filter "*.exe" -File -ErrorAction SilentlyContinue)
+          $installers = @($msiInstallers) + @($nsisInstallers)
+          if ($installers.Count -lt 2 -or $msiInstallers.Count -lt 1 -or $nsisInstallers.Count -lt 1) {
+            Write-Error "Expected at least 2 Windows installers (1 MSI + 1 NSIS) under $base; found $($msiInstallers.Count) MSI and $($nsisInstallers.Count) NSIS."
+            exit 1
+          }
+          foreach ($installer in $installers) {
+            & $signtoolPath verify /pa /v $installer.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Authenticode verification failed: $($installer.FullName)"
+              exit $LASTEXITCODE
+            }
+          }
+          Write-Host "Verified $($installers.Count) Authenticode-signed Windows installer(s)."
+
+      # Post-build backstop (ST-1, same shape as the .sig guard above): when
+      # the plugin-registry secret is set, the bundled first-party plugins the
+      # build just signed MUST verify against a pinned OPENBOOK_REGISTRY_KEYS
+      # entry — a wrong-key secret would otherwise ship bundles that every
+      # fresh install shows as Unverified. Skipped (with a note) while the
+      # secret is unset, where the TEST-signed fallback is the documented
+      # degrade.
+      - name: Guard — bundled plugins signed by a pinned registry key
+        shell: bash
+        env:
+          OPENBOOK_REGISTRY_PRIVATE_KEY: ${{ secrets.OPENBOOK_REGISTRY_PRIVATE_KEY }}
+        run: |
+          if [ -z "$OPENBOOK_REGISTRY_PRIVATE_KEY" ]; then
+            echo "OPENBOOK_REGISTRY_PRIVATE_KEY unset — TEST-signed bundle is the documented degrade; skipping backstop."
+            exit 0
+          fi
+          node scripts/check-bundled-signatures.mjs
+
       - name: Upload bundles to the v${{ needs.release.outputs.version }} release
         shell: bash
         env:
@@ -457,6 +642,31 @@ jobs:
           # point at them; without the `.sig` the client rejects the update.
           base="packages/app/src-tauri/target/${{ matrix.target }}/release/bundle"
           shopt -s nullglob
+          # macOS updater archive fix: Tauri names it "<ProductName>.app.tar.gz"
+          # with NO arch or version, so the two macOS legs (aarch64 + x86_64) both
+          # emit `OpenBook.app.tar.gz` and clobber each other on upload
+          # (`gh release upload --clobber`), leaving the release with a single
+          # arbitrary-arch archive. Worse, the account-server manifest selects the
+          # macOS updater asset by an ARCH-SUFFIXED name
+          # (`OpenBook_<ver>_{aarch64,x64}.app.tar.gz` — see lib/updates.ts
+          # updaterCandidates), so an arch-less name matches nothing and every
+          # macOS caller gets 204 "no update". Rename the archive (and its detached
+          # `.sig`) per-arch to the name the manifest expects. Signature-safe: the
+          # `.sig` signs the archive BYTES, not the filename.
+          case "${{ matrix.target }}" in
+            aarch64-apple-darwin) mac_arch=aarch64 ;;
+            x86_64-apple-darwin)  mac_arch=x64 ;;
+            *)                    mac_arch= ;;
+          esac
+          if [ -n "$mac_arch" ]; then
+            ver="${{ needs.release.outputs.version }}"
+            for archive in "$base"/macos/*.app.tar.gz; do
+              dest="$base/macos/OpenBook_${ver}_${mac_arch}.app.tar.gz"
+              [ "$archive" = "$dest" ] && continue
+              mv "$archive" "$dest"
+              [ -f "$archive.sig" ] && mv "$archive.sig" "$dest.sig"
+            done
+          fi
           files=(
             "$base"/dmg/*.dmg
             "$base"/macos/*.app.tar.gz
@@ -499,7 +709,7 @@ jobs:
   # trades for a short-lived, per-publish registry token, after npmjs.com matches
   # this repo+workflow+environment against the package's configured Trusted
   # Publisher. Configure once per package on npmjs.com (Settings → Trusted
-  # Publishers): org `eliotlim`, repo `OpenBook`, workflow `release.yml`,
+  # Publishers): org `lab255`, repo `OpenBook`, workflow `release.yml`,
   # environment `publish`. Replaces the expired/lost NPM_TOKEN that silently
   # blocked the 1.61–1.63 publishes.
   publish-npm:
@@ -553,9 +763,28 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build the libraries (sdk first; ui imports its types)
+        env:
+          # Sign the bundled first-party plugins with the production registry
+          # key (ST-1) — the published @book.dev/ui ships bundled.gen.ts in its
+          # dist. Unset until the key ceremony (docs/plugin-signing.md): the
+          # build then warns and falls back to the committed TEST key, and the
+          # bundled plugins show Unverified (the pre-signing status quo).
+          OPENBOOK_REGISTRY_PRIVATE_KEY: ${{ secrets.OPENBOOK_REGISTRY_PRIVATE_KEY }}
+          # Ceremony step 6 (docs/plugin-signing.md): once the secret above is
+          # stored, uncomment so a later loss of the secret FAILS the build
+          # instead of silently degrading to the TEST-signed fallback.
+          # OPENBOOK_REGISTRY_REQUIRE_KEY: "1"
         run: |
+          if [ -z "$OPENBOOK_REGISTRY_PRIVATE_KEY" ]; then
+            echo "::warning::OPENBOOK_REGISTRY_PRIVATE_KEY is unset — bundled first-party plugins will be TEST-signed and show Unverified. Run the key ceremony (docs/plugin-signing.md) to enable production signing."
+          fi
           pnpm --filter @book.dev/sdk build
           pnpm --filter @book.dev/ui build
+          # Post-build backstop (ST-1, mirrors publish-tauri): with the secret
+          # set, the freshly signed bundle must verify against a pinned key.
+          if [ -n "$OPENBOOK_REGISTRY_PRIVATE_KEY" ]; then
+            node scripts/check-bundled-signatures.mjs
+          fi
       - name: Publish to npm (OIDC trusted publishing)
         env:
           # Trusted publishing attaches provenance automatically, but make it

@@ -9,6 +9,7 @@ import {
   Code2,
   Columns2,
   Columns3,
+  ClipboardList,
   Database,
   ExternalLink,
   FilePlus2,
@@ -33,6 +34,7 @@ import {
   PanelTop,
   Puzzle,
   Quote,
+  ChevronRight,
   Search,
   Sigma,
   SlidersHorizontal,
@@ -52,7 +54,14 @@ import {aiSlashItems} from './aiBlocks';
 import {featureShown, readFeatureVisibility, type FeatureVisibility} from '@/lib/aiFeatures';
 import {pageLinks, type SubpageKind} from '@/lib/pageLinks';
 import {t, type TKey} from '../i18n';
+import {
+  observePopupPosition,
+  selectionAnchorRect,
+  SLASH_MENU_POSITION_OPTIONS,
+  type PopupPosition,
+} from './popupPosition';
 import type {BlockEditorController} from './useBlockEditor';
+import {FluidHover} from '@/components/ui/fluid-hover';
 
 type IconComp = React.ComponentType<{className?: string}>;
 
@@ -66,11 +75,15 @@ type IconComp = React.ComponentType<{className?: string}>;
 export interface SlashState {
   open: boolean;
   blockId: string;
-  /** Offset of the '/' character inside the block's text. */
+  /** Offset of the trigger's FIRST character inside the block's text. */
   anchorOffset: number;
   query: string;
   index: number;
   keyEvent?: {key: string; n: number};
+  /** The literal trigger sequence that opened this menu ("/" / "@" / ":" are
+   *  single-char and leave this undefined; the wikilink menu sets "[[" so the
+   *  query tracker and the accept-path know the trigger is two characters). */
+  trigger?: string;
 }
 
 /** Slash-menu categories, in display order. */
@@ -99,8 +112,8 @@ interface SlashItem {
 // Icons that describe each command visually. Core/page items key by item id;
 // custom blocks key by block type; everything else falls back per group.
 const ID_ICONS: Record<string, IconComp> = {
-  text: Type, h1: Heading1, h2: Heading2, h3: Heading3,
-  bullet: List, number: ListOrdered, todo: ListTodo, quote: Quote,
+  text: Type, h1: Heading1, h2: Heading2, h3: Heading3, chart: BarChart3,
+  bullet: List, number: ListOrdered, todo: ListTodo, quote: Quote, togglelist: ChevronRight,
   callout: Info, code: Code2, livecode: Sigma, divider: Minus, image: ImageIcon, notes: Mic,
   htmlartifact: AppWindow,
   table: Table, cols2: Columns2, cols3: Columns3, cols4: Columns3, group: Boxes,
@@ -115,6 +128,7 @@ const TYPE_ICONS: Record<string, IconComp> = {
   // June-2026 additions
   choicecards: GalleryHorizontalEnd, longtext: AlignLeft, richtext: TextQuote,
   searchselect: Search, tagfield: Tag, progressbar: Activity,
+  form: ClipboardList, meeting: Mic,
 };
 const GROUP_ICON: Record<SlashGroup, IconComp> = {
   pages: FileText, basic: Type, interactive: Boxes, extensions: Puzzle, ai: Sparkles,
@@ -140,7 +154,7 @@ const firstTextDescendant = (block: BlockMap): string | null => {
 };
 
 const insertAfterOrReplace =
-  (make: () => NewBlock) =>
+  (make: () => NewBlock, focusOnInsert = false) =>
     (editor: BlockEditorController, blockId: string): void => {
       const found = findBlock(editor.doc, blockId);
       const empty = found && blockType(found.block) === 'paragraph' && (blockText(found.block)?.length ?? 0) === 0;
@@ -162,6 +176,8 @@ const insertAfterOrReplace =
         const next = editor.insertAfter(id, {type: 'paragraph'});
         if (next) editor.requestCaret({blockId: next, offset: 0});
       }
+      // Opted renderers own focus; retain the following paragraph for writing.
+      if (focusOnInsert && id) editor.requestCaret({blockId: id, offset: 0});
     };
 
 const columns = (n: number): NewBlock => ({
@@ -224,15 +240,21 @@ export const SLASH_ITEMS: SlashItem[] = [
   {id: 'bullet', label: 'Bulleted list', hint: 'Simple list', keywords: 'bullet list ul', group: 'basic', apply: turn('list', {kind: 'bullet'})},
   {id: 'number', label: 'Numbered list', hint: 'Ordered list', keywords: 'number ordered list ol', group: 'basic', apply: turn('list', {kind: 'number'})},
   {id: 'todo', label: 'To-do', hint: 'Checkbox item', keywords: 'todo check task', group: 'basic', apply: turn('todo')},
+  {id: 'togglelist', label: 'Toggle list', hint: 'Show or hide nested blocks', keywords: 'togglelist toggle collapse disclosure fold children', group: 'basic', apply: turn('togglelist', {collapsed: false})},
   {id: 'quote', label: 'Quote', hint: 'Pull quote', keywords: 'quote blockquote', group: 'basic', apply: turn('quote')},
   {id: 'callout', label: 'Callout', hint: 'Highlighted note', keywords: 'callout note info', group: 'basic', apply: turn('callout', {variant: 'info'})},
   {id: 'code', label: 'Code', hint: 'Monospaced block', keywords: 'code snippet', group: 'basic', apply: turn('code')},
   {id: 'image', label: 'Image', hint: 'Upload, paste or drop a picture', keywords: 'image picture photo img upload media figure', group: 'basic', apply: insertAfterOrReplace(() => ({type: 'image'}))},
+  // Chart leads the interactive group (IA-8): it's the marquee data-viz block,
+  // so it lives here as a first-class core item rather than a registry entry
+  // buried behind the kit's input widgets. Inserts the same `kitchart` block
+  // the reactive kit renders; the kind is switched from the block's ⚙ config.
+  {id: 'chart', label: 'Chart', hint: 'Line, bar, pie, KPI & more — live over inputs and databases', keywords: 'chart graph plot data viz visualization visualisation dataviz line bar pie donut scatter funnel kpi heatmap combo dashboard analytics kit', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'kitchart', props: {kind: 'line', source: '[3, 1, 4, 1, 5, 9, 2, 6]'}}))},
   {id: 'livecode', label: 'Live code', hint: 'Computes over inputs; name the output to chain', keywords: 'livecode live code formula compute expr reactive calculation', group: 'interactive', apply: turn('code', {live: true, name: 'result', language: 'js'})},
   {id: 'htmlartifact', label: 'HTML artifact', hint: 'Upload a .html file — runs interactive, sandboxed', keywords: 'html artifact iframe embed widget interactive sandbox web app demo', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'htmlArtifact'}))},
-  {id: 'group', label: 'Group', hint: 'Lockable, syncable container that namespaces its inputs', keywords: 'group container section lock sync namespace box organise organize', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'group', props: {name: ''}, children: [{type: 'paragraph'}]}))},
+  {id: 'group', label: 'Section', hint: 'Lockable, syncable container that namespaces its inputs', keywords: 'section group container lock sync namespace box organise organize', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'group', props: {name: ''}, children: [{type: 'paragraph'}]}))},
   {id: 'tabs', label: 'Tabs', hint: 'Tabbed sections with auto completion and optional gating', keywords: 'tabs tabbed sections wizard steps completion gating container', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'tabs', props: {name: '', active: 0}, children: [{type: 'tab', props: {label: 'Tab 1'}, children: [{type: 'paragraph'}]}, {type: 'tab', props: {label: 'Tab 2'}, children: [{type: 'paragraph'}]}]}))},
-  {id: 'accordion', label: 'Accordion', hint: 'Collapsible checklist sections with auto completion and gating', keywords: 'accordion collapse sections checklist wizard stages completion gating container fold', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'accordion', props: {name: ''}, children: [{type: 'accordionsection', props: {label: 'Section 1'}, children: [{type: 'paragraph'}]}, {type: 'accordionsection', props: {label: 'Section 2', collapsed: true}, children: [{type: 'paragraph'}]}]}))},
+  {id: 'accordion', label: 'Accordion', hint: 'Collapsible checklist sections with auto completion and gating', keywords: 'accordion collapse sections checklist wizard stages completion gating container fold', group: 'interactive', apply: insertAfterOrReplace(() => ({type: 'accordion', props: {name: ''}, children: [{type: 'accordionsection', props: {label: t('blockEditor.accordionItem', {number: 1})}, children: [{type: 'paragraph'}]}, {type: 'accordionsection', props: {label: t('blockEditor.accordionItem', {number: 2}), collapsed: true}, children: [{type: 'paragraph'}]}]}))},
   {id: 'divider', label: 'Divider', hint: 'Horizontal rule — also a slide break in Present mode', keywords: 'divider rule hr line slide break present', group: 'basic', apply: insertAfterOrReplace(() => ({type: 'divider'}))},
   {id: 'notes', label: 'Speaker note', hint: 'Shown only in the presenter view — hidden from the audience', keywords: 'speaker note notes presenter comment hidden present', group: 'basic', apply: turn('notes')},
   {id: 'table', label: 'Table', hint: '3 × 3 to start', keywords: 'table grid cells', group: 'basic', apply: insertAfterOrReplace(() => makeTable(3, 3))},
@@ -253,8 +275,9 @@ export const SlashMenu: React.FC<{
   onLink?: (kind: 'page' | 'database', blockId: string, anchorOffset: number) => void;
 }> = ({state, editor, anchorEl, rootEl, onClose, pageId, onLink}) => {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{left: number; top: number; maxHeight: number} | null>(null);
+  const [pos, setPos] = useState<PopupPosition | null>(null);
   const [index, setIndex] = useState(0);
+  const [scrollEpoch, setScrollEpoch] = useState(0);
 
   // Labels resolve through the catalog at open time (`slash.<id>` for core
   // items, `slash.custom.<type>` for registered blocks), falling back to the
@@ -283,8 +306,8 @@ export const SlashMenu: React.FC<{
         hint: tr(`slash.custom.${def.type}.hint`, def.slash!.hint),
         keywords: def.slash!.keywords,
         group,
-        apply: insertAfterOrReplace(() => def.slash!.make()),
-        icon: TYPE_ICONS[def.type] ?? GROUP_ICON[group],
+        apply: insertAfterOrReplace(() => def.slash!.make(), def.focusOnInsert),
+        icon: def.slash!.icon ?? TYPE_ICONS[def.type] ?? GROUP_ICON[group],
       };
     });
     const ai: SlashItem[] = aiSlashItems().map((item) => ({
@@ -331,47 +354,36 @@ export const SlashMenu: React.FC<{
       .sort((a, b) => score(b) - score(a) || groupRank(a) - groupRank(b));
   }, [state.query, pageId, onLink]);
 
-  // Fixed (viewport) positioning: anchored to the caret, measured after
-  // render, flipped above the line when there's no room below, clamped to the
-  // viewport edges. `pos === null` renders the menu invisibly for measuring
-  // (the anchor block can mount a frame later than the menu — e.g. the “+”
-  // gutter button inserts a block and opens the menu in the same action).
+  // `pos === null` renders invisibly while the shared helper measures. The
+  // anchor block can mount a frame later than the menu in the “+” gutter flow.
   useLayoutEffect(() => {
-    let raf = 0;
-    let attempts = 0;
-    const isZero = (r: DOMRect | undefined | null): boolean => !r || (r.width === 0 && r.height === 0 && r.x === 0 && r.y === 0);
-    const measure = (): void => {
-      const sel = document.getSelection();
-      // The caret rect is all-zero in a not-yet-painted empty block (the “+”
-      // gutter flow) — fall back to the block's own rect, and retry a few
-      // frames while the anchor finishes mounting; bailing silently left the
-      // menu invisible until the first query keystroke re-ran this effect.
-      const caretRect =
-        sel && sel.rangeCount > 0 && anchorEl?.contains(sel.anchorNode) ? sel.getRangeAt(0).getBoundingClientRect() : null;
-      const rect = !isZero(caretRect) ? caretRect! : anchorEl?.getBoundingClientRect();
-      if (isZero(rect)) {
-        if (attempts++ < 20) raf = requestAnimationFrame(measure);
-        return;
-      }
-      const menu = ref.current;
-      const menuH = menu?.offsetHeight ?? 304;
-      const menuW = menu?.offsetWidth ?? 272;
-      // Open into whichever side of the caret line has more room, and never
-      // cover the line itself: the menu's height caps to the chosen side.
-      const below = window.innerHeight - rect!.bottom - 14;
-      const above = rect!.top - 14;
-      const flip = menuH > below && above > below;
-      const maxHeight = Math.max(120, Math.min(304, flip ? above : below));
-      const shownH = Math.min(menuH, maxHeight);
-      const top = flip ? Math.max(8, rect!.top - 6 - shownH) : rect!.bottom + 6;
-      const left = Math.max(8, Math.min(rect!.left, window.innerWidth - menuW - 8));
-      setPos({left, top, maxHeight});
-    };
-    measure();
-    return () => cancelAnimationFrame(raf);
+    return observePopupPosition({
+      popup: () => ref.current,
+      anchor: () => selectionAnchorRect(anchorEl, true),
+      onPosition: setPos,
+      options: SLASH_MENU_POSITION_OPTIONS,
+    });
   }, [anchorEl, rootEl, state.anchorOffset, items.length]);
 
-  useEffect(() => setIndex(0), [state.query]);
+  useLayoutEffect(() => setIndex(0), [state.query]);
+
+  // Move only the popup's scroller: scrollIntoView can also scroll the
+  // document, whose capture listener dismisses the insertion menu.
+  useLayoutEffect(() => {
+    const menu = ref.current;
+    const row = menu?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!menu || !row || !pos) return;
+    const bounds = menu.getBoundingClientRect();
+    const item = row.getBoundingClientRect();
+    const top = bounds.top + menu.clientTop;
+    const bottom = top + menu.clientHeight;
+    const previousScroll = menu.scrollTop;
+    if (item.top < top) menu.scrollTop -= top - item.top;
+    else if (item.bottom > bottom) menu.scrollTop += item.bottom - bottom;
+    // A viewport jump (including last→first wrapping) must not animate the
+    // wash from an offscreen row. Re-seed the shared glide before paint.
+    if (menu.scrollTop !== previousScroll) setScrollEpoch((epoch) => epoch + 1);
+  }, [index, state.query, pos]);
 
   /** Keys forwarded from the text block (the caret stays in the document). */
   useEffect(() => {
@@ -412,7 +424,8 @@ export const SlashMenu: React.FC<{
   return (
     <div
       ref={ref}
-      className="obe-slash"
+      className="obe-slash obe-insert-menu"
+      data-placement={pos?.placement}
       style={pos ? {left: pos.left, top: pos.top, maxHeight: pos.maxHeight} : {left: 0, top: 0, visibility: 'hidden'}}
       role="listbox"
       aria-label="Insert a block"
@@ -444,6 +457,7 @@ export const SlashMenu: React.FC<{
           </React.Fragment>
         );
       })}
+      <FluidHover key={scrollEpoch} surface="slash" selector=".obe-slash-item" selected=".obe-slash-item[aria-selected=true]" className="bg-accent" />
     </div>
   );
 };

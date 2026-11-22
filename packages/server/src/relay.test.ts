@@ -154,14 +154,14 @@ describe('Collab T1 — live relay', () => {
 
     const bad = await app.request(`/api/pages/${page.id}/updates`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({clientId: 1}),
     });
     expect(bad.status).toBe(400);
 
     const missing = await app.request(`/api/pages/${randomUUID()}/updates`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({update: Buffer.from('x').toString('base64'), clientId: 1}),
     });
     expect(missing.status).toBe(404);
@@ -224,17 +224,17 @@ describe('Collab T1 — late-joiner sync', () => {
 });
 
 describe('Collab T1 — live read-gate cache', () => {
-  it('caches canReadPage per page and re-evaluates only when the access epoch bumps', async () => {
+  it('caches canListPage per page and re-evaluates only when the access epoch bumps', async () => {
     const store = await freshStore();
     const page = await store.upsertPage({name: 'Gated', data: emptySnap()}, localPrincipal());
 
     // Count real authorization calls under the gate's cache.
     let calls = 0;
-    const realCanRead = store.canReadPage.bind(store);
-    (store as unknown as {canReadPage: PageStore['canReadPage']}).canReadPage = ((p, id, b) => {
+    const realCanList = store.canListPage.bind(store);
+    (store as unknown as {canListPage: PageStore['canListPage']}).canListPage = ((p, id, b) => {
       calls += 1;
-      return realCanRead(p, id, b);
-    }) as PageStore['canReadPage'];
+      return realCanList(p, id, b);
+    }) as PageStore['canListPage'];
 
     const gates = streamGates(store, localPrincipal());
     const frame = {type: 'yupdate', pageId: page.id, update: 'x', clientId: 1} as const;
@@ -283,7 +283,7 @@ describe('Collab T1 — safety invariants (the ones the epic rests on)', () => {
     const huge = 'A'.repeat(1024 * 1024 + 1024); // > 1 MiB cap
     const res = await app.request(`/api/pages/${page.id}/updates`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({update: huge, clientId: 1}),
     });
     expect(res.status).toBe(413);
@@ -303,7 +303,7 @@ describe('Collab T1 — safety invariants (the ones the epic rests on)', () => {
     // A garbage base64 "state vector" must not throw → 500; it falls back to full state.
     const res = await app.request(`/api/pages/${page.id}/sync`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-OpenBook-Client': '1'},
       body: JSON.stringify({sv: Buffer.from([0xff, 0xff, 0xff, 0xff, 0x7f]).toString('base64')}),
     });
     expect(res.status).toBe(200);

@@ -23,10 +23,15 @@
  * `</script>` is the writer's own).
  */
 import {createRoot} from 'react-dom/client';
-import {registerReactiveBlocks} from '@/blockeditor/reactiveBlocks';
+import {registerReactiveBlocks} from '@/blockeditor/reactiveCore';
 import {registerArtifactKit} from '@/blockeditor/kit';
+import {registerFormBlock} from '@/blockeditor/FormBlockView';
+import {registerDatabaseFormBlock} from '@/components/database/DatabaseFormBlock';
 import {MAX_ASSET_BYTES} from '@/blockeditor/imageBlock';
 import {setAssetBridge} from '@/lib/assetBridge';
+import {applyDataColors} from '@/lib/dataColorVars';
+import {readGlobalDataScheme} from '@/lib/dataScheme';
+import {MotionProvider} from './MotionProvider';
 import {ViewerApp} from './ViewerApp';
 import type {ViewerAssetEntry, ViewerHandle, ViewerMountOptions, ViewerSource} from './types';
 import '@/index.css';
@@ -34,8 +39,8 @@ import './viewer.css';
 
 export type {
   IslandPageJson,
-  SpaceBundleJson,
-  SpaceBundlePage,
+  LibraryBundleJson,
+  LibraryBundlePage,
   ViewerAssetEntry,
   ViewerHandle,
   ViewerMountOptions,
@@ -49,6 +54,17 @@ export type {
 // cards). Registered once at load, same as the app's page host does.
 registerReactiveBlocks();
 registerArtifactKit();
+registerDatabaseFormBlock();
+registerFormBlock();
+
+// The viewer is provider-less (no ThemeProvider), so nothing else writes the
+// data-colour CSS vars. Emit them once at load — for the scheme the export baked
+// in (`window.__OB_DATA_SCHEME`, OB-379; pastel otherwise) — so tags/charts/status
+// lights read the canonical palette rather than the `var(…, fallback)` literals,
+// and so the pastel/muted light-mode hairline (`--data-stroke`) correctly becomes
+// transparent under any `.dark` host instead of a baked light-mode rgba (OB-378,
+// Devon's dark-viewer note).
+applyDataColors(readGlobalDataScheme());
 
 /** Decode a base64 payload to bytes (inverse of the export's data-URI body). */
 function base64ToBytes(data: string): Uint8Array {
@@ -101,6 +117,11 @@ function installAssetPayload(assets: Record<string, ViewerAssetEntry>): () => vo
 /**
  * Render `source` into `container`, locked-but-interactive. Returns a handle
  * whose `unmount()` tears the viewer down and releases the container.
+ *
+ * `opts.staticBlocks` lets the host keep its own render for blocks this bundle
+ * has no renderer for (LX-5): the exported file hands over the static ledger
+ * report tables it already computed, and the viewer replants them instead of
+ * covering real numbers with a missing-plugin card.
  */
 export function mount(container: HTMLElement, source: ViewerSource, opts?: ViewerMountOptions): ViewerHandle {
   if (!container || !(container instanceof HTMLElement)) {
@@ -111,7 +132,15 @@ export function mount(container: HTMLElement, source: ViewerSource, opts?: Viewe
   }
   const uninstallAssets = opts?.assets && Object.keys(opts.assets).length > 0 ? installAssetPayload(opts.assets) : null;
   const root = createRoot(container);
-  root.render(<ViewerApp source={source} initialPage={opts?.page} />);
+  container.ownerDocument.documentElement.setAttribute('data-ob-hydrated', '');
+  root.render(
+    <MotionProvider><ViewerApp
+      source={source}
+      initialPage={opts?.page}
+      staticBlocks={opts?.staticBlocks}
+      formOrigins={opts?.formOrigins}
+    /></MotionProvider>,
+  );
   return {
     unmount(): void {
       root.unmount();

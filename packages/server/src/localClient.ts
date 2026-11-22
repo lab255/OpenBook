@@ -1,6 +1,14 @@
 import type {
   AclLevel,
+  AgentEditsMode,
+  AgentEditsPolicy,
+  AgentTokenList,
+  CreatedAgentToken,
   AiConfig,
+  AiTranscriptionResult,
+  AiPricingResponse,
+  AiPricingTable,
+  AiUsageResponse,
   AiSearchResponse,
   AiSkill,
   AiStatus,
@@ -17,14 +25,46 @@ import type {
   ImportResult,
   InstanceConfig,
   InstanceInfo,
+  LedgerAccount,
+  LedgerAccountInput,
+  LedgerAccountPatch,
+  LedgerAuditEvent,
+  LedgerClearedState,
+  LedgerDraftInput,
+  LedgerDraftPatch,
+  LedgerExportSection,
+  LedgerInfo,
+  LedgerPeriod,
+  LedgerPeriodCloseInput,
+  LedgerPeriodCloseResult,
+  LedgerPeriodReopenResult,
+  LedgerPosting,
+  LedgerReconciliation,
+  LedgerReconciliationInput,
+  LedgerReconciliationPatch,
+  LedgerReconciliationStatus,
+  LedgerReconciliationSummary,
+  LedgerReverseOptions,
+  LedgerSectionRestoreResult,
+  LedgerTransaction,
+  LedgerTransactionState,
+  LedgerVerifyReport,
+  LibraryBackup,
+  McpClientConfig,
+  McpConfigResponse,
+  McpTestResult,
   Member,
   MemberRole,
   MemberStatus,
   PageAcl,
+  PageGraph,
   PageInput,
   PageMeta,
+  PageVersionMeta,
   PageSubscription,
-  PageVisibility,
+  StoredPageVersion,
+  PageVisibilitySettings,
+  PageVisibilityUpdate,
   PluginPackage,
   RowInput,
   RowUpdate,
@@ -38,8 +78,9 @@ import type {
   SuggestionStatus,
   SuggestionUpdate,
 } from '@book.dev/sdk';
-import {BACKUP_CADENCES, BACKUP_CADENCE_MS, localPrincipal} from '@book.dev/sdk';
+import {BACKUP_CADENCES, BACKUP_CADENCE_MS, localPrincipal, resolveAgentEdits} from '@book.dev/sdk';
 import {PageStore} from './store';
+import {LocalSearchIndex} from './ai/localSearch';
 import {PageHub} from './hub';
 import {CollabRelay} from './collab';
 import {AwarenessRelay, awarenessUser, stampAwarenessIdentity} from './collabAwareness';
@@ -69,11 +110,16 @@ export class LocalDataClient implements DataClient {
   // Ephemeral presence (Collab T4) — mirrors the HTTP app's awareness relay so a
   // second in-process window sees presence + a late joiner gets the snapshot.
   private readonly awarenessRelay = new AwarenessRelay();
+  // In-webview lexical content search (no AI engine needed) — the local
+  // counterpart to the server's AiService search, kept fresh by write broadcasts.
+  private readonly searchIndex: LocalSearchIndex;
 
   constructor(
     private readonly store: PageStore,
     private readonly hub: PageHub = new PageHub(),
-  ) {}
+  ) {
+    this.searchIndex = new LocalSearchIndex(store);
+  }
 
   /** Release the underlying store (its PGlite connection). Used when swapping
    *  clients — e.g. the desktop moving between in-app and a published server. */
@@ -84,10 +130,12 @@ export class LocalDataClient implements DataClient {
   // ── Live-update broadcasts (mirror app.ts's broadcastList/broadcastRows) ─────
 
   private async broadcastList(): Promise<void> {
+    this.searchIndex.invalidate(); // any list-changing write staleness-marks search (mirrors app.ts)
     this.hub.publishList(await this.store.listPages());
   }
 
   private async broadcastRows(databaseId: string): Promise<void> {
+    this.searchIndex.invalidate(); // rows are pages too; a row write staleness-marks search
     // Skip the row query when nobody is watching — same guard the HTTP app uses.
     if (!this.hub.hasRowsListeners(databaseId)) return;
     this.hub.publishRows(databaseId, await this.store.listRows(databaseId));
@@ -134,6 +182,50 @@ export class LocalDataClient implements DataClient {
     return this.store.listBacklinks(id);
   }
 
+  // In-webview = single principal with full read access, so the graph is returned
+  // unfiltered (no per-principal canReadPage predicate) — the same posture as
+  // listBacklinks/listPages here. The HTTP transport is where per-principal read
+  // gating applies on a shared instance.
+  pageGraph(): Promise<PageGraph> {
+    return this.store.pageGraph();
+  }
+
+  // ── Page version history (PVH-3) ─────────────────────────────────────────────
+
+  listVersions(pageId: string, opts?: {limit?: number}): Promise<PageVersionMeta[]> {
+    return this.store.listPageVersions(pageId, opts?.limit);
+  }
+
+  getVersion(pageId: string, versionId: string): Promise<StoredPageVersion | null> {
+    return this.store.getPageVersion(pageId, versionId);
+  }
+
+  async restoreVersion(pageId: string, versionId: string): Promise<StoredPage | null> {
+    const version = await this.store.getPageVersion(pageId, versionId);
+    if (!version) return null;
+    // Preserve the page's current name — only the document content rolls back.
+    // Writing the old snapshot back captures the current state as a fresh version
+    // (PVH-1), so a restore is non-destructive. `captureMode: 'force'` bypasses the
+    // 45s coalesce window so restoring right after a save can't lose the pre-restore
+    // state (parity with the HTTP restore route). Mirrors savePage's publish wiring.
+    const existing = await this.store.getPage(pageId);
+    if (!existing) return null;
+    const page = await this.store.upsertPage(
+      {id: pageId, name: existing.name, data: version.data},
+      localPrincipal(),
+      {captureMode: 'force'},
+    );
+    // The restore wrote the old snapshot straight through `upsertPage`, bypassing the
+    // /updates collab stream — so a relay doc a second window is syncing against still
+    // holds the pre-restore state. Drop it so its next /sync reseeds from the restored
+    // snapshot (parity with the HTTP restore route; PVH-8).
+    this.relay.forget(pageId);
+    this.hub.publishPage(page);
+    await this.broadcastList();
+    if (page.databaseId) await this.broadcastRows(page.databaseId);
+    return page;
+  }
+
   async movePage(id: string, move: {parentId: string | null; orderedIds: string[]}): Promise<StoredPage> {
     const existing = await this.store.getPage(id);
     if (!existing) throw new Error('page not found');
@@ -158,11 +250,11 @@ export class LocalDataClient implements DataClient {
     return true;
   }
 
-  exportSpace(): Promise<{pages: StoredPage[]; databases: StoredDatabase[]}> {
+  exportLibrary(): Promise<LibraryBackup> {
     return this.store.exportAll();
   }
 
-  async importSpace(req: ImportRequest): Promise<ImportResult> {
+  async importLibrary(req: ImportRequest): Promise<ImportResult> {
     const result = await this.store.importBundle(req);
     await this.broadcastList();
     return result;
@@ -220,6 +312,19 @@ export class LocalDataClient implements DataClient {
     const update = (page?.data as {blockdoc?: {update?: string}} | undefined)?.blockdoc?.update;
     return typeof update === 'string' && update.length > 0 ? Buffer.from(update, 'base64') : null;
   };
+
+  async applyPageUpdate(id: string, update: string, clientId: number): Promise<boolean> {
+    const bytes = Buffer.from(update, 'base64');
+    const page = await this.store.applyPageUpdate(id, bytes, localPrincipal());
+    if (page === 'stale') throw Object.assign(new Error('stale stored base'), {status: 409});
+    if (!page) throw Object.assign(new Error('page not found'), {status: 404});
+    this.hub.publishPage(page);
+    this.hub.publishPageUpdate(id, update, clientId);
+    void this.relay.ingest(id, bytes, this.loadRelayBase).catch(console.error);
+    await this.broadcastList();
+    if (page.databaseId) await this.broadcastRows(page.databaseId);
+    return true;
+  }
 
   postPageUpdate(id: string, update: string, clientId: number): Promise<void> {
     this.hub.publishPageUpdate(id, update, clientId);
@@ -351,6 +456,205 @@ export class LocalDataClient implements DataClient {
     return this.hub.subscribeRows(databaseId, (event) => onRows(event.rows));
   }
 
+  // ── Ledger: server-enforced double-entry accounting (LGR-3) ──────────────────
+  // Same LedgerStore the HTTP routes use — the invariants are enforced in the
+  // STORE layer, so this in-process transport can't sidestep them. The publish
+  // wiring mirrors the HTTP routes so open ledger views stay live. Typed
+  // LedgerErrors propagate as-is (the HTTP client re-materializes the same class
+  // from the wire, so both transports throw identically).
+
+  ledgerInfo(): Promise<LedgerInfo> {
+    return this.store.ledger.info();
+  }
+
+  async ledgerInit(): Promise<LedgerInfo> {
+    const before = await this.store.ledgerIds();
+    const info = await this.store.ledger.ensureSetup(localPrincipal());
+    if (!before) await this.broadcastList();
+    return info;
+  }
+
+  async ledgerRestoreSection(section: LedgerExportSection): Promise<LedgerSectionRestoreResult> {
+    // LX-4: replay an export's embedded ledger records through the ONE writer.
+    // In-process transport = the machine owner; the HTTP route additionally
+    // gates on instance administration.
+    const before = await this.store.ledgerIds();
+    const result = await this.store.ledger.restoreExportSection(section, localPrincipal());
+    if (!before) await this.broadcastList();
+    await Promise.all(
+      (['accounts', 'transactions', 'postings', 'reconciliations'] as const).map((key) => this.broadcastLedgerRows(key)),
+    );
+    return result;
+  }
+
+  ledgerListAccounts(): Promise<LedgerAccount[]> {
+    return this.store.ledger.listAccounts();
+  }
+
+  async ledgerCreateAccount(input: LedgerAccountInput): Promise<LedgerAccount> {
+    const account = await this.store.ledger.createAccount(input, localPrincipal());
+    await this.broadcastLedgerRows('accounts');
+    return account;
+  }
+
+  ledgerGetAccount(id: string): Promise<LedgerAccount | null> {
+    return this.store.ledger.getAccount(id);
+  }
+
+  async ledgerUpdateAccount(id: string, patch: LedgerAccountPatch): Promise<LedgerAccount> {
+    const account = await this.store.ledger.updateAccount(id, patch, localPrincipal());
+    await this.broadcastLedgerRows('accounts');
+    return account;
+  }
+
+  ledgerListTransactions(opts?: {state?: LedgerTransactionState; limit?: number}): Promise<LedgerTransaction[]> {
+    return this.store.ledger.listTransactions(opts);
+  }
+
+  ledgerGetTransaction(id: string): Promise<LedgerTransaction | null> {
+    return this.store.ledger.getTransaction(id);
+  }
+
+  async ledgerCreateDraft(input: LedgerDraftInput): Promise<LedgerTransaction> {
+    const transaction = await this.store.ledger.createDraft(input, localPrincipal());
+    await this.broadcastLedgerRows('transactions', 'postings');
+    return transaction;
+  }
+
+  async ledgerUpdateDraft(id: string, patch: LedgerDraftPatch): Promise<LedgerTransaction> {
+    const transaction = await this.store.ledger.updateDraft(id, patch, localPrincipal());
+    await this.broadcastLedgerRows('transactions', 'postings');
+    return transaction;
+  }
+
+  async ledgerDeleteDraft(id: string): Promise<boolean> {
+    const deleted = await this.store.ledger.deleteDraft(id, localPrincipal());
+    await this.broadcastLedgerRows('transactions', 'postings');
+    return deleted;
+  }
+
+  async ledgerPostTransaction(id: string): Promise<LedgerTransaction> {
+    const transaction = await this.store.ledger.post(id, localPrincipal());
+    await this.broadcastLedgerRows('transactions');
+    return transaction;
+  }
+
+  async ledgerReverseTransaction(id: string, opts?: LedgerReverseOptions): Promise<LedgerTransaction> {
+    const transaction = await this.store.ledger.reverse(id, opts ?? {}, localPrincipal());
+    await this.broadcastLedgerRows('transactions', 'postings');
+    return transaction;
+  }
+
+  async ledgerSetPostingCleared(postingId: string, cleared: LedgerClearedState): Promise<LedgerPosting> {
+    // `reconciled` is unreachable from here in either direction — it is reached
+    // only by finishing a reconciliation and left only by reopening one (LGR-11).
+    const posting = await this.store.ledger.setPostingCleared(postingId, cleared, localPrincipal());
+    await this.broadcastLedgerRows('postings');
+    return posting;
+  }
+
+  // ── Statement reconciliation (LGR-11) ────────────────────────────────────────
+  // Same `LedgerStore` methods the HTTP routes call, so the zero-difference
+  // gate, the freeze and the reopen behave identically in browser-local mode —
+  // there is no second implementation for this transport to drift from.
+
+  ledgerListReconciliations(opts?: {accountId?: string; status?: LedgerReconciliationStatus}): Promise<LedgerReconciliation[]> {
+    return this.store.ledger.listReconciliations(opts);
+  }
+
+  ledgerGetReconciliation(id: string): Promise<LedgerReconciliationSummary | null> {
+    return this.store.ledger.getReconciliation(id);
+  }
+
+  async ledgerStartReconciliation(input: LedgerReconciliationInput): Promise<LedgerReconciliation> {
+    const reconciliation = await this.store.ledger.startReconciliation(input, localPrincipal());
+    await this.broadcastLedgerRows('reconciliations');
+    return reconciliation;
+  }
+
+  async ledgerAmendReconciliation(id: string, patch: LedgerReconciliationPatch): Promise<LedgerReconciliationSummary> {
+    const summary = await this.store.ledger.amendReconciliation(id, patch, localPrincipal());
+    await this.broadcastLedgerRows('reconciliations');
+    return summary;
+  }
+
+  async ledgerAbandonReconciliation(id: string): Promise<LedgerReconciliation> {
+    const reconciliation = await this.store.ledger.abandonReconciliation(id, localPrincipal());
+    // `reconciliations` only: abandoning writes no posting row (LGR-22's
+    // posting-neutrality), so broadcasting `postings` would announce a change
+    // that never happened.
+    await this.broadcastLedgerRows('reconciliations');
+    return reconciliation;
+  }
+
+  async ledgerToggleReconciliationPosting(id: string, postingId: string, cleared: 'pending' | 'cleared'): Promise<LedgerReconciliationSummary> {
+    const summary = await this.store.ledger.setReconciliationPostingCleared(id, postingId, cleared, localPrincipal());
+    await this.broadcastLedgerRows('postings');
+    return summary;
+  }
+
+  async ledgerFinishReconciliation(id: string): Promise<LedgerReconciliationSummary> {
+    const summary = await this.store.ledger.finishReconciliation(id, localPrincipal());
+    await this.broadcastLedgerRows('reconciliations', 'postings');
+    return summary;
+  }
+
+  async ledgerReopenReconciliation(id: string): Promise<LedgerReconciliationSummary> {
+    const summary = await this.store.ledger.reopenReconciliation(id, localPrincipal());
+    await this.broadcastLedgerRows('reconciliations', 'postings');
+    return summary;
+  }
+
+  // ── Period close (LGR-12) ────────────────────────────────────────────────────
+  // Same `LedgerStore` methods the HTTP routes call: the date-range lock, the
+  // closing entry and the reopen reversal are identical in browser-local mode.
+
+  ledgerListPeriods(): Promise<LedgerPeriod[]> {
+    return this.store.ledger.listPeriods();
+  }
+
+  async ledgerClosePeriod(input: LedgerPeriodCloseInput): Promise<LedgerPeriodCloseResult> {
+    const result = await this.store.ledger.closePeriod(input, localPrincipal());
+    // The closing entry is a real posted transaction; a close with nothing to
+    // close writes no rows, and broadcasting then would announce a change that
+    // never happened (the reconciliation-abandon precedent).
+    if (result.closingEntry) await this.broadcastLedgerRows('transactions', 'postings');
+    return result;
+  }
+
+  async ledgerReopenPeriod(id: string): Promise<LedgerPeriodReopenResult> {
+    const result = await this.store.ledger.reopenPeriod(id, localPrincipal());
+    if (result.reversal) await this.broadcastLedgerRows('transactions', 'postings');
+    return result;
+  }
+
+  ledgerListAudit(opts?: {limit?: number; before?: number}): Promise<LedgerAuditEvent[]> {
+    return this.store.ledger.listAudit(opts);
+  }
+
+  /** Canonical postings CSV (LGR-7) — same bytes as the HTTP route (parity-pinned). */
+  ledgerExportCsv(): Promise<string> {
+    return this.store.ledger.exportPostingsCsv();
+  }
+
+  /** Beancount journal (LGR-13) — same bytes as the HTTP route (parity-pinned). */
+  ledgerExportBeancount(): Promise<string> {
+    return this.store.ledger.exportBeancount();
+  }
+
+  /** The independent verifier (LGR-7). The in-webview store is single-user —
+   *  the local owner is the instance admin, so no gate applies here. */
+  ledgerVerify(): Promise<LedgerVerifyReport> {
+    return this.store.verifyLedger();
+  }
+
+  /** Refresh the named ledger databases' live row views (mirrors app.ts). */
+  private async broadcastLedgerRows(...keys: Array<'accounts' | 'transactions' | 'postings' | 'reconciliations'>): Promise<void> {
+    const ids = await this.store.ledgerIds();
+    if (!ids) return;
+    for (const key of keys) await this.broadcastRows(ids[key]);
+  }
+
   // ── Suggestions + comments (the review layer) ────────────────────────────────
 
   listSuggestions(pageId: string, status?: SuggestionStatus): Promise<StoredSuggestion[]> {
@@ -393,6 +697,11 @@ export class LocalDataClient implements DataClient {
     const config = await this.store.getInstanceConfig();
     return {
       guestAccess: config.guestAccess,
+      // The instance-wide agent-edits mode (AGED-5) — surfaced so the in-webview
+      // Settings toggle round-trips and a page's `inherit` policy resolves without
+      // a second probe. Mirrors the HTTP `GET /api/instance` field.
+      agentEdits: config.agentEdits,
+      instanceId: config.instanceId ?? null,
       ownerSubject: config.ownerSubject ?? null,
       trustedIssuers: config.trustedIssuers.map((i) => i.issuer),
       audience: config.audience ?? null,
@@ -419,13 +728,37 @@ export class LocalDataClient implements DataClient {
   // The single-process owner manages everything; resolveInvitee normalizes the
   // free email-or-handle string exactly as the HTTP route does.
 
-  async getPageVisibility(pageId: string): Promise<PageVisibility | null> {
+  async getPageVisibility(pageId: string): Promise<PageVisibilitySettings | null> {
     return this.store.getPageVisibility(pageId);
   }
 
-  async setPageVisibility(pageId: string, visibility: PageVisibility): Promise<PageVisibility> {
-    await this.store.setPageVisibility(pageId, visibility);
-    return visibility;
+  async setPageVisibility(pageId: string, update: PageVisibilityUpdate): Promise<PageVisibilitySettings> {
+    await this.store.setPageVisibility(pageId, update);
+    if (update.listed !== undefined) await this.broadcastList();
+    return (await this.store.getPageVisibility(pageId)) ?? {
+      visibility: update.visibility ?? 'inherit',
+      listed: update.listed ?? true,
+    };
+  }
+
+  // Agent-edits policy (AGED-1) — mirrors the HTTP route: a missing/unset page
+  // resolves to `inherit` (the instance mode then decides).
+  async getPageAgentEdits(pageId: string): Promise<AgentEditsPolicy> {
+    return (await this.store.getPageAgentEdits(pageId)) ?? 'inherit';
+  }
+
+  // Server-resolved effective mode (AGED-6) — mirrors the HTTP route: the raw policy
+  // resolved against the instance default (never `inherit`). The in-webview caller
+  // reads its own instance config freely, so this is a local resolve.
+  async getEffectiveAgentEdits(pageId: string): Promise<AgentEditsMode> {
+    const page = (await this.store.getPageAgentEdits(pageId)) ?? 'inherit';
+    const config = await this.store.getInstanceConfig();
+    return resolveAgentEdits(page, config.agentEdits);
+  }
+
+  async setPageAgentEdits(pageId: string, agentEdits: AgentEditsPolicy): Promise<AgentEditsPolicy> {
+    await this.store.setPageAgentEdits(pageId, agentEdits);
+    return agentEdits;
   }
 
   listPageAcl(pageId: string): Promise<PageAcl[]> {
@@ -477,6 +810,36 @@ export class LocalDataClient implements DataClient {
     return this.store.removeMember(id);
   }
 
+  // ── Agent access: PAT credential management (AGENT-6) ─────────────────────────
+  // Agent PATs authenticate an OUTWARD `Bearer obat_…` HTTP request; the in-webview
+  // store exposes no such server, so the feature is inert here — the panel renders a
+  // "runs on the desktop app or a connected server" notice.
+
+  listAgentTokens(): Promise<AgentTokenList> {
+    // Reject (rather than resolve empty) so the settings panel renders its
+    // "unavailable in the browser" state instead of a live-looking Enable toggle
+    // that would then error on use.
+    return Promise.reject(
+      new Error('Agent tokens run on the desktop app or a connected server — not in the browser.'),
+    );
+  }
+
+  setAgentApiEnabled(): Promise<{enabled: boolean; remote: boolean}> {
+    return Promise.reject(
+      new Error('Agent tokens run on the desktop app or a connected server — not in the browser.'),
+    );
+  }
+
+  createAgentToken(): Promise<CreatedAgentToken> {
+    return Promise.reject(
+      new Error('Agent tokens run on the desktop app or a connected server — not in the browser.'),
+    );
+  }
+
+  revokeAgentToken(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   // ── Scheduled backups (OB-166) ───────────────────────────────────────────────
   // The in-webview store has no filesystem, so scheduled backups don't run here
   // (`resolvedDir` is null → the UI shows it as a desktop/server feature). The
@@ -496,6 +859,8 @@ export class LocalDataClient implements DataClient {
           lastRun: last,
           nextDue: last ? new Date(Date.parse(last) + BACKUP_CADENCE_MS[cadence]).toISOString() : null,
           count: 0,
+          lastSkippedCount: config.lastSkippedCount[cadence] ?? null,
+          lastError: config.failures[cadence] ?? null,
         };
       }),
     };
@@ -506,20 +871,20 @@ export class LocalDataClient implements DataClient {
     return this.getBackupStatus();
   }
 
-  runBackup(): Promise<{file: string; dir: string}> {
+  runBackup(): Promise<{file: string; dir: string; skippedCount: number}> {
     return Promise.reject(
       new Error('Scheduled backups run on the desktop app or a connected server — not in the browser. Use Export instead.'),
     );
   }
 
-  // ── Extensions (installed plugins, stored per workspace in the DB) ───────────
+  // ── Extensions (installed plugins, stored per library in the DB) ───────────
 
   listPlugins(): Promise<StoredPlugin[]> {
     return this.store.listPlugins();
   }
 
-  installPlugin(pkg: PluginPackage): Promise<StoredPlugin> {
-    return this.store.upsertPlugin(pkg);
+  installPlugin(pkg: PluginPackage, opts: {allowDowngrade?: boolean} = {}): Promise<StoredPlugin> {
+    return this.store.upsertPlugin(pkg, opts);
   }
 
   async setPluginEnabled(id: string, enabled: boolean): Promise<StoredPlugin> {
@@ -551,12 +916,14 @@ export class LocalDataClient implements DataClient {
     return Promise.resolve(config);
   }
 
+  // Lexical content search works fully in-webview: no engine, just the page
+  // text (see LocalSearchIndex). Unlike the other AI methods, this is NOT stubbed.
   aiIndex(): Promise<{pages: number; chunks: number}> {
-    return Promise.resolve({pages: 0, chunks: 0});
+    return this.searchIndex.reindex();
   }
 
-  aiSearch(): Promise<AiSearchResponse> {
-    return Promise.resolve({results: [], mode: 'lexical'});
+  aiSearch(query: string, limit?: number): Promise<AiSearchResponse> {
+    return this.searchIndex.search(query, Math.min(Math.max(limit ?? 8, 1), 25));
   }
 
   aiTasks(): Promise<AiTasksResponse> {
@@ -564,6 +931,12 @@ export class LocalDataClient implements DataClient {
   }
 
   aiDownloadModel(): Promise<AiStatus['download']> {
+    return Promise.reject(this.aiUnavailable());
+  }
+
+  readonly supportsTranscription = false;
+
+  transcribeAsset(): Promise<AiTranscriptionResult> {
     return Promise.reject(this.aiUnavailable());
   }
 
@@ -589,6 +962,45 @@ export class LocalDataClient implements DataClient {
 
   aiDeleteSkill(): Promise<boolean> {
     return Promise.resolve(false);
+  }
+
+  // No hosted engine in local in-app mode → no usage attribution to price.
+  getAiPricing(): Promise<AiPricingResponse> {
+    return Promise.resolve({default: {}, override: {}, effective: {}});
+  }
+
+  setAiPricing(override: AiPricingTable): Promise<AiPricingResponse> {
+    return Promise.resolve({default: {}, override, effective: override});
+  }
+
+  getAiUsage(): Promise<AiUsageResponse> {
+    return Promise.resolve({exists: false, databaseId: null, hostPageId: null, retentionDays: null});
+  }
+
+  setAiUsageRetention(days: number): Promise<{days: number}> {
+    return Promise.resolve({days});
+  }
+
+  // No server process in local in-app mode → no external MCP tools. Report an
+  // empty, off config (and no stdio) so the settings panel renders its empty
+  // state rather than throwing; a save is a no-op, and a test is unavailable.
+  getMcpConfig(): Promise<McpConfigResponse> {
+    return Promise.resolve({config: {enabled: false, servers: []}, stdioAllowed: false});
+  }
+
+  putMcpConfig(config: McpClientConfig): Promise<McpConfigResponse> {
+    // No server → nothing persists. Echo back a REDACTED, off config (strip any
+    // write-only token the caller sent, flag it as set) so the stub matches the
+    // real server's response shape and never round-trips a secret.
+    const servers = (config.servers ?? []).map((s) => {
+      const {authToken, ...rest} = s;
+      return {...rest, ...(typeof authToken === 'string' && authToken.trim() ? {authTokenSet: true} : {})};
+    });
+    return Promise.resolve({config: {enabled: false, servers}, stdioAllowed: false});
+  }
+
+  testMcpServer(): Promise<McpTestResult> {
+    return Promise.resolve({ok: false, error: 'External tools run on a connected OpenBook server; not available in local in-app mode.'});
   }
 
   private aiUnavailable(): Error {

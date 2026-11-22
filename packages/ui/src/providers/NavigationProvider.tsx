@@ -13,13 +13,15 @@ import {useData} from '@/data';
 import {setPageLinkBridge, type PageLinkResult} from '@/lib/pageLinks';
 import {hydratePageIcons, readPageIcon, readStoredPageIcon, writePageIcon} from '@/lib/pageIcon';
 import {recordRecent} from '@/lib/recents';
-import {AGENT_PANE_ID, CONFIG_PANE_ID, CUSTOMISE_PANE_ID, FLOW_PANE_ID, HOME_PAGE_ID, REVIEW_PANE_ID} from '@/lib/homePage';
+import {AGENT_PANE_ID, CONFIG_PANE_ID, CUSTOMISE_PANE_ID, FLOW_PANE_ID, GRAPH_PANE_ID, HISTORY_PANE_ID, HOME_PAGE_ID, LINKS_PANE_ID, REVIEW_PANE_ID, TRASH_PAGE_ID} from '@/lib/homePage';
+import {PANE_TARGET_STORES, paneHasTarget} from '@/lib/paneTarget';
 import {registerKitPanelNav} from '@/blockeditor/kit/kitPanel';
 import {t as bareT} from '@/i18n';
 import {pagePathLabel} from '@/lib/pagePath';
 import {removeFavorite} from '@/lib/favorites';
+import {readCrashedPages} from '@/lib/crashRecovery';
 import {showToast} from '@/components/ui/toast';
-import {usePlatformLibrary, type NewViewTarget} from './PlatformLibraryProvider';
+import {usePlatformCapabilities, type NewViewTarget} from './PlatformCapabilitiesProvider';
 import * as W from './windowModel';
 import type {Pane, PaneId, WindowState} from './windowModel';
 
@@ -35,6 +37,10 @@ export interface NavigationContextValue {
   primaryPageId: string | null;
   loading: boolean;
   error: string | null;
+  /** True when the initial load failed because the publishing relay reports its site offline. */
+  siteOffline: boolean;
+  /** Re-run the initial page-list load after a startup failure. */
+  retryInitialLoad: () => void;
 
   // ── In-window tabs (desktop) ────────────────────────────────────────────────
   /** Whether tabs live inside the window (a custom titlebar tab bar). */
@@ -75,8 +81,41 @@ export interface NavigationContextValue {
   setPageHint: (id: string, name: string | null) => void;
 
   // ── Single-page navigation ──────────────────────────────────────────────────
+  // ── Active database view (URL `?view=`) ─────────────────────────────────────
+  /** The `?view=` param, scoped to the PRIMARY page's database. `null` when the
+   *  primary page has no view param (or has navigated away). Consumers should
+   *  still confirm it names a real view of *their* database before honouring it. */
+  activeViewParam: string | null;
+  /** Reflect the primary database's active view id into the URL (`?view=`), or
+   *  clear it with `null`. No-op'd by callers that don't own the primary page. */
+  setActiveViewParam: (viewId: string | null) => void;
+
+  // ── One-shot database anchors (URL `?row=` / `?group=`) ─────────────────────
+  /** A pending "scroll to this row" request from a copied row link
+   *  (`?page=<hostDb>&row=<rowId>`), captured at init and cleared on the URL's
+   *  first mirror. `null` once there's nothing to anchor. The DatabaseView owning
+   *  the row honours it (scroll + transient highlight), then calls {@link clearRowAnchor}. */
+  rowAnchor: string | null;
+  /** A pending "scroll to this group header" request from a copied group link
+   *  (`?page=<hostDb>&group=<groupKey>`). See {@link rowAnchor}. */
+  groupAnchor: string | null;
+  /** A pending "scroll to this block" request — from a search pick, a copied
+   *  block link (`?page=<page>&block=<blockId>`), or {@link selectPageAtBlock}.
+   *  The page document owning the block honours it (scroll + transient
+   *  highlight), then calls {@link clearBlockAnchor}. See {@link rowAnchor}. */
+  blockAnchor: string | null;
+  /** Consume {@link rowAnchor} once the row has been scrolled into view. */
+  clearRowAnchor: () => void;
+  /** Consume {@link groupAnchor} once the group header has been scrolled into view. */
+  clearGroupAnchor: () => void;
+  /** Consume {@link blockAnchor} once the block has been scrolled into view. */
+  clearBlockAnchor: () => void;
+
   /** Navigate the focused pane to a page. */
   selectPage: (id: string) => void;
+  /** Navigate the focused pane to a page and scroll/flash a specific block on
+   *  arrival (a search pick or copy-block-link landing on the matched block). */
+  selectPageAtBlock: (id: string, blockId: string) => void;
   /** Navigate (and focus) a SPECIFIC pane, regardless of which is focused. All
    *  link / sidebar / breadcrumb navigation targets the primary pane; the side
    *  pane stays put as a reference and changes only via "open in split". */
@@ -110,6 +149,12 @@ export interface NavigationContextValue {
   movePage: (id: string, parentId: string | null, orderedIds: string[]) => Promise<void>;
   /** Re-list pages from the store. */
   reload: () => Promise<PageMeta[]>;
+
+  /** Database ROWS whose title matches `query` (best matches first). Rows are
+   *  pages too, so the palette and `@`-mention picker can both surface them —
+   *  they live under each database, not the top-level {@link pages} list, so
+   *  this is async (per-database results are cached and reused). */
+  searchRows: (query: string, limit?: number) => Promise<PageLinkResult[]>;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
@@ -120,25 +165,89 @@ export const useNavigation = (): NavigationContextValue => {
   return ctx;
 };
 
+/** Like {@link useNavigation}, but returns `null` instead of throwing when there
+ *  is no provider — for components that may render in a reduced harness (unit
+ *  tests, previews) where nav isn't wired. The real app always supplies one. */
+export const useOptionalNavigation = (): NavigationContextValue | null => useContext(NavigationContext);
+
 const LAST_PAGE_KEY = 'openbook.currentPageId';
 
 // ── URL <-> window state ──────────────────────────────────────────────────────
 // A window's pages live in the query string so it restores on refresh and new
 // native tabs open by URL: `?page=<primary>&split=<secondary>`.
 
-const readUrl = (): {page: string | null; split: string | null} => {
-  if (typeof window === 'undefined') return {page: null, split: null};
+const readUrl = (): {
+  page: string | null;
+  split: string | null;
+  view: string | null;
+  paneTarget: string | null;
+  row: string | null;
+  group: string | null;
+  block: string | null;
+} => {
+  if (typeof window === 'undefined')
+    return {page: null, split: null, view: null, paneTarget: null, row: null, group: null, block: null};
   const params = new URLSearchParams(window.location.search);
-  return {page: params.get('page'), split: params.get('split')};
+  return {
+    page: params.get('page'),
+    split: params.get('split'),
+    view: params.get('view'),
+    paneTarget: params.get('paneTarget'),
+    row: params.get('row'),
+    group: params.get('group'),
+    block: params.get('block'),
+  };
 };
 
-const writeUrl = (primary: string, split: string | null): void => {
+/** The per-tab primary-history position mirrored into `history.state` on web,
+ *  so a `popstate` (browser Back/Forward) can be translated back into a window-
+ *  model step. `null` outside the web-history surface (desktop's in-window tabs
+ *  own their own back/forward and never touch browser history). */
+export interface HistoryEntryState {
+  obIndex: number;
+}
+
+const writeUrl = (
+  primary: string,
+  split: string | null,
+  view: string | null,
+  paneTarget: string | null,
+  // How to mirror this window into browser history. `index` is the active tab's
+  // primary-history position, stamped into `history.state`; `push` requests a
+  // *new* browser entry (a page navigation grew the history) rather than an
+  // in-place mirror (a pane/view/anchor change). Absent on the desktop, where
+  // the URL is a plain `replaceState` mirror with no browser-history semantics.
+  nav?: {push: boolean; index: number | null},
+): void => {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
   url.searchParams.set('page', primary);
   if (split) url.searchParams.set('split', split);
   else url.searchParams.delete('split');
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  // `?view=` names the active database view of the `?page='d database, so a chosen
+  // board/timeline is shareable. It is scoped to the primary page — dropped when
+  // the pane navigates elsewhere (see the provider's view-param reconciliation).
+  if (view) url.searchParams.set('view', view);
+  else url.searchParams.delete('view');
+  // `?paneTarget=` names the page a side pane (customise/review) is acting on,
+  // so `?split=customise&paneTarget=<id>` survives reload pointed at the same
+  // page. Omitted when the pane targets the primary page (the restore default).
+  if (paneTarget) url.searchParams.set('paneTarget', paneTarget);
+  else url.searchParams.delete('paneTarget');
+  // `?row=`/`?group=`/`?block=` are one-shot scroll-to anchors (a copied row /
+  // group / block link, or a search pick). They're consumed into provider state
+  // at init, then dropped here on the first window mirror so the anchor fires
+  // exactly once and the address bar stays clean.
+  url.searchParams.delete('row');
+  url.searchParams.delete('group');
+  url.searchParams.delete('block');
+  const path = `${url.pathname}${url.search}${url.hash}`;
+  const state: HistoryEntryState | null = nav && nav.index !== null ? {obIndex: nav.index} : null;
+  // A page navigation on the web pushes a real browser entry so Back/Forward
+  // walk the visited-page trail (IA-2). Pane/view/anchor mirrors — and every
+  // desktop write — replace in place, keeping a single entry per page.
+  if (nav?.push) window.history.pushState(state, '', path);
+  else window.history.replaceState(state, '', path);
   try {
     localStorage.setItem(LAST_PAGE_KEY, primary);
   } catch {
@@ -151,6 +260,11 @@ const pageUrl = (id: string): string => {
   const url = new URL(window.location.href);
   url.searchParams.set('page', id);
   url.searchParams.delete('split');
+  url.searchParams.delete('view'); // a fresh page opens on its own default view
+  url.searchParams.delete('paneTarget'); // no side pane carried into a new tab
+  url.searchParams.delete('row'); // a new tab isn't a one-shot scroll-to anchor
+  url.searchParams.delete('group');
+  url.searchParams.delete('block');
   return url.toString();
 };
 
@@ -162,29 +276,136 @@ const readLastPage = (): string | null => {
   }
 };
 
+/**
+ * Forget the last-opened page so the next startup won't auto-reopen it. Called
+ * by the crash boundaries (STAB-3) when a page or the whole app throws while
+ * rendering, so a reload doesn't deterministically re-poison itself.
+ */
+export const clearLastPage = (): void => {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(LAST_PAGE_KEY);
+  } catch {
+    // ignore storage failures
+  }
+};
+
 export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({children}) => {
   const client = useData();
-  const platform = usePlatformLibrary();
+  const platform = usePlatformCapabilities();
   const [pages, setPages] = useState<PageMeta[]>([]);
   const [win, setWin] = useState<WindowState | null>(null);
   const [titleHints, setTitleHints] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [siteOffline, setSiteOffline] = useState(false);
+  const [initialLoadAttempt, setInitialLoadAttempt] = useState(0);
+  // The active database view of the primary page, mirrored to `?view=`. Seeded
+  // from the URL so a deep link (`?page=…&view=…`) lands on that view.
+  const [viewParam, setViewParam] = useState<string | null>(() => readUrl().view);
+  // One-shot db anchors from a copied row/group link. Seeded synchronously from
+  // the URL (before the window-mirror effect strips them) so the anchor survives
+  // the URL cleanup; consumed by the DatabaseView that owns the row/group.
+  const [rowAnchor, setRowAnchor] = useState<string | null>(() => readUrl().row);
+  const [groupAnchor, setGroupAnchor] = useState<string | null>(() => readUrl().group);
+  // One-shot block anchor: seeded from `?block=` (a shared/copied block link) and
+  // also set in-session by search picks / block links via {@link selectPageAtBlock}.
+  const [blockAnchor, setBlockAnchor] = useState<string | null>(() => readUrl().block);
+  const clearRowAnchor = useCallback(() => setRowAnchor(null), []);
+  const clearGroupAnchor = useCallback(() => setGroupAnchor(null), []);
+  const clearBlockAnchor = useCallback(() => setBlockAnchor(null), []);
+  // Mirror of each pane-target store (customise/review), so the URL-sync effect
+  // re-runs — and re-writes `?paneTarget=` — the instant a pane's target page
+  // changes. A monotonic tick is enough; the effect reads the fresh value.
+  const [paneTargetTick, setPaneTargetTick] = useState(0);
 
   const initRef = useRef<Promise<void> | null>(null);
   const prevTopLevelIds = useRef<Set<string>>(new Set());
+  // Lazy per-database row cache for the `@`-mention row search (rows aren't in
+  // the top-level `pages` list). Cleared whenever the page list changes, so a
+  // renamed/added/removed row is re-listed on the next mention search.
+  const rowLinkCache = useRef<Map<string, PageLinkResult[]>>(new Map());
+  // The active tab's primary-history index last reflected into browser history
+  // (web only). Lets the URL-mirror effect decide push (new page) vs replace
+  // (pane/view/anchor), and lets the popstate handler mark the model in sync
+  // without re-pushing. `null` until the first mirror seeds it.
+  const browserIndexRef = useRef<number | null>(null);
 
-  // Mirror the window into the URL whenever it changes. The block-settings,
-  // customise, review, and agent panes are ephemeral (their state lives in
-  // in-memory bridges), so they never go in the URL — a reload would otherwise
-  // reopen an empty pane (homePage.ts documents each pane's persistence).
+  // Web only: the browser owns Back/Forward. The desktop draws its own in-window
+  // tabs, each with a private history, and never touches browser history.
+  const webHistory = !(platform.tabs?.inWindow ?? false);
+  // The primary page id `viewParam` was last reconciled against — lets us drop a
+  // stale `?view=` the moment the primary pane navigates to a different page.
+  const prevPrimaryRef = useRef<string | null>(null);
+
+  // Keep the URL-sync effect honest about target changes: bump a tick whenever
+  // either pane-target store moves, so a customise/review pane re-mirrors its
+  // `?paneTarget=` even when `win` and `viewParam` are unchanged.
+  useEffect(() => {
+    const bump = () => setPaneTargetTick((n) => n + 1);
+    const unsubs = Object.values(PANE_TARGET_STORES).map((store) => store.subscribe(bump));
+    return () => unsubs.forEach((u) => u());
+  }, []);
+
+  // Mirror the window into the URL whenever it changes. The block-settings and
+  // agent panes are ephemeral (their state lives in in-memory bridges with no
+  // page target), so they never go in the URL — a reload would otherwise reopen
+  // an empty pane. The customise/review panes DO act on a page, so they persist
+  // as `?split=…` plus `?paneTarget=<pageId>` (homePage.ts / lib/paneTarget.ts
+  // document each pane's persistence).
   useEffect(() => {
     if (!win) return;
     const split = W.activeTab(win).split;
-    const ephemeral =
-      split === CONFIG_PANE_ID || split === CUSTOMISE_PANE_ID || split === REVIEW_PANE_ID || split === AGENT_PANE_ID;
-    writeUrl(W.primaryPage(win), ephemeral ? null : split);
-  }, [win]);
+    const ephemeral = split === CONFIG_PANE_ID || split === AGENT_PANE_ID;
+    const primary = W.primaryPage(win);
+    // A page-targeting pane records its target — but only when it differs from
+    // the primary page, since restore defaults an absent param to the primary.
+    let paneTarget: string | null = null;
+    if (paneHasTarget(split)) {
+      const target = PANE_TARGET_STORES[split].get();
+      if (target && target !== primary) paneTarget = target;
+    }
+    // On the web, mirror the active tab's primary-history index into browser
+    // history: a *forward* move (the index grew past what the browser reflects)
+    // pushes a new entry so Back returns here; every other change (pane/view/
+    // anchor, or a Back/Forward the popstate handler already applied) replaces
+    // in place. `browserIndexRef` tracks what the browser currently reflects.
+    const index = W.activeTab(win).index;
+    const push = webHistory && browserIndexRef.current !== null && index > browserIndexRef.current;
+    writeUrl(
+      primary,
+      ephemeral ? null : split,
+      viewParam,
+      paneTarget,
+      webHistory ? {push, index} : undefined,
+    );
+    if (webHistory) browserIndexRef.current = index;
+  }, [win, viewParam, paneTargetTick, webHistory]);
+
+  // Web only: translate the browser's Back/Forward (a `popstate`) into the
+  // window model's back/forward. Each entry we wrote carries its primary-history
+  // index in `history.state.obIndex`; step the model until it matches. Entries
+  // without our state (history from before the app loaded) are left to the
+  // browser — stepping past our first entry simply leaves the app, as on any site.
+  useEffect(() => {
+    if (!webHistory || typeof window === 'undefined') return;
+    const onPopState = (event: PopStateEvent) => {
+      const state = event.state as HistoryEntryState | null;
+      const target = state && typeof state.obIndex === 'number' ? state.obIndex : null;
+      if (target === null) return;
+      browserIndexRef.current = target; // mark in sync so the mirror won't re-push
+      setWin((prev) => {
+        if (!prev) return prev;
+        let next = prev;
+        // Walk one step at a time (guarded by the model's own bounds) so a
+        // multi-entry jump — or a stale index — can never spin.
+        while (W.activeTab(next).index > target && W.canGoBack(next)) next = W.goBack(next);
+        while (W.activeTab(next).index < target && W.canGoForward(next)) next = W.goForward(next);
+        return next;
+      });
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [webHistory]);
 
   const update = useCallback((fn: (w: WindowState) => WindowState) => {
     setWin((prev) => (prev ? fn(prev) : prev));
@@ -196,14 +417,42 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
     return list;
   }, [client]);
 
+  const retryInitialLoad = useCallback(() => {
+    initRef.current = null;
+    setError(null);
+    setSiteOffline(false);
+    setLoading(true);
+    setInitialLoadAttempt((attempt) => attempt + 1);
+  }, []);
+
   // ── Navigation ──────────────────────────────────────────────────────────────
   const selectPage = useCallback((id: string) => update((w) => W.navigateFocused(w, id)), [update]);
+  // Navigate, then anchor a block. Set the anchor before navigating so it's in
+  // place by the time the destination document mounts and consumes it (a same-
+  // page pick fires it too, since the anchor — not the page — changed).
+  const selectPageAtBlock = useCallback(
+    (id: string, blockId: string) => {
+      setBlockAnchor(blockId);
+      update((w) => W.navigateFocused(w, id));
+    },
+    [update],
+  );
   const selectPageInPane = useCallback(
     (id: string, pane: PaneId) => update((w) => W.navigatePane(w, pane, id)),
     [update],
   );
-  const goBack = useCallback(() => update(W.goBack), [update]);
-  const goForward = useCallback(() => update(W.goForward), [update]);
+  // On the web the browser owns the history stack, so the app's own Back/Forward
+  // controls drive it (the popstate handler then steps the model) — otherwise
+  // the model and browser history would drift apart. The desktop steps the
+  // window model directly (its in-window tabs have no browser history).
+  const goBack = useCallback(() => {
+    if (webHistory && typeof window !== 'undefined') window.history.back();
+    else update(W.goBack);
+  }, [update, webHistory]);
+  const goForward = useCallback(() => {
+    if (webHistory && typeof window !== 'undefined') window.history.forward();
+    else update(W.goForward);
+  }, [update, webHistory]);
   const focusPane = useCallback((pane: PaneId) => update((w) => W.focusPane(w, pane)), [update]);
   const openInSplit = useCallback((id: string) => update((w) => W.openSplit(w, id)), [update]);
   const closeSplit = useCallback(() => update(W.closeSplit), [update]);
@@ -244,11 +493,15 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
   const pageLabel = useCallback(
     (id: string): string => {
       if (id === HOME_PAGE_ID) return bareT('nav.home');
+      if (id === TRASH_PAGE_ID) return bareT('nav.trash');
       if (id === FLOW_PANE_ID) return bareT('flow.title');
       if (id === CONFIG_PANE_ID) return bareT('pane.config');
       if (id === CUSTOMISE_PANE_ID) return bareT('pane.customise');
       if (id === REVIEW_PANE_ID) return bareT('pane.review');
+      if (id === LINKS_PANE_ID) return bareT('pane.links');
+      if (id === GRAPH_PANE_ID) return bareT('pane.graph');
       if (id === AGENT_PANE_ID) return bareT('pane.agent');
+      if (id === HISTORY_PANE_ID) return bareT('pane.history');
       const meta = pages.find((p) => p.id === id);
       if (meta) return meta.name && meta.name.trim().length > 0 ? meta.name : bareT('common.untitled');
       return titleHints[id] ?? bareT('common.untitled');
@@ -411,7 +664,7 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
         .map((p) => ({id: p.id, label: pageLabel(p.id), icon: readPageIcon(p.id), path: pagePathLabel(p, byId)}))
         .filter((r) => q === '' || r.label.toLowerCase().includes(q));
       // Exact title match first, then prefix matches, then by position; cap
-      // the list for the popover. Exact-first matters in big workspaces where
+      // the list for the popover. Exact-first matters in big libraries where
       // lookalikes ("Plan", "Plan (imported)", "Plan 2") share a prefix.
       const rank = (label: string): number => {
         const l = label.toLowerCase();
@@ -422,9 +675,64 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
     [pages, pageLabel],
   );
 
+  // Row targets for the `@`-mention picker — database rows are pages too, so `@`
+  // can link one (mirroring backlinks, which already point at rows). Async
+  // because rows live under each database, not in the top-level page list; the
+  // per-database results are cached (invalidated on any page-list change) so a
+  // keystroke doesn't re-list every table.
+  const searchRows = useCallback(
+    async (query: string, limit = 6): Promise<PageLinkResult[]> => {
+      const q = query.trim().toLowerCase();
+      const dbPages = pages.filter((p) => p.hostedDatabaseId);
+      const collected: PageLinkResult[] = [];
+      for (const dbPage of dbPages) {
+        const dbId = dbPage.hostedDatabaseId!;
+        let rows = rowLinkCache.current.get(dbId);
+        if (!rows) {
+          try {
+            const list = await client.listRows(dbId);
+            rows = list.map((r) => ({
+              id: r.id,
+              label: r.name && r.name.trim().length > 0 ? r.name : bareT('common.untitled'),
+              icon: readPageIcon(r.id),
+              // The host database's name gives the row a disambiguating context,
+              // the way an ancestor path does for a page.
+              path: pageLabel(dbPage.id),
+            }));
+            rowLinkCache.current.set(dbId, rows);
+          } catch {
+            rows = [];
+          }
+        }
+        collected.push(...rows);
+      }
+      const rank = (label: string): number => {
+        const l = label.toLowerCase();
+        return l === q ? 2 : l.startsWith(q) ? 1 : 0;
+      };
+      const top = collected
+        .filter((r) => q === '' || r.label.toLowerCase().includes(q))
+        .sort((a, b) => rank(b.label) - rank(a.label))
+        .slice(0, limit);
+      // Seed each row's title so an inserted mention chip renders its name.
+      top.forEach((r) => setPageHint(r.id, r.label));
+      return top;
+    },
+    [pages, client, pageLabel, setPageHint],
+  );
+
+  // Drop the row cache whenever the page list changes (a row rename/add/remove
+  // reflows the list); the next mention search re-lists lazily.
+  useEffect(() => {
+    rowLinkCache.current.clear();
+  }, [pages]);
+
   const createLinkedPage = useCallback(
-    async (name: string): Promise<string> => {
-      const page = await client.savePage({name: name.trim() || null, data: emptyPageSnapshot()});
+    async (name: string, parentId: string | null = null): Promise<string> => {
+      // Duplicate names are allowed (migration 0015) — a "[[" wikilink to a name
+      // that already exists still creates a fresh child page when the user picks
+      // the explicit Create row, so no dedupe here.
+      const page = await client.savePage({name: name.trim() || null, data: emptyPageSnapshot(), parentId});
       await reload();
       return page.id;
     },
@@ -433,7 +741,7 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
 
   // Initial load: list pages, then open the window described by the URL
   // (`?page`/`?split`), falling back to the last/first page. A brand-new
-  // (empty) workspace lands on Home — its guided start — rather than
+  // (empty) library lands on Home — its guided start — rather than
   // auto-creating a blank "Untitled" page nobody asked for. Runs exactly once
   // (the shared promise survives StrictMode's double-mount).
   useEffect(() => {
@@ -445,27 +753,48 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
         prevTopLevelIds.current = new Set(list.map((p) => p.id));
 
         const known = new Set(list.map((p) => p.id));
+        // Pages that threw while rendering earlier this session (STAB-3). The
+        // resolver must NOT auto-open a quarantined page — that's the crash loop
+        // (poison persists on disk, startup re-opens the last page, app dies
+        // again). Skipped here so the app lands on Home instead; the page stays
+        // in the sidebar and reachable by an explicit click.
+        const crashed = readCrashedPages();
         const resolve = async (id: string | null): Promise<string | null> => {
           if (!id) return null;
-          if (id === HOME_PAGE_ID || id === FLOW_PANE_ID) return id; // pseudo-pages
+          // Pseudo-pages: Home, Trash, dataflow, and the page-targeting side panes
+          // (customise/review) that now round-trip through the URL.
+          if (id === HOME_PAGE_ID || id === TRASH_PAGE_ID || id === FLOW_PANE_ID || paneHasTarget(id)) return id;
+          if (crashed.has(id)) return null;
           if (known.has(id)) return id;
           return (await client.getPage(id)) !== null ? id : null;
         };
 
-        const {page, split} = readUrl();
+        const {page, split, paneTarget} = readUrl();
         let primary = await resolve(page);
         if (!primary) primary = await resolve(readLastPage());
-        if (!primary) primary = list[0]?.id ?? HOME_PAGE_ID;
+        // Fall back to the first NON-quarantined page (or Home) rather than
+        // list[0], so a poisoned first page can't re-crash the app on startup.
+        if (!primary) primary = list.find((p) => !crashed.has(p.id))?.id ?? HOME_PAGE_ID;
         const secondary = await resolve(split && split !== primary ? split : null);
+
+        // Seed a restored side pane's target from the URL (falling back to the
+        // primary page) BEFORE the window — hence the pane body — mounts, so it
+        // renders pointed at the right page instead of an empty bridge.
+        if (paneHasTarget(secondary)) {
+          const target = (await resolve(paneTarget)) ?? primary;
+          PANE_TARGET_STORES[secondary].set(target);
+        }
 
         setWin(W.initWindow(primary, secondary));
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message);
+        setSiteOffline(/\b502\b|site[\s_-]*offline/i.test(message));
       } finally {
         setLoading(false);
       }
     })();
-  }, [client]);
+  }, [client, initialLoadAttempt]);
 
   // Icons travel on the page list now (page.properties), so hydrate the shared
   // icon cache whenever the list changes — the sidebar, tabs, mentions, etc. read
@@ -497,15 +826,21 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
     setPageLinkBridge({
       createSubpage: (parentId, kind) => createSubpage(parentId, kind),
       // A link click navigates the pane it came from (the editor passes 'primary'
-      // or 'secondary'); without a target it falls back to the focused pane.
-      openPage: (id, pane) => (pane ? selectPageInPane(id, pane) : selectPage(id)),
+      // or 'secondary'); without a target it falls back to the focused pane. A
+      // `blockId` additionally anchors the landing on that block (a block-scoped
+      // link) — the same one-shot scroll/flash a search pick uses.
+      openPage: (id, pane, blockId) => {
+        if (blockId) setBlockAnchor(blockId);
+        return pane ? selectPageInPane(id, pane) : selectPage(id);
+      },
       label: (id) => pageLabel(id),
       icon: (id) => readPageIcon(id),
       searchPages,
+      searchRows,
       createPage: createLinkedPage,
     });
     return () => setPageLinkBridge(null);
-  }, [createSubpage, selectPage, selectPageInPane, pageLabel, searchPages, createLinkedPage]);
+  }, [createSubpage, selectPage, selectPageInPane, pageLabel, searchPages, searchRows, createLinkedPage]);
 
   // Let an interactive block "Expand" its settings into the side pane (reusing
   // the split mechanism rather than a bespoke drawer).
@@ -513,6 +848,30 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
     () => registerKitPanelNav(() => openInSplit(CONFIG_PANE_ID), () => closeSplit()),
     [openInSplit, closeSplit],
   );
+
+  // Desktop `openbook://page/<id>` deep links: the host delivers the target page
+  // id here (a cold-start link or one opened while running); navigate the primary
+  // pane to it. Pseudo-pages (home/trash) pass straight through; a real id is
+  // confirmed against the store first so a stale/foreign link falls back to Home
+  // rather than stranding the pane on a page that doesn't exist here.
+  useEffect(() => {
+    const onNavigate = platform.deepLink?.onNavigate;
+    if (!onNavigate) return;
+    return onNavigate((pageId) => {
+      if (pageId === HOME_PAGE_ID || pageId === TRASH_PAGE_ID || pageId === FLOW_PANE_ID || paneHasTarget(pageId)) {
+        selectPageInPane(pageId, 'primary');
+        return;
+      }
+      void client
+        .getPage(pageId)
+        .then((page) => {
+          selectPageInPane(page ? pageId : HOME_PAGE_ID, 'primary');
+        })
+        // A failed lookup (offline/transport error) must not leave an unhandled
+        // rejection — fall back to Home, same as a stale/foreign id.
+        .catch(() => selectPageInPane(HOME_PAGE_ID, 'primary'));
+    });
+  }, [platform.deepLink, client, selectPageInPane]);
 
   // Refresh title hints from the live page list.
   useEffect(() => {
@@ -527,17 +886,41 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
   const currentPageId = win ? W.currentPageId(win) : null;
   const primaryPageId = win ? W.primaryPage(win) : null;
 
+  // A `?view=` names a view of the PRIMARY page's database, so it only survives
+  // while that page stays put. When the primary pane navigates to a different
+  // page (a non-db page, or another database) the param is stale — drop it. The
+  // first observation (init) is preserved so a deep-linked `?view=` still lands.
+  useEffect(() => {
+    if (primaryPageId === null) return; // window not ready yet
+    const prev = prevPrimaryRef.current;
+    prevPrimaryRef.current = primaryPageId;
+    if (prev !== null && prev !== primaryPageId) setViewParam(null);
+  }, [primaryPageId]);
+
+  const setActiveViewParam = useCallback(
+    (viewId: string | null) => {
+      // The caller owns the primary page; anchor the param to it so the
+      // reconciliation effect above doesn't immediately treat it as stale.
+      prevPrimaryRef.current = primaryPageId;
+      setViewParam(viewId);
+    },
+    [primaryPageId],
+  );
+
   // Track the focused page as "recently visited" (drives the palette's Recent
   // group). Covers every entry point — sidebar, palette, tabs, back/forward.
   useEffect(() => {
-    // Home/flow/config are places, not documents — they never enter the recents trail.
+    // Home/trash/flow/config are places, not documents — they never enter the recents trail.
     if (
       currentPageId &&
       currentPageId !== HOME_PAGE_ID &&
+      currentPageId !== TRASH_PAGE_ID &&
       currentPageId !== FLOW_PANE_ID &&
       currentPageId !== CONFIG_PANE_ID &&
       currentPageId !== CUSTOMISE_PANE_ID &&
-      currentPageId !== REVIEW_PANE_ID
+      currentPageId !== REVIEW_PANE_ID &&
+      currentPageId !== LINKS_PANE_ID &&
+      currentPageId !== HISTORY_PANE_ID
     )
       recordRecent(currentPageId);
   }, [currentPageId]);
@@ -558,6 +941,8 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
       primaryPageId,
       loading,
       error,
+      siteOffline,
+      retryInitialLoad,
       inWindowTabs,
       tabs,
       activeTabId,
@@ -575,7 +960,16 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
       closePage,
       pageLabel,
       setPageHint,
+      activeViewParam: viewParam,
+      setActiveViewParam,
+      rowAnchor,
+      groupAnchor,
+      blockAnchor,
+      clearRowAnchor,
+      clearGroupAnchor,
+      clearBlockAnchor,
       selectPage,
+      selectPageAtBlock,
       selectPageInPane,
       goBack,
       goForward,
@@ -589,13 +983,16 @@ export const NavigationProvider: React.FC<PropsWithChildren<unknown>> = ({childr
       renamePage,
       movePage,
       reload,
+      searchRows,
     }),
     [
-      pages, currentPageId, primaryPageId, loading, error, inWindowTabs, tabs, activeTabId, selectTab, closeTab,
+      pages, currentPageId, primaryPageId, loading, error, siteOffline, retryInitialLoad, inWindowTabs, tabs, activeTabId, selectTab, closeTab,
       panes, focusedPaneId, splitOpen, focusPane, openInSplit,
-      closeSplit, closePane, openInNew, newPageIn, closePage, pageLabel, setPageHint, selectPage, selectPageInPane, goBack,
+      closeSplit, closePane, openInNew, newPageIn, closePage, pageLabel, setPageHint, viewParam, setActiveViewParam,
+      rowAnchor, groupAnchor, blockAnchor, clearRowAnchor, clearGroupAnchor, clearBlockAnchor,
+      selectPage, selectPageAtBlock, selectPageInPane, goBack,
       goForward, canGoBack, canGoForward, createPage, createDatabasePage, createSubpage, duplicatePage, deletePage, renamePage,
-      movePage, reload,
+      movePage, reload, searchRows,
     ],
   );
 

@@ -2,14 +2,16 @@
  * A normalized, presentation-agnostic model of a page document, built once from
  * a {@link PageSnapshot} and consumed by every exporter (Markdown, PDF, HTML).
  *
- * It parses each EditorJS block into a typed shape: inline HTML → formatting
+ * It parses each export block into a typed shape: inline HTML → formatting
  * runs (bold/italic/code/marker/link/`@`-mention), lists into nested items, and
  * reactive blocks (slider/expr/chart) resolved against the snapshot's persisted
  * `values`/`names`. Pure and DOM-light (uses `DOMParser`, available in the
  * browser and happy-dom) so it is unit-tested directly.
  */
 import type {PageSnapshot} from '@book.dev/sdk';
-import {blockSnapshotToEditorJs} from '../blockeditor/exportBlocks';
+import {projectSnapshotForExport} from '../blockeditor/exportBlocks';
+import {formSchemaFromProps} from '../blockeditor/formBlock';
+import type {DbChartSeriesMap} from '../blockeditor/kit/chartData';
 import {normalizeChartInput, type NormalizedSeries} from './chartNormalize';
 
 export interface InlineRun {
@@ -33,14 +35,20 @@ export interface ListItem {
   items: ListItem[];
 }
 
+export interface TableCellSpan {
+  colspan: number;
+  rowspan: number;
+}
+
 export type DocBlock =
   | {type: 'paragraph'; runs: InlineRun[]}
+  | {type: 'togglelist'; runs: InlineRun[]; children: DocBlock[]}
   | {type: 'header'; level: number; runs: InlineRun[]}
   | {type: 'list'; ordered: boolean; items: ListItem[]}
   | {type: 'quote'; runs: InlineRun[]; caption: string}
   | {type: 'code'; code: string}
   | {type: 'delimiter'}
-  | {type: 'table'; withHeadings: boolean; rows: InlineRun[][][]}
+  | {type: 'table'; withHeadings: boolean; rows: InlineRun[][][]; cellSpans: TableCellSpan[][]}
   | {type: 'callout'; variant: string; runs: InlineRun[]}
   | {type: 'accordion'; title: InlineRun[]; content: InlineRun[]; open: boolean}
   | {type: 'checklist'; items: {runs: InlineRun[]; checked: boolean}[]}
@@ -54,7 +62,11 @@ export type DocBlock =
   | {type: 'light'; label: string; status: string; value: unknown}
   | {type: 'progress'; label: string; pct: number; readout: string}
   | {type: 'image'; src: string; alt: string; caption: string; width?: string}
-  | {type: 'unknown'; raw: string};
+  | {type: 'form'; fields: Array<{label: string; kind: string; required: boolean}>}
+  /** A block no exporter can draw — a plugin-contributed or newer-version type.
+   *  `raw` is the verbatim block type (renderers derive the display name from
+   *  it, see `describeUnknownBlock`); `runs` is any text the block carried. */
+  | {type: 'unknown'; raw: string; runs: InlineRun[]};
 
 export interface DocModel {
   title: string;
@@ -62,7 +74,7 @@ export interface DocModel {
   blocks: DocBlock[];
 }
 
-interface RawBlock {
+interface ExportBlock {
   id?: string;
   type?: string;
   data?: Record<string, unknown>;
@@ -72,11 +84,11 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 /** The HTML export keeps `columns` nested for side-by-side layout; the linear
  *  PDF/Markdown model flattens each column's blocks into reading order. */
-function flattenColumns(blocks: RawBlock[]): RawBlock[] {
-  const out: RawBlock[] = [];
+function flattenColumns(blocks: ExportBlock[]): ExportBlock[] {
+  const out: ExportBlock[] = [];
   for (const b of blocks) {
     if (b.type === 'columns' && Array.isArray(b.data?.columns)) {
-      for (const col of b.data!.columns as RawBlock[][]) out.push(...flattenColumns(col));
+      for (const col of b.data!.columns as ExportBlock[][]) out.push(...flattenColumns(col));
     } else {
       out.push(b);
     }
@@ -155,13 +167,16 @@ export interface BuildModelOptions {
   snapshot: PageSnapshot;
   /** Image assets resolved up front: `assetId` → a `data:` URI (see exportAssets). */
   assets?: Map<string, string>;
+  audioAssets?: Map<string, string>;
+  /** Database-bound chart series resolved live at export time (DASH-3). */
+  dbSeries?: DbChartSeriesMap;
 }
 
-export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets = new Map()}: BuildModelOptions): DocModel {
-  // Pages written by the CRDT block editor project into the EditorJS shape
-  // first, so every exporter below works on one block dialect.
-  const snapshot = blockSnapshotToEditorJs(rawSnapshot);
-  const blocks = flattenColumns(((snapshot.editorjs as {blocks?: RawBlock[]} | undefined)?.blocks ?? []) as RawBlock[]);
+export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets = new Map(), audioAssets, dbSeries}: BuildModelOptions): DocModel {
+  // Pages written by the CRDT block editor project into the export-projection
+  // shape first, so every exporter below works on one block dialect.
+  const snapshot = projectSnapshotForExport(rawSnapshot, dbSeries, undefined, {audioAssets});
+  const blocks = flattenColumns(((snapshot.editorjs as {blocks?: ExportBlock[]} | undefined)?.blocks ?? []) as ExportBlock[]);
   const values = new Map<string, unknown>(snapshot.values as Array<[string, unknown]>);
   const nameByCell = new Map<string, string>();
   for (const [name, cellId] of snapshot.names as Array<[string, string]>) nameByCell.set(cellId, name);
@@ -171,10 +186,17 @@ export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets =
     const data = block.data ?? {};
     const id = block.id ?? '';
     switch (block.type) {
+    case 'togglelist': {
+      const children = buildDocumentModel({title: '', icon: '', snapshot: {...snapshot, editor: undefined, blockdoc: undefined,
+        editorjs: {blocks: Array.isArray(data.children) ? data.children : []}}, assets, audioAssets, dbSeries}).blocks;
+      out.push({type: 'togglelist', runs: parseInline(str(data.text)), children});
+      break;
+    }
     case 'paragraph':
       out.push({type: 'paragraph', runs: parseInline(str(data.text))});
       break;
     case 'header': {
+      if (data.container && !str(data.text)) break;
       const level = typeof data.level === 'number' ? Math.min(6, Math.max(1, data.level)) : 2;
       out.push({type: 'header', level, runs: parseInline(str(data.text))});
       break;
@@ -194,7 +216,16 @@ export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets =
     case 'table': {
       const content = Array.isArray(data.content) ? (data.content as unknown[][]) : [];
       const rows = content.map((row) => (Array.isArray(row) ? row : []).map((cell) => parseInline(str(cell))));
-      out.push({type: 'table', withHeadings: data.withHeadings === true, rows});
+      const rawSpans = Array.isArray(data.cellSpans) ? (data.cellSpans as unknown[][]) : [];
+      const spanValue = (value: unknown): number =>
+        typeof value === 'number' && Number.isFinite(value) && value >= 2 ? Math.min(512, Math.floor(value)) : 1;
+      const cellSpans = rows.map((row, r) =>
+        row.map((_, c) => {
+          const raw = (Array.isArray(rawSpans[r]) ? rawSpans[r][c] : undefined) as Record<string, unknown> | undefined;
+          return {colspan: spanValue(raw?.colspan), rowspan: spanValue(raw?.rowspan)};
+        }),
+      );
+      out.push({type: 'table', withHeadings: data.withHeadings === true, rows, cellSpans});
       break;
     }
     case 'callout':
@@ -300,8 +331,26 @@ export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets =
       out.push({type: 'image', src, alt: str(data.alt), caption: str(data.caption).trim(), width: str(data.width) || undefined});
       break;
     }
+    case 'form': {
+      const props = data.props && typeof data.props === 'object' && !Array.isArray(data.props)
+        ? data.props as Record<string, unknown>
+        : data;
+      const schema = formSchemaFromProps(props);
+      out.push({
+        type: 'form',
+        fields: schema.fields.map((field) => ({
+          label: field.label,
+          kind: field.kind,
+          required: field.required,
+        })),
+      });
+      break;
+    }
     default:
-      out.push({type: 'unknown', raw: block.type ?? 'unknown'});
+      // Plugin-contributed / newer-version types land here (since LX-1 the
+      // projection preserves them instead of relabelling them `paragraph`), and
+      // render as a named placeholder — never as nothing.
+      out.push({type: 'unknown', raw: block.type ?? 'unknown', runs: parseInline(str(data.text))});
       break;
     }
   }

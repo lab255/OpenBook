@@ -1,10 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {invoke} from '@tauri-apps/api/core';
 import {WebviewWindow} from '@tauri-apps/api/webviewWindow';
-import {getCurrentWindow} from '@tauri-apps/api/window';
+import {type BackgroundThrottlingPolicy, getCurrentWindow} from '@tauri-apps/api/window';
 import {open as openExternal} from '@tauri-apps/plugin-shell';
 import {getCurrent as currentDeepLink, onOpenUrl} from '@tauri-apps/plugin-deep-link';
 import {
+  stopAllMeetingSessions,
   AccountProvider,
   DataProvider,
   DefaultLayout,
@@ -13,21 +14,25 @@ import {
   HudProvider,
   I18nProvider,
   NavigationProvider,
-  PlatformLibraryProvider,
+  PlatformCapabilitiesProvider,
   PreferencesProvider,
   ThemeProvider,
-  WorkspaceProvider,
-  type PlatformLibrary,
+  LibraryProvider,
+  readActiveAccountId,
+  type PlatformCapabilities,
   type WindowControls,
 } from '@book.dev/ui';
+import {getServerUrlOverride, onServerOverrideChange} from '@book.dev/sdk';
 import type {BookFolderFile, DataClient, ServerInfo} from '@book.dev/sdk';
 
 import {createDesktopClient, DEV_SERVER_URL} from './data/client';
 import {tauriStreamFetch} from './data/ipc';
 import {createTauriKeyStore, createLocalStorageKeyStore, createTauriAccountStore} from './data/keychain';
 import {createDesktopUpdates} from './data/updates';
+import {SidecarDegradedBanner, useSidecarStatus} from './SidecarStatus';
 
 import '@book.dev/ui/style.css';
+import '@book.dev/ui/app-font.css';
 
 // Tabs are in-window (a custom tab bar drawn in the titlebar by the UI), so a
 // "new tab" never opens an OS window — only "new window" does.
@@ -61,6 +66,8 @@ function openWindow(pageId: string): void {
   const view = new WebviewWindow(newWindowLabel(), {
     url: `${url.pathname}${url.search}`,
     title: 'OpenBook',
+    // Tauri exports this string enum as a type only.
+    backgroundThrottling: 'disabled' as BackgroundThrottlingPolicy,
     width: 1440,
     height: 900,
     // macOS keeps its native traffic lights via an overlay titlebar; elsewhere
@@ -85,6 +92,20 @@ const windowControls: WindowControls | undefined = IS_MAC
     },
   };
 
+// Parse `openbook://page/<id>` into the target page id (a copied "internal
+// link"). Only this exact host/shape navigates; any other `openbook://` link
+// (e.g. auth-callback) is ignored here.
+function parsePageDeepLink(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'openbook:' || u.hostname !== 'page') return null;
+    const id = decodeURIComponent(u.pathname.replace(/^\/+/, '')).trim();
+    return id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 // Parse `openbook://auth-callback#token=…&state=…` into the token handoff. The
 // AccountProvider still validates `state` against the in-flight sign-in; pinning
 // the host here is just defence-in-depth against stray `openbook://` links.
@@ -102,13 +123,17 @@ function parseAuthCallback(raw: string): {token: string; state: string} | null {
 
 // Expose the Tauri-managed local server + in-window tabs + window controls +
 // the account.book.pub deep-link sign-in.
-const platform: PlatformLibrary = {
+const platform: PlatformCapabilities = {
   serverControls: {
     info: () => invoke<ServerInfo>('server_info'),
     // Publish on the LAN: the local server *also* binds 0.0.0.0 + requires the
     // token. The local UI keeps using IPC, so there's no client switch — only the
     // LAN listener toggles.
     publish: (enabled: boolean) => invoke<ServerInfo>('publish_server', {enabled}),
+    // Bind (or unbind) the loopback TCP listener (127.0.0.1:4319) for an
+    // out-of-process local MCP/agent connector (STAB-5). Flipped with the agent-API
+    // toggle so the connector's default endpoint points at THIS library's server.
+    setAgentLocalTcp: (enabled: boolean) => invoke<ServerInfo>('set_agent_local_tcp', {enabled}),
     // Native folder picker / reveal for the on-disk book mirror.
     chooseBookDir: () => invoke<ServerInfo>('choose_book_dir'),
     revealBookDir: () => invoke<void>('reveal_book_dir'),
@@ -129,7 +154,10 @@ const platform: PlatformLibrary = {
     // can't be reattached by the next, and forwarding re-provisions a new site
     // (new `library-*` host) each run. A localStorage store survives rebuilds; the
     // keychain is correct for a signed release build (stable identity across versions).
-    keyStore: import.meta.env.DEV ? createLocalStorageKeyStore() : createTauriKeyStore(),
+    // Namespaced per account (NAME-2): the slot is resolved from the ACTIVE
+    // account id at each call, so switching accounts switches site identities
+    // instead of overwriting one address with another.
+    keyStore: import.meta.env.DEV ? createLocalStorageKeyStore(readActiveAccountId) : createTauriKeyStore(readActiveAccountId),
     // Serve forwarded requests over the SAME transport the local data client uses
     // (see createDesktopClient): the Unix-socket IPC bridge in a managed release
     // build, but plain loopback HTTP in dev — the `pnpm dev` server is TCP-only and
@@ -172,6 +200,27 @@ const platform: PlatformLibrary = {
       return () => unlisten?.();
     },
   },
+  // Deliver `openbook://page/<id>` deep links (a copied "internal link") to the
+  // UI, which navigates the primary pane to the page. Reuses the same deep-link
+  // plugin the account callback does; a link that cold-started the app plus every
+  // link while it runs. Non-page `openbook://` links (auth-callback) are filtered
+  // out by `parsePageDeepLink`, so the two subscribers don't cross-fire.
+  deepLink: {
+    onNavigate: (cb) => {
+      const emit = (urls: string[]): void => {
+        for (const u of urls) {
+          const id = parsePageDeepLink(u);
+          if (id) cb(id);
+        }
+      };
+      void currentDeepLink().then((urls) => urls && emit(urls)).catch(() => undefined);
+      let unlisten: (() => void) | undefined;
+      void onOpenUrl(emit).then((un) => {
+        unlisten = un;
+      });
+      return () => unlisten?.();
+    },
+  },
   // Self-update (OB-342): version surface + account-driven check + Tauri
   // updater install/relaunch. Presence of this key is the capability flag the
   // UI's Updates section (and the scheduler) key off; the web shell has none.
@@ -179,37 +228,66 @@ const platform: PlatformLibrary = {
 };
 
 function App() {
+  const sidecar = useSidecarStatus();
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onCloseRequested(() => stopAllMeetingSessions());
+    return () => { void unlisten.then((dispose) => dispose()); };
+  }, []);
   // Embedded local server by default, or an external one if configured. Built
   // async because we ask the host for the server status (loopback address + the
-  // access token when published) before connecting.
-  const [client, setClient] = useState<DataClient | null>(null);
+  // access token when published) before connecting. `connKey` keys the data
+  // subtree so a no-reload library switch (a re-pointed server override) remounts
+  // the nav providers fresh against the swapped client.
+  const [conn, setConn] = useState<{client: DataClient | null; connKey: string}>({client: null, connKey: 'local'});
   useEffect(() => {
-    void createDesktopClient().then(setClient);
+    let cancelled = false;
+    let current: DataClient | null = null;
+    const build = (): void => {
+      void createDesktopClient().then((c) => {
+        if (cancelled) {
+          c.dispose?.();
+          return;
+        }
+        current?.dispose?.();
+        current = c;
+        setConn({client: c, connKey: getServerUrlOverride() ?? 'local'});
+      });
+    };
+    build();
+    // Re-point in place when the library switcher changes the server override.
+    const unsub = onServerOverrideChange(build);
+    return () => {
+      cancelled = true;
+      unsub();
+      current?.dispose?.();
+    };
   }, []);
+  const {client, connKey} = conn;
 
   return (
     <ThemeProvider>
       <I18nProvider>
         <PreferencesProvider>
-          <PlatformLibraryProvider value={platform}>
+          <PlatformCapabilitiesProvider value={{...platform, sidecar}}>
+            <SidecarDegradedBanner sidecar={sidecar} />
             {client && (
-              <DataProvider client={client}>
+              <DataProvider key={connKey} client={client}>
                 <NavigationProvider>
-                  <WorkspaceProvider>
+                  <LibraryProvider>
                     <AccountProvider>
-                      <ForwardingProvider>
-                        <HudProvider>
+                      <HudProvider>
+                        <ForwardingProvider>
                           <DefaultLayout>
                             <DocumentArea />
                           </DefaultLayout>
-                        </HudProvider>
-                      </ForwardingProvider>
+                        </ForwardingProvider>
+                      </HudProvider>
                     </AccountProvider>
-                  </WorkspaceProvider>
+                  </LibraryProvider>
                 </NavigationProvider>
               </DataProvider>
             )}
-          </PlatformLibraryProvider>
+          </PlatformCapabilitiesProvider>
         </PreferencesProvider>
       </I18nProvider>
     </ThemeProvider>

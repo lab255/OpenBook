@@ -1,4 +1,5 @@
 import {test, expect, takeSnapshot, chooseValue} from './fixtures';
+import {newPage} from './seed';
 
 // Per-test workspace reset: each test builds a fresh database and some seed
 // fixed row titles, so a clean workspace before each test keeps them
@@ -15,6 +16,63 @@ async function newDatabase(page: import('@playwright/test').Page): Promise<void>
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', {name: 'Add column'})).toBeVisible();
 }
+
+test('database table: grid and toolbar visual', {tag: ['@database', '@visual']}, async ({page}, testInfo) => {
+  await newDatabase(page);
+
+  const toolbar = page.locator('[data-database-toolbar]');
+  const table = page.getByRole('table');
+  await expect(toolbar).toBeVisible();
+  await expect(table).toBeVisible();
+
+  // Give the grid one representative row so the baseline covers cells as well
+  // as the empty-state table chrome and the complete toolbar above it.
+  await page.getByRole('button', {name: 'New row'}).click();
+  const title = table.getByPlaceholder('Untitled').first();
+  await title.fill('Launch plan');
+  await title.blur();
+  // The row title is an editable textbox (its value, not a text node) — assert
+  // via toHaveValue rather than getByText, which never matches input values.
+  await expect(title).toHaveValue('Launch plan');
+  await takeSnapshot(page, testInfo); // visual: database grid + toolbar
+});
+
+test('database editor focus keeps the toolbar fixed', {tag: ['@database', '@editor', '@p1']}, async ({page}) => {
+  await newDatabase(page);
+
+  const toolbar = page.locator('[data-database-toolbar]');
+  const title = page.locator('.ob-page-title');
+  const bodyRows = page.locator('.obe-root.obe-compact > [data-block-row]');
+  const body = bodyRows.locator('.obe-text').first();
+  await expect(toolbar).toBeVisible();
+  await expect(bodyRows).toHaveCount(1);
+
+  const toolbarBox = async () => {
+    // Let focus/blur styles settle for two painted frames before measuring the
+    // downstream database chrome.
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    const box = await toolbar.boundingBox();
+    if (!box) throw new Error('database toolbar has no bounding box');
+    return box;
+  };
+
+  await title.focus();
+  await expect(title).toBeFocused();
+  const titleFocused = await toolbarBox();
+
+  await body.focus();
+  await expect(body).toBeFocused();
+  const bodyFocused = await toolbarBox();
+
+  await body.evaluate((element) => (element as HTMLElement).blur());
+  await expect(body).not.toBeFocused();
+  const blurred = await toolbarBox();
+
+  expect(bodyFocused).toEqual(titleFocused);
+  expect(blurred).toEqual(titleFocused);
+});
 
 // A formula column computes from another property (here the row title) — the
 // headline "simple expression formula" feature, end to end.
@@ -53,7 +111,7 @@ test('database views: board, gallery, and bar chart layouts render', {tag: ['@da
   // Add a Gallery view from the add-view menu.
   await page.getByRole('button', {name: 'Add view'}).click();
   await page.getByRole('menuitem', {name: 'Gallery'}).click();
-  await expect(page.getByRole('button', {name: 'New card'})).toBeVisible();
+  await expect(page.getByRole('button', {name: 'New row'})).toBeVisible();
 
   // Add a Bar chart view; with a grouped property it draws a bar per group.
   await page.getByRole('button', {name: 'Add view'}).click();
@@ -103,7 +161,7 @@ test('database summaries: a column footer calculation renders', {tag: ['@databas
 
   // Set the Name column footer summary to "Count all" → shows the row count.
   await page.locator('tfoot button').first().click();
-  await page.getByRole('menuitem', {name: 'Count all'}).click();
+  await page.getByRole('menuitemradio', {name: 'Count all'}).click();
   await expect(page.locator('tfoot').getByText('2', {exact: true})).toBeVisible();
 });
 
@@ -125,6 +183,89 @@ test('database quick search: filters rows by text', {tag: ['@database']}, async 
   // A matching query brings the row back.
   await page.getByRole('textbox', {name: 'Search rows'}).fill('Findme ');
   await expect(page.getByRole('table').getByPlaceholder('Untitled')).toHaveCount(1);
+});
+
+// Switching a database's view is addressable in the URL (`?view=`), so a chosen
+// board/timeline is shareable and survives a reload (URL over localStorage).
+test('database view in URL: switching reflects ?view= and a deep link restores it', {tag: ['@database']}, async ({page}) => {
+  await newDatabase(page);
+  await page.getByRole('button', {name: 'New row'}).click();
+
+  // The plain (no ?view=) load opens the default Table view.
+  await expect(page).not.toHaveURL(/[?&]view=/);
+
+  // Switch to the Board view → the id lands in the URL alongside ?page=.
+  await page.getByRole('button', {name: 'Board', exact: true}).click();
+  await expect(page.getByText('In progress', {exact: true})).toBeVisible();
+  await expect(page).toHaveURL(/[?&]view=/);
+  const boardUrl = page.url();
+
+  // Navigating away drops the now-stale ?view= (it named the db's view).
+  await page.goto('/');
+  await expect(page).not.toHaveURL(/[?&]view=/);
+
+  // Opening the captured link lands straight back on the Board view.
+  await page.goto(boardUrl);
+  await expect(page.getByText('In progress', {exact: true})).toBeVisible();
+  await expect(page).toHaveURL(/[?&]view=/);
+});
+
+// A `?view=` that names no real view of the database is ignored: the db opens on
+// its default (Table) view with no flash of a wrong layout, and the garbage param
+// is scrubbed from the URL so it can't linger on a copied link.
+test('database view in URL: an invalid ?view= scrubs to the default view', {tag: ['@database']}, async ({page}) => {
+  await newDatabase(page);
+  const pageId = new URL(page.url()).searchParams.get('page');
+  expect(pageId).toBeTruthy();
+
+  // Deep-link the db page with a bogus view id.
+  await page.goto(`/?page=${pageId}&view=not-a-real-view`);
+
+  // It settles on the default Table view (a <table>; Board/Gallery have none) and
+  // the unresolvable param is dropped from the URL.
+  await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByRole('button', {name: 'Add column'})).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]view=/);
+});
+
+// Per-db last-view memory (localStorage) still works with no param: a plain reopen
+// (no `?view=`) restores the last-used view, and because it came from memory — not
+// a deep link — the URL stays clean (no `?view=` written back).
+test('database view in URL: a plain reopen restores the last view from localStorage', {tag: ['@database']}, async ({page}) => {
+  await newDatabase(page);
+  const plainUrl = page.url(); // ?page=<id>, no ?view=
+  await expect(page).not.toHaveURL(/[?&]view=/);
+
+  // Switch to Board (records it as the db's last-used view).
+  await page.getByRole('button', {name: 'Board', exact: true}).click();
+  await expect(page.getByText('In progress', {exact: true})).toBeVisible();
+
+  // Reopen the bare page URL: memory restores Board, and no ?view= is written.
+  await page.goto('/');
+  await page.goto(plainUrl);
+  await expect(page.getByText('In progress', {exact: true})).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]view=/);
+});
+
+// `?view=` is scoped to the primary pane's page-level database. A database opened
+// in the split pane opts out entirely: switching its view never writes ?view=, so
+// it can't fight the primary page for the param.
+test('database view in URL: a split-pane database never writes ?view=', {tag: ['@database']}, async ({page, request}) => {
+  await newDatabase(page);
+  const dbPageId = new URL(page.url()).searchParams.get('page');
+  expect(dbPageId).toBeTruthy();
+
+  // A plain primary document, with the database docked in the split pane.
+  const primary = await newPage(request, 'Split Primary Doc');
+  await page.goto(`/?page=${primary}&split=${dbPageId}`);
+  const pane = page.locator('[data-split-pane]');
+  await expect(pane).toBeVisible();
+
+  // Switch the split-pane database's view: it renders Board, but the URL keeps
+  // only ?page=&split= — a non-primary database never owns ?view=.
+  await pane.getByRole('button', {name: 'Board', exact: true}).click();
+  await expect(pane.getByText('In progress', {exact: true})).toBeVisible();
+  await expect(page).not.toHaveURL(/[?&]view=/);
 });
 
 // Inline-database embedding (linking an existing database into a document) is

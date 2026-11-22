@@ -1,11 +1,11 @@
 import React from 'react';
 import {describe, it, expect, beforeEach, afterEach, vi} from 'vitest';
 import {renderHook, act, waitFor, cleanup} from '@testing-library/react';
-import {decodeIdentity, getIdentityCredential, setForwardingAudience, setIdentityToken} from '@book.dev/sdk';
+import {API, AccountClient, decodeIdentity, getIdentityCredential, setForwardingAudience, setIdentityToken} from '@book.dev/sdk';
 import {AccountProvider, useAccount} from '../AccountProvider';
-import {PlatformLibraryProvider, type AccountSecretStore, type PlatformLibrary} from '../PlatformLibraryProvider';
+import {PlatformCapabilitiesProvider, type AccountSecretStore, type PlatformCapabilities} from '../PlatformCapabilitiesProvider';
 import {PreferencesProvider} from '../PreferencesProvider';
-import {WorkspaceProvider} from '../WorkspaceProvider';
+import {LibraryProvider, useLibrary} from '../LibraryProvider';
 
 // ── A fake account.book.pub, keyed by device token. Each token resolves to a
 //    distinct identity (issuer#sub + persona email), so the provider can label
@@ -32,10 +32,22 @@ const settingsValid = (tok: string): boolean => !!PERSONAS[tok] || tok === NO_ID
 //  • failIdentityMint — tokens whose identity mint 503s (a transient failure).
 //  • identityMintUrls — every /api/identity/token URL requested, in order.
 let settingsPuts: Array<{token: string; settings: Record<string, unknown>}> = [];
+//  • serverBlobs — a per-token stored settings blob the GET returns (defaults to an
+//    empty blob). Lets an interop test stand up a server holding only the legacy
+//    `workspaces` key, or the new `libraries` key, and assert the client dual-reads.
+const serverBlobs = new Map<string, {settings: Record<string, unknown>; updatedAt: string}>();
 const failSettingsGet = new Set<string>();
 let rejectAudMints = false;
 const failIdentityMint = new Set<string>();
+//  • revokeIdentityMint — tokens whose identity mint 401s (the device token was
+//    revoked/blocked server-side): a terminal auth failure that must surface a
+//    visible re-auth state and drop the dead JWS, never a silent guest downgrade.
+const revokeIdentityMint = new Set<string>();
 let identityMintUrls: string[] = [];
+let ableRefreshRequests: Array<{method: string; authorization: string}> = [];
+let failAbleRefresh = false;
+let rejectAbleRefresh = false;
+let ableRenewalSequence = 0;
 const putsFor = (tok: string): Array<{token: string; settings: Record<string, unknown>}> =>
   settingsPuts.filter((p) => p.token === tok);
 
@@ -44,9 +56,16 @@ const b64u = (o: unknown): string => {
   for (const byte of new TextEncoder().encode(JSON.stringify(o))) bin += String.fromCharCode(byte);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
-const fakeJws = (tok: string): string => {
+const fakeJws = (tok: string, options: {expiresInMs?: number; marker?: string} = {}): string => {
   const p = PERSONAS[tok];
-  const claims = {iss: p.iss, sub: p.sub, name: p.name, email: p.email, exp: Math.floor(Date.now() / 1000) + 3600};
+  const claims = {
+    iss: p.iss,
+    sub: p.sub,
+    name: p.name,
+    email: p.email,
+    exp: Math.floor((Date.now() + (options.expiresInMs ?? 3_600_000)) / 1000),
+    ...(options.marker ? {jti: options.marker} : {}),
+  };
   return `${b64u({alg: 'EdDSA', typ: 'JWT'})}.${b64u(claims)}.sig`;
 };
 
@@ -61,8 +80,22 @@ function installFetchStub(): void {
       const url = typeof input === 'string' ? input : input.toString();
       const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
       const tok = auth?.replace(/^Bearer\s+/, '') ?? '';
+      if (url.includes(API.ableOauthRefresh)) {
+        const method = init?.method ?? 'GET';
+        ableRefreshRequests.push({method, authorization: auth ?? ''});
+        if (method === 'DELETE') return new Response(null, {status: 204});
+        if (rejectAbleRefresh) return jsonResponse(401, {error: 'able session could not be renewed'});
+        if (failAbleRefresh) return jsonResponse(502, {error: 'able session could not be renewed'});
+        ableRenewalSequence += 1;
+        const identity = fakeJws('tok-work', {marker: `able-renewal-${ableRenewalSequence}`});
+        return jsonResponse(200, {
+          identity,
+          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        });
+      }
       if (url.includes('/api/identity/token')) {
         identityMintUrls.push(url);
+        if (revokeIdentityMint.has(tok)) return jsonResponse(401, {}); // device token revoked/blocked
         if (failIdentityMint.has(tok)) return jsonResponse(503, {}); // transient outage
         if (!PERSONAS[tok]) return jsonResponse(501, {}); // issuance not configured
         if (rejectAudMints && url.includes('aud=')) {
@@ -83,6 +116,8 @@ function installFetchStub(): void {
         }
         if (failSettingsGet.has(tok)) return jsonResponse(500, {}); // forced transient failure
         if (!settingsValid(tok)) return jsonResponse(401, {}); // unknown/rejected token
+        const seeded = serverBlobs.get(tok);
+        if (seeded) return jsonResponse(200, seeded);
         return jsonResponse(200, {settings: {}, updatedAt: new Date().toISOString()});
       }
       return jsonResponse(404, {});
@@ -94,21 +129,21 @@ const tokenKey = (id: string): string => `openbook.account.token.${id}`;
 const readIndex = (): Array<{id: string; email: string | null; subject: string | null}> =>
   JSON.parse(localStorage.getItem('openbook.accounts') ?? '[]');
 
-function makeWrapper(platform: PlatformLibrary = {}) {
+function makeWrapper(platform: PlatformCapabilities = {}) {
   const Wrapper = ({children}: {children: React.ReactNode}) => (
-    <PlatformLibraryProvider value={platform}>
+    <PlatformCapabilitiesProvider value={platform}>
       <PreferencesProvider>
-        <WorkspaceProvider>
+        <LibraryProvider>
           <AccountProvider>{children}</AccountProvider>
-        </WorkspaceProvider>
+        </LibraryProvider>
       </PreferencesProvider>
-    </PlatformLibraryProvider>
+    </PlatformCapabilitiesProvider>
   );
   Wrapper.displayName = 'TestAccountWrapper';
   return Wrapper;
 }
 
-function renderAccount(platform?: PlatformLibrary) {
+function renderAccount(platform?: PlatformCapabilities) {
   return renderHook(() => useAccount(), {wrapper: makeWrapper(platform)});
 }
 
@@ -127,10 +162,16 @@ beforeEach(() => {
   sessionStorage.clear();
   setIdentityToken(null);
   settingsPuts = [];
+  serverBlobs.clear();
   failSettingsGet.clear();
   rejectAudMints = false;
   failIdentityMint.clear();
+  revokeIdentityMint.clear();
   identityMintUrls = [];
+  ableRefreshRequests = [];
+  failAbleRefresh = false;
+  rejectAbleRefresh = false;
+  ableRenewalSequence = 0;
   installFetchStub();
 });
 afterEach(() => {
@@ -142,7 +183,207 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+describe('AccountProvider — delegated able sign-in', () => {
+  const pendingState = (): string =>
+    (JSON.parse(sessionStorage.getItem('openbook.account.pending') ?? '{}') as {state?: string}).state ?? '';
+
+  function popupHarness(): ReturnType<typeof vi.fn> {
+    const replace = vi.fn();
+    vi.spyOn(window, 'open').mockReturnValue({location: {replace}} as unknown as Window);
+    return replace;
+  }
+
+  it('navigates the reserved popup to the able authorize route after a 204 same-origin probe', async () => {
+    const replace = popupHarness();
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, {status: 204}));
+    const {result} = renderAccount();
+
+    act(() => result.current.signIn());
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    expect(result.current.ableMode).toBe(true);
+    const state = pendingState();
+    const target = new URL(String(replace.mock.calls[0][0]));
+    expect(target.origin).toBe(window.location.origin);
+    expect(target.pathname).toBe(API.ableOauthAuthorize);
+    expect(target.searchParams.get('handoff_state')).toBe(state);
+    expect(state).not.toBe('');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const probe = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(probe.origin + probe.pathname).toBe(`${window.location.origin}${API.ableOauthAuthorize}`);
+    expect(probe.searchParams.get('probe')).toBe('1');
+  });
+
+  it.each([
+    ['404 response', () => Promise.resolve(new Response(null, {status: 404}))],
+    ['network failure', () => Promise.reject(new Error('offline'))],
+  ])('retains the account connect URL after a probe %s', async (_case, probeResult) => {
+    const replace = popupHarness();
+    vi.mocked(fetch).mockImplementationOnce(probeResult);
+    const {result} = renderAccount();
+
+    act(() => result.current.signIn());
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    const state = pendingState();
+    const expected = new AccountClient().connectUrl({
+      redirectUri: `${window.location.origin}/account/callback`,
+      state,
+      name: `OpenBook Web · ${localStorage.getItem('openbook.deviceId')}`,
+    });
+    expect(replace).toHaveBeenCalledWith(expected);
+    expect(result.current.ableMode).toBe(false);
+    expect(new URL(expected).searchParams.get('state')).toBe(state);
+    expect(state).not.toBe('');
+  });
+});
+
 describe('AccountProvider — multi-account (OB-194)', () => {
+  it('accepts a bridged identity assertion without treating it as an account API bearer', async () => {
+    const {result} = renderAccount();
+    const assertion = fakeJws('tok-work');
+    act(() => result.current.submitCode(assertion));
+
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    expect(result.current.connected).toBe(true);
+    expect(result.current.token).toBeNull();
+    expect(getIdentityCredential().jws).toBe(assertion);
+    expect(settingsPuts).toHaveLength(0);
+    expect(readIndex()[0]).toMatchObject({subject: subjectOf('tok-work')});
+  });
+
+  it('auto-renews an able identity before expiry and rotates its local assertion', async () => {
+    const {result} = renderAccount();
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const prior = fakeJws('tok-work', {marker: 'able-initial'});
+    act(() => result.current.submitCode(prior));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    const id = result.current.activeAccountId!;
+    const renewalTimer = timeoutSpy.mock.calls.find(([, delay]) => Number(delay) > 3_000_000);
+    expect(Number(renewalTimer?.[1])).toBeGreaterThan(3_500_000);
+    expect(Number(renewalTimer?.[1])).toBeLessThanOrEqual(3_600_000);
+
+    act(() => (renewalTimer?.[0] as () => void)());
+
+    await waitFor(() => expect(ableRefreshRequests).toHaveLength(1));
+    await waitFor(() => expect(getIdentityCredential().jws).not.toBe(prior));
+    expect(ableRefreshRequests[0]).toEqual({
+      method: 'POST',
+      authorization: `Bearer ${prior}`,
+    });
+    expect(localStorage.getItem(tokenKey(id))).toBe(getIdentityCredential().jws);
+    expect(result.current.identityExpired).toBe(false);
+  });
+
+  it('falls back to identityExpired when able renewal fails at expiry', async () => {
+    const {result} = renderAccount();
+    const expiring = fakeJws('tok-work', {expiresInMs: 10_000, marker: 'able-expiring'});
+    act(() => result.current.submitCode(expiring));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    failAbleRefresh = true;
+
+    act(() => result.current.syncNow());
+
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(result.current.status).toBe('error');
+    expect(getIdentityCredential().jws).toBeUndefined();
+    expect(ableRefreshRequests).toEqual([{
+      method: 'POST',
+      authorization: `Bearer ${expiring}`,
+    }]);
+  });
+
+  it('surfaces rejected able renewal as a re-authentication error', async () => {
+    const {result} = renderAccount();
+    const expiring = fakeJws('tok-work', {expiresInMs: 10_000, marker: 'able-rejected'});
+    act(() => result.current.submitCode(expiring));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    rejectAbleRefresh = true;
+
+    act(() => result.current.syncNow());
+
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(result.current.error).toBe('That sign-in was rejected. Please sign in again.');
+  });
+
+  it('renews a just-expired stored able identity during activation', async () => {
+    const id = 'expired-bridge';
+    const expired = fakeJws('tok-work', {expiresInMs: -1_000, marker: 'able-just-expired'});
+    localStorage.setItem('openbook.accounts', JSON.stringify([{
+      id,
+      name: 'Work User',
+      email: 'work@corp.example',
+      subject: subjectOf('tok-work'),
+      accountUrl: PERSONAS['tok-work'].iss,
+      connectedAt: Date.now() - 3_600_000,
+      lastServerUpdatedAt: null,
+      identityOnly: true,
+    }]));
+    localStorage.setItem('openbook.accounts.active', id);
+    localStorage.setItem(tokenKey(id), expired);
+
+    const {result} = renderAccount();
+
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+    expect(result.current.identityExpired).toBe(false);
+    expect(ableRefreshRequests).toEqual([{
+      method: 'POST',
+      authorization: `Bearer ${expired}`,
+    }]);
+    expect(localStorage.getItem(tokenKey(id))).toBe(getIdentityCredential().jws);
+    expect(getIdentityCredential().jws).not.toBe(expired);
+  });
+
+  it('sends authenticated refresh-token cleanup when removing an able account', async () => {
+    const {result} = renderAccount();
+    const assertion = fakeJws('tok-work', {marker: 'able-remove'});
+    act(() => result.current.submitCode(assertion));
+    await waitFor(() => expect(result.current.status).toBe('connected'));
+
+    act(() => result.current.signOut());
+
+    await waitFor(() => expect(result.current.status).toBe('disconnected'));
+    expect(ableRefreshRequests).toEqual([{
+      method: 'DELETE',
+      authorization: `Bearer ${assertion}`,
+    }]);
+  });
+
+  it('marks an expired stored bridged identity as errored when able renewal fails', async () => {
+    const id = 'expired-bridge';
+    const expired = `${b64u({alg: 'EdDSA', typ: 'JWT'})}.${b64u({
+      iss: PERSONAS['tok-work'].iss,
+      sub: PERSONAS['tok-work'].sub,
+      exp: Math.floor(Date.now() / 1000) - 1,
+    })}.sig`;
+    localStorage.setItem('openbook.accounts', JSON.stringify([{
+      id,
+      name: 'Work User',
+      email: 'work@corp.example',
+      subject: subjectOf('tok-work'),
+      accountUrl: PERSONAS['tok-work'].iss,
+      connectedAt: Date.now() - 3600_000,
+      lastServerUpdatedAt: null,
+      identityOnly: true,
+    }]));
+    localStorage.setItem('openbook.accounts.active', id);
+    localStorage.setItem(tokenKey(id), expired);
+    const fetchMock = vi.mocked(fetch);
+
+    const {result} = renderAccount();
+
+    failAbleRefresh = true;
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(result.current.status).toBe('error');
+    expect(result.current.token).toBeNull();
+    expect(getIdentityCredential().jws).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalled();
+    expect(ableRefreshRequests).toHaveLength(1);
+    expect(identityMintUrls).toHaveLength(0);
+    expect(settingsPuts).toHaveLength(0);
+  });
+
   it('adds an account, makes it active, and stores its token in a namespaced slot', async () => {
     const {result} = renderAccount();
     await waitFor(() => expect(result.current.status).toBe('disconnected'));
@@ -373,9 +614,131 @@ describe('AccountProvider — identity mint resilience', () => {
       await result.current.remintIdentity();
     });
 
-    // The 503 took the transient path: the stored JWS is untouched, and the
-    // issuance verdict didn't flip on a blip.
+    // The 503 took the transient path: the stored JWS is untouched (it's still well
+    // within its window), the issuance verdict didn't flip on a blip, and no
+    // spurious re-auth prompt was raised for a still-valid identity.
     expect(getIdentityCredential().jws).toBe(before);
     expect(result.current.identityIssuance).toBe('ok');
+    expect(result.current.identityExpired).toBe(false);
+  });
+
+  it('a revoked device token surfaces a visible re-auth state and drops the dead JWS', async () => {
+    const {result} = renderAccount();
+    await addAccount(result, 'tok-work');
+    expect(getIdentityCredential().jws).toBeTruthy();
+    expect(result.current.identityExpired).toBe(false);
+
+    // The device token is revoked server-side: the next refresh mint 401s. A
+    // present-but-invalid assertion hard-401s content on the data server (blank
+    // pages), so the provider must STOP presenting the dead JWS AND surface a
+    // visible reconnect affordance — never a silent drop to anonymous.
+    revokeIdentityMint.add('tok-work');
+    await act(async () => {
+      await result.current.remintIdentity();
+    });
+
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+    expect(getIdentityCredential().jws).toBeUndefined();
+    // A revoked token is NOT the legitimate named-guest (501) mode.
+    expect(result.current.identityIssuance).not.toBe('unconfigured');
+  });
+
+  it('signing out clears a raised re-auth prompt (a deliberate exit is not a lapse)', async () => {
+    const {result} = renderAccount();
+    await addAccount(result, 'tok-work');
+    revokeIdentityMint.add('tok-work');
+    await act(async () => {
+      await result.current.remintIdentity();
+    });
+    await waitFor(() => expect(result.current.identityExpired).toBe(true));
+
+    act(() => result.current.signOut());
+    await waitFor(() => expect(result.current.status).toBe('disconnected'));
+    expect(result.current.identityExpired).toBe(false);
+  });
+});
+
+// ── LIB-6: the account-sync wire key rename `workspaces` → `libraries`. The client
+//    DUAL-WRITES the library list under both keys and DUAL-READS `libraries ??
+//    workspaces`, so it interoperates with an account server on either side of the
+//    rename with no data loss. These exercise the three cross-version pairings. ───
+describe('AccountProvider — LIB-6 library sync-key dual-read/write', () => {
+  // Observe both the account status AND the adopted library list.
+  const renderBoth = () =>
+    renderHook(() => ({account: useAccount(), library: useLibrary()}), {wrapper: makeWrapper()});
+  type BothHook = ReturnType<typeof renderBoth>['result'];
+  const connect = async (result: BothHook, tok: string): Promise<void> => {
+    act(() => result.current.account.submitCode(tok));
+    await waitFor(() => expect(result.current.account.status).toBe('connected'));
+    await waitFor(() => expect(result.current.account.token).toBe(tok));
+  };
+  const libNames = (result: BothHook): string[] => result.current.library.libraries.map((l) => l.name);
+
+  it('new client ↔ new server: writes BOTH keys (dual-write), equal values', async () => {
+    // A distinctive local library the genuine first sign-in seeds to the server.
+    localStorage.setItem(
+      'openbook.workspaces',
+      JSON.stringify([{id: 'ws-acme', icon: '🅰️', name: 'Acme Corp', serverUrl: 'https://acme.example'}]),
+    );
+    const {result} = renderBoth();
+    await waitFor(() => expect(result.current.account.status).toBe('disconnected'));
+    await connect(result, 'tok-work');
+
+    const pushed = putsFor('tok-work');
+    expect(pushed.length).toBeGreaterThan(0);
+    const {settings} = pushed[0];
+    // The library list is written under BOTH wire keys…
+    expect(Array.isArray(settings.libraries)).toBe(true);
+    expect(Array.isArray(settings.workspaces)).toBe(true);
+    // …carrying the same value, and containing the local library.
+    expect(JSON.stringify(settings.libraries)).toContain('Acme Corp');
+    expect(settings.workspaces).toEqual(settings.libraries);
+  });
+
+  it('new client ↔ OLD server: server holds only `workspaces` ⇒ client dual-reads it', async () => {
+    // An old account server stored the blob under the legacy key only.
+    serverBlobs.set('tok-work', {
+      settings: {workspaces: [{id: 'ws-legacy', icon: '📼', name: 'Legacy Only', serverUrl: 'https://legacy.example'}]},
+      updatedAt: new Date().toISOString(),
+    });
+    const {result} = renderBoth();
+    await connect(result, 'tok-work');
+
+    // The client adopted the legacy-keyed library list (fallback read succeeded).
+    await waitFor(() => expect(libNames(result)).toContain('Legacy Only'));
+  });
+
+  it('new client prefers `libraries` when a server emits BOTH keys', async () => {
+    // A new/mirroring server exposes both keys; the NEW key must win.
+    serverBlobs.set('tok-work', {
+      settings: {
+        libraries: [{id: 'ws-new', icon: '📗', name: 'New Key Wins', serverUrl: 'https://new.example'}],
+        workspaces: [{id: 'ws-old', icon: '📕', name: 'Old Key Loses', serverUrl: 'https://old.example'}],
+      },
+      updatedAt: new Date().toISOString(),
+    });
+    const {result} = renderBoth();
+    await connect(result, 'tok-work');
+
+    await waitFor(() => expect(libNames(result)).toContain('New Key Wins'));
+    expect(libNames(result)).not.toContain('Old Key Loses');
+  });
+
+  it('old client ↔ new server: a legacy-only local push still round-trips (no data loss)', async () => {
+    // Model the reverse direction: the mirrored blob a NEW server would serve back
+    // after an old client wrote only `workspaces` still carries `libraries` too, so
+    // this (new) client reads it. Proves the server-side mirror closes the loop.
+    serverBlobs.set('tok-personal', {
+      settings: {
+        // What the account service stores after mirroring an old client's write.
+        libraries: [{id: 'ws-x', icon: '🔁', name: 'Round Trips', serverUrl: 'https://x.example'}],
+        workspaces: [{id: 'ws-x', icon: '🔁', name: 'Round Trips', serverUrl: 'https://x.example'}],
+      },
+      updatedAt: new Date().toISOString(),
+    });
+    const {result} = renderBoth();
+    await connect(result, 'tok-personal');
+
+    await waitFor(() => expect(libNames(result)).toContain('Round Trips'));
   });
 });

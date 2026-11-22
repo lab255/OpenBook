@@ -8,6 +8,16 @@
 export const HOME_PAGE_ID = 'home';
 
 /**
+ * The Trash view — a pseudo-page, exactly like {@link HOME_PAGE_ID}. It rides the
+ * window model, the URL (`?page=trash`), history and tabs like any page id, so
+ * back/forward, new tabs and copied deep links all reach it; the document area
+ * renders the full-page trash for it instead of fetching a document. The quick
+ * {@link CONFIG_PANE_ID}-style overlay (the Trash dialog) stays as a fast peek —
+ * both surfaces share the same list body.
+ */
+export const TRASH_PAGE_ID = 'trash';
+
+/**
  * The dataflow split-pane mode — another pseudo-page: `?split=flow` shows
  * the PRIMARY page's reactive graph instead of a second document.
  */
@@ -40,11 +50,45 @@ export const CUSTOMISE_PANE_ID = 'customise';
 export const REVIEW_PANE_ID = 'review';
 
 /**
- * The Assistant split-pane mode — a pseudo-page hosting the workspace agent chat.
+ * The Assistant split-pane mode — a pseudo-page hosting the library agent chat.
  * Like {@link REVIEW_PANE_ID} it reuses the side pane (rather than a separate
  * docked panel) and is ephemeral — never persisted to the URL.
  */
 export const AGENT_PANE_ID = 'agent';
+
+/**
+ * The Version-history split-pane mode — a pseudo-page hosting a page's captured
+ * version list (PVH), a read-only preview of any picked version, and the
+ * restore-with-confirm action. Like {@link CUSTOMISE_PANE_ID} / {@link
+ * REVIEW_PANE_ID} it reuses the side pane and acts on a specific page, so it
+ * persists as `?split=history&paneTarget=<pageId>` (round-tripped through the
+ * URL via `lib/paneTarget.ts`). The page it targets is tracked in
+ * `lib/historyPane.ts`.
+ */
+export const HISTORY_PANE_ID = 'history';
+
+/**
+ * The Linked-references split-pane mode — a pseudo-page hosting a page's
+ * persistent links surface: its **Backlinks** (pages that `@`-mention or relate
+ * to it) and **Unlinked mentions** (pages whose text names it without linking).
+ * Promotes the transient backlinks popover chip to a durable side pane. Like
+ * {@link HISTORY_PANE_ID} / {@link REVIEW_PANE_ID} it reuses the side pane and
+ * acts on a specific page, so it persists as `?split=links&paneTarget=<pageId>`
+ * (round-tripped through the URL via `lib/paneTarget.ts`). The page it targets is
+ * tracked in `lib/linksPane.ts`.
+ */
+export const LINKS_PANE_ID = 'links';
+
+/**
+ * The Page-graph split-pane mode — a pseudo-page hosting the whole-library link
+ * graph (OB-33): every readable page as a node, mention vs relation edges drawn
+ * distinctly, the current page highlighted, and node-click navigation. Unlike
+ * {@link FLOW_PANE_ID} (one page's reactive wiring) this spans the library, but
+ * it CENTRES on a page — an N-hop neighbourhood of it — so it acts on a target
+ * and persists as `?split=graph&paneTarget=<pageId>` (round-tripped via
+ * `lib/paneTarget.ts`). The page it targets is tracked in `lib/graphPane.ts`.
+ */
+export const GRAPH_PANE_ID = 'graph';
 
 /** Which Home widgets are shown. All on by default; configurable per device. */
 export interface HomeWidgets {

@@ -2,7 +2,7 @@ import * as React from 'react';
 import {cn} from '@/lib/utils';
 import {formatShortcut, isMacPlatform, type ShortcutCombo} from '@/lib/shortcuts';
 import {useModifierHeld} from '@/lib/useModifierHeld';
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from '@/components/ui/tooltip';
+import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip';
 
 /**
  * Platform flag for rendering. Initialised to `false` (Ctrl-style) so the first
@@ -30,7 +30,7 @@ export function Kbd({combo, className}: {combo: ShortcutCombo; className?: strin
     <kbd
       aria-hidden="true"
       className={cn(
-        'pointer-events-none inline-flex h-5 select-none items-center justify-center rounded border border-border/70 bg-muted px-1.5 font-sans text-[11px] font-medium leading-none text-muted-foreground transition-opacity duration-150',
+        'pointer-events-none inline-flex h-5 select-none items-center justify-center rounded border border-border/70 bg-muted px-1.5 font-sans text-[11px] font-medium leading-none text-muted-foreground transition-opacity duration-(--motion-fast)',
         held ? 'opacity-100' : 'opacity-0',
         className,
       )}
@@ -41,9 +41,9 @@ export function Kbd({combo, className}: {combo: ShortcutCombo; className?: strin
 }
 
 /**
- * Wrap a control to reveal its keyboard shortcut in a tooltip on long hover —
- * the quiet way to discover a shortcut without a permanent badge. Self-contained
- * provider with a deliberate delay so it only appears on a real, lingering hover.
+ * Wrap a control to reveal its keyboard shortcut in a tooltip on hover — the
+ * quiet way to discover a shortcut without a permanent badge. The app-level
+ * provider owns the common delay so shortcut and presence tooltips feel alike.
  */
 export function ShortcutTooltip({
   combo,
@@ -58,14 +58,12 @@ export function ShortcutTooltip({
 }) {
   const mac = useIsMac();
   return (
-    <TooltipProvider delayDuration={600}>
-      <Tooltip>
-        <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side={side} className="flex items-center gap-2">
-          {label && <span>{label}</span>}
-          <span className="font-semibold tracking-wide">{formatShortcut(combo, mac)}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side} className="flex items-center gap-2">
+        {label && <span>{label}</span>}
+        <span className="font-semibold tracking-wide">{formatShortcut(combo, mac)}</span>
+      </TooltipContent>
+    </Tooltip>
   );
 }

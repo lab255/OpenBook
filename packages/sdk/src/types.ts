@@ -11,12 +11,17 @@
 
 /**
  * The serialized form of a reactive document. Three sibling keys:
- *  - `editorjs` — EditorJS `OutputData` (kept opaque here so the SDK has no
- *    dependency on the editor; cast at the edit site).
+ *  - `editorjs` — the block-native export projection (`{blocks}`), and for
+ *    legacy pages the stored block list. **The JSON key name `editorjs` is a
+ *    RETAINED storage / back-compat alias** — do not rename it on disk; every
+ *    persisted snapshot uses it and renaming would strand stored data. In
+ *    memory this shape is `ExportDoc` (see ui `exportBlocks.ts`). Kept opaque
+ *    here so the SDK has no dependency on the editor; cast at the edit site.
  *  - `values`   — `[cellId, value]` pairs from the reactive store.
  *  - `names`    — `[name, cellId]` pairs (the name index).
  */
 export interface PageSnapshot {
+  /** Retained storage/back-compat alias for the export projection; see doc above. */
   editorjs: unknown;
   values: Array<[string, unknown]>;
   names: Array<[string, string]>;
@@ -44,6 +49,242 @@ export interface PageSnapshot {
   authors?: Array<[string, string]>;
 }
 
+/**
+ * Monotonic optimistic-concurrency token for one durable entity. Implementing
+ * servers return positive safe integers; see `docs/write-contract.md`.
+ */
+export type EntityRev = number;
+
+/** A representation that is guaranteed to carry its concurrency token. */
+export type WithRev<Shape> = Shape & {rev: EntityRev};
+
+/** Additive CAS input shared by revision-aware write payloads. Omission is LWW. */
+export interface ExpectedRevInput {
+  expectedRev?: EntityRev;
+}
+
+/** Opaque lexicographically ordered fractional key used by the CWD-12 target contract. */
+export type StablePosition = string;
+
+/** Stable page-id → position mapping; unlike `orderedIds`, identity survives insertion. */
+export type PagePositionRecord = Readonly<Record<string, StablePosition>>;
+
+/** Additive move input spanning wave 1 and the post-CWD-12 position contract. */
+export interface PageMoveInput extends ExpectedRevInput {
+  parentId: string | null;
+  /** Post-CWD-12 input; exactly the route page id is normally the sole key. */
+  positions?: PagePositionRecord;
+  /** @deprecated Wave-1 LWW sibling order; use {@link positions} after CWD-12. */
+  orderedIds?: string[];
+}
+
+/** Target input for position-record row ordering after the CWD-12 migration. */
+export interface PageOrderInput {
+  positions: PagePositionRecord;
+}
+
+/** UUID v4/v7 value carried in the `Idempotency-Key` request header. */
+export type IdempotencyKey = string;
+
+/** Request metadata accepted by the SDK write chokepoint (not part of JSON bodies). */
+export interface WriteRequestOptions {
+  idempotencyKey?: IdempotencyKey;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+/** The durable entity whose guarded write conflicted. */
+export type WriteEntityRef =
+  | {kind: 'page'; id: string}
+  | {kind: 'database-row'; id: string; databaseId: string}
+  | {kind: 'database'; id: string}
+  | {kind: 'instance-config'; id: 'instance'};
+
+/** Stable server codes introduced for the durable-write contract. */
+export type WriteServerErrorCode =
+  | 'rev-conflict'
+  | 'idempotency-key-reused'
+  | 'invalid-input'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not-found'
+  | 'rate-limited'
+  | 'server-error';
+
+/** Minimum non-2xx JSON body returned by durable write routes. */
+export interface WriteErrorEnvelope<Code extends string = WriteServerErrorCode> {
+  readonly error: string;
+  readonly code: Code;
+  readonly retryable: boolean;
+}
+
+/** Optional field-level detail on an {@link WriteValidationEnvelope}. */
+export interface WriteValidationIssue {
+  readonly path?: string;
+  readonly code?: string;
+  readonly message: string;
+}
+
+/** Structured invalid-input response; `issues` is omitted for request-wide errors. */
+export interface WriteValidationEnvelope extends WriteErrorEnvelope<'invalid-input'> {
+  readonly retryable: false;
+  readonly issues?: WriteValidationIssue[];
+}
+
+/** A key was previously committed for a different request fingerprint. */
+export interface WriteIdempotencyKeyReuseEnvelope extends WriteErrorEnvelope<'idempotency-key-reused'> {
+  readonly retryable: false;
+}
+
+/** Links offered by wave-1 conflict resolution. */
+export interface WriteConflictLinks {
+  /** Permission-appropriate GET endpoint used when `current` is omitted. */
+  readonly self: string;
+  /** Page/row history endpoint; `null` for entities without version history. */
+  readonly versionHistory: string | null;
+}
+
+/**
+ * Fields shared by every HTTP 409 CAS response. `current` is specialized by the
+ * responding route's projection in the discriminated members below.
+ */
+interface WriteConflictBase extends WriteErrorEnvelope<'rev-conflict'> {
+  readonly retryable: false;
+  readonly expectedRev: EntityRev;
+  readonly currentRev: EntityRev;
+  readonly links: WriteConflictLinks;
+}
+
+/** CAS response from a page route, secondarily discriminated by route projection. */
+export type PageConflict =
+  | (WriteConflictBase & {
+      readonly entity: Extract<WriteEntityRef, {kind: 'page'}>;
+      readonly projection: 'page';
+      readonly current: WithRev<StoredPage> | null;
+    })
+  | (WriteConflictBase & {
+      readonly entity: Extract<WriteEntityRef, {kind: 'page'}>;
+      readonly projection: 'visibility';
+      readonly current: WithRev<PageVisibilitySettings> | null;
+    })
+  | (WriteConflictBase & {
+      readonly entity: Extract<WriteEntityRef, {kind: 'page'}>;
+      readonly projection: 'agent-edits';
+      readonly current: WithRev<AgentEditsPolicySettings> | null;
+    });
+
+/** CAS response from a database-row property route. */
+export interface DatabaseRowConflict extends WriteConflictBase {
+  readonly entity: Extract<WriteEntityRef, {kind: 'database-row'}>;
+  readonly current: WithRev<import('./database').DatabaseRow> | null;
+}
+
+/** CAS response from a database route. */
+export interface DatabaseConflict extends WriteConflictBase {
+  readonly entity: Extract<WriteEntityRef, {kind: 'database'}>;
+  readonly current: WithRev<import('./database').StoredDatabase> | null;
+}
+
+/** CAS response from the instance-policy route. */
+export interface InstanceConfigConflict extends WriteConflictBase {
+  readonly entity: Extract<WriteEntityRef, {kind: 'instance-config'}>;
+  readonly current: WithRev<import('./provenance').InstanceConfig> | null;
+}
+
+/** HTTP 409 body for an opt-in CAS miss, discriminated by `entity.kind`. */
+export type WriteConflictEnvelope =
+  | PageConflict
+  | DatabaseRowConflict
+  | DatabaseConflict
+  | InstanceConfigConflict;
+
+/** Stable discriminators used by the SDK's future runtime `WriteError` classes. */
+export type WriteErrorKind =
+  | 'timeout'
+  | 'abort'
+  | 'conflict'
+  | 'idempotency-reuse'
+  | 'validation'
+  | 'authorization'
+  | 'rate-limit'
+  | 'transport'
+  | 'server'
+  | 'http';
+
+/** Shared structural contract implemented by every SDK `WriteError` class. */
+export interface WriteErrorInfo<
+  Kind extends WriteErrorKind = WriteErrorKind,
+  Status extends number | null = number | null,
+  Details = unknown,
+> {
+  readonly kind: Kind;
+  readonly status: Status;
+  readonly retryable: boolean;
+  readonly code: string;
+  readonly message: string;
+  readonly details?: Details;
+}
+
+export interface WriteTimeoutErrorInfo extends WriteErrorInfo<'timeout', null | 408 | 504> {
+  readonly retryable: true;
+}
+
+export interface WriteAbortErrorInfo extends WriteErrorInfo<'abort', null> {
+  readonly retryable: false;
+}
+
+export interface WriteConflictErrorInfo
+  extends WriteErrorInfo<'conflict', 409, WriteConflictEnvelope> {
+  readonly retryable: false;
+  readonly code: 'rev-conflict';
+}
+
+export interface WriteIdempotencyReuseErrorInfo
+  extends WriteErrorInfo<'idempotency-reuse', 409, WriteIdempotencyKeyReuseEnvelope> {
+  readonly retryable: false;
+  readonly code: 'idempotency-key-reused';
+}
+
+export interface WriteValidationErrorInfo
+  extends WriteErrorInfo<'validation', 400 | 413 | 422, WriteValidationEnvelope> {
+  readonly retryable: false;
+}
+
+export interface WriteAuthorizationErrorInfo extends WriteErrorInfo<'authorization', 401 | 403> {
+  readonly retryable: false;
+}
+
+export interface WriteRateLimitErrorInfo extends WriteErrorInfo<'rate-limit', 429> {
+  readonly retryable: true;
+  /** Milliseconds parsed from an HTTP `Retry-After` seconds value, when present. */
+  readonly retryAfterMs?: number;
+}
+
+export interface WriteTransportErrorInfo extends WriteErrorInfo<'transport', null> {
+  readonly retryable: true;
+}
+
+export interface WriteServerErrorInfo extends WriteErrorInfo<'server', 500 | 502 | 503> {
+  readonly retryable: true;
+}
+
+export interface WriteHttpErrorInfo extends WriteErrorInfo<'http', number> {
+  readonly retryable: false;
+}
+
+/** Exhaustive structural taxonomy implemented by the SDK error classes. */
+export type WriteErrorContract =
+  | WriteTimeoutErrorInfo
+  | WriteAbortErrorInfo
+  | WriteConflictErrorInfo
+  | WriteIdempotencyReuseErrorInfo
+  | WriteValidationErrorInfo
+  | WriteAuthorizationErrorInfo
+  | WriteRateLimitErrorInfo
+  | WriteTransportErrorInfo
+  | WriteServerErrorInfo
+  | WriteHttpErrorInfo;
+
 /** An empty snapshot, for initializing a brand-new page. */
 export const emptyPageSnapshot = (): PageSnapshot => ({
   editorjs: {blocks: []},
@@ -54,7 +295,12 @@ export const emptyPageSnapshot = (): PageSnapshot => ({
 /** Lightweight page record for listings (no `data` payload). */
 export interface PageMeta {
   id: string;
+  /** Optimistic-concurrency token; absent only when reading from a legacy server. */
+  rev?: EntityRev;
   name: string | null;
+  /** Whether the page participates in discovery surfaces. Independent of who
+   *  may read it; omitted by older servers. */
+  listed?: boolean;
   /** The page's emoji icon, or `null` when none is set — projected from
    *  `page.properties` so lists (sidebar, tabs, mentions) resolve it directly,
    *  without a per-page fetch. */
@@ -77,9 +323,43 @@ export interface PageMeta {
   updatedAt: string;
 }
 
+/** One node in the page-link graph — a live page (standalone or database row). */
+export interface PageGraphNode {
+  id: string;
+  name: string | null;
+  /** The page's emoji icon, or `null`/absent when none is set. */
+  icon?: string | null;
+}
+
+/**
+ * A directed link between two pages in the graph. `kind` distinguishes an inline
+ * `@`-mention in the source page's document (`'mention'`) from a structured
+ * relation reference in its properties (`'relation'`), so the two can be rendered
+ * distinctly.
+ */
+export interface PageGraphEdge {
+  from: string;
+  to: string;
+  kind: 'mention' | 'relation';
+}
+
+/**
+ * The whole page-link graph: every live, readable page as a node, plus every
+ * directed link (mention or relation) whose BOTH endpoints are readable by the
+ * requesting principal. Edges are computed on the fly from page content +
+ * properties (no persisted edge table); self-loops and edges to missing/deleted
+ * pages are dropped.
+ */
+export interface PageGraph {
+  nodes: PageGraphNode[];
+  edges: PageGraphEdge[];
+}
+
 /** A full page as returned by the store. `data` is the document snapshot. */
 export interface StoredPage {
   id: string;
+  /** Optimistic-concurrency token; absent only when reading from a legacy server. */
+  rev?: EntityRev;
   name: string | null;
   data: PageSnapshot;
   /** The database this page *hosts*, if any (mirrors {@link PageMeta.hostedDatabaseId}). */
@@ -92,8 +372,40 @@ export interface StoredPage {
   properties: Record<string, unknown>;
   /** When the page is in the trash, the ISO timestamp it was deleted; else `null`. */
   deletedAt: string | null;
+  /**
+   * Sibling sort key (sidebar order; row order within a database). Carried by
+   * exports since LGR-15 so a restore preserves ordering — for the LEDGER it is
+   * load-bearing: posting order feeds the audited content hash, so losing it
+   * would make a restored book read as tampered-with. Optional: bundles written
+   * before v2 have no such key and import with the mode's default placement.
+   */
+  position?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Metadata for one captured page version (PVH-1) — no snapshot payload, so a
+ * history list stays cheap. `author*` is the verified principal who *superseded*
+ * the captured state (the one who saved over it); all three are `null` for a
+ * server-merged checkpoint, which has no single saving principal.
+ */
+export interface PageVersionMeta {
+  id: string;
+  pageId: string;
+  authorSubject: string | null;
+  authorIssuer: string | null;
+  authorName: string | null;
+  createdAt: string;
+}
+
+/**
+ * A captured page version WITH its snapshot payload — the state to roll back TO.
+ * Restoring one writes this `data` back through the normal save path, which
+ * captures the pre-restore state as a new version (so restore is non-destructive).
+ */
+export interface StoredPageVersion extends PageVersionMeta {
+  data: PageSnapshot;
 }
 
 /**
@@ -105,10 +417,12 @@ export interface StoredPage {
  * not set through this payload — they are managed by the database row APIs so a
  * routine content save never clobbers them.
  */
-export interface PageInput {
+export interface PageInput extends ExpectedRevInput {
   id?: string;
   name?: string | null;
   data: PageSnapshot;
+  /** Initial discovery posture for a new page. Independent of visibility. */
+  listed?: boolean;
   /**
    * The page to nest this new page under. Applied only when the page is first
    * created; a later content save with the same id leaves the parent untouched.
@@ -155,9 +469,80 @@ export const PAGE_VISIBILITIES: readonly PageVisibility[] = [
   'restricted',
 ];
 
+/** The state returned by the co-located page visibility/listing endpoint.
+ * `listed` is a discovery flag, not another rung in {@link PageVisibility}. */
+export interface PageVisibilitySettings {
+  /** The owning page's concurrency token; absent only on a legacy server. */
+  rev?: EntityRev;
+  visibility: PageVisibility;
+  listed: boolean;
+}
+
+/** A non-empty update accepted by the page visibility/listing endpoint. */
+export type PageVisibilityUpdate = (
+  | {visibility: PageVisibility; listed?: boolean}
+  | {visibility?: PageVisibility; listed: boolean}
+) & ExpectedRevInput;
+
+/**
+ * The two INSTANCE-level agent-edits modes (AGED-1). Governs whether an agent (an
+ * MCP tool or the built-in AI) writes a page DIRECTLY or persists its change as a
+ * suggestion for a human to accept. `suggest` is the safe default; `direct` opts the
+ * whole instance into unattended agent edits. This is the resolved (effective) shape
+ * — never `inherit`, which is a page-level pointer at this instance mode.
+ */
+export type AgentEditsMode = 'suggest' | 'direct';
+
+/**
+ * A PAGE's agent-edits policy (AGED-1). `inherit` (the default) defers to the
+ * instance's {@link AgentEditsMode}; `suggest` / `direct` override it for this page.
+ * Resolve to an effective {@link AgentEditsMode} with {@link resolveAgentEdits}.
+ */
+export type AgentEditsPolicy = 'inherit' | 'suggest' | 'direct';
+
+/** Revision-bearing response from a page's agent-edits policy endpoint. */
+export interface AgentEditsPolicySettings {
+  /** The owning page's concurrency token; absent only on a legacy server. */
+  rev?: EntityRev;
+  agentEdits: AgentEditsPolicy;
+  effective: AgentEditsMode;
+}
+
+/** Revision-aware input for a page's agent-edits policy endpoint. */
+export interface AgentEditsPolicyUpdate extends ExpectedRevInput {
+  agentEdits: AgentEditsPolicy;
+}
+
+/** Every {@link AgentEditsMode} — the source of truth for validating an instance
+ *  policy write (`PUT /api/instance`). */
+export const AGENT_EDITS_MODES: readonly AgentEditsMode[] = ['suggest', 'direct'];
+
+/** Every {@link AgentEditsPolicy} — the source of truth for validating a page policy
+ *  write (`PUT /api/pages/:id/agent-edits`). */
+export const AGENT_EDITS_POLICIES: readonly AgentEditsPolicy[] = ['inherit', 'suggest', 'direct'];
+
+/**
+ * Resolve a page's agent-edits policy against the instance mode into the ONE
+ * effective {@link AgentEditsMode} (AGED-1 — the single source of truth shared by the
+ * server, the MCP layer, and the UI). Precedence: an explicit page policy
+ * (`suggest` / `direct`) wins; otherwise the instance mode; otherwise the safe
+ * `suggest` default (a pre-AGED-1 / unset instance, or `page='inherit'` with no
+ * instance mode). Never returns `inherit`.
+ */
+export function resolveAgentEdits(
+  page: AgentEditsPolicy,
+  instance: AgentEditsMode | undefined,
+): AgentEditsMode {
+  if (page === 'suggest' || page === 'direct') return page;
+  return instance ?? 'suggest';
+}
+
 /** The two OSS roster roles (OB-182): `admin` = full access, `viewer` = locked
  *  read-only. (Contract §1.1 names this union `Role`.) */
 export type MemberRole = 'admin' | 'viewer';
+
+/** Every {@link MemberRole} value, used for request-boundary validation. */
+export const MEMBER_ROLES: readonly MemberRole[] = ['admin', 'viewer'];
 
 /**
  * The caller's *effective* instance role (P1-8) — the roster roles plus `owner`,
@@ -177,9 +562,12 @@ export type EffectiveRole = 'owner' | MemberRole;
  */
 export type MemberStatus = 'invited' | 'active' | 'suspended';
 
+/** Every {@link MemberStatus} lifecycle value, used for request validation. */
+export const MEMBER_STATUSES: readonly MemberStatus[] = ['invited', 'active', 'suspended'];
+
 /**
  * Where a roster row came from (OB-199). `local` = a locally-issued invite (the
- * OB-191 path); `managed` = projected from the bound account workspace's roster by
+ * OB-191 path); `managed` = projected from the bound account library's roster by
  * the periodic sync. The two coexist: the managed sync only ever touches `managed`
  * rows, so a local invite is never clobbered (and vice-versa).
  */
@@ -187,6 +575,9 @@ export type MemberSource = 'local' | 'managed';
 
 /** Per-page ACL grant level (OB-182 §1.1). */
 export type AclLevel = 'read' | 'write';
+
+/** Every {@link AclLevel} value, used for request-boundary validation. */
+export const ACL_LEVELS: readonly AclLevel[] = ['read', 'write'];
 
 /**
  * One roster row — the data-server-native `members` table (OB-182 §2.1). A row is
@@ -208,7 +599,7 @@ export interface Member {
   status: MemberStatus;
   /**
    * Provenance of the row (OB-199): `local` for a locally-issued invite (OB-191),
-   * `managed` for a row projected from the bound workspace roster. Defaults to
+   * `managed` for a row projected from the bound library roster. Defaults to
    * `local`; the managed sync only ever writes/removes `managed` rows.
    * Optional: absent (a pre-OB-199 row / a test fixture) is treated as `local`.
    */
@@ -248,19 +639,26 @@ export interface ServerInfo {
   managed: boolean;
   /**
    * Whether the server is published on the LAN (bound beyond loopback). When
-   * true, the workspace is reachable by other devices and an {@link accessToken}
-   * is required. Off by default.
+   * true, the library is reachable by other devices at {@link lanAddress} and the
+   * sidecar also serves the web UI there. The LAN bind is TOKENLESS (STAB-7): the
+   * only gate is the library's guest-access setting (write/read/off). Off by default.
    */
   published?: boolean;
   /** The shareable LAN URL (`http://<ip>:<port>`) when published; else null. */
   lanAddress?: string | null;
-  /**
-   * The access token clients must present when {@link published}. Surfaced so the
-   * UI can show/copy it for other devices; the local UI sends it automatically.
-   */
-  accessToken?: string | null;
   /** Folder the on-disk book mirror writes to (durable mode). */
   bookDir?: string | null;
+  /**
+   * Whether the host also binds a loopback TCP listener (`127.0.0.1:4319`) on the
+   * same sidecar so an out-of-process local MCP/agent connector can reach this
+   * exact library (STAB-5). Gated on the local-MCP/agent toggle — OFF by default,
+   * and independent of {@link published} (which binds `0.0.0.0` for the LAN).
+   * Unlike the FS-permissioned IPC socket, this loopback listener is reachable by
+   * any local process AND by any web origin the user's browser will POST to (the
+   * sidecar serves wildcard CORS and guestAccess defaults to 'write') — a real
+   * added surface, hence the explicit opt-in toggle; browser-reachability
+   * hardening is tracked separately. */
+  agentLocalTcp?: boolean;
 }
 
 /**
@@ -274,7 +672,8 @@ export interface ServerControls {
   start?(): Promise<ServerInfo>;
   stop?(): Promise<ServerInfo>;
   /** Publish (or unpublish) the server on the LAN — adds the `0.0.0.0` bind and
-   *  requires the access token. The local UI keeps using IPC; resolves the new
+   *  serves the web UI there. Tokenless (STAB-7): the library's guest-access
+   *  setting is the only gate. The local UI keeps using IPC; resolves the new
    *  status. */
   publish?(enabled: boolean): Promise<ServerInfo>;
   /** Open a native folder picker to choose the book-mirror directory. Resolves
@@ -282,4 +681,11 @@ export interface ServerControls {
   chooseBookDir?(): Promise<ServerInfo>;
   /** Reveal the current book-mirror directory in the OS file manager. */
   revealBookDir?(): Promise<void>;
+  /**
+   * Bind (or unbind) the loopback TCP listener (`127.0.0.1:4319`) used by an
+   * out-of-process local MCP/agent connector (STAB-5). Flipped together with the
+   * agent-API toggle so the connector's default endpoint actually points at THIS
+   * library's server. Resolves the new status (with {@link ServerInfo.agentLocalTcp}).
+   * Absent on the web / an old host that predates the capability. */
+  setAgentLocalTcp?(enabled: boolean): Promise<ServerInfo>;
 }

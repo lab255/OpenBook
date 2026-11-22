@@ -1,7 +1,7 @@
 /**
- * A small bridge between the EditorJS subpage/database blocks and the app's
- * navigation. EditorJS instantiates block tools outside React's context (each
- * block mounts its own React root), so the blocks can't use `useNavigation`.
+ * A small bridge between the subpage/database blocks and the app's navigation.
+ * Block tools can run outside React's context (a block may mount its own React
+ * root), so they can't use `useNavigation` directly.
  * Instead {@link NavigationProvider} registers its actions here — the same
  * singleton pattern the reactive store uses — and the blocks call them.
  */
@@ -21,8 +21,9 @@ export interface PageLinkBridge {
   /** Create a child page nested under `parentId`; resolves to the new page id. */
   createSubpage: (parentId: string, kind: SubpageKind) => Promise<string>;
   /** Navigate to a page. Pass `pane` to drive a specific pane (the one the link
-   *  was clicked in) rather than whichever pane is focused. */
-  openPage: (id: string, pane?: 'primary' | 'secondary') => void;
+   *  was clicked in) rather than whichever pane is focused. Pass `blockId` to
+   *  land on (scroll/flash) a specific block within the destination page. */
+  openPage: (id: string, pane?: 'primary' | 'secondary', blockId?: string) => void;
   /** A display title for a page id. */
   label: (id: string) => string;
   /** The emoji icon for a page id. */
@@ -30,8 +31,13 @@ export interface PageLinkBridge {
   /** Pages whose title matches `query` (best matches first). Pass
    *  `{databasesOnly: true}` to restrict to pages that host a database. */
   searchPages: (query: string, opts?: {databasesOnly?: boolean}) => PageLinkResult[];
-  /** Create a new page titled `name` (no navigation); resolves its id. */
-  createPage: (name: string) => Promise<string>;
+  /** Database ROWS whose title matches `query` (rows are pages too, so `@` can
+   *  link one). Async — rows live under each database, not the page list. */
+  searchRows?: (query: string, limit?: number) => Promise<PageLinkResult[]>;
+  /** Create a new page titled `name` (no navigation); resolves its id. Pass
+   *  `parentId` to nest it under a page (the "[[" wikilink auto-create nests the
+   *  new page under the page it was typed in). */
+  createPage: (name: string, parentId?: string | null) => Promise<string>;
 }
 
 let bridge: PageLinkBridge | null = null;
@@ -56,10 +62,11 @@ export const subscribePageLinks = (cb: () => void): (() => void) => {
 export const pageLinks: PageLinkBridge = {
   createSubpage: (parentId, kind) =>
     bridge ? bridge.createSubpage(parentId, kind) : Promise.reject(new Error('page links not ready')),
-  openPage: (id, pane) => bridge?.openPage(id, pane),
+  openPage: (id, pane, blockId) => bridge?.openPage(id, pane, blockId),
   label: (id) => bridge?.label(id) ?? 'Untitled',
   icon: (id) => bridge?.icon(id) ?? '📄',
   searchPages: (query, opts) => bridge?.searchPages(query, opts) ?? [],
-  createPage: (name) =>
-    bridge ? bridge.createPage(name) : Promise.reject(new Error('page links not ready')),
+  searchRows: (query, limit) => bridge?.searchRows?.(query, limit) ?? Promise.resolve([]),
+  createPage: (name, parentId) =>
+    bridge ? bridge.createPage(name, parentId) : Promise.reject(new Error('page links not ready')),
 };

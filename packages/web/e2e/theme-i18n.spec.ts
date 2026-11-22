@@ -32,6 +32,10 @@ test('language: switching translates the chrome and persists', {tag: ['@shell', 
   await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe('de');
   await takeSnapshot(page, testInfo); // visual: German settings (also primes the chromatic snapshot helper)
 
+  // Reload with no Settings deep link: the old test relied on the defect that
+  // closed a param-present dialog on reload and exposed the sidebar.
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/settings=/);
   await page.reload();
   // Settle on a locale-stable landmark: the chrome (incl. the Settings button)
   // now translates, so wait for the sidebar tree instead of an English label.

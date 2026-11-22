@@ -1,7 +1,7 @@
 import {spawn, type ChildProcess} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
-import {providerSettings, type AiConfig, type AiProvider} from '@book.dev/sdk';
+import {providerSettings, type AiConfig, type AiProvider, type AiTranscriptionResult} from '@book.dev/sdk';
 
 /**
  * Inference engines behind one interface. Generation streams tokens;
@@ -32,6 +32,31 @@ export interface NativeToolCall {
   args: Record<string, unknown>;
 }
 
+/**
+ * Token accounting surfaced by an engine's {@link AiEngine.generate}. Real
+ * counts where the provider reports them (Anthropic SSE usage frames, an
+ * OpenAI-compatible final usage chunk), a best-effort local tokenize for
+ * llama.cpp, and deterministic numbers for the mock engine (so tests can assert
+ * exact values). `cache*` are populated only when the provider reports them
+ * (Anthropic prompt caching). The routes and the agent tool-loop log ONE usage
+ * row per generate call from this (see `ai/usage.ts`).
+ */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  /** Prompt-cache read tokens, when the provider reports them (Anthropic). */
+  cacheReadTokens?: number;
+  /** Prompt-cache write/creation tokens, when the provider reports them (Anthropic). */
+  cacheWriteTokens?: number;
+}
+
+/** Deterministic whitespace token estimate — used by the mock engine and as a
+ *  best-effort fallback. Stable so tests can compute exact expected counts. */
+export function estimateTokens(text: string): number {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
 export interface GenerateOptions {
   system?: string;
   maxTokens?: number;
@@ -49,10 +74,29 @@ export interface GenerateOptions {
   /** Called with any native tool calls the model emitted this turn. */
   onToolCalls?: (calls: NativeToolCall[]) => void;
   onToken: (token: string) => void;
+  /**
+   * Called once, after the turn completes, with the turn's token accounting
+   * (input/output, plus cache tokens where the provider reports them). The
+   * routes + agent loop use this to log a usage-attribution row per model call.
+   * Best-effort: an engine that can't surface counts simply never calls it.
+   */
+  onUsage?: (usage: TokenUsage) => void;
   signal?: AbortSignal;
 }
 
+export interface TranscribeOptions {
+  filename?: string;
+  mime?: string;
+  signal?: AbortSignal;
+}
+
+/** MEET-3 implements this capability; no chat/embedding engine is required. */
+export interface TranscriptionEngine {
+  transcribe(bytes: Uint8Array, opts?: TranscribeOptions): Promise<AiTranscriptionResult>;
+}
+
 export interface AiEngine {
+  transcribe?: TranscriptionEngine['transcribe'];
   readonly kind: string;
   /** Throws (with a user-readable message) when the engine can't run. */
   ensureReady(): Promise<void>;
@@ -75,6 +119,12 @@ export interface AiEngine {
  *  Keeps the whole AI surface testable without any model. */
 export class MockEngine implements AiEngine {
   readonly kind = 'mock';
+
+  async transcribe(bytes: Uint8Array, opts: TranscribeOptions = {}): Promise<AiTranscriptionResult> {
+    opts.signal?.throwIfAborted();
+    const text = `Mock transcription (${bytes.byteLength} bytes).`;
+    return {text, segments: [{start: 0, end: 1, text}], durationMs: 1000};
+  }
 
   async ensureReady(): Promise<void> {
     // always ready
@@ -102,6 +152,15 @@ export class MockEngine implements AiEngine {
         });
       } else if (/edit directly/i.test(lastUser)) {
         out = JSON.stringify({tool: 'request_edit_access', args: {summary: 'edit this page'}});
+      } else if (/append via agent/i.test(lastUser) && !prompt.includes('TOOL RESULT')) {
+        // AGED-6 policy-matrix e2e hook: emit a genuine document write so the
+        // built-in AI's write path (append_to_page → a persisted suggestion →
+        // AgentPanel routes it through the resolved agent-edits policy) is
+        // exercised end to end. The write tool needs the target page id — take
+        // it from the ambient context the runner injects into the system prompt
+        // ("… (id <pageId>):") for the page the user is viewing.
+        const pageId = /\(id ([^)]+)\)/.exec(opts.system ?? '')?.[1] ?? '';
+        out = JSON.stringify({tool: 'append_to_page', args: {pageId, content: 'AGED6 AI DIRECT MARKER'}});
         // Scripted agent turn: search first, then answer from the result. The
         // leading <think> block exercises the reasoning-channel splitter.
       } else if (!prompt.includes('TOOL RESULT')) {
@@ -121,6 +180,12 @@ export class MockEngine implements AiEngine {
       opts.onToken(token);
       await new Promise((r) => setTimeout(r, 2));
     }
+    // Deterministic usage (whitespace token estimate over the prompt + system and
+    // the produced output) so attribution tests can assert exact numbers.
+    opts.onUsage?.({
+      inputTokens: estimateTokens(prompt) + estimateTokens(opts.system ?? ''),
+      outputTokens: estimateTokens(out),
+    });
     return out;
   }
 
@@ -152,8 +217,38 @@ export class OpenAiCompatEngine implements AiEngine {
     private readonly baseUrl: string,
     private readonly model: string,
     kind = 'openai',
+    private readonly apiKey?: string | null,
   ) {
     this.kind = kind;
+  }
+
+  async transcribe(bytes: Uint8Array, opts: TranscribeOptions = {}): Promise<AiTranscriptionResult> {
+    const form = new FormData();
+    const extensions: Record<string, string> = {'audio/webm': 'webm', 'video/webm': 'webm', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/ogg': 'ogg', 'audio/flac': 'flac'};
+    const filename = opts.filename || `audio.${extensions[opts.mime?.split(';')[0] ?? ''] ?? 'bin'}`;
+    form.append('file', new Blob([new Uint8Array(bytes)], {type: opts.mime || 'application/octet-stream'}), filename);
+    form.append('model', this.model || 'whisper-1');
+    form.append('response_format', 'verbose_json');
+    form.append('timestamp_granularities[]', 'segment');
+    const base = this.baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '');
+    const res = await fetch(`${base}/v1/audio/transcriptions`, {
+      method: 'POST',
+      headers: this.apiKey ? {Authorization: `Bearer ${this.apiKey}`} : {},
+      body: form,
+      signal: opts.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(300_000)]) : AbortSignal.timeout(300_000),
+    });
+    // Do not echo upstream bodies: they can contain credentials or recording text.
+    if (!res.ok) throw new Error(`Transcription provider returned HTTP ${res.status}`);
+    const data = await res.json() as {text?: unknown; duration?: unknown; segments?: unknown};
+    if (typeof data.text !== 'string') throw new Error('Invalid transcription provider response');
+    const segments: AiTranscriptionResult['segments'] = Array.isArray(data.segments)
+      ? data.segments.filter((s): s is {start: number; end: number; text: string} =>
+        s && Number.isFinite(s.start) && s.start >= 0 && Number.isFinite(s.end) && s.end >= s.start && typeof s.text === 'string')
+        .map(({start, end, text}) => ({start, end, text}))
+      : undefined;
+    const duration = typeof data.duration === 'number' && Number.isFinite(data.duration) && data.duration >= 0
+      ? data.duration : segments?.reduce((end, s) => Math.max(end, s.end), 0) ?? 0;
+    return {text: data.text, ...(segments ? {segments} : {}), durationMs: Math.round(duration * 1000)};
   }
 
   async ensureReady(): Promise<void> {
@@ -206,6 +301,10 @@ export class OpenAiCompatEngine implements AiEngine {
       body: JSON.stringify({
         model: this.model || 'default',
         stream: true,
+        // Ask the server for a trailing usage chunk (prompt/completion tokens).
+        // OpenAI + most compatible servers (mlx_lm, vLLM, llama-server) honour it;
+        // ones that don't simply omit the chunk and usage stays best-effort.
+        stream_options: {include_usage: true},
         max_tokens: opts.maxTokens ?? 512,
         temperature: opts.temperature ?? 0.7,
         ...(useTools
@@ -227,6 +326,7 @@ export class OpenAiCompatEngine implements AiEngine {
     if (!res.ok || !res.body) throw new Error(`Generation failed: HTTP ${res.status}`);
 
     let full = '';
+    let usage: TokenUsage | undefined;
     // Native tool-call fragments accumulate by index across deltas.
     const toolAcc = new Map<number, {id: string; name: string; args: string}>();
     const reader = res.body.getReader();
@@ -251,7 +351,13 @@ export class OpenAiCompatEngine implements AiEngine {
                 tool_calls?: Array<{index?: number; id?: string; function?: {name?: string; arguments?: string}}>;
               };
             }>;
+            /** Trailing usage chunk (stream_options.include_usage). */
+            usage?: {prompt_tokens?: number; completion_tokens?: number};
           };
+          // The final usage chunk carries the whole-request token counts.
+          if (parsed.usage) {
+            usage = {inputTokens: parsed.usage.prompt_tokens ?? 0, outputTokens: parsed.usage.completion_tokens ?? 0};
+          }
           const delta = parsed.choices?.[0]?.delta;
           // Out-of-band reasoning → wrap so the splitter routes it to the
           // reasoning channel (it's never document content).
@@ -292,6 +398,7 @@ export class OpenAiCompatEngine implements AiEngine {
       }
       if (calls.length > 0) opts.onToolCalls(calls);
     }
+    if (usage) opts.onUsage?.(usage);
     return full;
   }
 
@@ -455,12 +562,30 @@ export class LlamaEngine implements AiEngine {
         contextSequence: context.getSequence(),
         systemPrompt: opts.system,
       });
-      return await session.prompt(prompt, {
+      const out = await session.prompt(prompt, {
         maxTokens: opts.maxTokens ?? 512,
         temperature: opts.temperature ?? 0.7,
         signal: opts.signal,
         onTextChunk: (chunk: string) => opts.onToken(chunk),
       });
+      // Best-effort local token counts via the model's own tokenizer; fall back to
+      // 0 if unavailable. Local inference is free (priced at 0), so precise counts
+      // aren't load-bearing for cost — they're logged for volume attribution only.
+      if (opts.onUsage) {
+        let inputTokens = 0;
+        let outputTokens = 0;
+        try {
+          const model = this.model as {tokenize?: (t: string) => {length: number}};
+          if (typeof model.tokenize === 'function') {
+            inputTokens = model.tokenize(prompt).length + (opts.system ? model.tokenize(opts.system).length : 0);
+            outputTokens = model.tokenize(out).length;
+          }
+        } catch {
+          // tokenizer unavailable — leave at 0
+        }
+        opts.onUsage({inputTokens, outputTokens});
+      }
+      return out;
     } finally {
       await context.dispose();
     }
@@ -490,13 +615,60 @@ export class LlamaEngine implements AiEngine {
 
 // ── Anthropic (hosted Claude API) ────────────────────────────────────────────
 
+/** AiEffort tiers → the Anthropic `output_config.effort` strings. */
+const EFFORT_TO_ANTHROPIC: Record<'low' | 'med' | 'high', 'low' | 'medium' | 'high'> = {low: 'low', med: 'medium', high: 'high'};
+
+/**
+ * Which request shape the target model expects.
+ *
+ * Current-generation Claude (Opus 4.7/4.8, Sonnet 5, Haiku 4.5, Fable/Mythos 5,
+ * and anything newer) use **adaptive** thinking — `thinking:{type:'adaptive'}`
+ * plus `output_config.effort` — and REJECT (HTTP 400) the old
+ * `thinking:{type:'enabled', budget_tokens}`, the `temperature`/`top_p`/`top_k`
+ * sampling params, and the `interleaved-thinking-2025-05-14` beta header
+ * (interleaved thinking is automatic under adaptive). Only the known
+ * budget_tokens-era families take the legacy shape.
+ *
+ * Unknown/unrecognized ids default to **adaptive**: the shipped default is Opus
+ * 4.8 and adaptive is the safe forward shape for anything not yet catalogued —
+ * so this only returns `false` for explicitly-known legacy families, keeping the
+ * generic client working against older pinned models and gateways.
+ */
+export function usesAdaptiveThinking(model: string): boolean {
+  const m = model.trim().toLowerCase();
+  // Claude 3.x (incl. 3.7 Sonnet's budget_tokens extended thinking).
+  if (m.startsWith('claude-3')) return false;
+  // Opus 4.0–4.6 used budget_tokens; 4.7/4.8 are adaptive-only. Anchor the minor
+  // version with `(?![0-9])` so ONLY single-digit 0–6 match — a hypothetical
+  // `claude-opus-4-10`…`4-16` must not be dragged legacy by its leading digit.
+  if (/^claude-opus-4-[0-6](?![0-9])/.test(m)) return false;
+  // Opus 4.0's ids don't fit that pattern: the `claude-opus-4-0` alias and its
+  // dated `claude-opus-4-20250514` snapshot (whose `2` is followed by a digit,
+  // so the anchored rule above skips it). Both are legacy.
+  if (m === 'claude-opus-4-0' || /^claude-opus-4-2025/.test(m)) return false;
+  // Sonnet 4.x (4.0/4.5/4.6). Sonnet 5 is `claude-sonnet-5` — no `-4-`.
+  if (/^claude-sonnet-4-/.test(m)) return false;
+  // Haiku 4.x (4.5) uses budget_tokens and allows temperature but REJECTS the
+  // effort param ("This model does not support the effort parameter"), so it
+  // belongs on the legacy path. (Haiku 3.x is already caught by `claude-3*`.)
+  if (/^claude-haiku-4-/.test(m)) return false;
+  // Documented residual (intentional, not a bug): a few models we route legacy
+  // (Opus 4.5/4.6, Sonnet 4.6) *do* accept `output_config.effort`, but we send
+  // them `budget_tokens` WITHOUT effort — which never 400s (budget_tokens works
+  // on them); we simply forgo the effort optimization on those older ids. Only
+  // the adaptive path (Opus 4.7/4.8, Sonnet 5, Fable/Mythos 5, unknowns) sends
+  // effort. Sonnet 4.6's adaptive-vs-budget status is ambiguous in the docs, so
+  // legacy is the safe default (affects only a user who pins `claude-sonnet-4-6`).
+  return true;
+}
+
 /** The Anthropic Messages API (`/v1/messages`). The only cloud provider —
  *  content leaves the machine. Streams text + (extended) thinking and supports
  *  native tool-calling. No embeddings endpoint, so search falls back to lexical. */
 export class AnthropicEngine implements AiEngine {
   readonly kind = 'claude';
-  /** Default when the user hasn't pinned a model — a current, balanced Claude. */
-  static readonly DEFAULT_MODEL = 'claude-sonnet-4-6';
+  /** Default when the user hasn't pinned a model — the current flagship Claude. */
+  static readonly DEFAULT_MODEL = 'claude-opus-4-8';
   private readonly apiKey: string;
   private readonly model: string;
   private readonly baseUrl: string;
@@ -541,24 +713,45 @@ export class AnthropicEngine implements AiEngine {
 
   async generate(prompt: string, opts: GenerateOptions): Promise<string> {
     const useTools = Boolean(opts.tools && opts.tools.length > 0);
-    const maxTokens = opts.maxTokens ?? 1024;
-    // Extended thinking needs a ≥1024-token budget below max_tokens, and forbids
-    // a custom temperature — so enable it only when the budget allows.
+    const maxTokens = opts.maxTokens ?? 4096;
+    const model = this.model || AnthropicEngine.DEFAULT_MODEL;
+    const adaptive = usesAdaptiveThinking(model);
+    // A ≥1024-token reasoning budget switches thinking on; below that we skip it.
+    // `think` also sizes the max_tokens headroom so a deliberate answer (thinking
+    // + reply) isn't truncated — this holds on both request shapes.
     const think = opts.thinkingBudget && opts.thinkingBudget >= 1024 ? Math.min(opts.thinkingBudget, maxTokens + 4096) : 0;
+    // The thinking + sampling shape is model-dependent (see usesAdaptiveThinking):
+    //  • current-gen → `thinking:{type:'adaptive'}` + `output_config.effort`; the
+    //    model self-regulates depth and interleaves between tool calls. It rejects
+    //    `budget_tokens`, `temperature`, and the interleaved beta header — so with
+    //    thinking off we send NO sampling params either.
+    //  • legacy (budget_tokens era) → the classic `thinking:{type:'enabled',
+    //    budget_tokens}` (+ interleaved beta header), and an explicit temperature
+    //    only when thinking is off.
+    const shape: Record<string, unknown> = think
+      ? adaptive
+        ? {thinking: {type: 'adaptive'}, output_config: {effort: EFFORT_TO_ANTHROPIC[opts.effort ?? 'med']}}
+        : {thinking: {type: 'enabled', budget_tokens: think}}
+      : adaptive
+        ? {}
+        : opts.temperature !== undefined
+          ? {temperature: opts.temperature}
+          : {};
     const body: Record<string, unknown> = {
-      model: this.model || AnthropicEngine.DEFAULT_MODEL,
+      model,
       max_tokens: think ? think + maxTokens : maxTokens,
       stream: true,
       messages: [{role: 'user', content: prompt}],
       ...(opts.system ? {system: opts.system} : {}),
-      ...(think
-        ? {thinking: {type: 'enabled', budget_tokens: think}}
-        : opts.temperature !== undefined
-          ? {temperature: opts.temperature}
-          : {}),
+      ...shape,
       ...(useTools ? {tools: opts.tools!.map((tool) => ({name: tool.name, description: tool.description, input_schema: tool.parameters}))} : {}),
     };
-    const res = await fetch(`${this.baseUrl}/v1/messages`, {method: 'POST', headers: this.headers(), body: JSON.stringify(body), signal: opts.signal});
+    const headers = this.headers();
+    // The interleaved-thinking beta belongs to the legacy budget_tokens path only.
+    // Under adaptive, interleaved thinking is automatic and this header 400s on
+    // Opus 4.7+, so never send it there.
+    if (!adaptive && think) headers['anthropic-beta'] = 'interleaved-thinking-2025-05-14';
+    const res = await fetch(`${this.baseUrl}/v1/messages`, {method: 'POST', headers, body: JSON.stringify(body), signal: opts.signal});
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => '');
       throw new Error(`Generation failed: HTTP ${res.status}${detail ? ` — ${detail.slice(0, 200)}` : ''}`);
@@ -566,6 +759,14 @@ export class AnthropicEngine implements AiEngine {
 
     let full = '';
     let streamError: string | undefined;
+    // Token accounting from the SSE usage frames: `message_start` carries the
+    // input (+ cache) counts and a seed output; each `message_delta` updates the
+    // cumulative output. We keep the latest of each.
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let cacheReadTokens = 0;
+    let cacheWriteTokens = 0;
+    let sawUsage = false;
     // Tool-use blocks accumulate their streamed JSON input by block index.
     const toolAcc = new Map<number, {id: string; name: string; args: string}>();
     const reader = res.body.getReader();
@@ -587,8 +788,22 @@ export class AnthropicEngine implements AiEngine {
             index?: number;
             content_block?: {type?: string; id?: string; name?: string};
             delta?: {type?: string; text?: string; thinking?: string; partial_json?: string};
+            message?: {usage?: {input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number}};
+            usage?: {output_tokens?: number};
             error?: {message?: string};
           };
+          if (ev.type === 'message_start' && ev.message?.usage) {
+            const u = ev.message.usage;
+            inputTokens = u.input_tokens ?? 0;
+            outputTokens = u.output_tokens ?? 0;
+            cacheReadTokens = u.cache_read_input_tokens ?? 0;
+            cacheWriteTokens = u.cache_creation_input_tokens ?? 0;
+            sawUsage = true;
+          } else if (ev.type === 'message_delta' && ev.usage) {
+            // Cumulative output-token count for the message.
+            outputTokens = ev.usage.output_tokens ?? outputTokens;
+            sawUsage = true;
+          }
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
             toolAcc.set(ev.index ?? 0, {id: ev.content_block.id ?? '', name: ev.content_block.name ?? '', args: ''});
           } else if (ev.type === 'content_block_delta') {
@@ -628,6 +843,14 @@ export class AnthropicEngine implements AiEngine {
     }
     // A mid-stream error with nothing produced is a real failure; surface it.
     if (streamError && !full && toolAcc.size === 0) throw new Error(`Anthropic: ${streamError}`);
+    if (sawUsage) {
+      opts.onUsage?.({
+        inputTokens,
+        outputTokens,
+        ...(cacheReadTokens ? {cacheReadTokens} : {}),
+        ...(cacheWriteTokens ? {cacheWriteTokens} : {}),
+      });
+    }
     return full;
   }
 

@@ -3,7 +3,14 @@ import {mkdirSync, writeFileSync} from 'fs';
 import {dirname, resolve} from 'path';
 import {fileURLToPath} from 'url';
 import {toHtml, toHtmlSite} from '../src/export/toHtml';
-import {parityExportSnapshot, parityExportAssets, paritySiteBundle} from '../src/export/__tests__/parityFixtureDoc';
+import {
+  parityExportSnapshot,
+  parityExportAssets,
+  paritySiteBundle,
+  PARITY_PLUGIN_BLOCKS,
+  LEDGER_BLOCK_TYPES,
+  parityLedgerSiteBundle,
+} from '../src/export/__tests__/parityFixtureDoc';
 
 /**
  * Generates the exported-HTML fixtures the Playwright parity harness opens
@@ -30,8 +37,8 @@ import {parityExportSnapshot, parityExportAssets, paritySiteBundle} from '../src
 const OUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../web/e2e-viewer/generated');
 
 describe('parity fixture generation (consumed by e2e-viewer/export-parity.spec.ts)', () => {
-  it('writes a deterministic single-page export', () => {
-    const snap = parityExportSnapshot();
+  it('writes a deterministic single-page export', async () => {
+    const snap = await parityExportSnapshot();
     const assets = parityExportAssets();
     const meta = {id: 'fx-root', updatedAt: '2026-07-04T00:00:00.000Z'};
     const html = toHtml(snap, 'Parity fixture', '🧪', assets, meta);
@@ -40,8 +47,55 @@ describe('parity fixture generation (consumed by e2e-viewer/export-parity.spec.t
     writeFileSync(resolve(OUT_DIR, 'export-page.html'), html);
   });
 
-  it('writes a deterministic site-bundle export', () => {
-    const bundle = paritySiteBundle();
+  // LX-1: the plugin-block page. Exported HTML must show every plugin block as a
+  // labelled placeholder — no block may vanish into an empty paragraph.
+  it('writes a plugin-block export where every unrenderable block is visibly labelled', async () => {
+    const snap = await parityExportSnapshot(PARITY_PLUGIN_BLOCKS);
+    const meta = {id: 'lx-root', updatedAt: '2026-07-04T00:00:00.000Z'};
+    const html = toHtml(snap, 'Ledger plugin blocks', '📒', parityExportAssets(), meta);
+    expect(toHtml(snap, 'Ledger plugin blocks', '📒', parityExportAssets(), meta)).toBe(html); // byte-stable
+    mkdirSync(OUT_DIR, {recursive: true});
+    writeFileSync(resolve(OUT_DIR, 'export-plugin-blocks.html'), html);
+
+    const body = html.slice(0, html.indexOf('<script type="application/openbook+json"'));
+    expect(body).not.toMatch(/<p>\s*<\/p>/); // the LX-1 regression: silent empty paragraphs
+    for (const type of LEDGER_BLOCK_TYPES) expect(body).toContain(`data-block-type="${type}"`);
+    expect(body).toContain('Trial balance');
+    expect(body).toContain('Beancount export');
+    // The FIRST-PARTY ledger blocks get ledger-aware hints, not the generic
+    // "install the plugin" line (LX-3 replaced that wording and this assertion
+    // was left behind): a report says the books weren't included, an
+    // interactive tool says it has no static view. Only a genuinely unknown
+    // third-party block still names a plugin to install.
+    expect(body).toContain('the books weren\'t included in this export');
+    expect(body).toContain('Interactive ledger tool');
+    expect(body).toContain('requires the Future plugin');
+  });
+
+  // LX-3 → LX-5: the ledger REPORTS page, exported twice. Records on, the five
+  // report blocks are real tables and must still be tables once the viewer
+  // hydrates; records off, they are the ledger-aware "books weren't included"
+  // cards and must stay that way.
+  it('writes the ledger-reports exports (records on and off)', () => {
+    mkdirSync(OUT_DIR, {recursive: true});
+    const withRecords = toHtmlSite(parityLedgerSiteBundle(true));
+    const noRecords = toHtmlSite(parityLedgerSiteBundle(false));
+    // Both files land BEFORE any assertion, so a failing expectation still
+    // leaves the browser harness a complete pair to open.
+    writeFileSync(resolve(OUT_DIR, 'export-ledger-reports.html'), withRecords);
+    writeFileSync(resolve(OUT_DIR, 'export-ledger-norecords.html'), noRecords);
+
+    // Records on: real tables, each marked for the hydrating viewer to keep.
+    expect(withRecords).toContain('figure class="ob-ledger-report"');
+    expect(withRecords).toContain('data-ob-keep-static="ledger"');
+    expect(withRecords).toContain('Amounts in USD');
+    // Records off: no fabricated tables, and the ledger-aware wording instead.
+    expect(noRecords).not.toContain('figure class="ob-ledger-report"');
+    expect(noRecords).toContain('the books weren\'t included in this export');
+  });
+
+  it('writes a deterministic site-bundle export', async () => {
+    const bundle = await paritySiteBundle();
     const html = toHtmlSite(bundle, parityExportAssets());
     expect(toHtmlSite(bundle, parityExportAssets())).toBe(html); // byte-stable
     mkdirSync(OUT_DIR, {recursive: true});

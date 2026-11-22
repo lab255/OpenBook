@@ -8,9 +8,12 @@ import {readPageIcon, subscribePageIcon} from '@/lib/pageIcon';
 import {PageIcon} from '@/components/PageIcon';
 import {readFavorites, subscribeFavorites} from '@/lib/favorites';
 import {readRecents, subscribeRecents} from '@/lib/recents';
-import {SIDEBAR_ACTIVE, SIDEBAR_HOVER} from '@/lib/sidebarStyles';
+import {SIDEBAR_HOVER, SIDEBAR_SELECTED_ROW} from '@/lib/sidebarStyles';
 import {cn} from '@/lib/utils';
 import {t as bareT} from '@/i18n';
+import {MENU_WIDTH_MD} from '@/components/ui/menu-components';
+import {FluidHover} from '@/components/ui/fluid-hover';
+import {HiddenPageBadge} from '@/components/HiddenPageBadge';
 
 /**
  * The sidebar's flat page sections — Recents (last visited, device-local) and
@@ -55,20 +58,25 @@ export function SidebarSection({id, label, children}: {id: string; label: string
       <button
         type="button"
         onClick={toggle}
+        onContextMenu={(event) => event.preventDefault()}
         aria-expanded={open}
         className="group/section flex w-full cursor-pointer items-center gap-1 px-3 pb-1 pt-1 text-left"
       >
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 transition-colors group-hover/section:text-muted-foreground">
+        <span className="text-xs font-semibold text-muted-foreground-strong">
           {label}
         </span>
         <ChevronRight
           className={cn(
-            'h-3 w-3 text-muted-foreground/50 opacity-0 transition-all group-hover/section:opacity-100',
+            'h-3 w-3 text-muted-foreground/50 opacity-0 transition-[opacity,transform] group-hover/section:opacity-100',
             open && 'rotate-90',
           )}
         />
       </button>
-      {open && children}
+      {open && <div className="relative isolate" data-sidebar-rows={id}>
+        <FluidHover surface={`sidebar-${id}`} selector="[data-sidebar-page-row]"
+          className="bg-[hsl(var(--sheet-1-foreground)/0.06)]" />
+        {children}
+      </div>}
     </div>
   );
 }
@@ -83,11 +91,13 @@ export function SidebarPageRow({page}: {page: PageMeta}) {
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
+          data-sidebar-page-row
+          data-selected={selected || undefined}
           onClick={() => selectPageInPane(page.id, 'primary')}
           className={cn(
-            'mx-1 flex cursor-pointer items-center rounded-md py-1 pl-2 pr-1.5 text-sm text-foreground/75 transition-colors',
+            'relative mx-1 flex cursor-pointer items-center rounded-md py-1 pl-2 pr-1.5 text-sm text-sheet-1-foreground transition-colors',
             SIDEBAR_HOVER,
-            selected && cn(SIDEBAR_ACTIVE, 'font-medium'),
+            selected && SIDEBAR_SELECTED_ROW,
           )}
         >
           <PageIcon
@@ -95,9 +105,10 @@ export function SidebarPageRow({page}: {page: PageMeta}) {
             className="mr-2 h-4 w-4 shrink-0 text-center text-xs leading-4"
           />
           <span className="grow truncate">{displayName(page.name)}</span>
+          {page.listed === false && <HiddenPageBadge />}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
+      <ContextMenuContent className={MENU_WIDTH_MD}>
         <PageMenuItems pageId={page.id} />
       </ContextMenuContent>
     </ContextMenu>
@@ -120,7 +131,7 @@ const SHOWN_SUGGESTED = 4;
 
 /**
  * Pages that changed recently but aren't in your recent trail — the "you
- * might be looking for this" shelf. Empty (and hidden) in a fresh workspace.
+ * might be looking for this" shelf. Empty (and hidden) in a fresh library.
  */
 export function SuggestedNav() {
   const {pages} = useNavigation();

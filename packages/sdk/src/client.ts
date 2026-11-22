@@ -5,16 +5,43 @@ import type {
   AgentChatMessage,
   AgentChatOptions,
   AiConfig,
+  AiTranscriptionResult,
+  AiPricingResponse,
+  AiPricingTable,
+  AiUsageResponse,
   AiSearchResponse,
   AiSkill,
   AiStatus,
   AiStreamEvent,
   AiTasksResponse,
+  McpClientConfig,
+  McpConfigResponse,
+  McpServerConfig,
+  McpTestResult,
 } from './ai';
-import type {AclLevel, Member, MemberRole, MemberStatus, PageAcl, PageInput, PageMeta, PageVisibility, StoredPage} from './types';
+import type {AclLevel, AgentEditsMode, AgentEditsPolicy, Member, MemberRole, MemberStatus, PageAcl, PageGraph, PageInput, PageMeta, PageVersionMeta, PageVisibilitySettings, PageVisibilityUpdate, StoredPage, StoredPageVersion} from './types';
 import type {InstanceConfig, InstanceInfo, StoredEdit} from './provenance';
-import type {BackupCadence, BackupConfig, BackupStatus, ImportRequest, ImportResult} from './backup';
+import {ICON_PROPERTY_ID} from './pageProperties';
+import {
+  DatabaseFormRequestError,
+  FormSubmissionError,
+  FormUploadError,
+  type DatabaseFormDescriptorRequest,
+  type DatabaseFormPublication,
+  type DatabaseFormPublishResult,
+  type DatabaseFormSubmissionRequest,
+  type DatabaseFormUploadInput,
+  type FormSubmissionRequest,
+  type FormSubmissionResult,
+  type FormUploadInput,
+  type FormUploadResult,
+} from './forms';
+import {FORM_VALIDATION_ERROR_CODES, type FormValidationError} from './formSchema';
+import type {AgentTokenMeta, AgentTokenScope} from './identity';
+import type {BackupCadence, BackupConfig, BackupStatus, ImportRequest, ImportResult, LibraryBackup} from './backup';
+import type {LedgerExportSection, LedgerSectionRestoreResult} from './ledgerExportSection';
 import type {
+  DatabaseFormDescriptor,
   DatabaseInput,
   DatabaseRow,
   DatabaseUpdate,
@@ -30,6 +57,31 @@ import type {
   SuggestionStatus,
   SuggestionUpdate,
 } from './suggestions';
+import {LEDGER_ERROR_CODES, LedgerError, type LedgerErrorCode} from './ledger';
+import type {
+  LedgerAccount,
+  LedgerAccountInput,
+  LedgerAccountPatch,
+  LedgerAuditEvent,
+  LedgerClearedState,
+  LedgerDraftInput,
+  LedgerDraftPatch,
+  LedgerInfo,
+  LedgerPeriod,
+  LedgerPeriodCloseInput,
+  LedgerPeriodCloseResult,
+  LedgerPeriodReopenResult,
+  LedgerPosting,
+  LedgerReconciliation,
+  LedgerReconciliationInput,
+  LedgerReconciliationPatch,
+  LedgerReconciliationStatus,
+  LedgerReconciliationSummary,
+  LedgerReverseOptions,
+  LedgerTransaction,
+  LedgerTransactionState,
+  LedgerVerifyReport,
+} from './ledger';
 
 /** Handlers for a single page's live update stream. */
 export interface PageSubscription {
@@ -37,6 +89,34 @@ export interface PageSubscription {
   onPage?: (page: StoredPage) => void;
   /** The page was deleted. */
   onDeleted?: (id: string) => void;
+}
+
+/** Input to {@link DataClient.createAgentToken}. `scope` defaults to `read`;
+ *  `expiresInDays` defaults to 90 server-side, and `null` mints a no-expiry token. */
+export interface CreateAgentTokenInput {
+  name: string;
+  scope?: AgentTokenScope;
+  expiresInDays?: number | null;
+  /** Mint a REMOTE-capable token (AGENT-7): usable over a forwarded `/api/mcp`
+   *  request via the public edge. Default false. Requires the instance's
+   *  `agentApi.remote` setting to already be on (else the mint 409s), and forces a
+   *  finite TTL (30 d default, 90 d max; no-expiry rejected). */
+  remote?: boolean;
+}
+
+/** The one-time create response: the plaintext `token` (shown ONCE) + its meta. */
+export interface CreatedAgentToken {
+  token: string;
+  meta: AgentTokenMeta;
+}
+
+/** The agent-token management view: the dark `agentApi` on/off state + the list. */
+export interface AgentTokenList {
+  enabled: boolean;
+  /** Whether REMOTE MCP is effectively enabled (AGENT-7): the `agentApi.remote`
+   *  setting AND the local feature on AND neither kill-switch set. */
+  remote: boolean;
+  tokens: AgentTokenMeta[];
 }
 
 /**
@@ -49,22 +129,71 @@ export interface PageSubscription {
  * document code never changes.
  */
 export interface DataClient {
+  /** HTTP origin used by connection-relative public URLs; empty for same-origin transports. */
+  readonly connectionBaseUrl?: string;
   /** List all pages' metadata, most-recently-updated first. */
   listPages(): Promise<PageMeta[]>;
   /** Fetch a page by id, or `null` if it does not exist. */
   getPage(id: string): Promise<StoredPage | null>;
   /** Create or update a page (upsert keyed on `input.id`). */
   savePage(input: PageInput): Promise<StoredPage>;
+  /** Public capability-gated form submission (remote HTTP clients only). */
+  submitForm?(
+    pageId: string,
+    formId: string,
+    input: FormSubmissionRequest,
+  ): Promise<FormSubmissionResult>;
+  /** Stage one file for a capability-gated public form submission. */
+  uploadFormFile?(
+    pageId: string,
+    formId: string,
+    input: FormUploadInput,
+  ): Promise<FormUploadResult>;
   /** Update only a page's name (leaves its document data untouched). */
   renamePage(id: string, name: string | null): Promise<StoredPage>;
   /**
    * Shallow-merge structured property values into a page (owner, verification,
-   * …), leaving its document content and other properties untouched. Used by
-   * the page properties panel for non-row pages (database rows use {@link updateRow}).
+   * …), leaving its document content and other properties untouched. Explicit
+   * `null` values are stored; by contrast, {@link updateRow} uses `null` to
+   * delete a row-property key. Readers currently treat either form as absent.
    */
   setPageProperties(id: string, properties: Record<string, unknown>): Promise<StoredPage>;
   /** List the live pages that link to `id` (via `@`-mentions), newest first. */
   listBacklinks(id: string): Promise<PageMeta[]>;
+  /**
+   * The whole-library page-link graph: readable pages as nodes + their
+   * mention/relation edges (both endpoints readable). Edges are derived on the
+   * fly. Read-filtered per principal like {@link listPages}.
+   */
+  pageGraph(): Promise<PageGraph>;
+
+  // ── Page version history (PVH-3) ─────────────────────────────────────────────
+  /**
+   * List a page's captured versions (metadata only — no snapshot payload, so a
+   * history list stays cheap), newest first. `opts.limit` caps the page (server
+   * clamps 1..1000; default 100). Version access inherits the page's READ
+   * capability — a caller who can't read the page can't list its versions.
+   *
+   * Asymmetry (intentional): unlike {@link getVersion}/{@link restoreVersion}, which
+   * return `null` on a 404, this THROWS on a non-OK response. A missing/unreadable
+   * page surfaces as a 403/404 error rather than an empty list, so a caller can't
+   * mistake "you can't see this page" for "this page has no history".
+   */
+  listVersions(pageId: string, opts?: {limit?: number}): Promise<PageVersionMeta[]>;
+  /**
+   * Read one captured version WITH its snapshot payload (the state to roll back
+   * to), or `null` when it doesn't exist / isn't that page's version (no
+   * cross-page leak). Read-gated on the page.
+   */
+  getVersion(pageId: string, versionId: string): Promise<StoredPageVersion | null>;
+  /**
+   * Roll a page back to a captured version, returning the restored page (or `null`
+   * when the page/version is gone). Write-gated on the page. Non-destructive: the
+   * server writes the old snapshot back through the normal save path, which captures
+   * the CURRENT (pre-restore) state as a fresh version first — so a restore is itself
+   * undoable via another restore. The page's name is left untouched.
+   */
+  restoreVersion(pageId: string, versionId: string): Promise<StoredPage | null>;
   /**
    * Move a page within the sidebar tree: set its parent (`null` = top level) and
    * the full ordered list of sibling ids under that parent (including this page).
@@ -80,24 +209,51 @@ export interface DataClient {
   aiSearch(query: string, limit?: number): Promise<AiSearchResponse>;
   aiTasks(goal: string, context?: string): Promise<AiTasksResponse>;
   aiDownloadModel(url?: string): Promise<AiStatus['download']>;
+  /** False for clients without a transcription transport (for example the local store). */
+  readonly supportsTranscription?: boolean;
+  transcribeAsset(assetId: string, pageId: string): Promise<AiTranscriptionResult>;
   aiComplete(text: string, onToken: (token: string) => void, opts?: {instruction?: string; signal?: AbortSignal}): Promise<string>;
   aiGenerate(prompt: string, onToken: (token: string) => void, opts?: {system?: string; maxTokens?: number; signal?: AbortSignal}): Promise<string>;
   /**
-   * Run the workspace agent on a conversation. `onEvent` fires once per step
+   * Run the library agent on a conversation. `onEvent` fires once per step
    * (tool call, tool result, reasoning, proposals, final answer, error);
    * resolves when the run ends. `opts` carries effort/thinking/skills overrides.
    */
   agentChat(messages: AgentChatMessage[], onEvent: (event: AgentChatEvent) => void, opts?: AgentChatOptions): Promise<void>;
-  /** List the workspace's prompt/recipe skills. */
+  /** List the library's prompt/recipe skills. */
   aiSkills(): Promise<AiSkill[]>;
   /** Create or replace a prompt/recipe skill (keyed on its slug). */
   aiSaveSkill(skill: AiSkill): Promise<AiSkill>;
   /** Delete a prompt/recipe skill by name. */
   aiDeleteSkill(name: string): Promise<boolean>;
+  /** Read the usage-attribution pricing (admin only): default + override merged. */
+  getAiPricing(): Promise<AiPricingResponse>;
+  /** Set the admin pricing override (admin only); returns the merged view. */
+  setAiPricing(override: AiPricingTable): Promise<AiPricingResponse>;
+  /** Read the admin-only AI usage view (recent rows + totals; admin only). Never
+   *  seeds the usage DB — a fresh library reports `exists:false`. */
+  getAiUsage(): Promise<AiUsageResponse>;
+  /** Set the AI usage database's retention window in days (admin only). */
+  setAiUsageRetention(days: number): Promise<{days: number}>;
+  /** Read the external-tools (MCP client) config (admin only): redacted config +
+   *  whether the stdio transport is permitted on this instance. */
+  getMcpConfig(): Promise<McpConfigResponse>;
+  /** Save the external-tools (MCP client) config (admin only). Auth tokens are
+   *  write-only (omit/blank preserves, a value sets, `null` clears). Returns the
+   *  redacted result. */
+  putMcpConfig(config: McpClientConfig): Promise<McpConfigResponse>;
+  /** Dry-run one MCP server config (admin only): connect + list tools; never
+   *  returns secrets. */
+  testMcpServer(server: McpServerConfig): Promise<McpTestResult>;
 
-  // ── Extensions (installed plugins, stored server-side per workspace) ───────
+  // ── Extensions (installed plugins, stored server-side per library) ───────
   listPlugins(): Promise<StoredPlugin[]>;
-  installPlugin(pkg: PluginPackage): Promise<StoredPlugin>;
+  /**
+   * Install or upgrade a plugin. The server preserves the enabled state and
+   * install time of an existing plugin, and REJECTS a downgrade (an older
+   * semver than what's installed) unless `opts.allowDowngrade` is explicit.
+   */
+  installPlugin(pkg: PluginPackage, opts?: {allowDowngrade?: boolean}): Promise<StoredPlugin>;
   setPluginEnabled(id: string, enabled: boolean): Promise<StoredPlugin>;
   removePlugin(id: string): Promise<boolean>;
   /**
@@ -106,10 +262,11 @@ export interface DataClient {
    * it. Resolves `true` if a live page was trashed.
    */
   deletePage(id: string): Promise<boolean>;
-  /** Export the whole space: every live page (full data) + every database. */
-  exportSpace(): Promise<{pages: StoredPage[]; databases: StoredDatabase[]}>;
+  /** Export the whole space: every live page (full data) + every database —
+   *  plus the ledger durability section when a ledger is seeded (LGR-15). */
+  exportLibrary(): Promise<LibraryBackup>;
   /** Restore a (client-selected) set of pages/databases; see {@link ImportRequest}. */
-  importSpace(req: ImportRequest): Promise<ImportResult>;
+  importLibrary(req: ImportRequest): Promise<ImportResult>;
   /** List the trash (most-recently-deleted first). */
   listTrash(): Promise<PageMeta[]>;
   /** Restore a trashed page, or `null` if it isn't in the trash. */
@@ -149,6 +306,9 @@ export interface DataClient {
    * own echo can be dropped. Ephemeral — never persisted (durability stays with
    * {@link savePage}'s debounced snapshot).
    */
+  /** Durably merge a delta. False only when the transport/server lacks support.
+   * A page-level 403/404 rejects; callers must never fall back after that failure. */
+  applyPageUpdate?(id: string, update: string, clientId: number): Promise<boolean>;
   postPageUpdate(id: string, update: string, clientId: number): Promise<void>;
   /**
    * Subscribe to a page's incremental Yjs updates. `onUpdate` fires with the base64
@@ -213,6 +373,36 @@ export interface DataClient {
   getPageDatabase(pageId: string): Promise<StoredDatabase | null>;
   /** Update a database's name and/or schema. */
   updateDatabase(id: string, patch: DatabaseUpdate): Promise<StoredDatabase>;
+  /** Read publication state without exposing the raw capability (F-3 reference seam). */
+  getDatabaseFormPublication?(
+    databaseId: string,
+    viewId: string,
+  ): Promise<DatabaseFormPublication>;
+  /** First-publish or rotate a form view, returning the one-time public fill URL. */
+  publishDatabaseForm?(
+    databaseId: string,
+    viewId: string,
+  ): Promise<DatabaseFormPublishResult>;
+  /** Revoke the single active public-fill capability for a form view. */
+  revokeDatabaseForm?(databaseId: string, viewId: string): Promise<boolean>;
+  /** Fetch the strict capability-gated public descriptor. */
+  getPublicDatabaseForm?(
+    databaseId: string,
+    viewId: string,
+    input: DatabaseFormDescriptorRequest,
+  ): Promise<DatabaseFormDescriptor>;
+  /** Submit one anonymous response through a database form capability. */
+  submitDatabaseForm?(
+    databaseId: string,
+    viewId: string,
+    input: DatabaseFormSubmissionRequest,
+  ): Promise<FormSubmissionResult>;
+  /** Stage one public database-form file and return its opaque submission token. */
+  uploadDatabaseFormFile?(
+    databaseId: string,
+    viewId: string,
+    input: DatabaseFormUploadInput,
+  ): Promise<FormUploadResult>;
   /** Delete a database and all its row pages. Resolves `true` if removed. */
   deleteDatabase(id: string): Promise<boolean>;
   /** List a database's rows (projected: properties + exported cell values). */
@@ -225,6 +415,97 @@ export interface DataClient {
   reorderRows(databaseId: string, orderedIds: string[]): Promise<void>;
   /** Subscribe to a database's live row-list updates. Returns an unsubscribe fn. */
   subscribeRows(databaseId: string, onRows: (rows: DatabaseRow[]) => void): () => void;
+
+  // ── Ledger: server-enforced double-entry accounting (LGR-3) ──────────────────
+  // Invariant violations reject with a typed {@link LedgerError} over BOTH
+  // transports (the HTTP client re-materializes the server's `{error, code}`).
+  /** Whether the ledger is initialized, and the seeded database/host ids. */
+  ledgerInfo(): Promise<LedgerInfo>;
+  /** Seed the four managed ledger databases + restricted host page (idempotent). */
+  ledgerInit(): Promise<LedgerInfo>;
+  /**
+   * LX-4: restore an export's embedded ledger-records section into an EMPTY
+   * ledger — the section is deep-validated, then REPLAYED through the server's
+   * ledger writer (fresh audit entries carrying import provenance; no direct
+   * row writes). Refuses with `LedgerError('invalid-state')` when the target
+   * already keeps any ledger data (merge is out of scope). Instance-admin gated
+   * over HTTP, like `importLibrary`.
+   */
+  ledgerRestoreSection(section: LedgerExportSection): Promise<LedgerSectionRestoreResult>;
+  /** List accounts (hierarchy is encoded in the colon-delimited names). */
+  ledgerListAccounts(): Promise<LedgerAccount[]>;
+  /** Create an account. `currency` defaults to `USD`. */
+  ledgerCreateAccount(input: LedgerAccountInput): Promise<LedgerAccount>;
+  /** Fetch one account, or `null` when it does not exist. */
+  ledgerGetAccount(id: string): Promise<LedgerAccount | null>;
+  /** Rename / close / reopen an account. Closing rejects at nonzero posted balance. */
+  ledgerUpdateAccount(id: string, patch: LedgerAccountPatch): Promise<LedgerAccount>;
+  /** List transactions with their postings (`state` filters; `limit` caps). */
+  ledgerListTransactions(opts?: {state?: LedgerTransactionState; limit?: number}): Promise<LedgerTransaction[]>;
+  /** Fetch one transaction (with postings), or `null` when it does not exist. */
+  ledgerGetTransaction(id: string): Promise<LedgerTransaction | null>;
+  /** Create a DRAFT transaction (with postings). Drafts are freely mutable. */
+  ledgerCreateDraft(input: LedgerDraftInput): Promise<LedgerTransaction>;
+  /** Update a DRAFT (posted/void transactions are immutable — typed rejection). */
+  ledgerUpdateDraft(id: string, patch: LedgerDraftPatch): Promise<LedgerTransaction>;
+  /** Delete a DRAFT and its postings (permanent, audited). Posted/void reject. */
+  ledgerDeleteDraft(id: string): Promise<boolean>;
+  /** Post a draft atomically (validates all invariants; assigns the entry number). */
+  ledgerPostTransaction(id: string): Promise<LedgerTransaction>;
+  /** Atomically create + post the reversing entry and void the original. */
+  ledgerReverseTransaction(id: string, opts?: LedgerReverseOptions): Promise<LedgerTransaction>;
+  /** Flip a posting between `pending`/`cleared` (`reconciled` is locked, LGR-11). */
+  ledgerSetPostingCleared(postingId: string, cleared: LedgerClearedState): Promise<LedgerPosting>;
+
+  // ── Statement reconciliation (LGR-11) ───────────────────────────────────────
+  // The workflow that catches the entries an import missed, doubled, or got
+  // wrong. Every step is one atomic, audited store mutation; `finish` is the
+  // gate — it is impossible at a nonzero difference over BOTH transports,
+  // because the check lives in the store, not in the caller.
+  /** List reconciliations, newest statement first. Filters are ANDed. */
+  ledgerListReconciliations(opts?: {accountId?: string; status?: LedgerReconciliationStatus}): Promise<LedgerReconciliation[]>;
+  /** One reconciliation with its live cleared balance + difference, or `null`. */
+  ledgerGetReconciliation(id: string): Promise<LedgerReconciliationSummary | null>;
+  /** START a reconciliation. Rejects `reconciliation-exists` if one is open. */
+  ledgerStartReconciliation(input: LedgerReconciliationInput): Promise<LedgerReconciliation>;
+  /** AMEND an OPEN reconciliation's statement date/balance (LGR-22) — the fix
+   *  for a mistyped target, which no amount of ticking can reach zero. Touches
+   *  no posting; returns the summary with the difference recomputed. */
+  ledgerAmendReconciliation(id: string, patch: LedgerReconciliationPatch): Promise<LedgerReconciliationSummary>;
+  /** ABANDON an OPEN reconciliation (LGR-22): end it without balancing it and
+   *  without posting anything. Terminal, audited, posting-neutral — every tick
+   *  keeps its cleared state, and the account is free to start a new one. */
+  ledgerAbandonReconciliation(id: string): Promise<LedgerReconciliation>;
+  /** Match (`cleared`) or unmatch (`pending`) one posting inside an OPEN one. */
+  ledgerToggleReconciliationPosting(id: string, postingId: string, cleared: 'pending' | 'cleared'): Promise<LedgerReconciliationSummary>;
+  /** FINISH — only at a difference of exactly 0; freezes the matched postings. */
+  ledgerFinishReconciliation(id: string): Promise<LedgerReconciliationSummary>;
+  /** REOPEN a finished reconciliation (explicit, audited); unfreezes its postings. */
+  ledgerReopenReconciliation(id: string): Promise<LedgerReconciliationSummary>;
+
+  /** Every period record — closed AND reopened history (LGR-12). */
+  ledgerListPeriods(): Promise<LedgerPeriod[]>;
+  /** CLOSE a period: closing entry + date-range lock; warns (never blocks) on
+   *  open reconciliations. Store-enforced — `period-closed` rejections for any
+   *  posting/reversal dated inside the range hold over both transports. */
+  ledgerClosePeriod(input: LedgerPeriodCloseInput): Promise<LedgerPeriodCloseResult>;
+  /** REOPEN a closed period (explicit, audited): voids the closing entry via a
+   *  reversal and restores postability for the range. */
+  ledgerReopenPeriod(id: string): Promise<LedgerPeriodReopenResult>;
+
+  /** Read the append-only audit log, newest first (`before` = seq cursor). */
+  ledgerListAudit(opts?: {limit?: number; before?: number}): Promise<LedgerAuditEvent[]>;
+  /** The whole ledger as the canonical postings CSV (LGR-7) — byte-stable:
+   *  same data ⇒ identical bytes over BOTH transports. */
+  ledgerExportCsv(): Promise<string>;
+  /** The whole ledger as a Beancount journal (LGR-13) — byte-stable like the
+   *  CSV, built from the same read model; `bean-check`/Fava re-verify it with
+   *  an independent implementation. */
+  ledgerExportBeancount(): Promise<string>;
+  /** The independent invariant verifier's report (LGR-7). Admin-gated over
+   *  HTTP (the report names entity ids across the whole book); the local
+   *  single-user store answers directly. */
+  ledgerVerify(): Promise<LedgerVerifyReport>;
 
   // ── Suggestions + comments (the review layer) ────────────────────────────────
   /** List a page's suggestions, newest first. `status` filters (e.g. only open). */
@@ -252,11 +533,25 @@ export interface DataClient {
   listPageEdits(pageId: string, limit?: number): Promise<StoredEdit[]>;
 
   // ── Sharing: per-page visibility scope + ACL (OB-182 §1.1; OB-191/203) ────────
-  /** A page's stored visibility scope (raw — `inherit` not yet resolved), or
-   *  `null` if the page does not exist. */
-  getPageVisibility(pageId: string): Promise<PageVisibility | null>;
-  /** Set a page's visibility scope (manager-only — gated on page write). */
-  setPageVisibility(pageId: string, visibility: PageVisibility): Promise<PageVisibility>;
+  /** A page's stored audience scope and independent discovery posture, or
+   *  `null` if the page does not exist. `visibility` is raw (`inherit` is not
+   *  resolved). */
+  getPageVisibility(pageId: string): Promise<PageVisibilitySettings | null>;
+  /** Update either or both page visibility settings (manager-only). */
+  setPageVisibility(pageId: string, update: PageVisibilityUpdate): Promise<PageVisibilitySettings>;
+  /** A page's agent-edits policy (AGED-1; raw — `inherit` not yet resolved against
+   *  the instance mode). Gated on read of the page. Use this for the UI tri-state
+   *  (which must show `inherit` as its own state); use {@link getEffectiveAgentEdits}
+   *  when you need the resolved decision. Resolve manually with {@link resolveAgentEdits}. */
+  getPageAgentEdits(pageId: string): Promise<AgentEditsPolicy>;
+  /** A page's SERVER-RESOLVED effective agent-edits mode (AGED-6): the raw policy
+   *  resolved against the instance default, computed server-side (never `inherit`).
+   *  Lets a PAT-scoped client learn the effective mode of an `inherit` page WITHOUT
+   *  the privileged instance read. Gated on read of the page. */
+  getEffectiveAgentEdits(pageId: string): Promise<AgentEditsMode>;
+  /** Set a page's agent-edits policy (AGED-1; jws-only — a PAT cannot change the
+   *  policy that governs whether agents edit directly). */
+  setPageAgentEdits(pageId: string, agentEdits: AgentEditsPolicy): Promise<AgentEditsPolicy>;
   /** A page's per-page ACL grants (manager-only — gated on page write). */
   listPageAcl(pageId: string): Promise<PageAcl[]>;
   /** Share a page with `invitee` (email or handle/subject) at `level`. */
@@ -273,13 +568,33 @@ export interface DataClient {
   /** Revoke a roster row by id. `true` if one was removed. */
   removeMember(id: string): Promise<boolean>;
 
+  // ── Agent access: PAT credential management (AGENT-6; admin-only) ─────────────
+  /** List minted agent tokens (redacted) plus the dark `agentApi` on/off state. */
+  listAgentTokens(): Promise<AgentTokenList>;
+  /** Toggle the dark `agentApi` setting on/off (+ the `agentApi.remote` remote-MCP
+   *  opt-in, AGENT-7). `remote` is forced off when `enabled` is off. Returns the new
+   *  effective state. */
+  setAgentApiEnabled(enabled: boolean, remote?: boolean): Promise<{enabled: boolean; remote: boolean}>;
+  /** Mint a token (requires `agentApi` enabled). The plaintext `token` comes back
+   *  exactly ONCE — store it now; only its hash is kept server-side. */
+  createAgentToken(input: CreateAgentTokenInput): Promise<CreatedAgentToken>;
+  /** Revoke a token by id. `true` if one was removed. */
+  revokeAgentToken(id: string): Promise<boolean>;
+
   // ── Scheduled backups (OB-166) ───────────────────────────────────────────────
   /** Scheduled-backup policy + per-cadence status. */
   getBackupStatus(): Promise<BackupStatus>;
   /** Update the backup policy (enable, cadences, retention, folder). Owner-only. */
   setBackupConfig(patch: Partial<BackupConfig>): Promise<BackupStatus>;
   /** Run a snapshot now ("Back up now"). Resolves the written file + its folder. */
-  runBackup(cadence?: BackupCadence): Promise<{file: string; dir: string}>;
+  runBackup(cadence?: BackupCadence): Promise<{file: string; dir: string; skippedCount: number}>;
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  /** Release the client's resources (close the live `EventSource`, drop
+   *  identity subscriptions). Optional — an in-webview client with no long-lived
+   *  connection has nothing to release. Called when the app swaps to a different
+   *  client (a no-reload library switch) or tears down. */
+  dispose?(): void;
 }
 
 /**
@@ -373,6 +688,16 @@ class LiveStream {
   private source: LiveSourceLike | null = null;
   private readonly listListeners = new Set<(pages: PageMeta[]) => void>();
   private readonly pageListeners = new Map<string, Set<PageSubscription>>();
+  // `/api/live` deliberately omits content frames for unlisted pages. Once its
+  // list snapshot proves that an actively-open page is absent, receive that
+  // page's durable save/delete events through the already read-gated per-page SSE
+  // endpoint instead. One fallback source is shared by every listener for an id.
+  private streamedPageIds: Set<string> | null = null;
+  // Last list snapshot delivered to chrome/navigation consumers. A subsequent
+  // `page` frame may be the only event for a metadata-only write, so keep enough
+  // state to patch and re-emit that entry without waiting for a list frame.
+  private streamedPages: PageMeta[] | null = null;
+  private readonly pageFallbackSources = new Map<string, LiveSourceLike>();
   private readonly rowsListeners = new Map<string, Set<(rows: DatabaseRow[]) => void>>();
   // Live collaboration — per-page incremental Yjs-update listeners (Collab T1).
   // Unlike the others these carry no durable state, so they are NOT resynced on
@@ -409,10 +734,52 @@ class LiveStream {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
-    private readonly liveUrl: string,
+    // NOT readonly: the URL bakes the identity/token credential (an EventSource
+    // can't send headers), and {@link updateUrl} re-points it when that credential
+    // changes so the stream can't keep asserting a stale identity — see below.
+    private liveUrl: string,
     private readonly fetchers: ResyncFetchers,
     private readonly createSource: (url: string) => LiveSourceLike,
+    private readonly pageStreamUrl: (id: string) => string,
   ) {}
+
+  /**
+   * Re-point the stream at a new URL (a changed identity/token credential) and,
+   * when a source is already open, tear it down and reopen against the new URL —
+   * so the streamed nav list re-asserts the CURRENT identity instead of the one
+   * frozen into the EventSource URL when it first opened (the cross-server
+   * "titles show, content blank" divergence). A no-op when the URL is unchanged,
+   * so an unrelated re-subscribe never churns the connection. Listeners survive
+   * (they live in the Sets, not the source); an identity-scoped resync then
+   * re-fetches every open subscription under the NEW credential and, unlike a
+   * transient reconnect resync, CLEARS any open page that is no longer readable
+   * (a 404/null or a 401) by firing its `onDeleted` — so a weaker identity or an
+   * account switch drops the now-unreadable body (never leaving account-A's
+   * content rendered under account-B) instead of leaving it stale until
+   * navigation, while a still-readable page repopulates.
+   */
+  updateUrl(url: string): void {
+    if (url === this.liveUrl) return;
+    this.liveUrl = url;
+    if (!this.source) return; // not open yet — the next ensureOpen() uses the new URL
+    this.source.close();
+    this.source = null;
+    this.closePageFallbacks();
+    // The previous identity's filtered list cannot decide which pages need a
+    // fallback under the new identity. Wait for the replacement firehose list.
+    this.streamedPageIds = null;
+    this.streamedPages = null;
+    // Reset the transport state machine so the reopen is evaluated from scratch
+    // (a fresh grace window, no inherited poll/error state).
+    this.clearGraceTimer();
+    this.stopPolling();
+    this.clearReconnectTimer();
+    this.hasOpened = false;
+    this.preOpenErrors = 0;
+    this.sawError = false;
+    this.ensureOpen();
+    void this.resync(true); // credential changed → clear pages unreadable under it
+  }
 
   private dispatch(raw: string): void {
     let ev: {type: string; [k: string]: unknown};
@@ -422,10 +789,34 @@ class LiveStream {
       return;
     }
     if (ev.type === 'list') {
-      this.listListeners.forEach((fn) => fn(ev.pages as PageMeta[]));
+      const pages = ev.pages as PageMeta[];
+      this.streamedPages = pages;
+      this.streamedPageIds = new Set(pages.map((page) => page.id));
+      this.reconcilePageFallbacks();
+      this.listListeners.forEach((fn) => fn(pages));
     } else if (ev.type === 'page') {
       const page = ev.page as StoredPage;
       this.pageListeners.get(page.id)?.forEach((s) => s.onPage?.(page));
+      const existing = this.streamedPages?.find((meta) => meta.id === page.id);
+      if (!existing) return;
+      const patched = {
+        ...existing,
+        name: page.name,
+        hostedDatabaseId: page.hostedDatabaseId,
+        parentId: page.parentId,
+        deletedAt: page.deletedAt,
+        updatedAt: page.updatedAt,
+        icon: (page.properties?.[ICON_PROPERTY_ID] as string | null | undefined) ?? null,
+      };
+      if (
+        patched.name === existing.name &&
+        patched.hostedDatabaseId === existing.hostedDatabaseId &&
+        patched.parentId === existing.parentId &&
+        patched.deletedAt === existing.deletedAt &&
+        patched.icon === existing.icon
+      ) return;
+      this.streamedPages = this.streamedPages!.map((meta) => meta.id === page.id ? patched : meta);
+      this.listListeners.forEach((fn) => fn(this.streamedPages!));
     } else if (ev.type === 'deleted') {
       const id = ev.id as string;
       this.pageListeners.get(id)?.forEach((s) => s.onDeleted?.(id));
@@ -550,8 +941,80 @@ class LiveStream {
     }
   }
 
-  /** Re-fetch and re-dispatch every open subscription after a reconnect or poll. */
-  private async resync(): Promise<void> {
+  /** Close one page's direct-stream fallback, if it is open. */
+  private closePageFallback(id: string): void {
+    this.pageFallbackSources.get(id)?.close();
+    this.pageFallbackSources.delete(id);
+  }
+
+  /** Close every direct-stream fallback (identity change / final unsubscribe). */
+  private closePageFallbacks(): void {
+    for (const source of this.pageFallbackSources.values()) source.close();
+    this.pageFallbackSources.clear();
+  }
+
+  /**
+   * Reconcile one active page subscription against the most recent filtered
+   * firehose list. Listed/readable pages stay on `/api/live`; an absent page gets
+   * `/api/pages/:id/stream`, whose server route performs the direct-read gate and
+   * therefore keeps a deliberately opened unlisted page live without putting its
+   * content back on the global channel.
+   */
+  private reconcilePageFallback(id: string): void {
+    const needsFallback =
+      this.streamedPageIds !== null &&
+      !this.streamedPageIds.has(id) &&
+      (this.pageListeners.get(id)?.size ?? 0) > 0;
+    if (!needsFallback) {
+      this.closePageFallback(id);
+      return;
+    }
+    if (this.pageFallbackSources.has(id)) return;
+
+    const source = this.createSource(this.pageStreamUrl(id));
+    source.addEventListener('page', (event) => {
+      if (event.data == null) return;
+      try {
+        const page = JSON.parse(event.data) as StoredPage;
+        if (page.id !== id) return;
+        this.pageListeners.get(id)?.forEach((sub) => sub.onPage?.(page));
+      } catch {
+        /* malformed frame — ignore it like the multiplexed dispatcher does */
+      }
+    });
+    source.addEventListener('deleted', (event) => {
+      if (event.data == null) return;
+      try {
+        const deleted = JSON.parse(event.data) as {id?: unknown};
+        if (deleted.id !== id) return;
+        this.pageListeners.get(id)?.forEach((sub) => sub.onDeleted?.(id));
+      } catch {
+        /* malformed frame — ignore it like the multiplexed dispatcher does */
+      }
+    });
+    this.pageFallbackSources.set(id, source);
+  }
+
+  private reconcilePageFallbacks(): void {
+    for (const id of this.pageListeners.keys()) this.reconcilePageFallback(id);
+    // Also close a fallback whose last listener disappeared before this pass.
+    for (const id of [...this.pageFallbackSources.keys()]) {
+      if (!this.pageListeners.has(id)) this.closePageFallback(id);
+    }
+  }
+
+  /**
+   * Re-fetch and re-dispatch every open subscription after a reconnect or poll.
+   *
+   * `clearUnreadable` distinguishes the two callers. A transient reconnect/poll
+   * resync (`false`) treats a null/failed page as "server still catching up" and
+   * leaves the current content in place — the next event heals it. An
+   * identity-change resync (`true`, from {@link updateUrl}) instead treats a page
+   * that is now a 404/null or a 401 as no-longer-readable UNDER THE NEW CREDENTIAL
+   * and CLEARS it (fires `onDeleted`), so an identity lapse or account switch drops
+   * the stale body rather than leaving account-A's content rendered under account-B.
+   */
+  private async resync(clearUnreadable = false): Promise<void> {
     // One resync at a time: a slow refetch must not overlap the next poll tick
     // (or a reconnect resync) and double-dispatch.
     if (this.resyncing) return;
@@ -559,6 +1022,7 @@ class LiveStream {
     try {
       try {
         const pages = await this.fetchers.listPages();
+        this.streamedPages = pages;
         this.listListeners.forEach((fn) => fn(pages));
       } catch {
         // Server still coming back up — the next event or resync will catch up.
@@ -567,8 +1031,13 @@ class LiveStream {
         try {
           const page = await this.fetchers.getPage(id);
           if (page) this.pageListeners.get(id)?.forEach((s) => s.onPage?.(page));
+          // Gone/hidden under the new credential (404 → null): drop the stale body.
+          else if (clearUnreadable) this.pageListeners.get(id)?.forEach((s) => s.onDeleted?.(id));
         } catch {
-          /* keep going */
+          // A rejected identity (401) or other read failure: on a credential change
+          // this page is no longer ours to show — clear it; on a transient resync
+          // keep the current content and let the next event heal it.
+          if (clearUnreadable) this.pageListeners.get(id)?.forEach((s) => s.onDeleted?.(id));
         }
       }
       for (const dbId of [...this.rowsListeners.keys()]) {
@@ -594,6 +1063,9 @@ class LiveStream {
     ) {
       this.source?.close();
       this.source = null;
+      this.closePageFallbacks();
+      this.streamedPageIds = null;
+      this.streamedPages = null;
       // Tear down both fallbacks and reset, so a later re-subscribe re-evaluates
       // the stream from scratch instead of inheriting a stale poll/grace timer.
       this.clearGraceTimer();
@@ -631,8 +1103,10 @@ class LiveStream {
       this.pageListeners.set(id, set);
     }
     set.add(sub);
+    this.reconcilePageFallback(id);
     return () => {
       this.removeFromMap(this.pageListeners, id, sub);
+      this.reconcilePageFallback(id);
       this.maybeClose();
     };
   }
@@ -710,11 +1184,45 @@ export interface HttpDataClientOptions {
    * instance reachability secret. Omit for a legacy anonymous client.
    */
   getIdentity?: () => IdentityCredential | null | undefined;
+  /**
+   * Subscribe to identity-credential changes (returns an unsubscribe). Wired to
+   * `onIdentityChange` from `connection.ts`, this lets the client rebuild its live
+   * stream when the identity actually changes — an EventSource bakes the identity
+   * into its URL when it opens and can't refresh it, so without this the streamed
+   * nav list keeps asserting a stale identity while one-shot content fetches use
+   * the current one (the cross-server "titles show, content blank" bug). Omit and
+   * the stream still reconciles on the next re-subscribe, just not proactively.
+   */
+  subscribeIdentity?: (onChange: () => void) => () => void;
 }
 
 /** Identity header names (kept in sync with the server's `principal.ts`). */
 const IDENTITY_HEADER = 'X-OpenBook-Identity';
 const GUEST_NAME_HEADER = 'X-OpenBook-Guest-Name';
+/**
+ * First-party-client marker (STAB-8, kept in sync with the sdk's `CLIENT_HEADER`
+ * and the server's guest-write gate). Sent on EVERY request so an unauthenticated
+ * guest write is a non-simple cross-origin request the browser can't forge as a
+ * plain form/`fetch` POST. Reads carry it too — harmless, and it means the desktop
+ * IPC / web / forwarded transports are uniform.
+ */
+const CLIENT_HEADER = 'X-OpenBook-Client';
+
+/**
+ * The data server REJECTED the caller's identity assertion (HTTP 401): the JWS is
+ * expired, scoped to a different audience, revoked, or from an untrusted issuer.
+ * Deliberately DISTINCT from a 404 (the page is genuinely gone or hidden from this
+ * principal, which reads as an empty document) so a caller can offer a re-auth
+ * affordance instead of silently rendering a blank page — the cross-server
+ * lapsed-identity bug. Thrown by {@link HttpDataClient.getPage}.
+ */
+export class IdentityRejectedError extends Error {
+  readonly status = 401 as const;
+  constructor(detail?: string) {
+    super(`identity rejected by the data server (401)${detail ? `: ${detail}` : ''}`);
+    this.name = 'IdentityRejectedError';
+  }
+}
 
 /**
  * {@link DataClient} backed by an OpenBook server's HTTP API. Isomorphic, and
@@ -724,11 +1232,14 @@ const GUEST_NAME_HEADER = 'X-OpenBook-Guest-Name';
  */
 export class HttpDataClient implements DataClient {
   private readonly baseUrl: string;
+  readonly connectionBaseUrl: string;
   private readonly token?: string;
   private readonly fetchImpl: FetchLike;
   private readonly createLiveSource: (url: string) => LiveSourceLike;
   private readonly getIdentity?: () => IdentityCredential | null | undefined;
   private live: LiveStream | null = null;
+  /** Unsubscribe from identity-change notifications (see {@link dispose}). */
+  private readonly identityUnsub?: () => void;
 
   /**
    * @param baseUrl  Server base URL. May be empty when a `fetchImpl` resolves
@@ -741,10 +1252,27 @@ export class HttpDataClient implements DataClient {
    */
   constructor(baseUrl: string, token?: string, opts: HttpDataClientOptions = {}) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.connectionBaseUrl = this.baseUrl;
     this.token = token && token.length > 0 ? token : undefined;
     this.fetchImpl = opts.fetchImpl ?? globalFetch;
     this.createLiveSource = opts.createLiveSource ?? ((url) => new EventSource(url) as unknown as LiveSourceLike);
     this.getIdentity = opts.getIdentity;
+    // Rebuild the live stream the moment the identity credential changes, so the
+    // baked-in EventSource URL can't keep asserting a stale identity while one-shot
+    // content fetches use the current one. Guarded to a real change by the setters
+    // in connection.ts, so this never churns the connection on a no-op set.
+    this.identityUnsub = opts.subscribeIdentity?.(() => this.live?.updateUrl(this.buildLiveUrl()));
+  }
+
+  /**
+   * Release the identity-change subscription. Call when discarding a client (e.g.
+   * the web shell swapping to a different server), so a stale client doesn't keep
+   * reacting to identity changes for a connection nothing is watching. The live
+   * stream itself is torn down when its last listener unsubscribes (React unmount).
+   * Safe to call more than once.
+   */
+  dispose(): void {
+    this.identityUnsub?.();
   }
 
   /**
@@ -755,6 +1283,10 @@ export class HttpDataClient implements DataClient {
    */
   private authFetch(input: string, init: RequestInit = {}): Promise<Response> {
     const headers: Record<string, string> = {...(init.headers as Record<string, string> | undefined)};
+    // Mark the request as a first-party client call (STAB-8). Cheap and unconditional
+    // so the server's guest-write gate admits it over every transport (desktop IPC,
+    // web same-origin, forwarded tunnel — the tunnel forwards it verbatim).
+    headers[CLIENT_HEADER] = '1';
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     const id = this.getIdentity?.();
     if (id?.jws) headers[IDENTITY_HEADER] = id.jws;
@@ -762,26 +1294,45 @@ export class HttpDataClient implements DataClient {
     return this.fetchImpl(input, {...init, headers});
   }
 
-  /** Lazily create the shared live connection (browser-only). */
+  /**
+   * The `/api/live` URL for the CURRENT credential. An EventSource can't send
+   * headers, so the access token and the identity assertion both ride the query
+   * string (the server reads `?token=` / `?identity=`). Read fresh each call so a
+   * rebuilt stream picks up a refreshed / dropped identity.
+   */
+  private buildStreamUrl(path: string): string {
+    const params = new URLSearchParams();
+    if (this.token) params.set('token', this.token);
+    const id = this.getIdentity?.();
+    if (id?.jws) params.set('identity', id.jws);
+    const query = params.toString();
+    return `${this.baseUrl}${path}${query ? `?${query}` : ''}`;
+  }
+
+  private buildLiveUrl(): string {
+    return this.buildStreamUrl(API.live);
+  }
+
+  /** Lazily create — or re-point — the shared live connection (browser-only). */
   private liveStream(): LiveStream {
+    const url = this.buildLiveUrl();
     if (!this.live) {
-      // EventSource can't send headers, so the access token and the identity
-      // assertion both ride the URL (the server reads `?token=` / `?identity=`).
-      const params = new URLSearchParams();
-      if (this.token) params.set('token', this.token);
-      const id = this.getIdentity?.();
-      if (id?.jws) params.set('identity', id.jws);
-      const query = params.toString();
-      const liveUrl = `${this.baseUrl}${API.live}${query ? `?${query}` : ''}`;
       this.live = new LiveStream(
-        liveUrl,
+        url,
         {
           listPages: () => this.listPages(),
           getPage: (id) => this.getPage(id),
           listRows: (databaseId) => this.listRows(databaseId),
         },
         this.createLiveSource,
+        (id) => this.buildStreamUrl(API.pageStream(id)),
       );
+    } else {
+      // A credential change since the stream opened (identity refresh / account
+      // switch / sign-out) re-points it, so the streamed nav list can't keep
+      // asserting a stale identity a new subscription would then out-rank. A no-op
+      // when the URL is unchanged.
+      this.live.updateUrl(url);
     }
     return this.live;
   }
@@ -792,7 +1343,12 @@ export class HttpDataClient implements DataClient {
 
   async getPage(id: string): Promise<StoredPage | null> {
     const res = await this.authFetch(`${this.baseUrl}${API.page(id)}`, {cache: 'no-store'});
+    // 404 = genuinely gone / hidden from this principal → an empty document, not
+    // an error. 401 = the identity was REJECTED (expired / wrong audience /
+    // revoked) → an auth problem the caller must surface (re-auth), never
+    // collapsed into "no content" (the blank-content-on-a-lapsed-identity bug).
     if (res.status === 404) return null;
+    if (res.status === 401) throw new IdentityRejectedError(await readErrorDetail(res));
     await throwIfNotOk(res);
     return (await res.json()) as StoredPage;
   }
@@ -811,6 +1367,69 @@ export class HttpDataClient implements DataClient {
     return this.request<StoredPage>('POST', API.pages, body);
   }
 
+  /** Submit values through a form block's capability-gated public endpoint. */
+  async submitForm(
+    pageId: string,
+    formId: string,
+    input: FormSubmissionRequest,
+  ): Promise<FormSubmissionResult> {
+    const res = await this.authFetch(`${this.baseUrl}${API.formSubmissions(pageId, formId)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(input),
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      let errors: FormValidationError[] = [];
+      try {
+        const payload = (await res.json()) as {errors?: unknown};
+        const codes = new Set<string>(FORM_VALIDATION_ERROR_CODES);
+        if (Array.isArray(payload.errors)) {
+          errors = payload.errors.flatMap((value) => {
+            if (
+              value &&
+              typeof value === 'object' &&
+              'fieldId' in value &&
+              typeof value.fieldId === 'string' &&
+              'code' in value &&
+              typeof value.code === 'string' &&
+              codes.has(value.code)
+            ) {
+              return [{fieldId: value.fieldId, code: value.code as FormValidationError['code']}];
+            }
+            return [];
+          });
+        }
+      } catch {
+        // Status is sufficient for unavailable/too-large handling.
+      }
+      throw new FormSubmissionError(res.status, errors);
+    }
+    return (await res.json()) as FormSubmissionResult;
+  }
+
+  /** Stage one form file as base64 JSON so every HTTP/IPC transport stays byte-exact. */
+  async uploadFormFile(
+    pageId: string,
+    formId: string,
+    input: FormUploadInput,
+  ): Promise<FormUploadResult> {
+    const res = await this.authFetch(`${this.baseUrl}${API.formUploads(pageId, formId)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        key: input.key,
+        fieldId: input.fieldId,
+        name: input.name,
+        mime: input.mime,
+        data: bytesToBase64(input.bytes),
+      }),
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new FormUploadError(res.status);
+    return (await res.json()) as FormUploadResult;
+  }
+
   async renamePage(id: string, name: string | null): Promise<StoredPage> {
     return this.request<StoredPage>('PATCH', API.page(id), {name});
   }
@@ -821,6 +1440,29 @@ export class HttpDataClient implements DataClient {
 
   async listBacklinks(id: string): Promise<PageMeta[]> {
     return this.request<PageMeta[]>('GET', API.pageBacklinks(id));
+  }
+
+  async pageGraph(): Promise<PageGraph> {
+    return this.request<PageGraph>('GET', API.pageGraph);
+  }
+
+  async listVersions(pageId: string, opts?: {limit?: number}): Promise<PageVersionMeta[]> {
+    const query = opts?.limit != null ? `?limit=${encodeURIComponent(opts.limit)}` : '';
+    return this.request<PageVersionMeta[]>('GET', `${API.pageVersions(pageId)}${query}`);
+  }
+
+  async getVersion(pageId: string, versionId: string): Promise<StoredPageVersion | null> {
+    const res = await this.authFetch(`${this.baseUrl}${API.pageVersion(pageId, versionId)}`, {cache: 'no-store'});
+    if (res.status === 404) return null;
+    await throwIfNotOk(res);
+    return (await res.json()) as StoredPageVersion;
+  }
+
+  async restoreVersion(pageId: string, versionId: string): Promise<StoredPage | null> {
+    const res = await this.authFetch(`${this.baseUrl}${API.pageVersionRestore(pageId, versionId)}`, {method: 'POST'});
+    if (res.status === 404) return null;
+    await throwIfNotOk(res);
+    return (await res.json()) as StoredPage;
   }
 
   async movePage(id: string, move: {parentId: string | null; orderedIds: string[]}): Promise<StoredPage> {
@@ -834,12 +1476,12 @@ export class HttpDataClient implements DataClient {
     return true;
   }
 
-  async exportSpace(): Promise<{pages: StoredPage[]; databases: StoredDatabase[]}> {
-    return this.request<{pages: StoredPage[]; databases: StoredDatabase[]}>('GET', API.exportSpace);
+  async exportLibrary(): Promise<LibraryBackup> {
+    return this.request<LibraryBackup>('GET', API.exportLibrary);
   }
 
-  async importSpace(req: ImportRequest): Promise<ImportResult> {
-    return this.request<ImportResult>('POST', API.importSpace, req);
+  async importLibrary(req: ImportRequest): Promise<ImportResult> {
+    return this.request<ImportResult>('POST', API.importLibrary, req);
   }
 
   async listTrash(): Promise<PageMeta[]> {
@@ -891,6 +1533,20 @@ export class HttpDataClient implements DataClient {
       cache: 'no-store',
     });
     await throwIfNotOk(res);
+  }
+
+  async applyPageUpdate(id: string, update: string, clientId: number): Promise<boolean> {
+    // Probe outside the page namespace: an old server and a deleted page must
+    // never be confused. Do not cache across server upgrades or store switches.
+    const health = await this.authFetch(`${this.baseUrl}${API.health}`, {cache: 'no-store'});
+    await throwIfNotOk(health);
+    if (health.headers.get('X-OpenBook-Stored-Updates') !== '1') return false;
+    const res = await this.authFetch(`${this.baseUrl}${API.pageUpdateApply(id)}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({update, clientId}), cache: 'no-store',
+    });
+    await throwIfNotOk(res);
+    return true;
   }
 
   subscribePageUpdates(id: string, onUpdate: (update: string, clientId: number) => void): () => void {
@@ -998,6 +1654,109 @@ export class HttpDataClient implements DataClient {
     return this.request<StoredDatabase>('PATCH', API.database(id), patch);
   }
 
+  async getDatabaseFormPublication(
+    databaseId: string,
+    viewId: string,
+  ): Promise<DatabaseFormPublication> {
+    return this.request<DatabaseFormPublication>('GET', API.databaseFormCapability(databaseId, viewId));
+  }
+
+  async publishDatabaseForm(
+    databaseId: string,
+    viewId: string,
+  ): Promise<DatabaseFormPublishResult> {
+    return this.request<DatabaseFormPublishResult>('POST', API.databaseFormCapability(databaseId, viewId));
+  }
+
+  async revokeDatabaseForm(databaseId: string, viewId: string): Promise<boolean> {
+    const res = await this.authFetch(`${this.baseUrl}${API.databaseFormCapability(databaseId, viewId)}`, {
+      method: 'DELETE',
+      cache: 'no-store',
+    });
+    if (res.status === 404) return false;
+    await throwIfNotOk(res);
+    return true;
+  }
+
+  async getPublicDatabaseForm(
+    databaseId: string,
+    viewId: string,
+    input: DatabaseFormDescriptorRequest,
+  ): Promise<DatabaseFormDescriptor> {
+    const res = await this.authFetch(`${this.baseUrl}${API.databaseForm(databaseId, viewId)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(input),
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({})) as {error?: unknown};
+      throw new DatabaseFormRequestError(res.status, typeof payload.error === 'string' ? payload.error : undefined);
+    }
+    return (await res.json()) as DatabaseFormDescriptor;
+  }
+
+  async submitDatabaseForm(
+    databaseId: string,
+    viewId: string,
+    input: DatabaseFormSubmissionRequest,
+  ): Promise<FormSubmissionResult> {
+    const res = await this.authFetch(`${this.baseUrl}${API.databaseFormSubmissions(databaseId, viewId)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(input),
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({})) as {error?: unknown; errors?: unknown};
+      const errors = Array.isArray(payload.errors)
+        ? payload.errors.flatMap((candidate) => {
+          if (
+            candidate
+            && typeof candidate === 'object'
+            && 'propertyId' in candidate
+            && typeof candidate.propertyId === 'string'
+            && 'code' in candidate
+            && typeof candidate.code === 'string'
+          ) {
+            return [{propertyId: candidate.propertyId, code: candidate.code}];
+          }
+          return [];
+        })
+        : [];
+      throw new DatabaseFormRequestError(
+        res.status,
+        typeof payload.error === 'string' ? payload.error : undefined,
+        errors,
+      );
+    }
+    return (await res.json()) as FormSubmissionResult;
+  }
+
+  async uploadDatabaseFormFile(
+    databaseId: string,
+    viewId: string,
+    input: DatabaseFormUploadInput,
+  ): Promise<FormUploadResult> {
+    const res = await this.authFetch(`${this.baseUrl}${API.databaseFormUploads(databaseId, viewId)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        capability: input.capability,
+        fieldId: input.fieldId,
+        name: input.name,
+        mime: input.mime,
+        data: bytesToBase64(input.bytes),
+      }),
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({})) as {error?: unknown};
+      throw new DatabaseFormRequestError(res.status, typeof payload.error === 'string' ? payload.error : undefined);
+    }
+    return (await res.json()) as FormUploadResult;
+  }
+
   async deleteDatabase(id: string): Promise<boolean> {
     const res = await this.authFetch(`${this.baseUrl}${API.database(id)}`, {method: 'DELETE'});
     if (res.status === 404) return false;
@@ -1023,6 +1782,196 @@ export class HttpDataClient implements DataClient {
 
   subscribeRows(databaseId: string, onRows: (rows: DatabaseRow[]) => void): () => void {
     return this.liveStream().onRows(databaseId, onRows);
+  }
+
+  // ── Ledger: server-enforced double-entry accounting (LGR-3) ──────────────────
+
+  /**
+   * Like {@link request}, but re-materializes the server's `{error, code}` body
+   * into a typed {@link LedgerError} — so a caller catches the SAME error class
+   * over HTTP as it does against the in-process {@link PageStore} (local mode).
+   */
+  private async ledgerRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+    const res = await this.authFetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: body === undefined ? undefined : {'Content-Type': 'application/json'},
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store',
+    });
+    if (!res.ok) return this.throwLedgerError(res);
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
+  }
+
+  /** Re-materialize a non-2xx ledger response into a typed {@link LedgerError}. */
+  private async throwLedgerError(res: Response): Promise<never> {
+    let data: {error?: string; code?: string} | null = null;
+    try {
+      data = (await res.json()) as {error?: string; code?: string};
+    } catch {
+      data = null;
+    }
+    if (data?.code && (LEDGER_ERROR_CODES as readonly string[]).includes(data.code)) {
+      throw new LedgerError(data.code as LedgerErrorCode, data.error ?? `ledger request failed (${res.status})`);
+    }
+    throw new Error(`OpenBook request failed (${res.status} ${res.statusText})${data?.error ? `: ${data.error}` : ''}`);
+  }
+
+  ledgerRestoreSection(section: LedgerExportSection): Promise<LedgerSectionRestoreResult> {
+    return this.ledgerRequest<LedgerSectionRestoreResult>('POST', API.ledgerRestoreSection, section);
+  }
+
+  ledgerInfo(): Promise<LedgerInfo> {
+    return this.ledgerRequest<LedgerInfo>('GET', API.ledger);
+  }
+
+  ledgerInit(): Promise<LedgerInfo> {
+    return this.ledgerRequest<LedgerInfo>('POST', API.ledger);
+  }
+
+  ledgerListAccounts(): Promise<LedgerAccount[]> {
+    return this.ledgerRequest<LedgerAccount[]>('GET', API.ledgerAccounts);
+  }
+
+  ledgerCreateAccount(input: LedgerAccountInput): Promise<LedgerAccount> {
+    return this.ledgerRequest<LedgerAccount>('POST', API.ledgerAccounts, input);
+  }
+
+  async ledgerGetAccount(id: string): Promise<LedgerAccount | null> {
+    try {
+      return await this.ledgerRequest<LedgerAccount>('GET', API.ledgerAccount(id));
+    } catch (err) {
+      if (err instanceof LedgerError && err.code === 'not-found') return null;
+      throw err;
+    }
+  }
+
+  ledgerUpdateAccount(id: string, patch: LedgerAccountPatch): Promise<LedgerAccount> {
+    return this.ledgerRequest<LedgerAccount>('PATCH', API.ledgerAccount(id), patch);
+  }
+
+  ledgerListTransactions(opts?: {state?: LedgerTransactionState; limit?: number}): Promise<LedgerTransaction[]> {
+    const params = new URLSearchParams();
+    if (opts?.state) params.set('state', opts.state);
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    const query = params.toString();
+    return this.ledgerRequest<LedgerTransaction[]>('GET', `${API.ledgerTransactions}${query ? `?${query}` : ''}`);
+  }
+
+  async ledgerGetTransaction(id: string): Promise<LedgerTransaction | null> {
+    try {
+      return await this.ledgerRequest<LedgerTransaction>('GET', API.ledgerTransaction(id));
+    } catch (err) {
+      if (err instanceof LedgerError && err.code === 'not-found') return null;
+      throw err;
+    }
+  }
+
+  ledgerCreateDraft(input: LedgerDraftInput): Promise<LedgerTransaction> {
+    return this.ledgerRequest<LedgerTransaction>('POST', API.ledgerTransactions, input);
+  }
+
+  ledgerUpdateDraft(id: string, patch: LedgerDraftPatch): Promise<LedgerTransaction> {
+    return this.ledgerRequest<LedgerTransaction>('PATCH', API.ledgerTransaction(id), patch);
+  }
+
+  async ledgerDeleteDraft(id: string): Promise<boolean> {
+    await this.ledgerRequest<void>('DELETE', API.ledgerTransaction(id));
+    return true;
+  }
+
+  ledgerPostTransaction(id: string): Promise<LedgerTransaction> {
+    return this.ledgerRequest<LedgerTransaction>('POST', API.ledgerTransactionPost(id));
+  }
+
+  ledgerReverseTransaction(id: string, opts?: LedgerReverseOptions): Promise<LedgerTransaction> {
+    return this.ledgerRequest<LedgerTransaction>('POST', API.ledgerTransactionReverse(id), opts ?? {});
+  }
+
+  ledgerSetPostingCleared(postingId: string, cleared: LedgerClearedState): Promise<LedgerPosting> {
+    return this.ledgerRequest<LedgerPosting>('PUT', API.ledgerPostingCleared(postingId), {cleared});
+  }
+
+  // ── Statement reconciliation (LGR-11) ───────────────────────────────────────
+
+  ledgerListReconciliations(opts?: {accountId?: string; status?: LedgerReconciliationStatus}): Promise<LedgerReconciliation[]> {
+    const params = new URLSearchParams();
+    if (opts?.accountId != null) params.set('accountId', opts.accountId);
+    if (opts?.status != null) params.set('status', opts.status);
+    const query = params.toString();
+    return this.ledgerRequest<LedgerReconciliation[]>('GET', `${API.ledgerReconciliations}${query ? `?${query}` : ''}`);
+  }
+
+  async ledgerGetReconciliation(id: string): Promise<LedgerReconciliationSummary | null> {
+    try {
+      return await this.ledgerRequest<LedgerReconciliationSummary>('GET', API.ledgerReconciliation(id));
+    } catch (err) {
+      if (err instanceof LedgerError && err.code === 'not-found') return null;
+      throw err;
+    }
+  }
+
+  ledgerStartReconciliation(input: LedgerReconciliationInput): Promise<LedgerReconciliation> {
+    return this.ledgerRequest<LedgerReconciliation>('POST', API.ledgerReconciliations, input);
+  }
+
+  ledgerAmendReconciliation(id: string, patch: LedgerReconciliationPatch): Promise<LedgerReconciliationSummary> {
+    return this.ledgerRequest<LedgerReconciliationSummary>('PATCH', API.ledgerReconciliation(id), patch);
+  }
+
+  ledgerAbandonReconciliation(id: string): Promise<LedgerReconciliation> {
+    return this.ledgerRequest<LedgerReconciliation>('POST', API.ledgerReconciliationAbandon(id));
+  }
+
+  ledgerToggleReconciliationPosting(id: string, postingId: string, cleared: 'pending' | 'cleared'): Promise<LedgerReconciliationSummary> {
+    return this.ledgerRequest<LedgerReconciliationSummary>('PUT', API.ledgerReconciliationPosting(id, postingId), {cleared});
+  }
+
+  ledgerFinishReconciliation(id: string): Promise<LedgerReconciliationSummary> {
+    return this.ledgerRequest<LedgerReconciliationSummary>('POST', API.ledgerReconciliationFinish(id));
+  }
+
+  ledgerReopenReconciliation(id: string): Promise<LedgerReconciliationSummary> {
+    return this.ledgerRequest<LedgerReconciliationSummary>('POST', API.ledgerReconciliationReopen(id));
+  }
+
+  ledgerListPeriods(): Promise<LedgerPeriod[]> {
+    return this.ledgerRequest<LedgerPeriod[]>('GET', API.ledgerPeriods);
+  }
+
+  ledgerClosePeriod(input: LedgerPeriodCloseInput): Promise<LedgerPeriodCloseResult> {
+    return this.ledgerRequest<LedgerPeriodCloseResult>('POST', API.ledgerPeriods, input);
+  }
+
+  ledgerReopenPeriod(id: string): Promise<LedgerPeriodReopenResult> {
+    return this.ledgerRequest<LedgerPeriodReopenResult>('POST', API.ledgerPeriodReopen(id));
+  }
+
+  ledgerListAudit(opts?: {limit?: number; before?: number}): Promise<LedgerAuditEvent[]> {
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    if (opts?.before != null) params.set('before', String(opts.before));
+    const query = params.toString();
+    return this.ledgerRequest<LedgerAuditEvent[]>('GET', `${API.ledgerAudit}${query ? `?${query}` : ''}`);
+  }
+
+  /** Canonical postings CSV (LGR-7) — a ledger read that is text, not JSON. */
+  async ledgerExportCsv(): Promise<string> {
+    const res = await this.authFetch(`${this.baseUrl}${API.ledgerExportCsv}`, {cache: 'no-store'});
+    if (!res.ok) return this.throwLedgerError(res);
+    return res.text();
+  }
+
+  /** Beancount journal (LGR-13) — text like the CSV, same error mapping. */
+  async ledgerExportBeancount(): Promise<string> {
+    const res = await this.authFetch(`${this.baseUrl}${API.ledgerExportBeancount}`, {cache: 'no-store'});
+    if (!res.ok) return this.throwLedgerError(res);
+    return res.text();
+  }
+
+  /** The independent verifier's report (admin-gated server-side). */
+  async ledgerVerify(): Promise<LedgerVerifyReport> {
+    return this.ledgerRequest<LedgerVerifyReport>('GET', API.ledgerVerify);
   }
 
   // ── Suggestions + comments (the review layer) ────────────────────────────────
@@ -1107,17 +2056,62 @@ export class HttpDataClient implements DataClient {
     return true;
   }
 
-  /** A page's stored visibility scope (raw — `inherit` not yet resolved), or
-   *  `null` if the page does not exist. Gated on read of the page. */
-  async getPageVisibility(pageId: string): Promise<PageVisibility | null> {
-    const {visibility} = await this.request<{visibility: PageVisibility}>('GET', API.pageVisibility(pageId));
-    return visibility;
+  // ── Agent access: PAT credential management (AGENT-6; admin-only) ─────────────
+
+  async listAgentTokens(): Promise<AgentTokenList> {
+    return this.request<AgentTokenList>('GET', API.agentTokens);
   }
 
-  /** Set a page's visibility scope. Gated on write of the page (manage = write). */
-  async setPageVisibility(pageId: string, visibility: PageVisibility): Promise<PageVisibility> {
-    const res = await this.request<{visibility: PageVisibility}>('PUT', API.pageVisibility(pageId), {visibility});
-    return res.visibility;
+  async setAgentApiEnabled(enabled: boolean, remote = false): Promise<{enabled: boolean; remote: boolean}> {
+    return this.request<{enabled: boolean; remote: boolean}>('PUT', API.agentTokens, {enabled, remote});
+  }
+
+  async createAgentToken(input: CreateAgentTokenInput): Promise<CreatedAgentToken> {
+    return this.request<CreatedAgentToken>('POST', API.agentTokens, {
+      name: input.name,
+      scope: input.scope,
+      expiresInDays: input.expiresInDays,
+      remote: input.remote,
+    });
+  }
+
+  async revokeAgentToken(id: string): Promise<boolean> {
+    const res = await this.authFetch(`${this.baseUrl}${API.agentToken(id)}`, {method: 'DELETE'});
+    if (res.status === 404) return false;
+    await throwIfNotOk(res);
+    return true;
+  }
+
+  /** A page's stored audience scope and independent discovery posture. */
+  async getPageVisibility(pageId: string): Promise<PageVisibilitySettings | null> {
+    return this.request<PageVisibilitySettings>('GET', API.pageVisibility(pageId));
+  }
+
+  /** Update its audience scope and/or discovery posture. Gated on page write. */
+  async setPageVisibility(pageId: string, update: PageVisibilityUpdate): Promise<PageVisibilitySettings> {
+    return this.request<PageVisibilitySettings>('PUT', API.pageVisibility(pageId), update);
+  }
+
+  /** A page's agent-edits policy (AGED-1; raw — `inherit` not yet resolved against
+   *  the instance mode). Gated on read of the page. */
+  async getPageAgentEdits(pageId: string): Promise<AgentEditsPolicy> {
+    const {agentEdits} = await this.request<{agentEdits: AgentEditsPolicy}>('GET', API.pageAgentEdits(pageId));
+    return agentEdits;
+  }
+
+  /** A page's server-resolved effective agent-edits mode (AGED-6). Reads the same
+   *  PAT-readable route as {@link getPageAgentEdits} and returns its `effective`
+   *  field — so an `inherit` page's mode resolves without the privileged instance read. */
+  async getEffectiveAgentEdits(pageId: string): Promise<AgentEditsMode> {
+    const {effective} = await this.request<{effective: AgentEditsMode}>('GET', API.pageAgentEdits(pageId));
+    return effective;
+  }
+
+  /** Set a page's agent-edits policy (AGED-1). jws-only: an agent PAT cannot change
+   *  the policy that governs whether agents edit directly. */
+  async setPageAgentEdits(pageId: string, agentEdits: AgentEditsPolicy): Promise<AgentEditsPolicy> {
+    const res = await this.request<{agentEdits: AgentEditsPolicy}>('PUT', API.pageAgentEdits(pageId), {agentEdits});
+    return res.agentEdits;
   }
 
   /** A page's per-page ACL grants (requires write on the page). */
@@ -1147,8 +2141,8 @@ export class HttpDataClient implements DataClient {
     return this.request<BackupStatus>('PUT', API.backups, patch);
   }
 
-  async runBackup(cadence?: BackupCadence): Promise<{file: string; dir: string}> {
-    return this.request<{file: string; dir: string}>('POST', API.backupRun, {cadence});
+  async runBackup(cadence?: BackupCadence): Promise<{file: string; dir: string; skippedCount: number}> {
+    return this.request<{file: string; dir: string; skippedCount: number}>('POST', API.backupRun, {cadence});
   }
 
   // ── Optional local AI ───────────────────────────────────────────────────────
@@ -1171,6 +2165,10 @@ export class HttpDataClient implements DataClient {
 
   async aiTasks(goal: string, context?: string): Promise<AiTasksResponse> {
     return this.request<AiTasksResponse>('POST', API.aiTasks, {goal, context});
+  }
+
+  async transcribeAsset(assetId: string, pageId: string): Promise<AiTranscriptionResult> {
+    return this.request<AiTranscriptionResult>('POST', API.aiTranscribe, {assetId, pageId});
   }
 
   async aiDownloadModel(url?: string): Promise<AiStatus['download']> {
@@ -1202,8 +2200,9 @@ export class HttpDataClient implements DataClient {
     return this.request<StoredPlugin[]>('GET', API.plugins);
   }
 
-  async installPlugin(pkg: PluginPackage): Promise<StoredPlugin> {
-    return this.request<StoredPlugin>('POST', API.plugins, pkg);
+  async installPlugin(pkg: PluginPackage, opts: {allowDowngrade?: boolean} = {}): Promise<StoredPlugin> {
+    const path = opts.allowDowngrade ? `${API.plugins}?allowDowngrade=1` : API.plugins;
+    return this.request<StoredPlugin>('POST', path, pkg);
   }
 
   async setPluginEnabled(id: string, enabled: boolean): Promise<StoredPlugin> {
@@ -1230,7 +2229,35 @@ export class HttpDataClient implements DataClient {
     return removed;
   }
 
-  /** Run the workspace agent, surfacing each streamed step via `onEvent`. */
+  async getAiPricing(): Promise<AiPricingResponse> {
+    return this.request<AiPricingResponse>('GET', API.aiPricing);
+  }
+
+  async setAiPricing(override: AiPricingTable): Promise<AiPricingResponse> {
+    return this.request<AiPricingResponse>('PUT', API.aiPricing, override);
+  }
+
+  async getMcpConfig(): Promise<McpConfigResponse> {
+    return this.request<McpConfigResponse>('GET', API.aiMcp);
+  }
+
+  async putMcpConfig(config: McpClientConfig): Promise<McpConfigResponse> {
+    return this.request<McpConfigResponse>('PUT', API.aiMcp, config);
+  }
+
+  async testMcpServer(server: McpServerConfig): Promise<McpTestResult> {
+    return this.request<McpTestResult>('POST', API.aiMcpTest, server);
+  }
+
+  async getAiUsage(): Promise<AiUsageResponse> {
+    return this.request<AiUsageResponse>('GET', API.aiUsage);
+  }
+
+  async setAiUsageRetention(days: number): Promise<{days: number}> {
+    return this.request<{days: number}>('PUT', API.aiUsageRetention, {days});
+  }
+
+  /** Run the library agent, surfacing each streamed step via `onEvent`. */
   async agentChat(
     messages: AgentChatMessage[],
     onEvent: (event: AgentChatEvent) => void,
@@ -1239,7 +2266,7 @@ export class HttpDataClient implements DataClient {
     const res = await this.authFetch(`${this.baseUrl}${API.agentChat}`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({messages, provider: opts.provider, model: opts.model, effort: opts.effort, thinking: opts.thinking, skills: opts.skills, pageId: opts.pageId, selection: opts.selection, allowDirectEdits: opts.allowDirectEdits}),
+      body: JSON.stringify({messages, provider: opts.provider, model: opts.model, effort: opts.effort, thinking: opts.thinking, skills: opts.skills, pageId: opts.pageId, selection: opts.selection, allowDirectEdits: opts.allowDirectEdits, allowExternalTools: opts.allowExternalTools, externalToolsUsed: opts.externalToolsUsed}),
       cache: 'no-store',
       signal: opts.signal,
     });
@@ -1351,12 +2378,16 @@ function base64ToBytes(b64: string): Uint8Array {
 
 async function throwIfNotOk(res: Response): Promise<void> {
   if (res.ok) return;
-  let detail = '';
+  const detail = await readErrorDetail(res);
+  throw new Error(`OpenBook request failed (${res.status} ${res.statusText})${detail ? `: ${detail}` : ''}`);
+}
+
+/** The server's `{error}` message from a non-ok response body, or `''`. */
+async function readErrorDetail(res: Response): Promise<string> {
   try {
     const data = (await res.json()) as ApiError;
-    detail = data?.error ? `: ${data.error}` : '';
+    return data?.error ? String(data.error) : '';
   } catch {
-    // Non-JSON error body; ignore.
+    return ''; // non-JSON error body
   }
-  throw new Error(`OpenBook request failed (${res.status} ${res.statusText})${detail}`);
 }

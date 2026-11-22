@@ -67,10 +67,22 @@ execFileSync('node', [join(here, 'copy-pglite-assets.mjs')], {stdio: 'inherit'})
 const viewerSrc = join(serverDir, '..', 'ui', 'src', 'export', 'vendor', 'openbook-viewer.js');
 if (!existsSync(viewerSrc)) {
   console.log('Viewer bundle missing — building it (pnpm --filter @book.dev/ui run build:viewer)…');
-  execFileSync('pnpm', ['--filter', '@book.dev/ui', 'run', 'build:viewer'], {stdio: 'inherit'});
+  // shell: pnpm on Windows is a .CMD shim Node only spawns through a shell.
+  execFileSync('pnpm', ['--filter', '@book.dev/ui', 'run', 'build:viewer'], {stdio: 'inherit', shell: process.platform === 'win32'});
 }
 mkdirSync(join(serverDir, 'assets'), {recursive: true});
 copyFileSync(viewerSrc, join(serverDir, 'assets', 'openbook-viewer.js'));
+
+// 1c. Ensure @book.dev/mcp is built so Bun can resolve its `main` (dist/index.js)
+// when compiling app.ts's mountMcpHttp import. `build:libs` builds it before the
+// server, but a standalone `build:sidecar` invocation may run before it exists —
+// build it on demand so this script is self-sufficient regardless of caller.
+const mcpDist = join(serverDir, '..', 'mcp', 'dist', 'index.js');
+if (!existsSync(mcpDist)) {
+  console.log('@book.dev/mcp dist missing — building it (pnpm --filter @book.dev/mcp run build)…');
+  // shell: pnpm on Windows is a .CMD shim Node only spawns through a shell.
+  execFileSync('pnpm', ['--filter', '@book.dev/mcp', 'run', 'build'], {stdio: 'inherit', shell: process.platform === 'win32'});
+}
 
 // 2. Compile the Bun entrypoint into a single binary. The optional llama.cpp
 // engine stays external (mirroring tsup.config.ts): its per-platform binding

@@ -1,5 +1,6 @@
+import {DATA_CHIP_CLASS} from '@/lib/dataColorVars';
 import {useEffect, useRef, useState} from 'react';
-import {ArrowUp, Bot, Brain, Check, ChevronDown, ChevronRight, ClipboardCheck, Loader2, Pencil, Plus, ShieldCheck, Sparkles, Square} from 'lucide-react';
+import {ArrowUp, Bot, Brain, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Loader2, Pencil, Plus, ShieldCheck, Sparkles, Square} from 'lucide-react';
 import {
   providerSettings,
   type AgentChatEvent,
@@ -11,19 +12,23 @@ import {
   type StoredSuggestion,
 } from '@book.dev/sdk';
 import {Button} from '@/components/ui/button';
+import {ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger} from '@/components/ui/context-menu';
+import {Input, inputVariants} from '@/components/ui/input';
 import {Markdown} from '@/components/ui/markdown';
+import {MENU_WIDTH_SM} from '@/components/ui/menu-components';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {useData} from '@/data';
 import type {TKey} from '@/i18n';
 import {useHud, useNavigation, useTranslation} from '@/providers';
 import {HOME_PAGE_ID, REVIEW_PANE_ID} from '@/lib/homePage';
 import {setReviewTarget} from '@/lib/reviewPane';
-import {aiBridge} from '@/lib/aiBridge';
+import {aiBridge, routeAiSuggestions} from '@/lib/aiBridge';
 import {lastSelection} from '@/lib/selection';
+import {copyText} from '@/lib/pageActions';
 import {cn} from '@/lib/utils';
 
 /**
- * The workspace assistant: a docked chat panel over the server's agent
+ * The library assistant: a docked chat panel over the server's agent
  * harness. Each reply streams as steps — tool calls render as chips while
  * they run (click one to see what the tool returned), reasoning lands as a
  * collapsible block, and the grounded answer lands as an assistant bubble.
@@ -42,8 +47,9 @@ type ThreadItem =
   | {kind: 'reasoning'; text: string; expanded?: boolean; streaming?: boolean}
   | {kind: 'tool'; name: string; detail?: string; running: boolean; result?: string; expanded?: boolean}
   | {kind: 'suggestions'; suggestions: StoredSuggestion[]}
-  /** The agent asked to apply edits directly; awaiting allow/deny. */
-  | {kind: 'permission'; summary: string; resolved?: 'allowed' | 'denied'}
+  /** The agent asked for a sticky permission (direct edits, or external tools);
+   *  awaiting allow/deny. */
+  | {kind: 'permission'; summary: string; permKind: 'direct_edits' | 'external_tools'; resolved?: 'allowed' | 'denied'}
   /** The agent posed a multi-step interview; `resolved` once answers were sent. */
   | {kind: 'interview'; title?: string; steps: InterviewStep[]; resolved?: boolean}
   /** Edits the agent applied directly (granted access). */
@@ -89,7 +95,7 @@ const EFFORTS: Array<{value: AiEffort; key: TKey}> = [
 const MODEL_PRESETS: Partial<Record<AiProvider, Array<{value: string; label: string}>>> = {
   claude: [
     {value: 'claude-opus-4-8', label: 'Opus 4.8'},
-    {value: 'claude-sonnet-4-6', label: 'Sonnet 4.6'},
+    {value: 'claude-sonnet-5', label: 'Sonnet 5'},
     {value: 'claude-haiku-4-5', label: 'Haiku 4.5'},
   ],
 };
@@ -115,6 +121,12 @@ export function AgentPanel() {
   const [thinking, setThinking] = useState(true);
   // Sticky once the agent's "apply directly" request is granted this conversation.
   const [directEdits, setDirectEdits] = useState(false);
+  // Sticky once the agent's "use external tools" request is granted this conversation.
+  const [externalTools, setExternalTools] = useState(false);
+  // Sticky once ANY external (mcp__*) tool has actually run this conversation — so
+  // taint (edits routed through review) persists across turns, not just the run
+  // that made the external call. Re-sent to the server each turn.
+  const externalUsedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -162,8 +174,31 @@ export function AgentPanel() {
     setThread([]);
     setConversation([]);
     setDirectEdits(false);
+    setExternalTools(false);
+    externalUsedRef.current = false;
     setBusy(false);
     inputRef.current?.focus();
+  };
+
+  // AGED-4: route AI-authored suggestions through the resolved agent-edits policy.
+  // `direct` pages apply immediately (and lose their review row); `suggest` pages
+  // keep the review card. A policy/apply failure falls back to the safe default —
+  // showing the suggestions for review.
+  const routeSuggestions = async (suggestions: StoredSuggestion[]): Promise<void> => {
+    let routing;
+    try {
+      routing = await routeAiSuggestions(client, suggestions);
+    } catch {
+      setThread((items) => [...items, {kind: 'suggestions', suggestions}]);
+      return;
+    }
+    setThread((items) => {
+      const next = [...items];
+      if (routing.applied > 0) next.push({kind: 'applied', text: t('agent.applied', {count: routing.applied})});
+      if (routing.suggested.length > 0) next.push({kind: 'suggestions', suggestions: routing.suggested});
+      if (routing.failed.length > 0) next.push({kind: 'error', text: t('agent.applyFailed')});
+      return next;
+    });
   };
 
   const handleEvent = (event: AgentChatEvent): void => {
@@ -171,6 +206,9 @@ export function AgentPanel() {
       // A live answer chunk — append to the streaming assistant bubble.
       setThread((items) => appendStream(items, 'assistant', event.text));
     } else if (event.type === 'tool') {
+      // An external tool actually ran → taint the conversation (sticky, re-sent so
+      // later turns route edits through review too).
+      if (event.name.startsWith('mcp__')) externalUsedRef.current = true;
       setThread((items) => [...settle(items), {kind: 'tool', name: event.name, detail: argSummary(event.args), running: true}]);
     } else if (event.type === 'tool_result') {
       setThread((items) => {
@@ -189,11 +227,14 @@ export function AgentPanel() {
       // way accumulate into a single collapsible block per burst.
       setThread((items) => appendStream(items, 'reasoning', event.text));
     } else if (event.type === 'suggestions') {
-      if (event.suggestions.length > 0) {
-        setThread((items) => [...items, {kind: 'suggestions', suggestions: event.suggestions}]);
-      }
+      // AGED-4: the built-in AI's writes follow the resolved agent-edits policy.
+      // The AI runs under the user's own session identity, so this suggest-vs-
+      // direct choice is enforced HERE on the client (the server can't tell an AI
+      // write from a human one). Under `direct` the change is applied at once and
+      // its review row dropped; under `suggest` the review card shows unchanged.
+      if (event.suggestions.length > 0) void routeSuggestions(event.suggestions);
     } else if (event.type === 'permission_request') {
-      setThread((items) => [...settle(items), {kind: 'permission', summary: event.summary}]);
+      setThread((items) => [...settle(items), {kind: 'permission', summary: event.summary, permKind: event.kind ?? 'direct_edits'}]);
     } else if (event.type === 'interview') {
       setThread((items) => [...settle(items), {kind: 'interview', title: event.title, steps: event.steps}]);
     } else if (event.type === 'apply') {
@@ -236,7 +277,7 @@ export function AgentPanel() {
   // Stream one agent run over `turns`. `direct` carries the edit-access grant for
   // this run (passed explicitly so a freshly-granted permission applies at once,
   // before the `directEdits` state has flushed).
-  const runAgent = (turns: AgentChatMessage[], direct: boolean): void => {
+  const runAgent = (turns: AgentChatMessage[], direct: boolean, external: boolean = externalTools): void => {
     setBusy(true);
     const abort = new AbortController();
     abortRef.current = abort;
@@ -252,6 +293,8 @@ export function AgentPanel() {
         pageId: targetPageId,
         selection: lastSelection() || undefined,
         allowDirectEdits: direct,
+        allowExternalTools: external,
+        externalToolsUsed: externalUsedRef.current,
       })
       .catch((err: unknown) => {
         if (abort.signal.aborted) return;
@@ -262,12 +305,12 @@ export function AgentPanel() {
 
   // Append a user turn and run the agent. Used by the composer and by the
   // interactive cards (permission grant / interview answers) to resume the agent.
-  const sendUser = (text: string, direct = directEdits): void => {
+  const sendUser = (text: string, direct = directEdits, external = externalTools): void => {
     if (busy) return;
     const turns: AgentChatMessage[] = [...conversation, {role: 'user', content: text}];
     setConversation(turns);
     setThread((items) => [...items, {kind: 'user', text}]);
-    runAgent(turns, direct);
+    runAgent(turns, direct, external);
   };
 
   const send = (): void => {
@@ -277,13 +320,26 @@ export function AgentPanel() {
     sendUser(text);
   };
 
-  // Resolve the agent's request to edit directly: granting flips the sticky flag
-  // and resumes the agent with edit access; declining keeps the review flow.
+  // Resolve the agent's sticky-permission request. For direct edits, granting
+  // flips the direct-edit flag; for external tools, the external-tools consent
+  // flag (Q4). Either way we resume the agent with the freshly-granted flag (the
+  // other grant stays as-is), or keep the safe default on decline.
   const resolvePermission = (index: number, allow: boolean): void => {
     if (busy) return;
+    const item = thread[index];
+    const kind = item && item.kind === 'permission' ? item.permKind : 'direct_edits';
     setThread((items) => items.map((it, i) => (i === index && it.kind === 'permission' ? {...it, resolved: allow ? 'allowed' : 'denied'} : it)));
+    if (kind === 'external_tools') {
+      if (allow) setExternalTools(true);
+      sendUser(
+        allow ? t('agent.permissionExternalGrantedMsg') : t('agent.permissionDeniedMsg'),
+        directEdits,
+        allow ? true : externalTools,
+      );
+      return;
+    }
     if (allow) setDirectEdits(true);
-    sendUser(allow ? t('agent.permissionGrantedMsg') : t('agent.permissionDeniedMsg'), allow);
+    sendUser(allow ? t('agent.permissionGrantedMsg') : t('agent.permissionDeniedMsg'), allow, externalTools);
   };
 
   // The user finished the interview: send their answers back as a tidy message.
@@ -317,7 +373,9 @@ export function AgentPanel() {
     if (config.provider !== 'off') picks.add(config.provider);
     for (const p of ['llama', 'mlx', 'openai', 'claude'] as AiProvider[]) {
       const s = providerSettings(config, p);
-      if (s.model || (p === 'claude' && s.apiKey)) picks.add(p);
+      // The status config is redacted (the key never leaves the server) — key
+      // presence is signalled by `apiKeySet`, not the value.
+      if (s.model || (p === 'claude' && s.apiKeySet)) picks.add(p);
     }
     return [...picks];
   })();
@@ -340,7 +398,7 @@ export function AgentPanel() {
   const barSummary = [providerShortLabel(provider), `${modelLabel} (${effortLabel})`, ...(thinking ? [t('agent.thinkingToggle')] : [])].join('  ·  ');
 
   return (
-    <div data-agent-panel aria-label={t('agent.title')} className="flex h-full flex-col bg-sheet-1">
+    <div data-agent-panel aria-label={t('agent.title')} className="flex h-full flex-col bg-muted">
       <header className="flex items-center gap-2 border-b border-border px-3 py-2">
         <Bot className="size-4 text-muted-foreground" aria-hidden />
         <h2 className="flex-1 truncate text-sm font-medium">{t('agent.title')}</h2>
@@ -399,10 +457,26 @@ export function AgentPanel() {
                   )}
                 >
                   {item.running ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <Chevron className="size-3" aria-hidden />}
-                  <span className="truncate">
-                    {t(`agent.tool.${item.name}` as TKey)}
-                    {item.detail ? ` · ${item.detail}` : ''}
-                  </span>
+                  {/* External MCP tools (`mcp__server__tool`) have no built-in
+                      label; show a generic "External tool" name + the tool's own
+                      name, with an "external" badge so its provenance is obvious. */}
+                  {item.name.startsWith('mcp__') ? (
+                    <span className="flex min-w-0 items-center gap-1.5 truncate">
+                      <span className={cn('rounded-sm px-1 py-px text-[10px] font-medium', DATA_CHIP_CLASS.yellow)} data-agent-tool-external>
+                        {t('agent.externalBadge')}
+                      </span>
+                      <span className="truncate">
+                        {t('agent.externalTool')}
+                        {` · ${item.name.split('__').slice(2).join('__') || item.name}`}
+                        {item.detail ? ` · ${item.detail}` : ''}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="truncate">
+                      {t(`agent.tool.${item.name}` as TKey)}
+                      {item.detail ? ` · ${item.detail}` : ''}
+                    </span>
+                  )}
                 </button>
                 {item.expanded && item.result !== undefined && (
                   <pre
@@ -452,22 +526,22 @@ export function AgentPanel() {
                 <p className="text-[11px] text-muted-foreground">{t('agent.suggestionsHint')}</p>
                 <ul className="flex flex-col gap-1.5">
                   {item.suggestions.map((s) => (
-                    <li key={s.id} className="rounded-md border border-border bg-sheet-1 px-2.5 py-1.5">
+                    <li key={s.id} className="rounded-md border border-border bg-muted px-2.5 py-1.5">
                       <p className="text-xs font-medium">
                         {typeof s.payload.summary === 'string' ? s.payload.summary : s.kind}
                       </p>
                       {(s.before || s.after) && (
                         <p className="mt-0.5 break-words font-mono text-[10px] leading-relaxed text-muted-foreground">
-                          {s.before && <span className="text-destructive/80">- {s.before}</span>}
+                          {s.before && <span className="text-[var(--data-red-chip-fg)]">- {s.before}</span>}
                           {s.before && s.after && ' '}
-                          {s.after && <span className="text-emerald-600 dark:text-emerald-400">+ {s.after}</span>}
+                          {s.after && <span className="text-[var(--data-green-chip-fg)]">+ {s.after}</span>}
                         </p>
                       )}
                     </li>
                   ))}
                 </ul>
                 <Button size="sm" data-agent-review className="self-start" onClick={() => openReview(item.suggestions)}>
-                  <ClipboardCheck className="mr-1 size-3.5" />
+                  <ClipboardCheck className="size-3.5" />
                   {t('agent.review')}
                 </Button>
               </div>
@@ -482,17 +556,25 @@ export function AgentPanel() {
               >
                 <p className="flex items-center gap-1.5 text-xs font-medium">
                   <ShieldCheck className="size-3.5 text-primary" aria-hidden />
-                  {t('agent.permissionTitle')}
+                  {item.permKind === 'external_tools' ? t('agent.permissionExternalTitle') : t('agent.permissionTitle')}
                 </p>
-                <p className="text-[11px] text-muted-foreground">{t('agent.permissionHint', {summary: item.summary})}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {item.permKind === 'external_tools'
+                    ? t('agent.permissionExternalHint', {summary: item.summary})
+                    : t('agent.permissionHint', {summary: item.summary})}
+                </p>
                 {item.resolved ? (
                   <p className="text-[11px] font-medium text-muted-foreground">
-                    {item.resolved === 'allowed' ? t('agent.permissionAllowed') : t('agent.permissionDeclined')}
+                    {item.resolved === 'allowed'
+                      ? item.permKind === 'external_tools'
+                        ? t('agent.permissionExternalAllowed')
+                        : t('agent.permissionAllowed')
+                      : t('agent.permissionDeclined')}
                   </p>
                 ) : (
                   <div className="flex gap-2">
                     <Button size="sm" data-agent-permission-allow onClick={() => resolvePermission(i, true)} disabled={busy}>
-                      {t('agent.permissionAllow')}
+                      {item.permKind === 'external_tools' ? t('agent.permissionExternalAllow') : t('agent.permissionAllow')}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => resolvePermission(i, false)} disabled={busy}>
                       {t('agent.permissionKeepReview')}
@@ -519,7 +601,7 @@ export function AgentPanel() {
               <div
                 key={i}
                 data-agent-applied
-                className="inline-flex items-center gap-1.5 self-start rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2.5 py-1 text-[11px] text-emerald-700 dark:text-emerald-300"
+                className={cn('inline-flex items-center gap-1.5 self-start rounded-md px-2.5 py-1 text-[11px]', DATA_CHIP_CLASS.green)}
               >
                 <Check className="size-3.5" aria-hidden />
                 {item.text}
@@ -527,18 +609,27 @@ export function AgentPanel() {
             );
           }
           return (
-            <div
-              key={i}
-              data-agent-item={item.kind}
-              className={cn(
-                'max-w-[90%] rounded-lg px-3 py-2 text-sm',
-                item.kind === 'user' && 'self-end whitespace-pre-wrap bg-primary text-primary-foreground',
-                item.kind === 'assistant' && 'self-start bg-accent/50',
-                item.kind === 'error' && 'self-start whitespace-pre-wrap border border-destructive/40 text-destructive',
-              )}
-            >
-              {item.kind === 'assistant' ? <Markdown content={item.text} /> : item.text}
-            </div>
+            <ContextMenu key={i}>
+              <ContextMenuTrigger asChild>
+                <div
+                  data-agent-item={item.kind}
+                  className={cn(
+                    'max-w-[90%] rounded-lg px-3 py-2 text-sm',
+                    item.kind === 'user' && 'self-end whitespace-pre-wrap bg-primary text-primary-foreground',
+                    item.kind === 'assistant' && 'self-start bg-accent/50',
+                    item.kind === 'error' && 'self-start whitespace-pre-wrap border border-destructive/40 text-destructive',
+                  )}
+                >
+                  {item.kind === 'assistant' ? <Markdown content={item.text} /> : item.text}
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className={MENU_WIDTH_SM}>
+                <ContextMenuItem onSelect={() => void copyText(item.text)}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  {t('menu.copyMessage')}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           );
         })}
         {busy && (
@@ -566,7 +657,7 @@ export function AgentPanel() {
           }}
           placeholder={t('agent.placeholder')}
           aria-label={t('agent.placeholder')}
-          className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-hidden focus:border-ring"
+          className={cn(inputVariants(), '!h-auto min-h-control-md resize-none')}
         />
         <div className="flex items-center gap-2">
           {providerOptions.length > 0 && (
@@ -577,7 +668,7 @@ export function AgentPanel() {
                   data-agent-modelbar
                   aria-label={t('agent.modelSettings')}
                   title={t('agent.modelSettings')}
-                  className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
+                  className="inline-flex h-control-sm min-w-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
                 >
                   <Sparkles className="size-3.5 shrink-0" aria-hidden />
                   <span className="truncate">{barSummary}</span>
@@ -586,7 +677,7 @@ export function AgentPanel() {
               </PopoverTrigger>
               <PopoverContent align="start" side="top" className="w-64 p-2 text-sm">
                 <div className="flex flex-col gap-0.5" data-agent-provider aria-label={t('agent.provider')}>
-                  <p className="px-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('agent.provider')}</p>
+                  <p className="px-1 pb-0.5 text-[10px] font-medium text-muted-foreground">{t('agent.provider')}</p>
                   {providerOptions.map((p) => (
                     <button
                       key={p}
@@ -604,7 +695,7 @@ export function AgentPanel() {
                 </div>
                 {presets && presets.length > 0 && (
                   <div className="mt-2 flex flex-col gap-0.5">
-                    <p className="px-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('agent.model')}</p>
+                    <p className="px-1 pb-0.5 text-[10px] font-medium text-muted-foreground">{t('agent.model')}</p>
                     {presets.map((m) => (
                       <button
                         key={m.value}
@@ -622,20 +713,21 @@ export function AgentPanel() {
                   </div>
                 )}
                 <div className="mt-2 flex flex-col gap-1">
-                  <p className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="px-1 text-[10px] font-medium text-muted-foreground">
                     {presets ? t('agent.modelCustom') : t('agent.model')}
                   </p>
-                  <input
+                  <Input
+                    inputSize="sm"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     placeholder={t('agent.modelPlaceholder')}
                     data-agent-model
                     aria-label={t('agent.model')}
-                    className="h-8 w-full rounded-md border border-border bg-background px-2 text-xs outline-hidden focus:border-ring"
+                    className="text-xs"
                   />
                 </div>
                 <div className="mt-2 flex flex-col gap-1">
-                  <p className="px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t('ai.effort')}</p>
+                  <p className="px-1 text-[10px] font-medium text-muted-foreground">{t('ai.effort')}</p>
                   <div className="flex gap-1" data-agent-effort aria-label={t('ai.effort')}>
                     {EFFORTS.map((e) => (
                       <button
@@ -643,7 +735,7 @@ export function AgentPanel() {
                         type="button"
                         onClick={() => setEffort(e.value)}
                         className={cn(
-                          'flex-1 rounded-md border px-2 py-1 text-xs transition-colors',
+                          'h-control-sm flex-1 rounded-md border px-2.5 py-1.5 text-xs transition-colors',
                           effort === e.value ? 'border-ring bg-accent/40 text-foreground' : 'border-border text-muted-foreground hover:bg-hover',
                         )}
                       >
@@ -658,7 +750,7 @@ export function AgentPanel() {
                   aria-pressed={thinking}
                   onClick={() => setThinking((v) => !v)}
                   className={cn(
-                    'mt-2 flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors',
+                    'mt-2 flex h-control-sm w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors',
                     thinking ? 'border-ring bg-accent/40 text-foreground' : 'border-border text-muted-foreground hover:bg-hover',
                   )}
                 >
@@ -791,7 +883,7 @@ function InterviewCard({
           onChange={(e) => setTexts((prev) => ({...prev, [step.id]: e.target.value}))}
           placeholder={t('agent.interviewPlaceholder')}
           aria-label={step.question}
-          className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-hidden focus:border-ring"
+          className={cn(inputVariants(), '!h-auto min-h-control-md resize-none')}
         />
       )}
       <div className="flex items-center justify-between gap-2">

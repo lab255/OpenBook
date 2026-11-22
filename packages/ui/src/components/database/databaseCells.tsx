@@ -1,3 +1,5 @@
+import {STATUS_INK_CLASS} from '@/lib/statusStyles';
+import {sectionLabel} from './databaseRecipes';
 import React, {useRef, useState} from 'react';
 import {BadgeCheck, Check, ChevronDown, ExternalLink, MapPin, Plus, X} from 'lucide-react';
 import {
@@ -29,12 +31,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {IconButton} from '@/components/ui/icon-button';
+import {MENU_WIDTH_MD} from '@/components/ui/menu-components';
 import {PageIcon} from '@/components/PageIcon';
-import {usePreferences, useNavigation} from '@/providers';
+import {usePreferences, useNavigation, useTranslation} from '@/providers';
 import {useData} from '@/data';
 import {pageLinks, subscribePageLinks} from '@/lib/pageLinks';
 import {cn} from '@/lib/utils';
-import {SWATCH_HEX} from './databaseColors';
+import {dotStyle} from './databaseColors';
+import {chipBgVar, chipFgVar} from '@/lib/dataColorVars';
 import {RowHoverCard} from './DatabaseCard';
 
 /**
@@ -66,8 +70,8 @@ export function useIdentity(): string {
 /** A person value rendered as an avatar chip. */
 export const PersonChip: React.FC<{name: string}> = ({name}) => (
   <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-muted px-2 py-0.5 text-xs">
-    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[9px] font-semibold uppercase text-brand">
-      {name.slice(0, 1) || '?'}
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-[9px] font-semibold text-brand">
+      {name.slice(0, 1).toUpperCase() || '?'}
     </span>
     <span className="truncate">{name}</span>
   </span>
@@ -80,36 +84,27 @@ export const VerificationBadge: React.FC<{value: unknown}> = ({value}) => {
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs',
-        verified ? 'text-green-700 dark:text-green-300' : 'text-muted-foreground',
+        verified ? STATUS_INK_CLASS.ok : 'text-muted-foreground',
       )}
     >
-      <BadgeCheck className={cn('h-3.5 w-3.5', verified ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground/50')} />
+      <BadgeCheck className={cn('h-3.5 w-3.5', verified ? STATUS_INK_CLASS.ok : 'text-muted-foreground/50')} />
       {verified ? 'Verified' : 'Unverified'}
     </span>
   );
 };
 
-/** Tailwind classes for each `select` swatch token. */
-const COLOR_CLASSES: Record<string, string> = {
-  gray: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700/60 dark:text-zinc-200',
-  brown: 'bg-amber-200/70 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200',
-  orange: 'bg-orange-200 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
-  yellow: 'bg-yellow-200 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
-  green: 'bg-green-200 text-green-800 dark:bg-green-900/40 dark:text-green-200',
-  blue: 'bg-blue-200 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
-  purple: 'bg-purple-200 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200',
-  pink: 'bg-pink-200 text-pink-800 dark:bg-pink-900/40 dark:text-pink-200',
-  red: 'bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-200',
-};
-
-const colorClass = (color?: string): string => COLOR_CLASSES[color ?? 'gray'] ?? COLOR_CLASSES.gray;
+/** Inline chip colours for a `select` swatch token (canonical palette vars). */
+const chipStyle = (color?: string): React.CSSProperties => ({
+  backgroundColor: chipBgVar(color),
+  color: chipFgVar(color),
+});
 
 const findOption = (property: DatabaseProperty, value: unknown): DatabaseSelectOption | undefined =>
   property.options?.find((o) => o.id === value);
 
 /** A colored select-option chip. */
-export const SelectChip: React.FC<{option: DatabaseSelectOption}> = ({option}) => (
-  <span className={cn('inline-flex max-w-full items-center truncate rounded px-1.5 py-0.5 text-xs', colorClass(option.color))}>
+export const SelectChip: React.FC<{option: DatabaseSelectOption; pill?: boolean; title?: string}> = ({option, pill = false, title}) => (
+  <span title={title} className={cn('inline-flex max-w-full items-center truncate px-1.5 py-0.5 text-xs', pill ? 'rounded-full' : 'rounded-sm')} style={chipStyle(option.color)}>
     {option.label}
   </span>
 );
@@ -230,12 +225,15 @@ function csvValue(row: DatabaseRow, property: DatabaseProperty, properties: Data
 }
 
 /** Serialise rows to CSV — a header of "Name" + column names, then a row each.
- *  Values are flattened and RFC-4180-escaped. Pure (shared by the export action). */
-export function rowsToCsv(rows: DatabaseRow[], columns: DatabaseProperty[], properties: DatabaseProperty[]): string {
+ *  Values are flattened and RFC-4180-escaped. Pure (shared by the export action).
+ *  `resolveRows` is the set derived values (rollups, dependency names) resolve
+ *  against — pass the display path's rollup rows/properties so a cross-database
+ *  rollup exports the value that's on screen, not "—"; defaults to `rows`. */
+export function rowsToCsv(rows: DatabaseRow[], columns: DatabaseProperty[], properties: DatabaseProperty[], resolveRows: DatabaseRow[] = rows): string {
   const esc = (s: string): string => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   const lines = [['Name', ...columns.map((c) => c.name)].map(esc).join(',')];
   for (const row of rows) {
-    const cells = [row.name ?? '', ...columns.map((c) => csvValue(row, c, properties, rows))];
+    const cells = [row.name ?? '', ...columns.map((c) => csvValue(row, c, properties, resolveRows))];
     lines.push(cells.map(esc).join(','));
   }
   return lines.join('\n');
@@ -288,7 +286,7 @@ export function parseCsv(text: string): string[][] {
    focused — a table of mostly-empty cells reads as calm whitespace, not a grid
    of grey "Empty" labels. Rows (and the page property panel) carry `group`. */
 const inputClass =
-  'w-full bg-transparent px-2 py-1 text-sm outline-hidden placeholder:text-muted-foreground/40 placeholder:opacity-0 placeholder:transition-opacity group-hover:placeholder:opacity-100 focus:placeholder:opacity-100 focus:bg-hover';
+  'w-full bg-transparent px-2 py-1 text-sm outline-hidden placeholder:text-placeholder-foreground placeholder:opacity-0 placeholder:transition-opacity group-hover:placeholder:opacity-100 focus:placeholder:opacity-100 focus:bg-hover';
 
 /** The hover-revealed "Empty" label for button-style cells (select, date…). */
 const emptyHint = 'text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100';
@@ -296,6 +294,10 @@ const emptyHint = 'text-muted-foreground/40 opacity-0 transition-opacity group-h
 export interface PropertyValueCellProps {
   property: DatabaseProperty;
   value: unknown;
+  /** Optional form-view copy for the editor's empty state. */
+  placeholder?: string;
+  /** Accessible field state supplied by form surfaces. */
+  controlProps?: Pick<React.AriaAttributes, 'aria-describedby' | 'aria-invalid' | 'aria-label' | 'aria-required'>;
   /** Live exported value (expr columns are read-only and use this). */
   exprValue?: unknown;
   onChange: (value: unknown) => void;
@@ -313,15 +315,18 @@ export interface PropertyValueCellProps {
 export const PropertyValueCell: React.FC<PropertyValueCellProps> = ({
   property,
   value,
+  placeholder,
+  controlProps,
   exprValue,
   onChange,
   onAddOption,
   rowOptions,
 }) => {
+  const {t} = useTranslation();
   switch (property.type) {
   case 'expr':
     return (
-      <div className="px-2 py-1 text-sm tabular-nums text-foreground/80" title="Computed from the row's exported cell">
+      <div className="px-2 py-1 text-sm tabular-nums text-foreground/80" title={t('database.cells.exported')}>
         {formatExprValue(exprValue, property.numberFormat)}
       </div>
     );
@@ -352,33 +357,34 @@ export const PropertyValueCell: React.FC<PropertyValueCellProps> = ({
           onChange={(e) => onChange(e.target.checked)}
           className="h-4 w-4 cursor-pointer accent-primary"
           aria-label={property.name}
+          {...controlProps}
         />
       </div>
     );
   case 'number':
-    return <NumberCell property={property} value={value} onChange={onChange} />;
+    return <NumberCell property={property} value={value} placeholder={placeholder} onChange={onChange} controlProps={controlProps} />;
   case 'rating':
-    return <RatingCell property={property} value={value} onChange={onChange} />;
+    return <RatingCell property={property} value={value} onChange={onChange} controlProps={controlProps} />;
   case 'date':
-    return <DateCell property={property} value={value} onChange={onChange} />;
+    return <DateCell property={property} value={value} onChange={onChange} controlProps={controlProps} />;
   case 'select':
-    return <SelectCell property={property} value={value} onChange={onChange} onAddOption={onAddOption} />;
+    return <SelectCell property={property} value={value} placeholder={placeholder} onChange={onChange} onAddOption={onAddOption} controlProps={controlProps} />;
   case 'status':
-    return <StatusCell property={property} value={value} onChange={onChange} />;
+    return <StatusCell property={property} value={value} placeholder={placeholder} onChange={onChange} controlProps={controlProps} />;
   case 'multi_select':
-    return <MultiSelectCell property={property} value={value} onChange={onChange} onAddOption={onAddOption} />;
+    return <MultiSelectCell property={property} value={value} placeholder={placeholder} onChange={onChange} onAddOption={onAddOption} controlProps={controlProps} />;
   case 'relation':
     return <RelationCell property={property} value={value} onChange={onChange} />;
   case 'dependency':
     return <DependencyCell value={value} onChange={onChange} rowOptions={rowOptions ?? []} />;
   case 'files':
-    return <FilesCell value={value} onChange={onChange} />;
+    return <FilesCell value={value} onChange={onChange} controlProps={controlProps} />;
   case 'url':
   case 'email':
   case 'phone':
-    return <LinkCell kind={property.type} value={value} onChange={onChange} />;
+    return <LinkCell property={property} kind={property.type} value={value} placeholder={placeholder} onChange={onChange} controlProps={controlProps} />;
   case 'location':
-    return <LocationCell value={value} onChange={onChange} />;
+    return <LocationCell value={value} onChange={onChange} controlProps={controlProps} />;
   case 'created_time':
   case 'last_edited_time':
     return (
@@ -416,7 +422,8 @@ export const PropertyValueCell: React.FC<PropertyValueCellProps> = ({
         defaultValue={typeof value === 'string' ? value : value == null ? '' : String(value)}
         onBlur={(e) => onChange(e.target.value)}
         className={inputClass}
-        placeholder="Empty"
+        placeholder={placeholder || 'Empty'}
+        {...controlProps}
       />
     );
   }
@@ -457,10 +464,12 @@ const ProgressRing: React.FC<{frac: number}> = ({frac}) => {
  * or `ring` it pairs the editable input with a progress visual scaled to the
  * property's `numberTarget` (defaults to 100).
  */
-const NumberCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'onChange'>> = ({
+const NumberCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'placeholder' | 'onChange' | 'controlProps'>> = ({
   property,
   value,
+  placeholder,
   onChange,
+  controlProps,
 }) => {
   const input = (
     <input
@@ -473,8 +482,9 @@ const NumberCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
         property.numberDisplay === 'bar' && 'w-14 flex-none',
         property.numberDisplay === 'ring' && 'flex-1',
       )}
-      placeholder="—"
+      placeholder={placeholder || '—'}
       aria-label={property.name}
+      {...controlProps}
     />
   );
   if (property.numberDisplay !== 'bar' && property.numberDisplay !== 'ring') return input;
@@ -490,17 +500,17 @@ const NumberCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | '
 
 /** Rating cell: a row of clickable stars (0..max, default 5). Clicking the
  *  current value clears it; the stored value is a plain number. */
-const RatingCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'onChange'>> = ({property, value, onChange}) => {
+const RatingCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'onChange' | 'controlProps'>> = ({property, value, onChange, controlProps}) => {
   const max = property.numberTarget && property.numberTarget > 0 ? Math.min(10, Math.round(property.numberTarget)) : 5;
   const current = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : 0;
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1" role="group" aria-label={property.name}>
+    <div className="flex items-center gap-0.5 px-2 py-1" role="group" aria-label={property.name} {...controlProps}>
       {Array.from({length: max}, (_, i) => i + 1).map((n) => (
         <button
           key={n}
           type="button"
           onClick={() => onChange(current === n ? null : n)}
-          className={cn('text-base leading-none transition-colors', n <= current ? 'text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400/60')}
+          className={cn('text-base leading-none transition-colors', n <= current ? 'text-primary' : 'text-muted-foreground/30 hover:text-primary/60')}
           aria-label={`${n} ${n === 1 ? 'star' : 'stars'}`}
           aria-pressed={n <= current}
         >
@@ -541,10 +551,11 @@ const LINK_HREF = {
 } as const;
 
 /** Date cell — a single day, or a start→end range when the property is `dateRange`. */
-const DateCell: React.FC<{property: DatabaseProperty; value: unknown; onChange: (value: unknown) => void}> = ({
+const DateCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'onChange' | 'controlProps'>> = ({
   property,
   value,
   onChange,
+  controlProps,
 }) => {
   const inputType = property.includeTime ? 'datetime-local' : 'date';
   const [editing, setEditing] = useState(false);
@@ -562,8 +573,9 @@ const DateCell: React.FC<{property: DatabaseProperty; value: unknown; onChange: 
         onClick={() => setEditing(true)}
         className="flex w-full items-center px-2 py-1 text-left text-sm outline-hidden hover:bg-hover"
         aria-label={property.name}
+        {...controlProps}
       >
-        {text || <span className={emptyHint}>Empty</span>}
+        {text || <span data-empty-hint className={emptyHint}>Empty</span>}
       </button>
     );
   }
@@ -588,6 +600,7 @@ const DateCell: React.FC<{property: DatabaseProperty; value: unknown; onChange: 
         onBlur={exit}
         className={cn(inputClass, 'ob-date-empty')}
         aria-label={property.name}
+        {...controlProps}
       />
     );
   }
@@ -595,8 +608,10 @@ const DateCell: React.FC<{property: DatabaseProperty; value: unknown; onChange: 
   return (
     <div
       className="group/dates flex items-center gap-1 px-1 text-sm"
+      role="group"
       onFocus={enter}
       onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && exit()}
+      {...controlProps}
     >
       <input
         type={inputType}
@@ -656,13 +671,13 @@ const DependencyCell: React.FC<{
       ))}
       <Popover>
         <PopoverTrigger asChild>
-          <button
+          <IconButton
+            size="inline"
             type="button"
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
             aria-label="Add dependency"
           >
             <Plus className="h-3.5 w-3.5" />
-          </button>
+          </IconButton>
         </PopoverTrigger>
         <PopoverContent
           align="start"
@@ -720,7 +735,7 @@ const fileName = (url: string): string => {
  * open); other URLs render as named file chips. Add via a small URL popover.
  * No upload backend: media is referenced by URL.
  */
-const FilesCell: React.FC<{value: unknown; onChange: (value: unknown) => void}> = ({value, onChange}) => {
+const FilesCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' | 'controlProps'>> = ({value, onChange, controlProps}) => {
   const urls = Array.isArray(value) ? (value as string[]) : [];
   const [draft, setDraft] = useState('');
   const add = () => {
@@ -732,7 +747,7 @@ const FilesCell: React.FC<{value: unknown; onChange: (value: unknown) => void}> 
   const remove = (i: number) => onChange(urls.filter((_, idx) => idx !== i));
 
   return (
-    <div className="flex min-h-[28px] flex-wrap items-center gap-1 px-2 py-1">
+    <div className="flex min-h-[28px] flex-wrap items-center gap-1 px-2 py-1" role="group" {...controlProps}>
       {urls.map((url, i) =>
         isImageUrl(url) ? (
           <span key={i} className="group/file relative inline-block">
@@ -742,7 +757,7 @@ const FilesCell: React.FC<{value: unknown; onChange: (value: unknown) => void}> 
             <button
               type="button"
               onClick={() => remove(i)}
-              className="absolute -right-1 -top-1 hidden rounded-full bg-background text-muted-foreground shadow group-hover/file:block hover:text-destructive"
+              className="pointer-events-none absolute -right-1 -top-1 rounded-full bg-background text-muted-foreground opacity-0 shadow transition-[color,opacity] group-hover/file:pointer-events-auto group-hover/file:opacity-100 hover:text-destructive focus-visible:pointer-events-auto focus-visible:opacity-100"
               aria-label="Remove file"
             >
               <X className="h-3 w-3" />
@@ -767,9 +782,9 @@ const FilesCell: React.FC<{value: unknown; onChange: (value: unknown) => void}> 
       )}
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground" aria-label="Add file">
+          <IconButton size="inline" type="button" aria-label="Add file">
             <Plus className="h-3.5 w-3.5" />
-          </button>
+          </IconButton>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-64 p-1.5">
           <div className="flex items-center gap-1">
@@ -792,10 +807,13 @@ const FilesCell: React.FC<{value: unknown; onChange: (value: unknown) => void}> 
 };
 
 /** Editable url / email / phone cell with an "open" affordance when filled. */
-const LinkCell: React.FC<{kind: 'url' | 'email' | 'phone'; value: unknown; onChange: (value: unknown) => void}> = ({
+const LinkCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'placeholder' | 'onChange' | 'controlProps'> & {kind: 'url' | 'email' | 'phone'}> = ({
+  property,
   kind,
   value,
+  placeholder,
   onChange,
+  controlProps,
 }) => {
   const str = typeof value === 'string' ? value : '';
   return (
@@ -805,8 +823,9 @@ const LinkCell: React.FC<{kind: 'url' | 'email' | 'phone'; value: unknown; onCha
         defaultValue={str}
         onBlur={(e) => onChange(e.target.value.trim() || null)}
         className={inputClass}
-        placeholder="Empty"
-        aria-label={kind}
+        placeholder={placeholder || 'Empty'}
+        aria-label={property.name}
+        {...controlProps}
       />
       {str && (
         <a
@@ -830,7 +849,7 @@ const LinkCell: React.FC<{kind: 'url' | 'email' | 'phone'; value: unknown; onCha
  * stored shape ({@link LocationValue}) matches the location kit input so the two
  * are interchangeable. Clearing both coordinates empties the cell.
  */
-const LocationCell: React.FC<{value: unknown; onChange: (value: unknown) => void}> = ({value, onChange}) => {
+const LocationCell: React.FC<Pick<PropertyValueCellProps, 'value' | 'onChange' | 'controlProps'>> = ({value, onChange, controlProps}) => {
   const loc = asLocation(value);
   // Edit the raw text inputs as strings so a half-typed "-" or "." survives.
   const stored = (value && typeof value === 'object' ? (value as Partial<LocationValue>) : {}) as Partial<LocationValue>;
@@ -865,6 +884,7 @@ const LocationCell: React.FC<{value: unknown; onChange: (value: unknown) => void
           type="button"
           className="group flex w-full items-center gap-1.5 px-2 py-1 text-left text-sm transition-colors hover:bg-hover"
           aria-label="Location"
+          {...controlProps}
         >
           <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
           {summary ? <span className="truncate">{summary}</span> : <span className={emptyHint}>Empty</span>}
@@ -873,46 +893,46 @@ const LocationCell: React.FC<{value: unknown; onChange: (value: unknown) => void
       <PopoverContent align="start" className="w-64 space-y-2 p-2.5">
         <div className="flex gap-1.5">
           <label className="flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Latitude</span>
+            <span className={sectionLabel}>Latitude</span>
             <input
               value={lat}
               onChange={(e) => setLat(e.target.value)}
               onBlur={commit}
               inputMode="decimal"
               placeholder="51.5074"
-              className="mt-1 w-full rounded border border-border bg-background px-1.5 py-1 text-xs outline-hidden"
+              className="mt-1 w-full rounded border border-border bg-background px-2 py-1 text-xs outline-hidden"
             />
           </label>
           <label className="flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Longitude</span>
+            <span className={sectionLabel}>Longitude</span>
             <input
               value={lng}
               onChange={(e) => setLng(e.target.value)}
               onBlur={commit}
               inputMode="decimal"
               placeholder="-0.1278"
-              className="mt-1 w-full rounded border border-border bg-background px-1.5 py-1 text-xs outline-hidden"
+              className="mt-1 w-full rounded border border-border bg-background px-2 py-1 text-xs outline-hidden"
             />
           </label>
         </div>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Label</span>
+          <span className={sectionLabel}>Label</span>
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             onBlur={commit}
             placeholder="Optional name"
-            className="mt-1 w-full rounded border border-border bg-background px-1.5 py-1 text-xs outline-hidden"
+            className="mt-1 w-full rounded border border-border bg-background px-2 py-1 text-xs outline-hidden"
           />
         </label>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">Address</span>
+          <span className={sectionLabel}>Address</span>
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             onBlur={commit}
             placeholder="Optional address"
-            className="mt-1 w-full rounded border border-border bg-background px-1.5 py-1 text-xs outline-hidden"
+            className="mt-1 w-full rounded border border-border bg-background px-2 py-1 text-xs outline-hidden"
           />
         </label>
       </PopoverContent>
@@ -921,7 +941,7 @@ const LocationCell: React.FC<{value: unknown; onChange: (value: unknown) => void
 };
 
 /** Multi-select: toggle any number of option chips; create options inline. */
-const MultiSelectCell: React.FC<PropertyValueCellProps> = ({property, value, onChange, onAddOption}) => {
+const MultiSelectCell: React.FC<PropertyValueCellProps> = ({property, value, placeholder, onChange, onAddOption, controlProps}) => {
   const [draft, setDraft] = useState('');
   const ids = Array.isArray(value) ? (value as string[]) : [];
   const selected = (property.options ?? []).filter((o) => ids.includes(o.id));
@@ -935,15 +955,15 @@ const MultiSelectCell: React.FC<PropertyValueCellProps> = ({property, value, onC
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex min-h-[28px] w-full flex-wrap items-center gap-1 px-2 py-1 text-left text-sm hover:bg-hover">
+        <button className="flex min-h-[28px] w-full flex-wrap items-center gap-1 px-2 py-1 text-left text-sm hover:bg-hover" {...controlProps}>
           {selected.length > 0 ? (
             selected.map((o) => <SelectChip key={o.id} option={o} />)
           ) : (
-            <span className={emptyHint}>Empty</span>
+            <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>
           )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-52">
+      <DropdownMenuContent align="start" className={MENU_WIDTH_MD}>
         {(property.options ?? []).map((option) => (
           <DropdownMenuItem
             key={option.id}
@@ -1067,13 +1087,13 @@ const RelationCell: React.FC<{property: DatabaseProperty; value: unknown; onChan
       {(!single || ids.length === 0) && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <button
+            <IconButton
+              size="inline"
               type="button"
-              className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground"
               aria-label={`Link a ${noun}`}
             >
               <Plus className="h-3.5 w-3.5" />
-            </button>
+            </IconButton>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-60 p-1">
             <input
@@ -1108,7 +1128,7 @@ const RelationCell: React.FC<{property: DatabaseProperty; value: unknown; onChan
   );
 };
 
-const SelectCell: React.FC<PropertyValueCellProps> = ({property, value, onChange, onAddOption}) => {
+const SelectCell: React.FC<PropertyValueCellProps> = ({property, value, placeholder, onChange, onAddOption, controlProps}) => {
   const [draft, setDraft] = useState('');
   const selected = findOption(property, value);
 
@@ -1121,12 +1141,12 @@ const SelectCell: React.FC<PropertyValueCellProps> = ({property, value, onChange
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-sm hover:bg-hover">
-          {selected ? <SelectChip option={selected} /> : <span className={emptyHint}>Empty</span>}
+        <button className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-sm hover:bg-hover" {...controlProps}>
+          {selected ? <SelectChip option={selected} /> : <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>}
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-52">
+      <DropdownMenuContent align="start" className={MENU_WIDTH_MD}>
         {(property.options ?? []).map((option) => (
           <DropdownMenuItem key={option.id} onClick={() => onChange(option.id)} className="gap-2">
             <SelectChip option={option} />
@@ -1175,28 +1195,30 @@ const SelectCell: React.FC<PropertyValueCellProps> = ({property, value, onChange
  * In progress / Complete groups (the lifecycle `status` type). Renders a coloured
  * dot + label and groups the dropdown by lifecycle.
  */
-const StatusCell: React.FC<{property: DatabaseProperty; value: unknown; onChange: (value: unknown) => void}> = ({
+const StatusCell: React.FC<Pick<PropertyValueCellProps, 'property' | 'value' | 'placeholder' | 'onChange' | 'controlProps'>> = ({
   property,
   value,
+  placeholder,
   onChange,
+  controlProps,
 }) => {
   const selected = findOption(property, value);
   const options = property.options ?? [];
   const dot = (color?: string) => (
-    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{backgroundColor: SWATCH_HEX[color ?? 'gray'] ?? SWATCH_HEX.gray}} />
+    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={dotStyle(color)} />
   );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-sm hover:bg-hover">
+        <button className="flex w-full items-center justify-between gap-1 px-2 py-1 text-left text-sm hover:bg-hover" {...controlProps}>
           {selected ? (
             <span className="inline-flex items-center gap-1.5 text-xs">
               {dot(selected.color)}
               {selected.label}
             </span>
           ) : (
-            <span className={emptyHint}>Empty</span>
+            <span data-empty-hint className={emptyHint}>{placeholder || 'Empty'}</span>
           )}
           <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" />
         </button>
@@ -1207,7 +1229,7 @@ const StatusCell: React.FC<{property: DatabaseProperty; value: unknown; onChange
           if (opts.length === 0) return null;
           return (
             <React.Fragment key={group.id}>
-              <div className="px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60">
+              <div className={cn('px-2 pb-0.5 pt-1.5', sectionLabel)}>
                 {group.label}
               </div>
               {opts.map((o) => (
