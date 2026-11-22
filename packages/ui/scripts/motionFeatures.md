@@ -1,5 +1,69 @@
 # Export-viewer motion accounting
 
+### Non-Motion endpoint consumers (BUILD-6)
+
+`endpointConsumers` records non-Motion consumption separately from the historical
+feature chain. Its signed raw byte costs must sum exactly to the measured
+whole-IIFE coordinate; tolerance is zero. Carried-forward unattributed residue
+has its own labeled row. Each row records its measurement commit, mechanism and
+evidence; working-tree checkpoints are explicitly distinguished from final commits.
+The chain anchor is pinned by construction because non-Motion consumers never
+enter the chain: 1,932,375 B remains the anchor and 1,941,788 B the owner-ruled absolute upper
+endpoint. Neither adding a consumer nor recovering bytes grants new budget.
+
+Historical consumption before the F1 slice: 567 B carried-forward residue,
+160 B history seam, 38 B projection seam, 15 B constructor seam and 72 B lean
+viewer catalogue = 852 B. The fresh BUILD-6 baseline reproduces 1,933,227 B,
+SHA256 67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198.
+The independent Motion module, block-own-code and aggregate guards still apply.
+
+Consumer deltas are raw IIFE bytes measured at landing and sum to the coordinate;
+module ownership is a partition for attribution; rendered bytes are diagnostic
+only. These two spaces are never added together. `modules` assigns each emitted
+non-Motion module once, including inherited infrastructure in the carried-forward
+row. Later consumers reference existing owners through `usesModules`, so sharing
+does not duplicate ownership. Completeness covers all emitted non-Motion modules
+(stronger than checking only newly emitted modules), and diagnostics explicitly
+label their pre-final-minification rendered sizes. The inherited ownership
+inventory is from the reproduced BUILD-6 baseline at 99cd2dc7, raw 1,933,227 B;
+it is not a claim that the historical residue equals the inventory's byte sum.
+
+BUILD-6 complete measurement (UNLANDED provenance; owner authorized 2026-11-22): the canvas row
+measures 1,933,227 → 1,941,788 raw IIFE B, a cost of 8,561 B. The six consumer
+rows reconcile exactly: 567 + 160 + 38 + 15 + 72 + 8,561 = 9,413 B coordinate.
+The owner authorized EXACTLY 9,413 B on 2026-11-22 via PM² relay, with no
+inferred margin: 1,932,375 + 9,413 = 1,941,788 B equals the complete artifact.
+Any growth past 9,413 is a NEW OWNER RULING; stop unpushed at this owner
+decision boundary. Superseded 4,096 is CALIBRATED-TWO-CONTRACTS-AGO, not a miss:
+it correctly calibrated the pre-option-B design at 59c49f80. Three ruled
+contracts were added after it: curve-fidelity ladder, quarantine-never-silent-default,
+and producer projection. The new number prices those contracts. The independent
+subtraction controls below are the authorization justification, not additive prices.
+Landing provenance remains UNLANDED through merge. A tiny post-merge follow-up
+records main’s actual squash-merge SHA, never the branch SHA. `measuredAt` is
+required provenance metadata, not Git-existence or ancestry validation. The artifact SHA256 is
+`b8b9ec51b52eeed2ce0886c3b636743d1f460b0eef4d51d16b460ea8ed4a14c8`;
+`endpointAttribution` binds the regenerated final module partition to that
+artifact and its graph SHA256. Repeated normalized graph IDs have one owner;
+their rendered instances are aggregated for diagnostics, never dropped.
+
+Canvas is non-Motion: it consumes the endpoint window, not a new Motion-chain
+row. It is not a direct Motion adopter charged by the separate 2,048 B guard;
+that guard remains unchanged for its adopters. Exact Motion bytes stay 211,511.
+Aggregate growth is 95,275 B, leaving 166,869 B of the 262,144 B allowance.
+Exported observable: drawing present immediately as static fallback, with no
+motion; hydration enables local pan/zoom/inspection, never document editing,
+network, persistence or undo. The raster serializer, Markdown package and
+canvas-specific export layout CSS remain outside the emitted viewer code.
+
+Independent whole-IIFE subtraction controls price the current contracts:
+curve/pressure subdivision 1,192 B; committed-input quarantine 1,886 B;
+pointArity producer projection 309 B; kept-static handoff/reuse 144 B;
+local camera interactions 659 B. These are non-additive marginal costs against
+the same final candidate. The controls deliberately violate the contract and
+are not shipping variants. `scripts/canvas-export-measure/measureCosts.mjs`
+rebuilds and byte-verifies the restored full candidate afterward.
+
 The app uses eager Motion independently. The viewer provider uses non-strict LazyMotion/domAnimation and seeds the lazy renderer. `motionBoundary.mjs` checks the resolved app/viewer graphs; `motionGraph.mjs` checks the viewer's emitted modules after tree shaking. The exporter intentionally carries viewer JS as an inert raw asset in the app graph.
 
 `motionFeatures.json` records historical, ordered-integration measurements, not independent package sizes. Never sum rows to forecast a future total: shared code and minification interact. The FF-6 seed measurements can be reproduced with `pnpm exec vite build --config vite.motion-calibration.config.js --mode lazyRuntime`, then `domAnimation`, then `renderer`. Outputs and module inventories land under the web test harness's ignored `generated/calibration-*` directories. These commands never rewrite the ledger.
@@ -176,7 +240,7 @@ menu-exit transient is accepted as cosmetic (it recovers without misaction).
 Post-rebase clean rebuild measured non-motion headroom of **475 B**, not 4 B.
 4e22000e (test(ui): record shared gutter evidence and unresolved divider conflict)
 
-### R1 window widening (BUILD-1, owner 2026-11-12 via PM² relay)
+### Historical R1 window widening (superseded; CALIBRATED-TWO-CONTRACTS-AGO)
 
 The superseded 571 B window came from CARD-10: +100 B FF-7a explicit dark
 ladder declarations from PR #435 CI and +471 B command-palette polish, following precedent

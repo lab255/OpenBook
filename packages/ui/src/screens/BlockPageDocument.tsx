@@ -454,7 +454,11 @@ const BlockPageDocument: React.FC<PageDocumentProps> = ({
         // embeds the picture rather than a dangling reference. Markdown has no
         // sandboxed-iframe equivalent, so only the image map applies here.
         const assets = await resolveExportAssets(client, [snapshot]);
-        downloadText(`${base}.md`, toMarkdown(buildDocumentModel({title, icon, snapshot, assets: assets.images, audioAssets: assets.audio, dbSeries})), 'text/markdown');
+        const model=buildDocumentModel({title, icon, snapshot, assets: assets.images, audioAssets: assets.audio, dbSeries});
+        const {packageCanvasMarkdown}=await import('@/export/canvasMarkdown');
+        const packaged=packageCanvasMarkdown(model);
+        if(packaged)downloadBlob(`${base}.zip`,new Blob([packaged as BlobPart],{type:'application/zip'}));
+        else downloadText(`${base}.md`,toMarkdown(model),'text/markdown');
       } else if (kind === 'pdf-paged' || kind === 'pdf-continuous' || kind === 'pdf-slides') {
         // PDF mirrors the HTML export (vector, selectable) rather than a separate
         // hand-drawn renderer — so it looks like the window. See export/toPdf.ts.

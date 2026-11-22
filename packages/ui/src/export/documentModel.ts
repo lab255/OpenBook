@@ -1,3 +1,4 @@
+import {canvasRaster} from './canvasStatic';
 /**
  * A normalized, presentation-agnostic model of a page document, built once from
  * a {@link PageSnapshot} and consumed by every exporter (Markdown, PDF, HTML).
@@ -61,7 +62,7 @@ export type DocBlock =
   | {type: 'kvalue'; label: string; value: unknown}
   | {type: 'light'; label: string; status: string; value: unknown}
   | {type: 'progress'; label: string; pct: number; readout: string}
-  | {type: 'image'; src: string; alt: string; caption: string; width?: string}
+  | {type: 'image'; src: string; alt: string; caption: string; width?: string; packageAs?: string}
   | {type: 'form'; fields: Array<{label: string; kind: string; required: boolean}>}
   /** A block no exporter can draw — a plugin-contributed or newer-version type.
    *  `raw` is the verbatim block type (renderers derive the display name from
@@ -321,6 +322,11 @@ export function buildDocumentModel({title, icon, snapshot: rawSnapshot, assets =
         runs: [{text: str(data.pageId), mention: {pageId: str(data.pageId), label: str(data.pageId)}}],
       });
       break;
+    case 'canvas': {
+      const raster=canvasRaster(data.props);
+      out.push({type:'image',src:raster.src,alt:raster.alt,caption:raster.scene.diagnostics.join('; '),packageAs:`assets/canvas-${out.length}.png`});
+      break;
+    }
     case 'image': {
       // Resolve a pre-resolved `assetId` → data-URI, else a legacy `data:`/remote
       // `src`; an unresolved image keeps an empty `src` so the renderer degrades.
