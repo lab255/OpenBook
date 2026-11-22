@@ -1,0 +1,134 @@
+{
+ "export-nojs.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   20.84,
+   20.8,
+   20.76
+  ]
+ },
+ "export-hydrated.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   20.84,
+   20.8,
+   20.76
+  ]
+ },
+ "export-mixed.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   24.32,
+   24.28,
+   24.25
+  ]
+ },
+ "export-following.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   19.69,
+   19.64,
+   19.6
+  ]
+ },
+ "pdf-page.png": {
+  "size": [
+   1224,
+   1584
+  ],
+  "stddev": [
+   20.59,
+   20.51,
+   20.43
+  ]
+ },
+ "export-inert.gif": {
+  "bytes": 119522,
+  "frames": 17,
+  "seconds": 6.74,
+  "size": [
+   1280,
+   800
+  ]
+ },
+ "pair": {
+  "figureOffsetPx": 0,
+  "outsideFigureChangedPixels": 0,
+  "outsideFigurePopulation": 727648
+ },
+ "gifExpectations": {
+  "pointerFocusRing": {
+   "focusVisible": false,
+   "outline": "none"
+  },
+  "keyboardFocusRing": {
+   "focusVisible": true,
+   "outline": "solid",
+   "width": "2px",
+   "colorMatchesToken": true
+  },
+  "zoomCentreAnchoredDeltaPx": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "contentInViewAfterZoom": true,
+  "resetToBaseline": true,
+  "panRepaints": true,
+  "inert": {
+   "htmlUnchanged": true,
+   "canvasUnchanged": true
+  }
+ },
+ "mixedExpectations": {
+  "figureStyles": {
+   "margin": "24px 0px",
+   "padding": "24px",
+   "borderRadius": "8px",
+   "background": "rgb(246, 245, 244)",
+   "outline": "none"
+  },
+  "summaryStyles": {
+   "fontSize": "12px",
+   "lineHeight": "20px",
+   "listStyle": "none",
+   "marginTop": "12px",
+   "display": "flex",
+   "marker": "\"+\""
+  },
+  "attachment": {
+   "summaryInsideFigure": true,
+   "summaryBottomToFigureBottomPx": 24,
+   "figureBottomToTrailingParagraphPx": 24
+  }
+ },
+ "followingExpectations": {
+  "figureOffsetPx": 0,
+  "followingParagraphOffsetPx": 0
+ },
+ "pdf": {
+  "pages": 1,
+  "canvasPage": 0,
+  "images": 1,
+  "inspectLinePresent": false,
+  "drawingRegionStddev": 24.26,
+  "rendered": [
+   1224,
+   1584
+  ],
+  "text": "Canvas export\nBefore the drawing: mixed document context.\nAfter the drawing: content must remain in place.\n"
+ }
+}

@@ -1,0 +1,160 @@
+{
+ "baseline": {
+  "hash": -668399825,
+  "stddev": 48.721567562284605,
+  "matrix": {
+   "a": 1,
+   "d": 1,
+   "e": 0,
+   "f": 0
+  },
+  "rect": {
+   "x": 328,
+   "y": 195.1875,
+   "width": 624,
+   "height": 360
+  },
+  "inViewport": true
+ },
+ "pointerFocus": {
+  "active": true,
+  "focusVisible": false,
+  "outline": "none",
+  "outlineWidth": "3px",
+  "outlineColor": "rgb(26, 26, 26)",
+  "expectedTokenColor": "rgb(28, 121, 196)"
+ },
+ "afterPan": {
+  "hash": 1963227323,
+  "stddev": 48.721610388215815,
+  "matrix": {
+   "a": 1,
+   "d": 1,
+   "e": 90,
+   "f": 42
+  },
+  "rect": {
+   "x": 328,
+   "y": 195.1875,
+   "width": 624,
+   "height": 360
+  },
+  "inViewport": true
+ },
+ "keyboardFocus": {
+  "active": true,
+  "focusVisible": true,
+  "outline": "solid",
+  "outlineWidth": "2px",
+  "outlineColor": "rgb(28, 121, 196)",
+  "expectedTokenColor": "rgb(28, 121, 196)"
+ },
+ "zoom1": {
+  "hash": 1574886762,
+  "stddev": 60.26449345245621,
+  "matrix": {
+   "a": 1.25,
+   "d": 1.25,
+   "e": 34.5,
+   "f": 7.5
+  },
+  "rect": {
+   "x": 328,
+   "y": 195.1875,
+   "width": 624,
+   "height": 360
+  },
+  "inViewport": true,
+  "centre": {
+   "ratio": 1.25,
+   "deltaE": 0,
+   "deltaF": 0
+  }
+ },
+ "zoom2": {
+  "hash": 1752969330,
+  "stddev": 72.20791482691581,
+  "matrix": {
+   "a": 1.5625,
+   "d": 1.5625,
+   "e": -34.875,
+   "f": -35.625
+  },
+  "rect": {
+   "x": 328,
+   "y": 195.1875,
+   "width": 624,
+   "height": 360
+  },
+  "inViewport": true,
+  "centre": {
+   "ratio": 1.25,
+   "deltaE": 0,
+   "deltaF": 0
+  }
+ },
+ "reset": {
+  "matches": true,
+  "reset": {
+   "hash": -668399825,
+   "stddev": 48.721567562284605,
+   "matrix": {
+    "a": 1,
+    "d": 1,
+    "e": 0,
+    "f": 0
+   },
+   "rect": {
+    "x": 328,
+    "y": 195.1875,
+    "width": 624,
+    "height": 360
+   },
+   "inViewport": true
+  }
+ },
+ "panChanged": true,
+ "inert": {
+  "htmlUnchanged": true,
+  "canvasUnchanged": true
+ },
+ "frameCount": 36,
+ "durations": [
+  180,
+  180,
+  180,
+  180,
+  140,
+  140,
+  140,
+  140,
+  140,
+  140,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  180,
+  140,
+  140,
+  140,
+  140,
+  180,
+  180,
+  400,
+  400,
+  400
+ ]
+}

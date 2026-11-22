@@ -1,0 +1,77 @@
+{
+ "measure": {
+  "scrollY": 0,
+  "figure": {
+   "x": 304,
+   "y": 282.1875,
+   "width": 672,
+   "height": 440
+  },
+  "figureStyles": {
+   "margin": "24px 0px",
+   "padding": "24px",
+   "borderRadius": "8px",
+   "background": "rgb(246, 245, 244)",
+   "outline": "none"
+  },
+  "summary": {
+   "rect": {
+    "x": 328,
+    "y": 678.1875,
+    "width": 624,
+    "height": 20
+   },
+   "text": "Inspect drawing (5 objects)",
+   "styles": {
+    "fontSize": "12px",
+    "lineHeight": "20px",
+    "listStyle": "none",
+    "marginTop": "12px",
+    "display": "flex",
+    "marker": "\"+\""
+   }
+  },
+  "hasImage": true,
+  "imageLoaded": true,
+  "hasCanvas": true,
+  "paragraphs": [
+   {
+    "text": "Before the drawing: mixed document conte",
+    "x": 304,
+    "y": 194.1875,
+    "width": 672,
+    "height": 32
+   },
+   {
+    "text": "A second paragraph checks document ink a",
+    "x": 304,
+    "y": 226.1875,
+    "width": 672,
+    "height": 32
+   },
+   {
+    "text": "After the drawing: content must remain i",
+    "x": 304,
+    "y": 746.1875,
+    "width": 672,
+    "height": 32
+   }
+  ],
+  "headings": [
+   {
+    "text": "Canvas export",
+    "x": 304,
+    "y": 48,
+    "width": 672,
+    "height": 67.1875
+   }
+  ],
+  "bodyFont": "-apple-system, \"system-ui\", \"Segoe UI\", Roboto, sans-serif",
+  "bodyBackground": "rgb(255, 255, 255)"
+ },
+ "attachment": {
+  "summaryInsideFigure": true,
+  "summaryBottomToFigureBottomPx": 24,
+  "figureBottomToTrailingParagraphPx": 24
+ }
+}

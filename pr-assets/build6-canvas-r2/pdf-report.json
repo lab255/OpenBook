@@ -1,0 +1,30 @@
+{
+ "pages": 1,
+ "canvasPage": 0,
+ "images": [
+  {
+   "xref": 19,
+   "width": 672,
+   "height": 360,
+   "rects": [
+    [
+     82.39999389648438,
+     187.88436889648438,
+     564.0,
+     445.8843688964844
+    ]
+   ]
+  }
+ ],
+ "text": "Canvas export\nBefore the drawing: mixed document context.\nAfter the drawing: content must remain in place.\n",
+ "inspectLinePresent": false,
+ "rendered": [
+  1224,
+  1584
+ ],
+ "drawingRegionStddev": 24.26,
+ "drawingRegionSize": [
+  964,
+  517
+ ]
+}
