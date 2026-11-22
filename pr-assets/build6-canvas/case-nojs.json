@@ -1,0 +1,35 @@
+{
+ "measure": {
+  "figure": {
+   "x": 304,
+   "y": 147.1875,
+   "width": 672,
+   "height": 384,
+   "hasImage": true,
+   "imageLoaded": true,
+   "hasCanvas": false
+  },
+  "paragraphs": [
+   {
+    "text": "Before the drawing: mixed document conte",
+    "x": 304,
+    "y": 115.1875,
+    "width": 672,
+    "height": 32
+   },
+   {
+    "text": "After the drawing: content must remain i",
+    "x": 304,
+    "y": 531.1875,
+    "width": 672,
+    "height": 32
+   }
+  ],
+  "scrollY": 0,
+  "bodyHasUnsupported": false,
+  "bodyFont": "-apple-system, \"system-ui\", \"Segoe UI\", Roboto, sans-serif",
+  "bodyBackground": "rgb(255, 255, 255)",
+  "colorScheme": "light"
+ },
+ "measureMechanism": "CDP evaluate with page JavaScript disabled"
+}

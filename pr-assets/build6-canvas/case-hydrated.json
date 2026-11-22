@@ -1,0 +1,19 @@
+{
+ "measure": {
+  "figure": {
+   "x": 304,
+   "y": 147.1875,
+   "width": 672,
+   "height": 384,
+   "hasImage": true,
+   "imageLoaded": true,
+   "hasCanvas": true
+  },
+  "paragraphs": [],
+  "scrollY": 0,
+  "bodyHasUnsupported": false,
+  "bodyFont": "-apple-system, \"system-ui\", \"Segoe UI\", Roboto, sans-serif",
+  "bodyBackground": "rgb(255, 255, 255)",
+  "colorScheme": "light"
+ }
+}

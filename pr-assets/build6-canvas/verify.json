@@ -1,0 +1,81 @@
+{
+ "export-nojs.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   21.15,
+   21.08,
+   21.01
+  ]
+ },
+ "export-hydrated.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   18.85,
+   18.99,
+   19.18
+  ]
+ },
+ "export-mixed.png": {
+  "size": [
+   1280,
+   800
+  ],
+  "stddev": [
+   25.77,
+   26.11,
+   26.56
+  ]
+ },
+ "export-dark-os-light-export.png": {
+  "size": [
+   2584,
+   852
+  ],
+  "stddev": [
+   59.5,
+   59.54,
+   58.64
+  ]
+ },
+ "pdf-page.png": {
+  "size": [
+   1224,
+   1584
+  ],
+  "stddev": [
+   13.19,
+   13.52,
+   13.78
+  ]
+ },
+ "pair": {
+  "figureRegionByteMismatch": 4169,
+  "regionBytes": 776160,
+  "mismatchShare": 0.005371
+ },
+ "export-inert.gif": {
+  "bytes": 221873,
+  "frames": 35,
+  "seconds": 6.65
+ },
+ "schemePair": {
+  "darkVsLightDifferingBytes": 0,
+  "identical": true
+ },
+ "pdf": {
+  "pages": 2,
+  "canvasPage": 1,
+  "images": 1,
+  "text": "Canvas export\nBefore the drawing: mixed document context.\nInspect drawing (5 objects)\nAfter the drawing: content must remain in place.\n",
+  "rendered": [
+   1224,
+   1584
+  ]
+ }
+}
