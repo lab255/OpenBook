@@ -23,8 +23,7 @@ export const CanvasViewer: React.FC<CustomBlockProps> = ({block}) => {
     if (!element) return;
     // Export scenes are immutable. Camera changes repaint synchronously and
     // cannot enter React/document history or any persistence path.
-    const initial=kept?.getAttribute('data-canvas-camera');
-    const fitted=initial?JSON.parse(initial):fitCanvas(scene.shapes,624,height);
+    const fitted=fitCanvas(scene.shapes,624,height);
     let camera = {...fitted}, drag:{x:number;y:number}|null = null;
     const draw = ():void => {
       if(!element.getContext('2d'))return;

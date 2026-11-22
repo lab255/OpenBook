@@ -21,9 +21,9 @@ export function canvasRaster(props:unknown,width=624,density=window.devicePixelR
   return {scene,camera,width,height,background:swatch.style.backgroundColor,alt,src:canvas.toDataURL('image/png')};
 }
 export function canvasStaticHtml(id:string,props:unknown):string {
-  const {scene,camera,width,height,background,alt,src}=canvasRaster(props);
+  const {scene,width,height,background,alt,src}=canvasRaster(props);
   return `<figure data-canvas-export=""${id?` data-block-id="${escape(id)}" ${KEEP_STATIC_ATTR}="canvas"`:''}>`+
-    `<div data-canvas-fallback="" data-canvas-camera="${escape(JSON.stringify(camera))}" style="aspect-ratio:${width}/${height};max-width:${width}px;overflow:hidden;background:${escape(background)}">`+
+    `<div data-canvas-fallback="" style="aspect-ratio:${width}/${height};max-width:${width}px;overflow:hidden;background:${escape(background)}">`+
     `<img alt="${escape(alt)}" src="${src}" width="${width}" height="${height}" style="display:block;width:100%;height:100%"></div>`+
     (scene.diagnostics.length?`<figcaption role="status">${escape(scene.diagnostics.join('; '))}</figcaption>`:'')+
     `<details><summary>Inspect drawing (${scene.shapes.length} objects)</summary><ol>`+

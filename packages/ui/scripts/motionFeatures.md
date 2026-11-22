@@ -2,8 +2,8 @@
 
 ### BUILD-6 owner ruling — exactly 10,086 B (2026-11-22)
 
-The owner authorizes EXACTLY **10,086 B**, no inferred margin. The complete
-artifact measures **1,942,461 raw IIFE B = 1,932,375 pinned anchor +10,086**,
+The owner authorizes EXACTLY **10,086 B**, no inferred margin. The owner-calibration
+artifact measured **1,942,461 raw IIFE B = 1,932,375 pinned anchor +10,086**,
 SHA256 `3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc`.
 **Growth past 10,086 is a NEW OWNER RULING.** The boundary fixtures accept
 +10,086 and reject +10,087; the independent lower boundary remains −506/−507.
@@ -29,13 +29,24 @@ curve-fidelity ladder, quarantine-never-silent-default and producer projection
 were added afterward. Historical quantities remain separate: 2,981 B raw slice,
 3,159 B coordinate, 4,096 B former authorization, 656 B projected remainder.
 
+### Current measured artifact — camera-input repair
+
+Measured coordinate **10,030 B**, distinct from the unchanged **10,086 B authorized** ceiling.
+Raw **1,942,405 =1,932,375 +10,030 B**, SHA256
+`60c516011e03c091f31156cb8105b5c83f794fe163165bb124c07f440691cab4`.
+Removing serialized camera input saves **56 raw B**. Static and hydrated paths
+compute the same fit from the same scene and canonical 624px box. Damaged obsolete
+attributes cannot throw or hide the drawing; previous-runtime controls demonstrate
+both failures. No fidelity or scope reduction; the boundary fixtures remain unchanged.
+The partition is regenerated at this measured artifact, not the calibration artifact.
+
 ### Non-Motion endpoint consumers
 
 `endpointConsumers` itemizes non-Motion consumption separately from the Motion
 feature chain. The anchor is pinned by construction: non-Motion consumers never
 enter that chain. Raw IIFE landing deltas sum exactly to the coordinate, with
-zero tolerance. Current row: 1,933,227 →1,942,461, cost **9,234 B**.
-Reconciliation: **567 +160 +38 +15 +72 +9,234 =10,086 B**. Earlier consumers
+zero tolerance. Current row: 1,933,227 →1,942,405, cost **9,178 B**.
+Reconciliation: **567 +160 +38 +15 +72 +9,178 =10,030 B**. Earlier consumers
 are residue, history seam, projection seam, constructor seam and lean catalogue.
 The reproduced BUILD-6 baseline is 1,933,227 B / coordinate 852, SHA256
 `67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198`.
@@ -55,7 +66,7 @@ metadata, not Git-existence or ancestry validation.
 
 Motion stays **211,511 rendered B**. Canvas is non-Motion and uses the endpoint
 window; it is not a direct Motion adopter under the separate 2,048 B guard.
-Aggregate growth is **95,948 raw B**, leaving **166,196 B (63.4%)** of the
+Aggregate growth is **95,892 raw B**, leaving **166,252 B (63.4%)** of the
 262,144 allowance. Endpoint widening does not trade another feature's allocation.
 Exported observable: drawing present immediately, no motion; hydration permits
 local pan/zoom/inspection, never editing, networking, persistence or document undo.
@@ -64,7 +75,7 @@ CSS stay export-side. The viewer owns its layout/touch obligations in mirrors.
 
 The floor pass measured shared app bounds at 10,519 B; the read-only bounds
 mirror reuses existing viewer point helpers and exact app-source drift tests,
-saving 433 B to reach 10,086. Independent marginal subtraction controls at this
+saving 433 B to reach 10,086. Independent marginal subtraction controls at that owner-calibration
 artifact price fit/adoption at 627 B and mirror self-sufficiency at 85 B. These
 are not additive; the ordered M1 repair above costs 111 B at its integration point.
 Export-only M2/M3/L1–L4/F2/F3 changes reproduce the pushed 9,343 artifact exactly.

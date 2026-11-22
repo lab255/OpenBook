@@ -18,13 +18,14 @@ crop-only 9,459 variant that opens at origin.
 | Superseded authorization | 4,096 | CALIBRATED-TWO-CONTRACTS-AGO, not a miss |
 | Historical projected remainder | 656 | Planning, never current headroom |
 | Superseded calibration | 9,413 | superseded-by-re-gate-findings |
-| Measured and authorized coordinate | 10,086 | Current complete artifact; exact owner boundary |
+| Authorized coordinate | 10,086 | Owner boundary; calibration artifact 3c47b972 |
+| Current measured coordinate | 10,030 | Camera-input repair, 56 B below authorization |
 
-Final artifact **1,942,461 B = 1,932,375 +10,086**, SHA256
-`3c47b972581e8b88b06d530fd0c45dca947d09aa256476b3587001371aac72dc`.
-Raw slice cost **9,234 B** against baseline 1,933,227. Consumer sum:
-567 +160 +38 +15 +72 +9,234 =10,086. Motion stays 211,511 rendered B;
-aggregate growth 95,948 raw B leaves 166,196 B (63.4%) of the 262,144 allowance.
+Final measured artifact **1,942,405 B = 1,932,375 +10,030**, SHA256
+`60c516011e03c091f31156cb8105b5c83f794fe163165bb124c07f440691cab4`.
+Raw slice cost **9,178 B** against baseline 1,933,227. Consumer sum:
+567 +160 +38 +15 +72 +9,178 =10,030. Motion stays 211,511 rendered B;
+aggregate growth 95,892 raw B leaves 166,252 B (63.4%) of the 262,144 allowance.
 The historical 4,096 correctly calibrated pre-option-B; curve fidelity,
 quarantine and producer projection were ruled in afterward. See the ledger for
 historical contract prices, final partition and separate raw/rendered units.
@@ -37,8 +38,8 @@ Taste rulings 2026-11-22: **28px caption-link ladder and muted caption ink**.
 Export-side CSS, confirmed zero viewer delta. The writer-wide compression scope
 below is explicitly accepted by the owner.
 
-The export serializes a camera fitted at the canonical 624px inner width; the
-viewer adopts it. Mirrors without a kept raster compute the identical fit.
+Static export and viewer independently compute the identical fitted camera from
+the same scene and canonical 624px inner box. No camera attribute is serialized or read.
 Static image and live canvas share the 624:height aspect ratio and scale together
 at narrow widths; resize does not refit. Native pointer deltas map back into
 canonical coordinates. Empty input retains the app's origin/zoom-1 camera.
@@ -109,3 +110,13 @@ with its own ink control. Chromium's 1/64px intrinsic text-width difference from
 one parsed text node versus three React text nodes is diagnostic geometry only:
 caption pixels, figure rect and outside-figure pixels remain exact. See the
 ledger's named LayoutUnit mechanism and measured controls; no epsilon is used.
+
+
+Camera-input regression: `checkCameraInput.mjs` checks absent, non-JSON, null,
+empty-object and zero-zoom obsolete attributes against the current production
+runtime and the saved 4315517c runtime. The current drawing must be pixel-identical
+to the good fallback in every case. The old runtime must fire both error-boundary
+loss and hidden-fallback/blank-canvas controls. Set `BUILD6_CAMERA_CONTROL_VIEWER`
+to that saved bundle, `BUILD6_CAMERA_OUTPUT` to an evidence JSON path, and
+`BUILD6_ORIGIN` to the built harness. This is an obsolete metadata input, not
+scene data: damaged scene quarantine remains independently tested.
