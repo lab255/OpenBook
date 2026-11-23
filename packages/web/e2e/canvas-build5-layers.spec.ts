@@ -1,6 +1,6 @@
 import {test,expect} from './fixtures';
 import {newPage} from './seed';
-import {writeFileSync} from 'node:fs';
+import {writeFileSync,mkdirSync} from 'node:fs';
 
 test.use({freshWorkspace:true,mockAi:true,screenshot:'off',trace:'off',video:'off'});
 test('BUILD-5 real shell layer relationships',async({page,request})=>{
@@ -9,7 +9,7 @@ test('BUILD-5 real shell layer relationships',async({page,request})=>{
   const id=await newPage(request,'BUILD-5 layers',{editor:'blocks',blockdoc:{blocks:[{id:'canvas',type:'canvas',props:{canvasVersion:1,height:360,background:'#ffffff',shapes:{}}},{id:'picture',type:'image',props:{src:'https://canvas-layer.test/probe.png',alt:'Layer probe'}}]},editorjs:{blocks:[]},values:[],names:[]});
   const toastId=await newPage(request,'BUILD-5 toast probe');
   await page.goto(`/?page=${id}`);await expect(page.getByRole('button',{name:'Page actions'})).toBeVisible();
-  const rows:unknown[]=[];const save=()=>writeFileSync('../../_evidence-build5/round3-layers.json',JSON.stringify({scope:'Real production Next app + isolated data server; native hit testing at 1280x800 and 1024x640 light/dark, inline mirror1280x1400, too-tall1024x240. No screenshots/trace/video.',rows},null,2));
+  const rows:unknown[]=[];const save=()=>{mkdirSync('../../_evidence-build5',{recursive:true});return writeFileSync('../../_evidence-build5/round3-layers.json',JSON.stringify({scope:'Real production Next app + isolated data server; native hit testing at 1280x800 and 1024x640 light/dark, inline mirror1280x1400, too-tall1024x240. No screenshots/trace/video.',rows},null,2));};
   const hit=async(selector:string)=>page.locator(selector).first().evaluate(el=>{const r=el.getBoundingClientRect(),target=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {name:el.getAttribute('aria-label')||el.textContent,hittable:el===target||el.contains(target),canvasOnTop:!!target?.closest('.ob-canvas-expanded'),z:getComputedStyle(el).zIndex,rect:r.toJSON()};});
   const assertModalReturn=async(route:string)=>{
     const inside=()=>page.locator('.ob-canvas-expanded').evaluate(el=>el.contains(document.activeElement));
