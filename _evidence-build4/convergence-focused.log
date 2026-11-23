@@ -1,9 +1,0 @@
-
- RUN  v4.1.7 /Users/eliot/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_yr3pisy978-1/OpenBook/packages/ui
-
-
- Test Files  9 passed (9)
-      Tests  272 passed (272)
-   Start at  12:44:26
-   Duration  3.34s (transform 3.32s, setup 0ms, import 5.49s, tests 4.72s, environment 1.83s)
-

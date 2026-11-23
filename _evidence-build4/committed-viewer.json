@@ -1,9 +1,0 @@
-{
-  "commit": "b75eaeb56900b9a2e904945b46823e082524fc2d",
-  "buildMode": "full production UI build from committed product source",
-  "path": "packages/ui/src/export/vendor/openbook-viewer.js",
-  "bytes": 1933227,
-  "coordinate": 852,
-  "mtime": "2026-11-17T03:12:56.664419+00:00",
-  "sha256": "67957e3d2be144ce7e53037e28bb32f263a74d7ac1c138a1ef17d7601bc76198"
-}
