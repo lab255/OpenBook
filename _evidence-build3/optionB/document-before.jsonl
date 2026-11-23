@@ -1,8 +1,0 @@
-{"shapes":100,"coordinates":"fractional","pointsPerShape":50,"batchSize":16,"rawBytes":191885,"base64Bytes":255848,"projectionBytes":100046,"combinedBytes":355894}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":50,"batchSize":64,"rawBytes":152355,"base64Bytes":203140,"projectionBytes":94046,"combinedBytes":297186}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":250,"batchSize":16,"rawBytes":730339,"base64Bytes":973788,"projectionBytes":391946,"combinedBytes":1365734}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":250,"batchSize":64,"rawBytes":570003,"base64Bytes":760004,"projectionBytes":367246,"combinedBytes":1127250}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":1000,"batchSize":16,"rawBytes":2769728,"base64Bytes":3692972,"projectionBytes":1577646,"combinedBytes":5270618}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":1000,"batchSize":64,"rawBytes":2139406,"base64Bytes":2852544,"projectionBytes":1479446,"combinedBytes":4331990}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":2000,"batchSize":16,"rawBytes":5481126,"base64Bytes":7308168,"projectionBytes":3230046,"combinedBytes":10538214}
-{"shapes":100,"coordinates":"fractional","pointsPerShape":2000,"batchSize":64,"rawBytes":4233024,"base64Bytes":5644032,"projectionBytes":3030646,"combinedBytes":8674678}

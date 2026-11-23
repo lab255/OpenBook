@@ -1,8 +1,0 @@
-{
-  "path": "packages/ui/src/export/vendor/openbook-viewer.js",
-  "mtime": "2026-11-17T01:54:57.652Z",
-  "bytes": 1933155,
-  "buildMode": "production; pnpm --filter @book.dev/ui build:viewer",
-  "coordinate": 780,
-  "growthOver765": 15
-}
