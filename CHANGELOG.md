@@ -1,3 +1,21 @@
+## 3.30.0 (2026-11-24)
+
+### 🚀 Features
+
+- **ui:** add headless canvas core with semantic undo ([#448](https://github.com/lab255/OpenBook/pull/448))
+- **ui:** add inline canvas editor with keyboard parity (BUILD-4) ([#450](https://github.com/lab255/OpenBook/pull/450))
+- **ui:** complete canvas expansion, presence, and precision (BUILD-5) ([#451](https://github.com/lab255/OpenBook/pull/451))
+- **ui:** export canvas with exact ruled viewer allowance ([#452](https://github.com/lab255/OpenBook/pull/452))
+
+### 🩹 Fixes
+
+- **ui:** apply ruled viewer window and fence editing registration ([#447](https://github.com/lab255/OpenBook/pull/447))
+- **web:** preserve Settings URL authority across navigation races ([#454](https://github.com/lab255/OpenBook/pull/454))
+
+### ❤️ Thank You
+
+- Eliot Lim @eliotlim
+
 ## 3.29.0 (2026-11-11)
 
 ### 🚀 Features
